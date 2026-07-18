@@ -1,0 +1,53 @@
+{
+  "offset": 0,
+  "limit": 100,
+  "totalFound": 2,
+  "content": [
+    {
+      "id": "744000100000001",
+      "uuid": "cccccccc-dddd-eeee-ffff-000000000001",
+      "name": "Data Analyst",
+      "jobAdId": "cccccccc-dddd-eeee-ffff-100000000001",
+      "defaultJobAd": true,
+      "refNumber": "REF1001A",
+      "company": { "identifier": "acme-example", "name": "Acme Example Inc." },
+      "releasedDate": "2026-07-01T09:00:00.000Z",
+      "location": {
+        "city": "Bogota",
+        "region": "Cundinamarca",
+        "country": "co",
+        "remote": true,
+        "hybrid": false,
+        "fullLocation": "Bogota, Cundinamarca, Colombia"
+      },
+      "industry": { "id": "computer_software", "label": "Computer Software" },
+      "function": { "id": "engineering", "label": "Engineering" },
+      "typeOfEmployment": { "id": "permanent", "label": "Full-time" },
+      "experienceLevel": { "id": "entry_level", "label": "Entry level" },
+      "customField": [],
+      "ref": "https://api.smartrecruiters.com/v1/companies/acme-example/postings/744000100000001",
+      "language": { "code": "en", "label": "English", "labelNative": "English" },
+      "visibility": "PUBLIC"
+    },
+    {
+      "id": "744000100000002",
+      "uuid": "cccccccc-dddd-eeee-ffff-000000000002",
+      "name": "BI Engineer",
+      "jobAdId": "cccccccc-dddd-eeee-ffff-100000000002",
+      "defaultJobAd": true,
+      "refNumber": "REF1002B",
+      "company": { "identifier": "acme-example", "name": "Acme Example Inc." },
+      "releasedDate": "2026-06-20T12:30:00.000Z",
+      "location": {
+        "city": "Berlin",
+        "country": "de",
+        "remote": false,
+        "hybrid": false
+      },
+      "department": {},
+      "experienceLevel": { "id": "mid_senior_level", "label": "Mid-Senior Level" },
+      "ref": "https://api.smartrecruiters.com/v1/companies/acme-example/postings/744000100000002",
+      "visibility": "PUBLIC"
+    }
+  ]
+}

@@ -25,3 +25,7 @@ export {
 } from "./greenhouse/greenhouse-adapter.js";
 export { LeverAdapter, type LeverAdapterOptions } from "./lever/lever-adapter.js";
 export { AshbyAdapter, type AshbyAdapterOptions } from "./ashby/ashby-adapter.js";
+export {
+  SmartRecruitersAdapter,
+  type SmartRecruitersAdapterOptions
+} from "./smartrecruiters/smartrecruiters-adapter.js";

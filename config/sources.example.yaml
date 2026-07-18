@@ -36,3 +36,15 @@ sources:
     company_name: Linear
     enabled: true
     rate_limit_per_minute: 30
+
+  # SmartRecruiters: board_token = companyIdentifier de
+  # jobs.smartrecruiters.com/<identifier>. DESHABILITADO por defecto:
+  # lee docs/source-catalog/smartrecruiters.md §9 y docs/adr/0002 (robots.txt
+  # del host) antes de poner enabled: true en tu sources.local.yaml.
+  - id: smartrecruiters:smartrecruiters
+    adapter: smartrecruiters
+    board_token: smartrecruiters
+    company_name: SmartRecruiters
+    enabled: false
+    rate_limit_per_minute: 30
+    notes: "Ver ADR-0002 antes de habilitar"

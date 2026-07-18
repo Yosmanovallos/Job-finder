@@ -1,0 +1,6 @@
+{
+  "id": "cccccccc-dddd-eeee-ffff-999999999999",
+  "httpCode": 404,
+  "code": "RESOURCE_NOT_FOUND",
+  "message": "[MDC: ppa-fixture] Response code: 404. Reason: Resource not found"
+}
