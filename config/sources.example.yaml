@@ -20,3 +20,11 @@ sources:
     company_name: Cloudflare
     enabled: true
     rate_limit_per_minute: 30
+
+  # Lever: board_token = site slug de jobs.lever.co/<site>
+  - id: lever:spotify
+    adapter: lever
+    board_token: spotify
+    company_name: Spotify
+    enabled: true
+    rate_limit_per_minute: 30

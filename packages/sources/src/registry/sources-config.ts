@@ -9,9 +9,9 @@ import { fromZodError, readYamlFile } from "@job-radar/domain";
 export const SourceConfigSchema = z
   .object({
     id: z.string().min(1, "Must not be empty"),
-    adapter: z.enum(["greenhouse"]),
+    adapter: z.enum(["greenhouse", "lever"]),
     enabled: z.boolean().default(true),
-    /** Company board token, e.g. the {board_token} in the Greenhouse API. */
+    /** Company identifier in the source: Greenhouse board_token, Lever site slug. */
     board_token: z.string().min(1, "Must not be empty"),
     /** Fallback display name when the API omits the company name. */
     company_name: z.string().min(1).optional(),

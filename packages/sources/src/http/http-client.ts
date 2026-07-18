@@ -13,6 +13,11 @@ export interface HttpResponse {
   body: string;
 }
 
+/** Minimal getter contract; contract tests inject fixture-backed stubs. */
+export interface HttpGetter {
+  get(url: string): Promise<HttpResponse>;
+}
+
 export interface HttpClientOptions {
   timeoutMs?: number;
   /** Retries after the first attempt; total attempts = maxRetries + 1. */
@@ -35,7 +40,7 @@ export class HttpError extends Error {
 
 const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
 
-export class HttpClient {
+export class HttpClient implements HttpGetter {
   private readonly timeoutMs: number;
   private readonly maxRetries: number;
   private readonly minIntervalMs: number;
@@ -81,7 +86,11 @@ export class HttpClient {
         }
       }
     }
-    throw new HttpError(url, null, `Request failed after ${this.maxRetries + 1} attempts: ${lastError?.message ?? "unknown error"}`);
+    throw new HttpError(
+      url,
+      null,
+      `Request failed after ${this.maxRetries + 1} attempts: ${lastError?.message ?? "unknown error"}`
+    );
   }
 
   /** Serializes calls so this client never exceeds its per-minute budget. */

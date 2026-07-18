@@ -10,7 +10,7 @@ import type {
   SourceReference,
   VerificationResult
 } from "../types.js";
-import type { HttpResponse } from "../http/http-client.js";
+import type { HttpGetter } from "../http/http-client.js";
 import { SourceRequestError, SourceSchemaError } from "../errors.js";
 import { contentHash } from "../util/content-hash.js";
 import { decodeHtmlEntities, htmlToText } from "../util/html-to-text.js";
@@ -28,11 +28,6 @@ export interface GreenhouseAdapterOptions {
   companyName?: string;
   rateLimitPerMinute?: number;
   concurrency?: number;
-}
-
-/** Injected so contract tests can run against fixtures without a network. */
-export interface HttpGetter {
-  get(url: string): Promise<HttpResponse>;
 }
 
 const API_BASE = "https://boards-api.greenhouse.io";
@@ -330,7 +325,10 @@ function mapCompensation(
   };
 }
 
-function buildEvidence(detail: GreenhouseJobDetail, descriptionText: string): CanonicalJob["evidence"] {
+function buildEvidence(
+  detail: GreenhouseJobDetail,
+  descriptionText: string
+): CanonicalJob["evidence"] {
   const evidence: CanonicalJob["evidence"] = [
     { field: "titleRaw", quote: detail.title, sourceUrl: detail.absolute_url }
   ];
