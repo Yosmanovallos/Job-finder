@@ -1,0 +1,25 @@
+# Phase 0 only defines postgres — the only service with runnable code today.
+# api/worker/scheduler/mcp-server are added as their phases land (plan section 28);
+# ollama and playwright-worker will be introduced under the `local-ai` and
+# `browser` profiles when Fase 7+ needs them.
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-job_radar}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-job_radar}
+      POSTGRES_DB: ${POSTGRES_DB:-job_radar}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-job_radar} -d ${POSTGRES_DB:-job_radar}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres_data:

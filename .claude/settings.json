@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./private/**)",
+      "Read(./secrets/**)",
+      "Read(./backups/**)"
+    ],
+    "ask": [
+      "Bash(docker compose down*)",
+      "Bash(pnpm db:reset*)",
+      "Bash(pnpm notion:sync --execute*)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pnpm format:changed"
+          }
+        ]
+      }
+    ]
+  }
+}
