@@ -17,7 +17,7 @@
     "@job-radar/dedupe": "workspace:*",
     "@job-radar/domain": "workspace:*",
     "@job-radar/sources": "workspace:*",
-    "drizzle-orm": "^0.38.2"
+    "drizzle-orm": "^0.45.2"
   },
   "devDependencies": {
     "@types/node": "^22.10.5",

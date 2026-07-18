@@ -54,19 +54,49 @@ importación manual. Never skip to a heavier method when a lighter one works.
 
 ## Current status
 
-Fase 0 (bootstrap) only: monorepo skeleton, config loader, logger, minimal
-DB schema, empty CLI. Nothing beyond that exists yet — no connectors, no
-Notion sync, no LLM calls. Check `docs/adr/` for decisions made so far.
+MVP complete through Fase 9 (auditoría final, 2026-07-18). Implemented:
+
+- **Fase 1**: profile/facts/canonical-job schemas (Zod, strict, PII-safe
+  errors, defensive YAML loading).
+- **Fase 2**: 4 API-first connectors — Greenhouse, Lever, Ashby,
+  SmartRecruiters (disabled by default, see `docs/adr/0002`), with fixtures,
+  contract tests and real canaries. Catalogs in `docs/source-catalog/`.
+- **Fase 3**: persistence + layered dedupe (external id → canonical URL →
+  dedupe key → simhash) + immutable `job_versions` + freshness verification
+  (2 negative signals to close) + circuit breaker. Idempotent re-runs.
+- **Fase 4**: deterministic matching (hard blockers + weighted score),
+  synthetic eval baseline: precision@10 = 1.0, escaped_blockers 0/6.
+- **Fase 5**: model gateway (aliases, per-hash cache, budgets, cost ledger),
+  versioned prompts — ALL `active: false` until real evals pass §24.5 gates;
+  offline mock eval + cost estimate (~$0.24/day economic mode).
+- **Fase 6**: Notion projection (`notion:schema:check`, `notion:sync`
+  dry-run-first, `notion:reconcile` non-destructive, DLQ, human fields
+  pulled and never overwritten). Postgres remains the source of truth.
+- **Fase 8**: assisted application without auto-apply — every generated
+  sentence carries `supporting_fact_ids`; factuality validator blocks
+  unevidenced claims; human `apply:approve` exports Markdown for MANUAL
+  submission.
+- **Fase 9**: release audit `docs/release/2026-07-18-audit.md` (all checks
+  green; drizzle-orm upgraded to 0.45.2 to clear GHSA-gpj5-g38j-94v9).
+
+Not implemented (post-MVP by design): Fase 7 hardening extras (scheduler,
+cost dashboard), extra Notion data sources, LLM prompt activation (requires
+ANTHROPIC_API_KEY + real evals), embeddings (noop seam in place).
 
 ## Commands
 
 ```bash
 pnpm install
-pnpm lint
-pnpm typecheck
-pnpm test
-pnpm db:generate
-pnpm db:migrate
+pnpm lint && pnpm typecheck && pnpm test
+pnpm db:generate && pnpm db:migrate
+
+pnpm sources:list && pnpm source:health --all
+pnpm discover --source greenhouse --limit 20 --dry-run
+pnpm ingest && pnpm dedupe:replay && pnpm verify --due
+pnpm match && pnpm eval:matching && pnpm report:latest
+pnpm llm:cost-estimate && pnpm eval:llm
+pnpm notion:schema:check && pnpm notion:sync --dry-run   # --execute explícito
+pnpm apply:prepare --job <uuid> && pnpm apply:approve --application <uuid>
 ```
 
 ## Package layout
@@ -74,8 +104,12 @@ pnpm db:migrate
 - `packages/config` — Zod env loader, actionable errors.
 - `packages/observability` — Pino structured logger, PII redaction.
 - `packages/db` — Drizzle schema, migrations, Postgres client.
+- `packages/domain` — profile / CV-facts / canonical-job schemas.
+- `packages/sources` — SourceAdapter contract + 4 ATS connectors.
+- `packages/dedupe` — URL normalization, dedupe keys, simhash, merge.
+- `packages/ingestion` — ingest pipeline, verification, circuit breaker.
+- `packages/matching` — deterministic scoring, taxonomy, evals.
+- `packages/models` — LLM gateway, versioned prompts (inactive), budgets.
+- `packages/notion` — Notion projection (sync/pull/reconcile/DLQ).
+- `packages/application` — drafts + factuality validator, no auto-apply.
 - `apps/cli` — command-line entry point.
-
-New packages are added only when the phase that needs them starts (see plan
-section 5 for the full target tree — most of it does not exist yet by
-design).

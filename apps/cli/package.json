@@ -43,7 +43,7 @@
     "@job-radar/observability": "workspace:*",
     "@job-radar/sources": "workspace:*",
     "commander": "^12.1.0",
-    "drizzle-orm": "^0.38.2"
+    "drizzle-orm": "^0.45.2"
   },
   "devDependencies": {
     "@types/node": "^22.10.5",
