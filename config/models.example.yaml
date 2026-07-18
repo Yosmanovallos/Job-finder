@@ -1,0 +1,49 @@
+# Model routing (plan §15). Copy to config/models.local.yaml to tune.
+# No model IDs in code: aliases resolve here. Pricing per 1M tokens (USD).
+
+providers:
+  anthropic:
+    enabled: true
+  openai_compatible:
+    enabled: false
+    base_url_env: OPENAI_COMPAT_BASE_URL
+  ollama:
+    enabled: false
+    base_url: http://localhost:11434
+
+aliases:
+  reasoning_high: claude-opus-4-8
+  general_balanced: claude-sonnet-5
+  fast_structured: claude-haiku-4-5
+  local_fast: claude-haiku-4-5 # sin Ollama habilitado, cae al cloud rápido
+  embedding: none
+
+pricing:
+  claude-opus-4-8: { input_per_mtok: 5.00, output_per_mtok: 25.00 }
+  claude-sonnet-5: { input_per_mtok: 3.00, output_per_mtok: 15.00 }
+  claude-haiku-4-5: { input_per_mtok: 1.00, output_per_mtok: 5.00 }
+
+tasks:
+  relevance_gate:
+    model_alias: local_fast
+    fallback_alias: fast_structured
+    max_output_tokens: 500
+  fit_judge:
+    model_alias: general_balanced
+    max_output_tokens: 1800
+  disputed_review:
+    model_alias: reasoning_high
+    max_output_tokens: 2200
+  extraction_fallback:
+    model_alias: fast_structured
+    max_output_tokens: 1800
+  application_pack:
+    model_alias: general_balanced
+    max_output_tokens: 3000
+
+# Modo económico (guía Paso 15)
+budgets:
+  max_llm_jobs_per_run: 20
+  max_reasoning_high_calls_per_run: 3
+  max_daily_cloud_cost_usd: 1.00
+  stop_on_budget_exceeded: true

@@ -11,6 +11,7 @@
     { "path": "../../packages/domain" },
     { "path": "../../packages/ingestion" },
     { "path": "../../packages/matching" },
+    { "path": "../../packages/models" },
     { "path": "../../packages/sources" },
     { "path": "../../packages/observability" }
   ]

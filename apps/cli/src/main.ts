@@ -23,6 +23,7 @@ import { createLogger } from "@job-radar/observability";
 import { checkDbStatus } from "./commands/db-status.js";
 import { runDiscover, selectSources } from "./commands/source-commands.js";
 import { runValidation } from "./commands/validate-yaml-file.js";
+import { llmCostEstimate, runLlmMockEval } from "./commands/llm-commands.js";
 
 const program = new Command();
 
@@ -311,6 +312,25 @@ program
   .action((options: { file: string }) => {
     const root = process.env.INIT_CWD ?? process.cwd();
     const result = importLabels(root, resolveUserPath(options.file));
+    console.log(JSON.stringify({ ok: true, ...result }, null, 2));
+  });
+
+program
+  .command("llm:cost-estimate")
+  .description("Estimate the cloud cost of one daily run under the configured budgets")
+  .action(() => {
+    const root = process.env.INIT_CWD ?? process.cwd();
+    console.log(JSON.stringify({ ok: true, ...llmCostEstimate(root) }, null, 2));
+  });
+
+program
+  .command("eval:llm")
+  .description(
+    "Offline LLM-pipeline eval with a deterministic mock (does NOT satisfy activation gates)"
+  )
+  .action(async () => {
+    const root = process.env.INIT_CWD ?? process.cwd();
+    const result = await runLlmMockEval(root);
     console.log(JSON.stringify({ ok: true, ...result }, null, 2));
   });
 

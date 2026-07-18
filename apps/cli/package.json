@@ -21,6 +21,8 @@
     "eval:matching": "tsx src/main.ts eval:matching",
     "report:latest": "tsx src/main.ts report:latest",
     "labels:import": "tsx src/main.ts labels:import",
+    "llm:cost-estimate": "tsx src/main.ts llm:cost-estimate",
+    "eval:llm": "tsx src/main.ts eval:llm",
     "test": "vitest run"
   },
   "dependencies": {
@@ -29,6 +31,7 @@
     "@job-radar/domain": "workspace:*",
     "@job-radar/ingestion": "workspace:*",
     "@job-radar/matching": "workspace:*",
+    "@job-radar/models": "workspace:*",
     "@job-radar/sources": "workspace:*",
     "@job-radar/observability": "workspace:*",
     "commander": "^12.1.0",
