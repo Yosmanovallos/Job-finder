@@ -1,0 +1,42 @@
+# CV facts template — copy to private/cv/facts.yaml (git-ignored) and fill in
+# ONLY facts that are true and verifiable. The AI may never claim anything
+# about the candidate that is not in that file; missing skills are reported
+# as gaps, never invented.
+#
+# This example file must contain placeholders only — no real personal data.
+
+experience:
+  - id: experience_001
+    company: "Empresa real"
+    title: "Cargo real"
+    start_date: "2023-01"
+    end_date: "2025-06" # null si es el empleo actual
+    responsibilities:
+      - "Responsabilidad real"
+    achievements:
+      - id: achievement_001
+        statement: "Logro real y verificable"
+        metric: "20%"
+
+skills:
+  - id: skill_sql
+    name: SQL
+    evidence:
+      - experience_001
+
+education:
+  - id: education_001
+    institution: "Institución real"
+    program: "Programa real"
+
+certifications: []
+
+languages:
+  - language: Spanish
+    level: native
+  - language: English
+    level: B2
+
+links: []
+
+constraints: []

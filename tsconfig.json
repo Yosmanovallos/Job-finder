@@ -2,6 +2,7 @@
   "files": [],
   "references": [
     { "path": "./packages/config" },
+    { "path": "./packages/domain" },
     { "path": "./packages/observability" },
     { "path": "./packages/db" },
     { "path": "./apps/cli" }

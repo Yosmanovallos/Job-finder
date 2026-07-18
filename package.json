@@ -16,6 +16,7 @@
     "db:generate": "pnpm --filter @job-radar/db generate",
     "db:migrate": "pnpm --filter @job-radar/db migrate",
     "profile:validate": "pnpm --filter @job-radar/cli profile:validate",
+    "facts:validate": "pnpm --filter @job-radar/cli facts:validate",
     "cli": "pnpm --filter @job-radar/cli start"
   },
   "devDependencies": {

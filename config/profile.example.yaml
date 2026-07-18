@@ -1,0 +1,103 @@
+# Search profile example — copy to config/profile.local.yaml and edit.
+# config/*.local.yaml is git-ignored; keep email, phone and address out of Git.
+
+profile_id: default
+locale: es-CO
+timezone: America/Bogota
+
+identity:
+  display_name: "Candidato"
+  # Mantener email, teléfono y dirección fuera de Git.
+
+roles:
+  target_titles:
+    - "Data Analyst"
+    - "Business Intelligence Analyst"
+  title_synonyms:
+    - "BI Analyst"
+    - "Analytics Analyst"
+  adjacent_titles:
+    - "Product Analyst"
+  excluded_titles:
+    - "Senior Director"
+    - "Unpaid Intern"
+
+seniority:
+  preferred: [junior, mid]
+  accepted: [entry, junior, mid]
+  years_experience_min: 1
+  years_experience_max: 5
+
+skills:
+  must_have:
+    - SQL
+  strong:
+    - Power BI
+    - Python
+    - Excel
+  nice_to_have:
+    - dbt
+    - Tableau
+  exclusions: []
+
+responsibilities:
+  preferred:
+    - dashboarding
+    - data analysis
+    - stakeholder reporting
+  excluded:
+    - pure outbound sales
+
+locations:
+  countries: [CO]
+  cities: [Bogota, Medellin]
+  remote_worldwide: true
+  remote_latam: true
+  hybrid: true
+  onsite: false
+
+work_authorization:
+  countries_authorized: [CO]
+  requires_sponsorship: false
+  accept_contracting: true
+
+languages:
+  Spanish: native
+  English: B2
+
+compensation:
+  currency: COP
+  minimum_monthly: null
+  minimum_annual_usd_remote: null
+  reject_if_below_minimum: false
+
+employment:
+  types: [full_time, contract]
+  reject_types: [unpaid]
+
+industries:
+  preferred: []
+  excluded: []
+
+companies:
+  include: []
+  exclude: []
+  watchlist: []
+
+application_policy:
+  auto_apply: false
+  generate_materials: true
+  require_human_approval: true
+  max_priority_jobs_per_day: 25
+
+cv:
+  master_path: "private/cv/master.md"
+  variants_directory: "private/cv/variants"
+  facts_path: "private/cv/facts.yaml"
+
+search:
+  languages: [es, en]
+  max_age_days: 30
+  preferred_age_days: 7
+  include_unknown_date: true
+  discovery_mode: high_recall

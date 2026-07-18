@@ -9,11 +9,14 @@
   "scripts": {
     "build": "tsc -b",
     "start": "tsx src/main.ts",
+    "profile:validate": "tsx src/main.ts profile:validate",
+    "facts:validate": "tsx src/main.ts facts:validate",
     "test": "vitest run"
   },
   "dependencies": {
     "@job-radar/config": "workspace:*",
     "@job-radar/db": "workspace:*",
+    "@job-radar/domain": "workspace:*",
     "@job-radar/observability": "workspace:*",
     "commander": "^12.1.0",
     "drizzle-orm": "^0.38.2"
