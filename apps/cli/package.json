@@ -23,7 +23,10 @@
     "labels:import": "tsx src/main.ts labels:import",
     "llm:cost-estimate": "tsx src/main.ts llm:cost-estimate",
     "eval:llm": "tsx src/main.ts eval:llm",
-    "test": "vitest run"
+    "test": "vitest run",
+    "notion:schema:check": "tsx src/main.ts notion:schema:check",
+    "notion:sync": "tsx src/main.ts notion:sync",
+    "notion:reconcile": "tsx src/main.ts notion:reconcile"
   },
   "dependencies": {
     "@job-radar/config": "workspace:*",
@@ -32,8 +35,9 @@
     "@job-radar/ingestion": "workspace:*",
     "@job-radar/matching": "workspace:*",
     "@job-radar/models": "workspace:*",
-    "@job-radar/sources": "workspace:*",
+    "@job-radar/notion": "workspace:*",
     "@job-radar/observability": "workspace:*",
+    "@job-radar/sources": "workspace:*",
     "commander": "^12.1.0",
     "drizzle-orm": "^0.38.2"
   },

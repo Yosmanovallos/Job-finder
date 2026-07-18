@@ -4,15 +4,36 @@
     "outDir": "./dist",
     "rootDir": "./src"
   },
-  "include": ["src"],
+  "include": [
+    "src"
+  ],
   "references": [
-    { "path": "../../packages/config" },
-    { "path": "../../packages/db" },
-    { "path": "../../packages/domain" },
-    { "path": "../../packages/ingestion" },
-    { "path": "../../packages/matching" },
-    { "path": "../../packages/models" },
-    { "path": "../../packages/sources" },
-    { "path": "../../packages/observability" }
+    {
+      "path": "../../packages/config"
+    },
+    {
+      "path": "../../packages/db"
+    },
+    {
+      "path": "../../packages/domain"
+    },
+    {
+      "path": "../../packages/ingestion"
+    },
+    {
+      "path": "../../packages/matching"
+    },
+    {
+      "path": "../../packages/notion"
+    },
+    {
+      "path": "../../packages/models"
+    },
+    {
+      "path": "../../packages/sources"
+    },
+    {
+      "path": "../../packages/observability"
+    }
   ]
 }

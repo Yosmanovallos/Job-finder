@@ -29,7 +29,10 @@
     "labels:import": "pnpm --filter @job-radar/cli labels:import",
     "llm:cost-estimate": "pnpm --filter @job-radar/cli llm:cost-estimate",
     "eval:llm": "pnpm --filter @job-radar/cli eval:llm",
-    "cli": "pnpm --filter @job-radar/cli start"
+    "cli": "pnpm --filter @job-radar/cli start",
+    "notion:schema:check": "pnpm --filter @job-radar/cli notion:schema:check",
+    "notion:sync": "pnpm --filter @job-radar/cli notion:sync",
+    "notion:reconcile": "pnpm --filter @job-radar/cli notion:reconcile"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",

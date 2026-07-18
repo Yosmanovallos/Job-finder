@@ -1,15 +1,38 @@
 {
   "files": [],
   "references": [
-    { "path": "./packages/config" },
-    { "path": "./packages/domain" },
-    { "path": "./packages/sources" },
-    { "path": "./packages/dedupe" },
-    { "path": "./packages/ingestion" },
-    { "path": "./packages/matching" },
-    { "path": "./packages/models" },
-    { "path": "./packages/observability" },
-    { "path": "./packages/db" },
-    { "path": "./apps/cli" }
+    {
+      "path": "./apps/cli"
+    },
+    {
+      "path": "./packages/config"
+    },
+    {
+      "path": "./packages/db"
+    },
+    {
+      "path": "./packages/dedupe"
+    },
+    {
+      "path": "./packages/domain"
+    },
+    {
+      "path": "./packages/ingestion"
+    },
+    {
+      "path": "./packages/matching"
+    },
+    {
+      "path": "./packages/models"
+    },
+    {
+      "path": "./packages/observability"
+    },
+    {
+      "path": "./packages/sources"
+    },
+    {
+      "path": "packages/notion"
+    }
   ]
 }

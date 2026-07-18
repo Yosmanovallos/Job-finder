@@ -24,6 +24,13 @@ import { checkDbStatus } from "./commands/db-status.js";
 import { runDiscover, selectSources } from "./commands/source-commands.js";
 import { runValidation } from "./commands/validate-yaml-file.js";
 import { llmCostEstimate, runLlmMockEval } from "./commands/llm-commands.js";
+import { createNotionApi } from "@job-radar/notion";
+import {
+  notionSchemaCheck,
+  requireNotionConfig,
+  runNotionReconcile,
+  runNotionSync
+} from "./commands/notion-commands.js";
 
 const program = new Command();
 
@@ -332,6 +339,64 @@ program
     const root = process.env.INIT_CWD ?? process.cwd();
     const result = await runLlmMockEval(root);
     console.log(JSON.stringify({ ok: true, ...result }, null, 2));
+  });
+
+program
+  .command("notion:schema:check")
+  .description("Validate the Notion Vacantes data source against the expected schema")
+  .action(async () => {
+    loadDotEnv(resolveUserPath(".env"));
+    const env = loadEnv();
+    const { token, dataSourceId } = requireNotionConfig(env);
+    const api = createNotionApi(token);
+    const { ok, report } = await notionSchemaCheck(api, dataSourceId);
+    console.log(JSON.stringify({ ...report, ok }, null, 2));
+    process.exitCode = ok ? 0 : 1;
+  });
+
+program
+  .command("notion:sync")
+  .description("Project ranked jobs into Notion (dry-run by default; --execute writes)")
+  .option("--execute", "Apply the plan against Notion (default: dry-run preview)", false)
+  .option("--dry-run", "Explicit dry-run (default behaviour)", false)
+  .option("--top <n>", "How many ranked jobs to project", "50")
+  .option("--profile <id>", "Profile id", "default")
+  .action(async (options: { execute: boolean; dryRun: boolean; top: string; profile: string }) => {
+    const root = process.env.INIT_CWD ?? process.cwd();
+    loadDotEnv(resolveUserPath(".env"));
+    const env = loadEnv();
+    const handle = openDb();
+    try {
+      const result = await runNotionSync({
+        db: handle.db,
+        profile: resolveProfile(root, options.profile),
+        scoring: resolveScoring(root),
+        root,
+        env,
+        top: Number.parseInt(options.top, 10),
+        execute: options.execute && !options.dryRun
+      });
+      console.log(JSON.stringify(result, null, 2));
+      process.exitCode = result.ok === true ? 0 : 1;
+    } finally {
+      await handle.close();
+    }
+  });
+
+program
+  .command("notion:reconcile")
+  .description("Re-align local sync state with Notion pages (never deletes anything)")
+  .option("--execute", "Persist adoptions/error marks (default: dry-run report)", false)
+  .action(async (options: { execute: boolean }) => {
+    loadDotEnv(resolveUserPath(".env"));
+    const env = loadEnv();
+    const handle = openDb();
+    try {
+      const result = await runNotionReconcile({ db: handle.db, env, execute: options.execute });
+      console.log(JSON.stringify(result, null, 2));
+    } finally {
+      await handle.close();
+    }
   });
 
 program.parseAsync(process.argv).catch((error: unknown) => {

@@ -15,6 +15,13 @@
       "when": 1784386024597,
       "tag": "0001_quiet_toro",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1784404651668,
+      "tag": "0002_simple_star_brand",
+      "breakpoints": true
     }
   ]
 }

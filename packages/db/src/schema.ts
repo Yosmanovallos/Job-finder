@@ -243,3 +243,28 @@ export const jobVerifications = pgTable(
   },
   (table) => [index("job_verifications_job_idx").on(table.jobId, table.checkedAt)]
 );
+
+/**
+ * Notion projection state (plan §14.5, §22). One row per job pushed to Notion.
+ * PostgreSQL stays the source of truth: this table only tracks the projection
+ * (page id + last synced hash) and the human-owned fields pulled back.
+ */
+export const notionSyncState = pgTable(
+  "notion_sync_state",
+  {
+    jobId: uuid("job_id")
+      .primaryKey()
+      .references(() => jobs.id),
+    notionPageId: text("notion_page_id").notNull(),
+    dataSourceId: text("data_source_id").notNull(),
+    /** Hash of the last system-owned payload pushed; equal hash => no-op. */
+    lastSyncedHash: text("last_synced_hash").notNull(),
+    lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }).notNull(),
+    status: text("status").notNull().default("synced"),
+    lastError: text("last_error"),
+    /** Human-owned fields last pulled from Notion (Decisión, Notas, ...). */
+    humanFields: jsonb("human_fields"),
+    humanPulledAt: timestamp("human_pulled_at", { withTimezone: true })
+  },
+  (table) => [uniqueIndex("notion_sync_state_page_idx").on(table.notionPageId)]
+);
