@@ -32,7 +32,10 @@
     "cli": "pnpm --filter @job-radar/cli start",
     "notion:schema:check": "pnpm --filter @job-radar/cli notion:schema:check",
     "notion:sync": "pnpm --filter @job-radar/cli notion:sync",
-    "notion:reconcile": "pnpm --filter @job-radar/cli notion:reconcile"
+    "notion:reconcile": "pnpm --filter @job-radar/cli notion:reconcile",
+    "apply:prepare": "pnpm --filter @job-radar/cli apply:prepare",
+    "apply:approve": "pnpm --filter @job-radar/cli apply:approve",
+    "apply:list": "pnpm --filter @job-radar/cli apply:list"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",

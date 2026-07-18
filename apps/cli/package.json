@@ -26,9 +26,13 @@
     "test": "vitest run",
     "notion:schema:check": "tsx src/main.ts notion:schema:check",
     "notion:sync": "tsx src/main.ts notion:sync",
-    "notion:reconcile": "tsx src/main.ts notion:reconcile"
+    "notion:reconcile": "tsx src/main.ts notion:reconcile",
+    "apply:prepare": "tsx src/main.ts apply:prepare",
+    "apply:approve": "tsx src/main.ts apply:approve",
+    "apply:list": "tsx src/main.ts apply:list"
   },
   "dependencies": {
+    "@job-radar/application": "workspace:*",
     "@job-radar/config": "workspace:*",
     "@job-radar/db": "workspace:*",
     "@job-radar/domain": "workspace:*",

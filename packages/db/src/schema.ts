@@ -268,3 +268,42 @@ export const notionSyncState = pgTable(
   },
   (table) => [uniqueIndex("notion_sync_state_page_idx").on(table.notionPageId)]
 );
+
+/**
+ * Assisted-application records (plan Fase 8, §19.7). There is NO auto-apply:
+ * `approvedByHumanAt` can only be set by an explicit CLI action, and the final
+ * submission is always performed by the human outside the system.
+ */
+export const applications = pgTable(
+  "applications",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    jobId: uuid("job_id")
+      .notNull()
+      .references(() => jobs.id),
+    /** draft | blocked | awaiting_human_approval | approved | exported | submitted_by_human | withdrawn */
+    status: text("status").notNull().default("draft"),
+    factualityOk: boolean("factuality_ok").notNull().default(false),
+    approvedByHumanAt: timestamp("approved_by_human_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    notes: text("notes")
+  },
+  (table) => [index("applications_job_idx").on(table.jobId)]
+);
+
+/** Immutable generated artifacts (cv_patch, cover_letter, answers, export). */
+export const applicationArtifacts = pgTable(
+  "application_artifacts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    applicationId: uuid("application_id")
+      .notNull()
+      .references(() => applications.id),
+    kind: text("kind").notNull(),
+    content: jsonb("content").notNull(),
+    factualityReport: jsonb("factuality_report"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
+  },
+  (table) => [index("application_artifacts_app_idx").on(table.applicationId)]
+);

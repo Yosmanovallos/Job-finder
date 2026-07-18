@@ -12,6 +12,9 @@
       "path": "../../packages/config"
     },
     {
+      "path": "../../packages/application"
+    },
+    {
       "path": "../../packages/db"
     },
     {

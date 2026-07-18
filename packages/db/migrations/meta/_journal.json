@@ -22,6 +22,13 @@
       "when": 1784404651668,
       "tag": "0002_simple_star_brand",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1784406151796,
+      "tag": "0003_yellow_sinister_six",
+      "breakpoints": true
     }
   ]
 }

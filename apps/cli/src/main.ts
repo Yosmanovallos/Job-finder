@@ -31,6 +31,7 @@ import {
   runNotionReconcile,
   runNotionSync
 } from "./commands/notion-commands.js";
+import { applyApprove, applyList, applyPrepare } from "./commands/apply-commands.js";
 
 const program = new Command();
 
@@ -394,6 +395,61 @@ program
     try {
       const result = await runNotionReconcile({ db: handle.db, env, execute: options.execute });
       console.log(JSON.stringify(result, null, 2));
+    } finally {
+      await handle.close();
+    }
+  });
+
+program
+  .command("apply:prepare")
+  .description("Generate application drafts from the facts vault (NEVER auto-submits)")
+  .requiredOption("--job <id>", "Job id (uuid) from the local database")
+  .option("--question <q...>", "Application questions to draft answers for")
+  .action(async (options: { job: string; question?: string[] }) => {
+    const root = process.env.INIT_CWD ?? process.cwd();
+    const handle = openDb();
+    try {
+      const result = await applyPrepare(handle.db, root, options.job, options.question ?? []);
+      console.log(JSON.stringify({ ok: result.status !== "blocked", ...result }, null, 2));
+      process.exitCode = result.status === "blocked" ? 1 : 0;
+    } finally {
+      await handle.close();
+    }
+  });
+
+program
+  .command("apply:approve")
+  .description("HUMAN action: approve a prepared application and export Markdown for manual submission")
+  .requiredOption("--application <id>", "Application id returned by apply:prepare")
+  .action(async (options: { application: string }) => {
+    const root = process.env.INIT_CWD ?? process.cwd();
+    const handle = openDb();
+    try {
+      const { exportPath } = await applyApprove(handle.db, root, options.application);
+      console.log(
+        JSON.stringify(
+          {
+            ok: true,
+            exportPath,
+            nota: "Exportado para revisión y envío MANUAL. El sistema nunca envía candidaturas."
+          },
+          null,
+          2
+        )
+      );
+    } finally {
+      await handle.close();
+    }
+  });
+
+program
+  .command("apply:list")
+  .description("List assisted applications and their status")
+  .action(async () => {
+    const handle = openDb();
+    try {
+      const rows = await applyList(handle.db);
+      console.log(JSON.stringify({ ok: true, count: rows.length, applications: rows }, null, 2));
     } finally {
       await handle.close();
     }
