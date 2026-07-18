@@ -28,3 +28,11 @@ sources:
     company_name: Spotify
     enabled: true
     rate_limit_per_minute: 30
+
+  # Ashby: board_token = jobBoardName de jobs.ashbyhq.com/<name>
+  - id: ashby:linear
+    adapter: ashby
+    board_token: linear
+    company_name: Linear
+    enabled: true
+    rate_limit_per_minute: 30

@@ -2,6 +2,7 @@ import type { SourceAdapter } from "../types.js";
 import { HttpClient } from "../http/http-client.js";
 import { GreenhouseAdapter } from "../greenhouse/greenhouse-adapter.js";
 import { LeverAdapter } from "../lever/lever-adapter.js";
+import { AshbyAdapter } from "../ashby/ashby-adapter.js";
 import type { SourceConfig } from "./sources-config.js";
 
 /** Instantiates the adapter for one configured source. */
@@ -18,5 +19,7 @@ export function buildAdapter(config: SourceConfig): SourceAdapter {
       return new GreenhouseAdapter({ ...common, boardToken: config.board_token }, http);
     case "lever":
       return new LeverAdapter({ ...common, site: config.board_token }, http);
+    case "ashby":
+      return new AshbyAdapter({ ...common, jobBoardName: config.board_token }, http);
   }
 }

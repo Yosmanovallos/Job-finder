@@ -9,7 +9,7 @@ import { fromZodError, readYamlFile } from "@job-radar/domain";
 export const SourceConfigSchema = z
   .object({
     id: z.string().min(1, "Must not be empty"),
-    adapter: z.enum(["greenhouse", "lever"]),
+    adapter: z.enum(["greenhouse", "lever", "ashby"]),
     enabled: z.boolean().default(true),
     /** Company identifier in the source: Greenhouse board_token, Lever site slug. */
     board_token: z.string().min(1, "Must not be empty"),
