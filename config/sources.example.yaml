@@ -1,0 +1,22 @@
+# Source registry example — copy to config/sources.local.yaml and edit.
+# config/*.local.yaml is git-ignored.
+#
+# Greenhouse boards are addressed by board_token (the slug in
+# job-boards.greenhouse.io/<token>). There is no public directory of all
+# companies — list the ones you care about. Tokens verified 2026-07-17
+# (see docs/source-catalog/greenhouse.md §8).
+
+sources:
+  - id: greenhouse:gitlab
+    adapter: greenhouse
+    board_token: gitlab
+    company_name: GitLab
+    enabled: true
+    rate_limit_per_minute: 30
+
+  - id: greenhouse:cloudflare
+    adapter: greenhouse
+    board_token: cloudflare
+    company_name: Cloudflare
+    enabled: true
+    rate_limit_per_minute: 30

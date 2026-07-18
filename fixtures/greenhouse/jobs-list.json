@@ -1,0 +1,46 @@
+{
+  "jobs": [
+    {
+      "id": 7000001001,
+      "internal_job_id": 8000001001,
+      "title": "Data Analyst",
+      "updated_at": "2026-07-10T08:48:22-04:00",
+      "first_published": "2026-07-01T09:00:00-04:00",
+      "requisition_id": "1001",
+      "absolute_url": "https://job-boards.greenhouse.io/acme-example/jobs/7000001001",
+      "location": { "name": "Remote, Colombia" },
+      "company_name": "Acme Example Inc.",
+      "language": "en",
+      "application_deadline": null,
+      "metadata": null,
+      "data_compliance": [
+        {
+          "type": "gdpr",
+          "requires_consent": false,
+          "requires_processing_consent": false,
+          "requires_retention_consent": false,
+          "retention_period": null,
+          "demographic_data_consent_applies": false
+        }
+      ]
+    },
+    {
+      "id": 7000001002,
+      "internal_job_id": 8000001002,
+      "title": "Business Intelligence Analyst",
+      "updated_at": "2026-07-12T10:15:00-04:00",
+      "first_published": "2026-06-20T12:30:00-04:00",
+      "requisition_id": "1002",
+      "absolute_url": "https://job-boards.greenhouse.io/acme-example/jobs/7000001002",
+      "location": { "name": "Bogotá, Colombia" },
+      "company_name": "Acme Example Inc.",
+      "language": "en",
+      "application_deadline": null,
+      "metadata": [
+        { "id": 1, "name": "Team", "value": "Analytics", "value_type": "single_select" }
+      ],
+      "data_compliance": []
+    }
+  ],
+  "meta": { "total": 2 }
+}

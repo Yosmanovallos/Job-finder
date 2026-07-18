@@ -17,6 +17,9 @@
     "db:migrate": "pnpm --filter @job-radar/db migrate",
     "profile:validate": "pnpm --filter @job-radar/cli profile:validate",
     "facts:validate": "pnpm --filter @job-radar/cli facts:validate",
+    "sources:list": "pnpm --filter @job-radar/cli sources:list",
+    "source:health": "pnpm --filter @job-radar/cli source:health",
+    "discover": "pnpm --filter @job-radar/cli discover",
     "cli": "pnpm --filter @job-radar/cli start"
   },
   "devDependencies": {
