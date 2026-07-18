@@ -20,6 +20,9 @@
     "sources:list": "pnpm --filter @job-radar/cli sources:list",
     "source:health": "pnpm --filter @job-radar/cli source:health",
     "discover": "pnpm --filter @job-radar/cli discover",
+    "ingest": "pnpm --filter @job-radar/cli ingest",
+    "dedupe:replay": "pnpm --filter @job-radar/cli dedupe:replay",
+    "verify": "pnpm --filter @job-radar/cli verify",
     "cli": "pnpm --filter @job-radar/cli start"
   },
   "devDependencies": {

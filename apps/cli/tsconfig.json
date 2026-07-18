@@ -9,6 +9,7 @@
     { "path": "../../packages/config" },
     { "path": "../../packages/db" },
     { "path": "../../packages/domain" },
+    { "path": "../../packages/ingestion" },
     { "path": "../../packages/sources" },
     { "path": "../../packages/observability" }
   ]

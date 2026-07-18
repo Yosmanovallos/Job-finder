@@ -9,6 +9,8 @@ import {
   loadProfile
 } from "@job-radar/domain";
 import { buildAdapter, DEFAULT_SOURCES_PATH, loadSourcesConfig } from "@job-radar/sources";
+import { createDb } from "@job-radar/db";
+import { replayDedupe, runIngest, runVerify } from "@job-radar/ingestion";
 import { createLogger } from "@job-radar/observability";
 import { checkDbStatus } from "./commands/db-status.js";
 import { runDiscover, selectSources } from "./commands/source-commands.js";
@@ -136,6 +138,85 @@ program
     });
     console.log(JSON.stringify(report, null, 2));
     process.exitCode = report.ok ? 0 : 1;
+  });
+
+function openDb() {
+  loadDotEnv(resolveUserPath(".env"));
+  const env = loadEnv();
+  return createDb(env.DATABASE_URL);
+}
+
+program
+  .command("ingest")
+  .description("Discover, fetch, extract and persist jobs with dedupe and versioning")
+  .option("--source <name>", "Adapter name or source id (default: all enabled)")
+  .option("--limit <n>", "Maximum jobs per source (marks the run as partial)")
+  .option("--dry-run", "Walk the pipeline without writing anything", false)
+  .option("--sources <path>", "Path to the sources YAML file", DEFAULT_SOURCES_PATH)
+  .action(
+    async (options: { source?: string; limit?: string; dryRun: boolean; sources: string }) => {
+      const file = loadSourcesConfig(resolveUserPath(options.sources));
+      const limit = options.limit === undefined ? undefined : Number.parseInt(options.limit, 10);
+      const handle = options.dryRun ? null : openDb();
+      try {
+        const report = await runIngest(handle?.db ?? null, {
+          configs: file.sources,
+          ...(options.source === undefined ? {} : { selector: options.source }),
+          ...(limit === undefined ? {} : { limit }),
+          dryRun: options.dryRun
+        });
+        console.log(JSON.stringify(report, null, 2));
+        process.exitCode = report.runs.every((run) => run.status !== "failed") ? 0 : 1;
+      } finally {
+        await handle?.close();
+      }
+    }
+  );
+
+program
+  .command("dedupe")
+  .description("Re-apply extraction + dedupe over the raw documents of a stored run")
+  .option("--run <id>", "Run id or 'latest'", "latest")
+  .option("--sources <path>", "Path to the sources YAML file", DEFAULT_SOURCES_PATH)
+  .action(async (options: { run: string; sources: string }) => {
+    const file = loadSourcesConfig(resolveUserPath(options.sources));
+    const handle = openDb();
+    try {
+      const report = await replayDedupe(handle.db, {
+        configs: file.sources,
+        ...(options.run === "latest" ? {} : { runId: options.run })
+      });
+      if (!report) {
+        console.log(JSON.stringify({ ok: false, error: "No stored runs found" }));
+        process.exitCode = 1;
+        return;
+      }
+      console.log(JSON.stringify({ ok: true, ...report }, null, 2));
+    } finally {
+      await handle.close();
+    }
+  });
+
+program
+  .command("verify")
+  .description("Verify freshness of stored jobs (never closes on a single failure)")
+  .option("--due", "Only jobs due for verification (default behavior)", true)
+  .option("--hours <n>", "Consider jobs due after this many hours", "24")
+  .option("--limit <n>", "Maximum jobs to verify", "50")
+  .option("--sources <path>", "Path to the sources YAML file", DEFAULT_SOURCES_PATH)
+  .action(async (options: { hours: string; limit: string; sources: string }) => {
+    const file = loadSourcesConfig(resolveUserPath(options.sources));
+    const handle = openDb();
+    try {
+      const report = await runVerify(handle.db, {
+        configs: file.sources,
+        dueHours: Number.parseInt(options.hours, 10),
+        limit: Number.parseInt(options.limit, 10)
+      });
+      console.log(JSON.stringify({ ok: true, ...report }, null, 2));
+    } finally {
+      await handle.close();
+    }
   });
 
 program.parseAsync(process.argv).catch((error: unknown) => {

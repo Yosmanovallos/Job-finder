@@ -14,12 +14,16 @@
     "sources:list": "tsx src/main.ts sources:list",
     "source:health": "tsx src/main.ts source:health",
     "discover": "tsx src/main.ts discover",
+    "ingest": "tsx src/main.ts ingest",
+    "dedupe:replay": "tsx src/main.ts dedupe",
+    "verify": "tsx src/main.ts verify",
     "test": "vitest run"
   },
   "dependencies": {
     "@job-radar/config": "workspace:*",
     "@job-radar/db": "workspace:*",
     "@job-radar/domain": "workspace:*",
+    "@job-radar/ingestion": "workspace:*",
     "@job-radar/sources": "workspace:*",
     "@job-radar/observability": "workspace:*",
     "commander": "^12.1.0",

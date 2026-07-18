@@ -1,0 +1,28 @@
+{
+  "name": "@job-radar/ingestion",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@job-radar/db": "workspace:*",
+    "@job-radar/dedupe": "workspace:*",
+    "@job-radar/domain": "workspace:*",
+    "@job-radar/sources": "workspace:*",
+    "drizzle-orm": "^0.38.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "postgres": "^3.4.5",
+    "typescript": "^5.7.0",
+    "vitest": "^2.1.8"
+  }
+}

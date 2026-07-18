@@ -4,6 +4,8 @@
     { "path": "./packages/config" },
     { "path": "./packages/domain" },
     { "path": "./packages/sources" },
+    { "path": "./packages/dedupe" },
+    { "path": "./packages/ingestion" },
     { "path": "./packages/observability" },
     { "path": "./packages/db" },
     { "path": "./apps/cli" }

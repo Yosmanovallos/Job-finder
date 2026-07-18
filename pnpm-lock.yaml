@@ -46,6 +46,9 @@ importers:
       "@job-radar/domain":
         specifier: workspace:*
         version: link:../../packages/domain
+      "@job-radar/ingestion":
+        specifier: workspace:*
+        version: link:../../packages/ingestion
       "@job-radar/observability":
         specifier: workspace:*
         version: link:../../packages/observability
@@ -116,6 +119,22 @@ importers:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@22.20.1)
 
+  packages/dedupe:
+    dependencies:
+      "@job-radar/domain":
+        specifier: workspace:*
+        version: link:../domain
+    devDependencies:
+      "@types/node":
+        specifier: ^22.10.5
+        version: 22.20.1
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.20.1)
+
   packages/domain:
     dependencies:
       yaml:
@@ -128,6 +147,37 @@ importers:
       "@types/node":
         specifier: ^22.10.5
         version: 22.20.1
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.20.1)
+
+  packages/ingestion:
+    dependencies:
+      "@job-radar/db":
+        specifier: workspace:*
+        version: link:../db
+      "@job-radar/dedupe":
+        specifier: workspace:*
+        version: link:../dedupe
+      "@job-radar/domain":
+        specifier: workspace:*
+        version: link:../domain
+      "@job-radar/sources":
+        specifier: workspace:*
+        version: link:../sources
+      drizzle-orm:
+        specifier: ^0.38.2
+        version: 0.38.4(postgres@3.4.9)
+    devDependencies:
+      "@types/node":
+        specifier: ^22.10.5
+        version: 22.20.1
+      postgres:
+        specifier: ^3.4.5
+        version: 3.4.9
       typescript:
         specifier: ^5.7.0
         version: 5.9.3
