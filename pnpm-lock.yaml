@@ -49,6 +49,9 @@ importers:
       "@job-radar/ingestion":
         specifier: workspace:*
         version: link:../../packages/ingestion
+      "@job-radar/matching":
+        specifier: workspace:*
+        version: link:../../packages/matching
       "@job-radar/observability":
         specifier: workspace:*
         version: link:../../packages/observability
@@ -178,6 +181,31 @@ importers:
       postgres:
         specifier: ^3.4.5
         version: 3.4.9
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.20.1)
+
+  packages/matching:
+    dependencies:
+      "@job-radar/db":
+        specifier: workspace:*
+        version: link:../db
+      "@job-radar/domain":
+        specifier: workspace:*
+        version: link:../domain
+      drizzle-orm:
+        specifier: ^0.38.2
+        version: 0.38.4(postgres@3.4.9)
+      zod:
+        specifier: ^3.24.1
+        version: 3.25.76
+    devDependencies:
+      "@types/node":
+        specifier: ^22.10.5
+        version: 22.20.1
       typescript:
         specifier: ^5.7.0
         version: 5.9.3

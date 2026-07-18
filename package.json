@@ -23,6 +23,10 @@
     "ingest": "pnpm --filter @job-radar/cli ingest",
     "dedupe:replay": "pnpm --filter @job-radar/cli dedupe:replay",
     "verify": "pnpm --filter @job-radar/cli verify",
+    "match": "pnpm --filter @job-radar/cli match",
+    "eval:matching": "pnpm --filter @job-radar/cli eval:matching",
+    "report:latest": "pnpm --filter @job-radar/cli report:latest",
+    "labels:import": "pnpm --filter @job-radar/cli labels:import",
     "cli": "pnpm --filter @job-radar/cli start"
   },
   "devDependencies": {

@@ -17,6 +17,10 @@
     "ingest": "tsx src/main.ts ingest",
     "dedupe:replay": "tsx src/main.ts dedupe",
     "verify": "tsx src/main.ts verify",
+    "match": "tsx src/main.ts match",
+    "eval:matching": "tsx src/main.ts eval:matching",
+    "report:latest": "tsx src/main.ts report:latest",
+    "labels:import": "tsx src/main.ts labels:import",
     "test": "vitest run"
   },
   "dependencies": {
@@ -24,6 +28,7 @@
     "@job-radar/db": "workspace:*",
     "@job-radar/domain": "workspace:*",
     "@job-radar/ingestion": "workspace:*",
+    "@job-radar/matching": "workspace:*",
     "@job-radar/sources": "workspace:*",
     "@job-radar/observability": "workspace:*",
     "commander": "^12.1.0",

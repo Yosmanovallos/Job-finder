@@ -10,6 +10,7 @@
     { "path": "../../packages/db" },
     { "path": "../../packages/domain" },
     { "path": "../../packages/ingestion" },
+    { "path": "../../packages/matching" },
     { "path": "../../packages/sources" },
     { "path": "../../packages/observability" }
   ]

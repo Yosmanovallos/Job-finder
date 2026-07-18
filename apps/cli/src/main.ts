@@ -10,7 +10,15 @@ import {
 } from "@job-radar/domain";
 import { buildAdapter, DEFAULT_SOURCES_PATH, loadSourcesConfig } from "@job-radar/sources";
 import { createDb } from "@job-radar/db";
-import { replayDedupe, runIngest, runVerify } from "@job-radar/ingestion";
+import { replayDedupe, rowToCanonical, runIngest, runVerify } from "@job-radar/ingestion";
+import { rankResults, scoreJob } from "@job-radar/matching";
+import {
+  importLabels,
+  latestReport,
+  resolveProfile,
+  resolveScoring,
+  runMatchingEval
+} from "./commands/match-commands.js";
 import { createLogger } from "@job-radar/observability";
 import { checkDbStatus } from "./commands/db-status.js";
 import { runDiscover, selectSources } from "./commands/source-commands.js";
@@ -217,6 +225,93 @@ program
     } finally {
       await handle.close();
     }
+  });
+
+program
+  .command("match")
+  .description("Score and rank stored jobs against the profile (no LLM)")
+  .option("--profile <id>", "Profile id (default resolves profile.local/example)", "default")
+  .option("--view <mode>", "high_precision | high_recall", "high_recall")
+  .option("--top <n>", "How many results to print", "15")
+  .action(async (options: { profile: string; view: string; top: string }) => {
+    const root = process.env.INIT_CWD ?? process.cwd();
+    const profile = resolveProfile(root, options.profile);
+    const scoring = resolveScoring(root);
+    const view = options.view === "high_precision" ? "high_precision" : "high_recall";
+    const handle = openDb();
+    try {
+      const rows = await handle.db.query.jobs.findMany();
+      const meta = new Map(
+        rows.map((row) => [
+          row.id,
+          { title: row.titleRaw, company: row.companyNameRaw, url: row.canonicalUrl }
+        ])
+      );
+      const results = rows.map((row) => scoreJob(profile, rowToCanonical(row), scoring));
+      const ranked = rankResults(results, view).slice(0, Number.parseInt(options.top, 10));
+      console.log(
+        JSON.stringify(
+          {
+            ok: true,
+            profile: options.profile,
+            scoring_version: scoring.scoring_version,
+            view,
+            total_jobs: rows.length,
+            shown: ranked.length,
+            results: ranked.map((result) => ({
+              title: meta.get(result.jobId)?.title ?? "",
+              company: meta.get(result.jobId)?.company ?? "",
+              url: meta.get(result.jobId)?.url ?? "",
+              score: result.score,
+              confidence: result.confidence,
+              decision: result.decision,
+              why_apply: result.why_apply,
+              why_not_apply: result.why_not_apply,
+              uncertain: result.uncertain_requirements
+            }))
+          },
+          null,
+          2
+        )
+      );
+    } finally {
+      await handle.close();
+    }
+  });
+
+program
+  .command("eval:matching")
+  .description("Run the offline matching baseline eval on the synthetic dataset")
+  .action(() => {
+    const root = process.env.INIT_CWD ?? process.cwd();
+    const { summary, jsonPath, markdownPath } = runMatchingEval(root);
+    console.log(JSON.stringify({ ok: true, summary, jsonPath, markdownPath }, null, 2));
+  });
+
+program
+  .command("report:latest")
+  .description("Print the latest eval report")
+  .action(() => {
+    const root = process.env.INIT_CWD ?? process.cwd();
+    const report = latestReport(root);
+    if (report === null) {
+      console.log(
+        JSON.stringify({ ok: false, error: "No reports found. Run eval:matching first." })
+      );
+      process.exitCode = 1;
+      return;
+    }
+    console.log(report);
+  });
+
+program
+  .command("labels:import")
+  .description("Import human labels from a CSV (job_id,label[,reason])")
+  .requiredOption("--file <path>", "CSV file to import")
+  .action((options: { file: string }) => {
+    const root = process.env.INIT_CWD ?? process.cwd();
+    const result = importLabels(root, resolveUserPath(options.file));
+    console.log(JSON.stringify({ ok: true, ...result }, null, 2));
   });
 
 program.parseAsync(process.argv).catch((error: unknown) => {

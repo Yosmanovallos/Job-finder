@@ -1,0 +1,25 @@
+# Scoring weights (plan §13.2). Copy to config/scoring.local.yaml to tune.
+# Weights must reflect what matters to YOU; totals are normalized to 0-100.
+
+scoring_version: baseline-1
+
+weights:
+  responsibilities: 20
+  must_have_skills: 20
+  preferred_skills: 10
+  seniority: 15
+  location: 15
+  industry: 5
+  compensation: 5
+  language: 5
+  freshness: 3
+  data_quality: 2
+
+penalties:
+  probable_blocker: 40
+  possibly_closed: 20
+  risk: 30
+
+thresholds:
+  priority: 70
+  consider: 45

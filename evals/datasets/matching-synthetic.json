@@ -1,0 +1,160 @@
+{
+  "name": "matching-synthetic-v1",
+  "reference_date": "2026-07-18T00:00:00.000Z",
+  "items": [
+    {
+      "title": "Data Analyst",
+      "description": "We need a data analyst with strong SQL, Power BI dashboards and Excel reporting for stakeholder reporting across finance. Remote for LATAM candidates welcome. You will own data analysis and dashboarding end to end with our analytics team every week.",
+      "workMode": "remote",
+      "locations": ["Remote - LATAM"],
+      "label": "relevant"
+    },
+    {
+      "title": "Business Intelligence Analyst",
+      "description": "BI Analyst role: build Power BI and Tableau dashboards, write advanced SQL queries, partner with product for stakeholder reporting and data analysis. Python is a plus. Hybrid in Bogota with flexible days.",
+      "workMode": "hybrid",
+      "locations": ["Bogota, Colombia"],
+      "countryCode": "CO",
+      "label": "relevant"
+    },
+    {
+      "title": "Analytics Analyst",
+      "description": "Analytics analyst position focused on SQL modeling, Excel automation, dashboarding in Power BI and clear communication with stakeholders. Remote worldwide, async-first company.",
+      "workMode": "remote",
+      "locations": ["Remote"],
+      "label": "relevant"
+    },
+    {
+      "title": "Product Analyst",
+      "description": "Product analyst working with SQL, experimentation, funnels and dashboards. Python for deeper analysis. Remote across the Americas, reporting to head of product analytics.",
+      "workMode": "remote",
+      "locations": ["Remote - Americas"],
+      "label": "relevant"
+    },
+    {
+      "title": "Junior Data Analyst",
+      "description": "Entry role: SQL queries, Excel reports, Power BI dashboards under mentorship. Great for junior profiles who love data analysis and stakeholder reporting. Remote LATAM.",
+      "workMode": "remote",
+      "locations": ["Remote - LATAM"],
+      "label": "relevant"
+    },
+    {
+      "title": "Data Analyst (Marketing)",
+      "description": "Analyze campaign data with SQL and Google Analytics, build Power BI dashboards, present insights to marketing stakeholders. Remote friendly within Colombia.",
+      "workMode": "remote",
+      "locations": ["Colombia"],
+      "countryCode": "CO",
+      "label": "relevant"
+    },
+    {
+      "title": "BI Analyst",
+      "description": "SQL, dbt models, Tableau and Power BI reporting. Data analysis for operations, building a metrics layer with the data team. Remote worldwide with quarterly meetups.",
+      "workMode": "remote",
+      "locations": ["Remote"],
+      "label": "relevant"
+    },
+    {
+      "title": "Senior Director of Analytics",
+      "description": "Executive leadership for the analytics organization: strategy, hiring, budget ownership, board reporting. Requires 15 years leading large data teams and deep SQL heritage.",
+      "workMode": "remote",
+      "locations": ["Remote - US"],
+      "label": "not_relevant",
+      "expect_blocker": true
+    },
+    {
+      "title": "Data Analyst",
+      "description": "Onsite-only data analyst role in Munich headquarters. SQL and Power BI required, daily presence in office, no remote option at all.",
+      "workMode": "onsite",
+      "locations": ["Munich, Germany"],
+      "countryCode": "DE",
+      "label": "not_relevant",
+      "expect_blocker": true
+    },
+    {
+      "title": "Unpaid Data Intern",
+      "description": "Unpaid internship helping with Excel spreadsheets and SQL exports. Great learning opportunity for students, no compensation offered.",
+      "workMode": "remote",
+      "locations": ["Remote"],
+      "employmentTypes": ["unpaid"],
+      "label": "not_relevant",
+      "expect_blocker": true
+    },
+    {
+      "title": "Backend Engineer (Go)",
+      "description": "Design and ship Go microservices, gRPC APIs, Kubernetes deployments and infrastructure automation. No analytics involved, deep systems programming role.",
+      "workMode": "remote",
+      "locations": ["Remote"],
+      "label": "not_relevant"
+    },
+    {
+      "title": "Sales Development Representative",
+      "description": "Pure outbound sales: cold calls, quota, CRM hygiene and pipeline generation. Zero technical or analytical work involved in this role.",
+      "workMode": "remote",
+      "locations": ["Remote - LATAM"],
+      "label": "not_relevant",
+      "expect_blocker": true
+    },
+    {
+      "title": "Data Analyst",
+      "description": "This position was filled. SQL Power BI dashboards stakeholder reporting.",
+      "workMode": "remote",
+      "locations": ["Remote"],
+      "status": "closed",
+      "label": "not_relevant",
+      "expect_blocker": true
+    },
+    {
+      "title": "Marketing Manager",
+      "description": "Own brand campaigns, budgets and agencies. Some dashboard consumption but no hands-on data work. Hybrid in Mexico City.",
+      "workMode": "hybrid",
+      "locations": ["Mexico City"],
+      "countryCode": "MX",
+      "label": "not_relevant"
+    },
+    {
+      "title": "Financial Analyst",
+      "description": "Budgeting, forecasting and variance analysis in Excel with heavy stakeholder reporting; SQL used occasionally for pulls. Remote within LATAM.",
+      "workMode": "remote",
+      "locations": ["Remote - LATAM"],
+      "label": "relevant"
+    },
+    {
+      "title": "Data Engineer",
+      "description": "Build Airflow pipelines, Spark jobs, dbt models and warehouse infrastructure in Snowflake. SQL heavy but engineering focused, on-call rotation included. Remote worldwide.",
+      "workMode": "remote",
+      "locations": ["Remote"],
+      "label": "not_relevant"
+    },
+    {
+      "title": "Analista de Datos",
+      "description": "Buscamos analista de datos con SQL avanzado, dashboards en Power BI, reportes en Excel y comunicación con stakeholders. Remoto para Colombia con contrato a término indefinido.",
+      "workMode": "remote",
+      "locations": ["Remoto - Colombia"],
+      "countryCode": "CO",
+      "label": "relevant"
+    },
+    {
+      "title": "Data Analyst",
+      "description": "SQL and dashboards role with no stated location details anywhere.",
+      "workMode": "unknown",
+      "locations": [],
+      "publishedDaysAgo": null,
+      "label": "relevant"
+    },
+    {
+      "title": "Head of Data",
+      "description": "Executive hire owning the entire data organization, strategy and a 40 person team. Deep leadership requirements.",
+      "workMode": "remote",
+      "locations": ["Remote - Europe"],
+      "label": "not_relevant",
+      "expect_blocker": true
+    },
+    {
+      "title": "Customer Support Specialist",
+      "description": "Answer tickets, manage escalations, document knowledge base. Zero analytics content. Remote LATAM with rotating weekend shifts.",
+      "workMode": "remote",
+      "locations": ["Remote - LATAM"],
+      "label": "not_relevant"
+    }
+  ]
+}

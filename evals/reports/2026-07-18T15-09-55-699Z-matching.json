@@ -1,0 +1,1087 @@
+{
+  "scoring_version": "baseline-1",
+  "dataset_size": 20,
+  "precision_at_10": 1,
+  "precision_at_25": 0.909,
+  "false_positives_top25": 1,
+  "escaped_blockers": 0,
+  "expected_blockers": 6,
+  "results": [
+    {
+      "jobId": "76e9014d-197b-4ac4-82ca-dff9ea8f20f0",
+      "score": 78,
+      "confidence": 0.65,
+      "decision": "priority",
+      "matched_requirements": [
+        "must-have skill present: SQL",
+        "preferred skill present: Power BI",
+        "preferred skill present: Excel",
+        "location: remote and profile accepts remote worldwide"
+      ],
+      "missing_requirements": [
+        "preferred skill not found: Python",
+        "preferred skill not found: dbt",
+        "preferred skill not found: Tableau"
+      ],
+      "uncertain_requirements": [
+        "seniority not stated"
+      ],
+      "hard_blockers": [],
+      "evidence": [
+        {
+          "field": "titleRaw",
+          "quote": "Data Analyst",
+          "sourceUrl": "https://synthetic.example.test/jobs/76e9014d-197b-4ac4-82ca-dff9ea8f20f0"
+        }
+      ],
+      "why_apply": [
+        "must-have skill present: SQL",
+        "preferred skill present: Power BI",
+        "preferred skill present: Excel",
+        "location: remote and profile accepts remote worldwide"
+      ],
+      "why_not_apply": [
+        "preferred skill not found: Python",
+        "preferred skill not found: dbt",
+        "preferred skill not found: Tableau"
+      ],
+      "recommended_action": "review_and_tailor_cv",
+      "score_breakdown": {
+        "responsibilities": 20,
+        "must_have_skills": 20,
+        "preferred_skills": 4,
+        "seniority": 7.5,
+        "location": 15,
+        "industry": 2.5,
+        "compensation": 2.5,
+        "language": 2.5,
+        "freshness": 3,
+        "data_quality": 0.6
+      },
+      "label": "relevant",
+      "title": "Data Analyst"
+    },
+    {
+      "jobId": "011ff8bb-b6d0-42d0-81ee-3a110b40c067",
+      "score": 73,
+      "confidence": 0.65,
+      "decision": "priority",
+      "matched_requirements": [
+        "must-have skill present: SQL",
+        "preferred skill present: Power BI",
+        "preferred skill present: Python",
+        "preferred skill present: Tableau",
+        "location: hybrid in an accepted location"
+      ],
+      "missing_requirements": [
+        "preferred skill not found: Excel",
+        "preferred skill not found: dbt"
+      ],
+      "uncertain_requirements": [
+        "seniority not stated"
+      ],
+      "hard_blockers": [],
+      "evidence": [
+        {
+          "field": "titleRaw",
+          "quote": "Business Intelligence Analyst",
+          "sourceUrl": "https://synthetic.example.test/jobs/011ff8bb-b6d0-42d0-81ee-3a110b40c067"
+        }
+      ],
+      "why_apply": [
+        "must-have skill present: SQL",
+        "preferred skill present: Power BI",
+        "preferred skill present: Python",
+        "preferred skill present: Tableau",
+        "location: hybrid in an accepted location"
+      ],
+      "why_not_apply": [
+        "preferred skill not found: Excel",
+        "preferred skill not found: dbt"
+      ],
+      "recommended_action": "review_and_tailor_cv",
+      "score_breakdown": {
+        "responsibilities": 13.333333333333332,
+        "must_have_skills": 20,
+        "preferred_skills": 6,
+        "seniority": 7.5,
+        "location": 15,
+        "industry": 2.5,
+        "compensation": 2.5,
+        "language": 2.5,
+        "freshness": 3,
+        "data_quality": 0.6
+      },
+      "label": "relevant",
+      "title": "Business Intelligence Analyst"
+    },
+    {
+      "jobId": "5e8bb7cb-34a0-4486-8390-37fdbdcbf7b7",
+      "score": 64,
+      "confidence": 0.65,
+      "decision": "consider",
+      "matched_requirements": [
+        "must-have skill present: SQL",
+        "preferred skill present: Power BI",
+        "preferred skill present: Excel",
+        "location: remote and profile accepts remote worldwide"
+      ],
+      "missing_requirements": [
+        "preferred skill not found: Python",
+        "preferred skill not found: dbt",
+        "preferred skill not found: Tableau"
+      ],
+      "uncertain_requirements": [
+        "seniority not stated"
+      ],
+      "hard_blockers": [],
+      "evidence": [
+        {
+          "field": "titleRaw",
+          "quote": "Analytics Analyst",
+          "sourceUrl": "https://synthetic.example.test/jobs/5e8bb7cb-34a0-4486-8390-37fdbdcbf7b7"
+        }
+      ],
+      "why_apply": [
+        "must-have skill present: SQL",
+        "preferred skill present: Power BI",
+        "preferred skill present: Excel",
+        "location: remote and profile accepts remote worldwide"
+      ],
+      "why_not_apply": [
+        "preferred skill not found: Python",
+        "preferred skill not found: dbt",
+        "preferred skill not found: Tableau"
+      ],
+      "recommended_action": "review_manually",
+      "score_breakdown": {
+        "responsibilities": 6.666666666666666,
+        "must_have_skills": 20,
+        "preferred_skills": 4,
+        "seniority": 7.5,
+        "location": 15,
+        "industry": 2.5,
+        "compensation": 2.5,
+        "language": 2.5,
+        "freshness": 3,
+        "data_quality": 0.6
+      },
+      "label": "relevant",
+      "title": "Analytics Analyst"
+    },
+    {
+      "jobId": "721c2cc6-adfd-4c36-88b3-7c8cb9c519b0",
+      "score": 44,
+      "confidence": 0.65,
+      "decision": "discard",
+      "matched_requirements": [
+        "must-have skill present: SQL",
+        "preferred skill present: Python",
+        "location: remote and profile accepts remote worldwide"
+      ],
+      "missing_requirements": [
+        "preferred skill not found: Power BI",
+        "preferred skill not found: Excel",
+        "preferred skill not found: dbt",
+        "preferred skill not found: Tableau"
+      ],
+      "uncertain_requirements": [
+        "seniority not stated"
+      ],
+      "hard_blockers": [],
+      "evidence": [
+        {
+          "field": "titleRaw",
+          "quote": "Product Analyst",
+          "sourceUrl": "https://synthetic.example.test/jobs/721c2cc6-adfd-4c36-88b3-7c8cb9c519b0"
+        }
+      ],
+      "why_apply": [
+        "must-have skill present: SQL",
+        "preferred skill present: Python",
+        "location: remote and profile accepts remote worldwide"
+      ],
+      "why_not_apply": [
+        "preferred skill not found: Power BI",
+        "preferred skill not found: Excel",
+        "preferred skill not found: dbt"
+      ],
+      "recommended_action": "ignore_unless_curious",
+      "score_breakdown": {
+        "responsibilities": 0,
+        "must_have_skills": 20,
+        "preferred_skills": 2,
+        "seniority": 7.5,
+        "location": 15,
+        "industry": 2.5,
+        "compensation": 2.5,
+        "language": 2.5,
+        "freshness": 3,
+        "data_quality": 0.6
+      },
+      "label": "relevant",
+      "title": "Product Analyst"
+    },
+    {
+      "jobId": "dfc6735f-e300-4537-8629-4ac194fdb69f",
+      "score": 78,
+      "confidence": 0.8,
+      "decision": "priority",
+      "matched_requirements": [
+        "must-have skill present: SQL",
+        "preferred skill present: Power BI",
+        "preferred skill present: Excel",
+        "location: remote and profile accepts remote worldwide",
+        "seniority matches preference"
+      ],
+      "missing_requirements": [
+        "preferred skill not found: Python",
+        "preferred skill not found: dbt",
+        "preferred skill not found: Tableau"
+      ],
+      "uncertain_requirements": [],
+      "hard_blockers": [],
+      "evidence": [
+        {
+          "field": "titleRaw",
+          "quote": "Junior Data Analyst",
+          "sourceUrl": "https://synthetic.example.test/jobs/dfc6735f-e300-4537-8629-4ac194fdb69f"
+        }
+      ],
+      "why_apply": [
+        "must-have skill present: SQL",
+        "preferred skill present: Power BI",
+        "preferred skill present: Excel",
+        "location: remote and profile accepts remote worldwide",
+        "seniority matches preference"
+      ],
+      "why_not_apply": [
+        "preferred skill not found: Python",
+        "preferred skill not found: dbt",
+        "preferred skill not found: Tableau"
+      ],
+      "recommended_action": "review_and_tailor_cv",
+      "score_breakdown": {
+        "responsibilities": 13.333333333333332,
+        "must_have_skills": 20,
+        "preferred_skills": 4,
+        "seniority": 15,
+        "location": 15,
+        "industry": 2.5,
+        "compensation": 2.5,
+        "language": 2.5,
+        "freshness": 3,
+        "data_quality": 0.6
+      },
+      "label": "relevant",
+      "title": "Junior Data Analyst"
+    },
+    {
+      "jobId": "8f430ed6-2bcc-4354-8f83-cd048b2b852d",
+      "score": 56,
+      "confidence": 0.65,
+      "decision": "consider",
+      "matched_requirements": [
+        "must-have skill present: SQL",
+        "preferred skill present: Power BI",
+        "location: remote and profile accepts remote worldwide"
+      ],
+      "missing_requirements": [
+        "preferred skill not found: Python",
+        "preferred skill not found: Excel",
+        "preferred skill not found: dbt",
+        "preferred skill not found: Tableau"
+      ],
+      "uncertain_requirements": [
+        "seniority not stated"
+      ],
+      "hard_blockers": [],
+      "evidence": [
+        {
+          "field": "titleRaw",
+          "quote": "Data Analyst (Marketing)",
+          "sourceUrl": "https://synthetic.example.test/jobs/8f430ed6-2bcc-4354-8f83-cd048b2b852d"
+        }
+      ],
+      "why_apply": [
+        "must-have skill present: SQL",
+        "preferred skill present: Power BI",
+        "location: remote and profile accepts remote worldwide"
+      ],
+      "why_not_apply": [
+        "preferred skill not found: Python",
+        "preferred skill not found: Excel",
+        "preferred skill not found: dbt"
+      ],
+      "recommended_action": "review_manually",
+      "score_breakdown": {
+        "responsibilities": 0,
+        "must_have_skills": 20,
+        "preferred_skills": 2,
+        "seniority": 7.5,
+        "location": 15,
+        "industry": 2.5,
+        "compensation": 2.5,
+        "language": 2.5,
+        "freshness": 3,
+        "data_quality": 0.6
+      },
+      "label": "relevant",
+      "title": "Data Analyst (Marketing)"
+    },
+    {
+      "jobId": "079e0b03-e39c-4812-8b22-1aa73c564e23",
+      "score": 66,
+      "confidence": 0.65,
+      "decision": "consider",
+      "matched_requirements": [
+        "must-have skill present: SQL",
+        "preferred skill present: Power BI",
+        "preferred skill present: dbt",
+        "preferred skill present: Tableau",
+        "location: remote and profile accepts remote worldwide"
+      ],
+      "missing_requirements": [
+        "preferred skill not found: Python",
+        "preferred skill not found: Excel"
+      ],
+      "uncertain_requirements": [
+        "seniority not stated"
+      ],
+      "hard_blockers": [],
+      "evidence": [
+        {
+          "field": "titleRaw",
+          "quote": "BI Analyst",
+          "sourceUrl": "https://synthetic.example.test/jobs/079e0b03-e39c-4812-8b22-1aa73c564e23"
+        }
+      ],
+      "why_apply": [
+        "must-have skill present: SQL",
+        "preferred skill present: Power BI",
+        "preferred skill present: dbt",
+        "preferred skill present: Tableau",
+        "location: remote and profile accepts remote worldwide"
+      ],
+      "why_not_apply": [
+        "preferred skill not found: Python",
+        "preferred skill not found: Excel"
+      ],
+      "recommended_action": "review_manually",
+      "score_breakdown": {
+        "responsibilities": 6.666666666666666,
+        "must_have_skills": 20,
+        "preferred_skills": 6,
+        "seniority": 7.5,
+        "location": 15,
+        "industry": 2.5,
+        "compensation": 2.5,
+        "language": 2.5,
+        "freshness": 3,
+        "data_quality": 0.6
+      },
+      "label": "relevant",
+      "title": "BI Analyst"
+    },
+    {
+      "jobId": "19ed7d36-1ee6-4cd1-836e-991bd5234d5f",
+      "score": 0,
+      "confidence": 0.8,
+      "decision": "reject",
+      "matched_requirements": [
+        "must-have skill present: SQL",
+        "location: remote and profile accepts remote worldwide"
+      ],
+      "missing_requirements": [
+        "preferred skill not found: Power BI",
+        "preferred skill not found: Python",
+        "preferred skill not found: Excel",
+        "preferred skill not found: dbt",
+        "preferred skill not found: Tableau"
+      ],
+      "uncertain_requirements": [],
+      "hard_blockers": [
+        "title matches an excluded title"
+      ],
+      "evidence": [
+        {
+          "field": "titleRaw",
+          "quote": "Senior Director of Analytics",
+          "sourceUrl": "https://synthetic.example.test/jobs/19ed7d36-1ee6-4cd1-836e-991bd5234d5f"
+        }
+      ],
+      "why_apply": [
+        "must-have skill present: SQL",
+        "location: remote and profile accepts remote worldwide"
+      ],
+      "why_not_apply": [
+        "title matches an excluded title",
+        "preferred skill not found: Power BI",
+        "preferred skill not found: Python",
+        "preferred skill not found: Excel"
+      ],
+      "recommended_action": "skip",
+      "score_breakdown": {
+        "responsibilities": 0,
+        "must_have_skills": 20,
+        "preferred_skills": 0,
+        "seniority": 9,
+        "location": 15,
+        "industry": 2.5,
+        "compensation": 2.5,
+        "language": 2.5,
+        "freshness": 3,
+        "data_quality": 0.6
+      },
+      "label": "not_relevant",
+      "title": "Senior Director of Analytics"
+    },
+    {
+      "jobId": "aec6172b-66ee-47b7-86c0-95ed48bb8fe7",
+      "score": 1,
+      "confidence": 0.65,
+      "decision": "reject",
+      "matched_requirements": [
+        "must-have skill present: SQL",
+        "preferred skill present: Power BI"
+      ],
+      "missing_requirements": [
+        "preferred skill not found: Python",
+        "preferred skill not found: Excel",
+        "preferred skill not found: dbt",
+        "preferred skill not found: Tableau"
+      ],
+      "uncertain_requirements": [
+        "seniority not stated"
+      ],
+      "hard_blockers": [
+        "location incompatible: onsite not accepted by profile"
+      ],
+      "evidence": [
+        {
+          "field": "titleRaw",
+          "quote": "Data Analyst",
+          "sourceUrl": "https://synthetic.example.test/jobs/aec6172b-66ee-47b7-86c0-95ed48bb8fe7"
+        }
+      ],
+      "why_apply": [
+        "must-have skill present: SQL",
+        "preferred skill present: Power BI"
+      ],
+      "why_not_apply": [
+        "location incompatible: onsite not accepted by profile",
+        "preferred skill not found: Python",
+        "preferred skill not found: Excel",
+        "preferred skill not found: dbt"
+      ],
+      "recommended_action": "skip",
+      "score_breakdown": {
+        "responsibilities": 0,
+        "must_have_skills": 20,
+        "preferred_skills": 2,
+        "seniority": 7.5,
+        "location": 0,
+        "industry": 2.5,
+        "compensation": 2.5,
+        "language": 2.5,
+        "freshness": 3,
+        "data_quality": 0.6
+      },
+      "label": "not_relevant",
+      "title": "Data Analyst"
+    },
+    {
+      "jobId": "aef1b15d-bbb2-4486-8e4e-d7dac5663c2e",
+      "score": 0,
+      "confidence": 0.8,
+      "decision": "reject",
+      "matched_requirements": [
+        "must-have skill present: SQL",
+        "preferred skill present: Excel",
+        "location: remote and profile accepts remote worldwide"
+      ],
+      "missing_requirements": [
+        "preferred skill not found: Power BI",
+        "preferred skill not found: Python",
+        "preferred skill not found: dbt",
+        "preferred skill not found: Tableau"
+      ],
+      "uncertain_requirements": [],
+      "hard_blockers": [
+        "title matches an excluded title",
+        "employment type rejected: unpaid"
+      ],
+      "evidence": [
+        {
+          "field": "titleRaw",
+          "quote": "Unpaid Data Intern",
+          "sourceUrl": "https://synthetic.example.test/jobs/aef1b15d-bbb2-4486-8e4e-d7dac5663c2e"
+        }
+      ],
+      "why_apply": [
+        "must-have skill present: SQL",
+        "preferred skill present: Excel",
+        "location: remote and profile accepts remote worldwide"
+      ],
+      "why_not_apply": [
+        "title matches an excluded title",
+        "employment type rejected: unpaid",
+        "preferred skill not found: Power BI",
+        "preferred skill not found: Python",
+        "preferred skill not found: dbt"
+      ],
+      "recommended_action": "skip",
+      "score_breakdown": {
+        "responsibilities": 0,
+        "must_have_skills": 20,
+        "preferred_skills": 2,
+        "seniority": 0,
+        "location": 15,
+        "industry": 2.5,
+        "compensation": 2.5,
+        "language": 2.5,
+        "freshness": 3,
+        "data_quality": 0.6
+      },
+      "label": "not_relevant",
+      "title": "Unpaid Data Intern"
+    },
+    {
+      "jobId": "5c4e1c05-c93f-4bae-8f76-4daf081bc5a9",
+      "score": 0,
+      "confidence": 0.65,
+      "decision": "reject",
+      "matched_requirements": [
+        "location: remote and profile accepts remote worldwide"
+      ],
+      "missing_requirements": [
+        "must-have skill not found: SQL",
+        "preferred skill not found: Power BI",
+        "preferred skill not found: Python",
+        "preferred skill not found: Excel",
+        "preferred skill not found: dbt",
+        "preferred skill not found: Tableau"
+      ],
+      "uncertain_requirements": [
+        "seniority not stated"
+      ],
+      "hard_blockers": [
+        "no must-have skill found (SQL)"
+      ],
+      "evidence": [
+        {
+          "field": "titleRaw",
+          "quote": "Backend Engineer (Go)",
+          "sourceUrl": "https://synthetic.example.test/jobs/5c4e1c05-c93f-4bae-8f76-4daf081bc5a9"
+        }
+      ],
+      "why_apply": [
+        "location: remote and profile accepts remote worldwide"
+      ],
+      "why_not_apply": [
+        "no must-have skill found (SQL)",
+        "must-have skill not found: SQL",
+        "preferred skill not found: Power BI",
+        "preferred skill not found: Python"
+      ],
+      "recommended_action": "skip",
+      "score_breakdown": {
+        "responsibilities": 0,
+        "must_have_skills": 0,
+        "preferred_skills": 0,
+        "seniority": 7.5,
+        "location": 15,
+        "industry": 2.5,
+        "compensation": 2.5,
+        "language": 2.5,
+        "freshness": 3,
+        "data_quality": 0.6
+      },
+      "label": "not_relevant",
+      "title": "Backend Engineer (Go)"
+    },
+    {
+      "jobId": "f71aad3d-c16e-4874-8b32-26391057a3ea",
+      "score": 0,
+      "confidence": 0.65,
+      "decision": "reject",
+      "matched_requirements": [
+        "location: remote and profile accepts remote worldwide"
+      ],
+      "missing_requirements": [
+        "must-have skill not found: SQL",
+        "preferred skill not found: Power BI",
+        "preferred skill not found: Python",
+        "preferred skill not found: Excel",
+        "preferred skill not found: dbt",
+        "preferred skill not found: Tableau"
+      ],
+      "uncertain_requirements": [
+        "seniority not stated"
+      ],
+      "hard_blockers": [
+        "no must-have skill found (SQL)"
+      ],
+      "evidence": [
+        {
+          "field": "titleRaw",
+          "quote": "Sales Development Representative",
+          "sourceUrl": "https://synthetic.example.test/jobs/f71aad3d-c16e-4874-8b32-26391057a3ea"
+        }
+      ],
+      "why_apply": [
+        "location: remote and profile accepts remote worldwide"
+      ],
+      "why_not_apply": [
+        "no must-have skill found (SQL)",
+        "must-have skill not found: SQL",
+        "preferred skill not found: Power BI",
+        "preferred skill not found: Python"
+      ],
+      "recommended_action": "skip",
+      "score_breakdown": {
+        "responsibilities": 0,
+        "must_have_skills": 0,
+        "preferred_skills": 0,
+        "seniority": 7.5,
+        "location": 15,
+        "industry": 2.5,
+        "compensation": 2.5,
+        "language": 2.5,
+        "freshness": 3,
+        "data_quality": 0.6
+      },
+      "label": "not_relevant",
+      "title": "Sales Development Representative"
+    },
+    {
+      "jobId": "81e2c1f5-25b2-4d44-8655-b6d6bd521321",
+      "score": 22,
+      "confidence": 0.65,
+      "decision": "reject",
+      "matched_requirements": [
+        "must-have skill present: SQL",
+        "preferred skill present: Power BI",
+        "location: remote and profile accepts remote worldwide"
+      ],
+      "missing_requirements": [
+        "preferred skill not found: Python",
+        "preferred skill not found: Excel",
+        "preferred skill not found: dbt",
+        "preferred skill not found: Tableau"
+      ],
+      "uncertain_requirements": [
+        "seniority not stated"
+      ],
+      "hard_blockers": [
+        "job is closed"
+      ],
+      "evidence": [
+        {
+          "field": "titleRaw",
+          "quote": "Data Analyst",
+          "sourceUrl": "https://synthetic.example.test/jobs/81e2c1f5-25b2-4d44-8655-b6d6bd521321"
+        }
+      ],
+      "why_apply": [
+        "must-have skill present: SQL",
+        "preferred skill present: Power BI",
+        "location: remote and profile accepts remote worldwide"
+      ],
+      "why_not_apply": [
+        "job is closed",
+        "preferred skill not found: Python",
+        "preferred skill not found: Excel",
+        "preferred skill not found: dbt"
+      ],
+      "recommended_action": "skip",
+      "score_breakdown": {
+        "responsibilities": 6.666666666666666,
+        "must_have_skills": 20,
+        "preferred_skills": 2,
+        "seniority": 7.5,
+        "location": 15,
+        "industry": 2.5,
+        "compensation": 2.5,
+        "language": 2.5,
+        "freshness": 3,
+        "data_quality": 0.6
+      },
+      "label": "not_relevant",
+      "title": "Data Analyst"
+    },
+    {
+      "jobId": "118b4c22-075c-4e16-8ba2-30fa5b6a599d",
+      "score": 0,
+      "confidence": 0.8,
+      "decision": "reject",
+      "matched_requirements": [],
+      "missing_requirements": [
+        "must-have skill not found: SQL",
+        "preferred skill not found: Power BI",
+        "preferred skill not found: Python",
+        "preferred skill not found: Excel",
+        "preferred skill not found: dbt",
+        "preferred skill not found: Tableau"
+      ],
+      "uncertain_requirements": [],
+      "hard_blockers": [
+        "location incompatible: hybrid outside accepted locations",
+        "no must-have skill found (SQL)",
+        "seniority far above preference (manager)"
+      ],
+      "evidence": [
+        {
+          "field": "titleRaw",
+          "quote": "Marketing Manager",
+          "sourceUrl": "https://synthetic.example.test/jobs/118b4c22-075c-4e16-8ba2-30fa5b6a599d"
+        }
+      ],
+      "why_apply": [],
+      "why_not_apply": [
+        "location incompatible: hybrid outside accepted locations",
+        "no must-have skill found (SQL)",
+        "seniority far above preference (manager)",
+        "must-have skill not found: SQL",
+        "preferred skill not found: Power BI",
+        "preferred skill not found: Python"
+      ],
+      "recommended_action": "skip",
+      "score_breakdown": {
+        "responsibilities": 0,
+        "must_have_skills": 0,
+        "preferred_skills": 0,
+        "seniority": 0,
+        "location": 0,
+        "industry": 2.5,
+        "compensation": 2.5,
+        "language": 2.5,
+        "freshness": 3,
+        "data_quality": 0.6
+      },
+      "label": "not_relevant",
+      "title": "Marketing Manager"
+    },
+    {
+      "jobId": "2b7f2fe9-a5bb-4e05-88f7-fe037b8f1911",
+      "score": 28,
+      "confidence": 0.65,
+      "decision": "discard",
+      "matched_requirements": [
+        "must-have skill present: SQL",
+        "preferred skill present: Excel",
+        "location: remote and profile accepts remote worldwide"
+      ],
+      "missing_requirements": [
+        "preferred skill not found: Power BI",
+        "preferred skill not found: Python",
+        "preferred skill not found: dbt",
+        "preferred skill not found: Tableau"
+      ],
+      "uncertain_requirements": [
+        "seniority not stated"
+      ],
+      "hard_blockers": [],
+      "evidence": [
+        {
+          "field": "titleRaw",
+          "quote": "Financial Analyst",
+          "sourceUrl": "https://synthetic.example.test/jobs/2b7f2fe9-a5bb-4e05-88f7-fe037b8f1911"
+        }
+      ],
+      "why_apply": [
+        "must-have skill present: SQL",
+        "preferred skill present: Excel",
+        "location: remote and profile accepts remote worldwide"
+      ],
+      "why_not_apply": [
+        "preferred skill not found: Power BI",
+        "preferred skill not found: Python",
+        "preferred skill not found: dbt"
+      ],
+      "recommended_action": "ignore_unless_curious",
+      "score_breakdown": {
+        "responsibilities": 6.666666666666666,
+        "must_have_skills": 20,
+        "preferred_skills": 2,
+        "seniority": 7.5,
+        "location": 15,
+        "industry": 2.5,
+        "compensation": 2.5,
+        "language": 2.5,
+        "freshness": 3,
+        "data_quality": 0.6
+      },
+      "label": "relevant",
+      "title": "Financial Analyst"
+    },
+    {
+      "jobId": "d1895625-8aeb-4634-82b4-0d18b247613e",
+      "score": 25,
+      "confidence": 0.65,
+      "decision": "discard",
+      "matched_requirements": [
+        "must-have skill present: SQL",
+        "preferred skill present: dbt",
+        "location: remote and profile accepts remote worldwide"
+      ],
+      "missing_requirements": [
+        "preferred skill not found: Power BI",
+        "preferred skill not found: Python",
+        "preferred skill not found: Excel",
+        "preferred skill not found: Tableau"
+      ],
+      "uncertain_requirements": [
+        "seniority not stated"
+      ],
+      "hard_blockers": [],
+      "evidence": [
+        {
+          "field": "titleRaw",
+          "quote": "Data Engineer",
+          "sourceUrl": "https://synthetic.example.test/jobs/d1895625-8aeb-4634-82b4-0d18b247613e"
+        }
+      ],
+      "why_apply": [
+        "must-have skill present: SQL",
+        "preferred skill present: dbt",
+        "location: remote and profile accepts remote worldwide"
+      ],
+      "why_not_apply": [
+        "preferred skill not found: Power BI",
+        "preferred skill not found: Python",
+        "preferred skill not found: Excel"
+      ],
+      "recommended_action": "ignore_unless_curious",
+      "score_breakdown": {
+        "responsibilities": 0,
+        "must_have_skills": 20,
+        "preferred_skills": 2,
+        "seniority": 7.5,
+        "location": 15,
+        "industry": 2.5,
+        "compensation": 2.5,
+        "language": 2.5,
+        "freshness": 3,
+        "data_quality": 0.6
+      },
+      "label": "not_relevant",
+      "title": "Data Engineer"
+    },
+    {
+      "jobId": "33b7a77b-1e8e-4e6e-807c-2017eecbcc55",
+      "score": 26,
+      "confidence": 0.65,
+      "decision": "discard",
+      "matched_requirements": [
+        "must-have skill present: SQL",
+        "preferred skill present: Power BI",
+        "preferred skill present: Excel",
+        "location: remote and profile accepts remote worldwide"
+      ],
+      "missing_requirements": [
+        "preferred skill not found: Python",
+        "preferred skill not found: dbt",
+        "preferred skill not found: Tableau"
+      ],
+      "uncertain_requirements": [
+        "seniority not stated"
+      ],
+      "hard_blockers": [],
+      "evidence": [
+        {
+          "field": "titleRaw",
+          "quote": "Analista de Datos",
+          "sourceUrl": "https://synthetic.example.test/jobs/33b7a77b-1e8e-4e6e-807c-2017eecbcc55"
+        }
+      ],
+      "why_apply": [
+        "must-have skill present: SQL",
+        "preferred skill present: Power BI",
+        "preferred skill present: Excel",
+        "location: remote and profile accepts remote worldwide"
+      ],
+      "why_not_apply": [
+        "preferred skill not found: Python",
+        "preferred skill not found: dbt",
+        "preferred skill not found: Tableau"
+      ],
+      "recommended_action": "ignore_unless_curious",
+      "score_breakdown": {
+        "responsibilities": 0,
+        "must_have_skills": 20,
+        "preferred_skills": 4,
+        "seniority": 7.5,
+        "location": 15,
+        "industry": 2.5,
+        "compensation": 2.5,
+        "language": 2.5,
+        "freshness": 3,
+        "data_quality": 0.6
+      },
+      "label": "relevant",
+      "title": "Analista de Datos"
+    },
+    {
+      "jobId": "4aaa8f98-a6f4-41a8-85f7-b4c95fd7a7e6",
+      "score": 45,
+      "confidence": 0.35,
+      "decision": "consider",
+      "matched_requirements": [
+        "must-have skill present: SQL"
+      ],
+      "missing_requirements": [
+        "preferred skill not found: Power BI",
+        "preferred skill not found: Python",
+        "preferred skill not found: Excel",
+        "preferred skill not found: dbt",
+        "preferred skill not found: Tableau"
+      ],
+      "uncertain_requirements": [
+        "location: work mode not stated by the source",
+        "work mode not stated",
+        "publication date not stated",
+        "seniority not stated"
+      ],
+      "hard_blockers": [],
+      "evidence": [
+        {
+          "field": "titleRaw",
+          "quote": "Data Analyst",
+          "sourceUrl": "https://synthetic.example.test/jobs/4aaa8f98-a6f4-41a8-85f7-b4c95fd7a7e6"
+        }
+      ],
+      "why_apply": [
+        "must-have skill present: SQL"
+      ],
+      "why_not_apply": [
+        "preferred skill not found: Power BI",
+        "preferred skill not found: Python",
+        "preferred skill not found: Excel"
+      ],
+      "recommended_action": "review_manually",
+      "score_breakdown": {
+        "responsibilities": 0,
+        "must_have_skills": 20,
+        "preferred_skills": 0,
+        "seniority": 7.5,
+        "location": 7.5,
+        "industry": 2.5,
+        "compensation": 2.5,
+        "language": 2.5,
+        "freshness": 1.5,
+        "data_quality": 0.6
+      },
+      "label": "relevant",
+      "title": "Data Analyst"
+    },
+    {
+      "jobId": "893f8686-c41d-4747-8f9e-88ddd82a0e5e",
+      "score": 0,
+      "confidence": 0.8,
+      "decision": "reject",
+      "matched_requirements": [
+        "location: remote and profile accepts remote worldwide"
+      ],
+      "missing_requirements": [
+        "must-have skill not found: SQL",
+        "preferred skill not found: Power BI",
+        "preferred skill not found: Python",
+        "preferred skill not found: Excel",
+        "preferred skill not found: dbt",
+        "preferred skill not found: Tableau"
+      ],
+      "uncertain_requirements": [],
+      "hard_blockers": [
+        "no must-have skill found (SQL)",
+        "seniority far above preference (executive)"
+      ],
+      "evidence": [
+        {
+          "field": "titleRaw",
+          "quote": "Head of Data",
+          "sourceUrl": "https://synthetic.example.test/jobs/893f8686-c41d-4747-8f9e-88ddd82a0e5e"
+        }
+      ],
+      "why_apply": [
+        "location: remote and profile accepts remote worldwide"
+      ],
+      "why_not_apply": [
+        "no must-have skill found (SQL)",
+        "seniority far above preference (executive)",
+        "must-have skill not found: SQL",
+        "preferred skill not found: Power BI",
+        "preferred skill not found: Python"
+      ],
+      "recommended_action": "skip",
+      "score_breakdown": {
+        "responsibilities": 0,
+        "must_have_skills": 0,
+        "preferred_skills": 0,
+        "seniority": 0,
+        "location": 15,
+        "industry": 2.5,
+        "compensation": 2.5,
+        "language": 2.5,
+        "freshness": 3,
+        "data_quality": 0.6
+      },
+      "label": "not_relevant",
+      "title": "Head of Data"
+    },
+    {
+      "jobId": "0e6c0016-8c77-4ba8-8adf-f98207a91f30",
+      "score": 0,
+      "confidence": 0.65,
+      "decision": "reject",
+      "matched_requirements": [
+        "location: remote and profile accepts remote worldwide"
+      ],
+      "missing_requirements": [
+        "must-have skill not found: SQL",
+        "preferred skill not found: Power BI",
+        "preferred skill not found: Python",
+        "preferred skill not found: Excel",
+        "preferred skill not found: dbt",
+        "preferred skill not found: Tableau"
+      ],
+      "uncertain_requirements": [
+        "seniority not stated"
+      ],
+      "hard_blockers": [
+        "no must-have skill found (SQL)"
+      ],
+      "evidence": [
+        {
+          "field": "titleRaw",
+          "quote": "Customer Support Specialist",
+          "sourceUrl": "https://synthetic.example.test/jobs/0e6c0016-8c77-4ba8-8adf-f98207a91f30"
+        }
+      ],
+      "why_apply": [
+        "location: remote and profile accepts remote worldwide"
+      ],
+      "why_not_apply": [
+        "no must-have skill found (SQL)",
+        "must-have skill not found: SQL",
+        "preferred skill not found: Power BI",
+        "preferred skill not found: Python"
+      ],
+      "recommended_action": "skip",
+      "score_breakdown": {
+        "responsibilities": 0,
+        "must_have_skills": 0,
+        "preferred_skills": 0,
+        "seniority": 7.5,
+        "location": 15,
+        "industry": 2.5,
+        "compensation": 2.5,
+        "language": 2.5,
+        "freshness": 3,
+        "data_quality": 0.6
+      },
+      "label": "not_relevant",
+      "title": "Customer Support Specialist"
+    }
+  ]
+}

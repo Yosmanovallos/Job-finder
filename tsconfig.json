@@ -6,6 +6,7 @@
     { "path": "./packages/sources" },
     { "path": "./packages/dedupe" },
     { "path": "./packages/ingestion" },
+    { "path": "./packages/matching" },
     { "path": "./packages/observability" },
     { "path": "./packages/db" },
     { "path": "./apps/cli" }
