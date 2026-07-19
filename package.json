@@ -33,6 +33,8 @@
     "notion:schema:check": "pnpm --filter @job-radar/cli notion:schema:check",
     "notion:sync": "pnpm --filter @job-radar/cli notion:sync",
     "notion:reconcile": "pnpm --filter @job-radar/cli notion:reconcile",
+    "discover:secop": "pnpm --filter @job-radar/notion exec tsx src/run-secop.ts",
+    "discover:boards": "pnpm --filter @job-radar/notion exec tsx src/run-boards.ts",
     "apply:prepare": "pnpm --filter @job-radar/cli apply:prepare",
     "apply:approve": "pnpm --filter @job-radar/cli apply:approve",
     "apply:list": "pnpm --filter @job-radar/cli apply:list"
