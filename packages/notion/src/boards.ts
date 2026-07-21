@@ -15,7 +15,9 @@ const UA = "job-radar-local (+contact: yosmanovallos123@gmail.com)";
 const NS = "6ba7b810-9dad-11d1-80b4-00c04fd430c8";
 function uuidv5(name: string): string {
   const ns = Buffer.from(NS.replace(/-/g, ""), "hex");
-  const hash = createHash("sha1").update(Buffer.concat([ns, Buffer.from(name, "utf8")])).digest();
+  const hash = createHash("sha1")
+    .update(Buffer.concat([ns, Buffer.from(name, "utf8")]))
+    .digest();
   const b = hash.subarray(0, 16);
   b[6] = (b[6]! & 0x0f) | 0x50;
   b[8] = (b[8]! & 0x3f) | 0x80;
@@ -36,7 +38,9 @@ function decodeEntities(s: string): string {
 }
 
 function stripHtml(html: string): string {
-  return decodeEntities(html.replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim();
+  return decodeEntities(html.replace(/<[^>]+>/g, " "))
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function isoOrNull(raw: string | null): string | null {
@@ -91,8 +95,32 @@ export interface BuildInput {
   compMin: number | null;
   compMax: number | null;
   compCurrency: string | null;
+  /** Source-stated employment type, verbatim. null when the source omits it. */
+  employmentType: string | null;
   extractionMethod: CanonicalJob["extractionMethod"];
   now: string;
+}
+
+/**
+ * Normalizes the source-stated employment type to a stable vocabulary.
+ * Returns [] for null/unrecognized input rather than guessing — an unmapped
+ * value must not become a fabricated job fact (regla 5).
+ */
+export function normalizeEmploymentType(raw: string | null): string[] {
+  if (!raw) return [];
+  const key = raw.toLowerCase().replace(/[\s_-]+/g, "");
+  const map: Record<string, string> = {
+    fulltime: "full_time",
+    parttime: "part_time",
+    contract: "contract",
+    contractor: "contract",
+    freelance: "freelance",
+    temporary: "temporary",
+    internship: "internship",
+    intern: "internship"
+  };
+  const mapped = map[key];
+  return mapped ? [mapped] : [];
 }
 
 /** Builds a schema-valid CanonicalJob; never invents unstated facts. */
@@ -131,7 +159,7 @@ export function buildCanonicalJob(input: BuildInput): CanonicalJob {
     // These boards are remote-only by design (source-stated, not inferred).
     workMode: "remote",
     remoteRegion: input.location,
-    employmentTypes: [],
+    employmentTypes: normalizeEmploymentType(input.employmentType),
     compensation: {
       min: input.compMin,
       max: input.compMax,
@@ -170,7 +198,9 @@ function tag(block: string, name: string): string | null {
 }
 
 async function getText(url: string): Promise<string> {
-  const res = await fetch(url, { headers: { "user-agent": UA, accept: "application/xml, application/json" } });
+  const res = await fetch(url, {
+    headers: { "user-agent": UA, accept: "application/xml, application/json" }
+  });
   if (!res.ok) throw new Error(`${url} → HTTP ${res.status}`);
   return res.text();
 }
@@ -178,9 +208,18 @@ async function getText(url: string): Promise<string> {
 // ---- RemoteOK (JSON API) -------------------------------------------------
 
 interface RemoteOkJob {
-  id?: string; slug?: string; position?: string; company?: string; tags?: string[];
-  description?: string; location?: string; url?: string; apply_url?: string;
-  date?: string; salary_min?: number; salary_max?: number;
+  id?: string;
+  slug?: string;
+  position?: string;
+  company?: string;
+  tags?: string[];
+  description?: string;
+  location?: string;
+  url?: string;
+  apply_url?: string;
+  date?: string;
+  salary_min?: number;
+  salary_max?: number;
 }
 
 export async function fetchRemoteOk(now: string): Promise<CanonicalJob[]> {
@@ -208,6 +247,10 @@ export async function fetchRemoteOk(now: string): Promise<CanonicalJob[]> {
         compMin: min,
         compMax: max,
         compCurrency: min || max ? "USD" : null,
+        // RemoteOK exposes no contract-type field: neither the flat API nor the
+        // tags carry it (verified 2026-07-20, 0/303 sampled). Left null rather
+        // than a second fetch per job for a signal that isn't there.
+        employmentType: null,
         extractionMethod: "api",
         now
       })
@@ -239,7 +282,8 @@ export async function fetchRemotive(now: string): Promise<CanonicalJob[]> {
       const description = stripHtml(tag(block, "description") ?? "");
       const category = tag(block, "category") ?? "";
       // software-development is broad: keep only QA/AI-relevant ones.
-      if (cat === "software-development" && matchesQaAi(`${title} ${description}`).length === 0) continue;
+      if (cat === "software-development" && matchesQaAi(`${title} ${description}`).length === 0)
+        continue;
       seen.add(jobId);
       out.push(
         buildCanonicalJob({
@@ -256,6 +300,7 @@ export async function fetchRemotive(now: string): Promise<CanonicalJob[]> {
           compMin: null,
           compMax: null,
           compCurrency: null,
+          employmentType: tag(block, "type"),
           extractionMethod: "api",
           now
         })
@@ -289,13 +334,14 @@ export async function fetchWwr(now: string): Promise<CanonicalJob[]> {
         title,
         company,
         descriptionText: description,
-        tags: (tag(block, "category") ? [tag(block, "category")!] : []),
+        tags: tag(block, "category") ? [tag(block, "category")!] : [],
         location: region,
         publishedAt: isoOrNull(tag(block, "pubDate")),
         expiresAt: isoOrNull(tag(block, "expires_at")),
         compMin: null,
         compMax: null,
         compCurrency: null,
+        employmentType: tag(block, "type"),
         extractionMethod: "api",
         now
       })

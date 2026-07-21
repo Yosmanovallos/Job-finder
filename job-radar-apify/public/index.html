@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Job Radar Professional | Buscador Inteligente Multidisciplinario</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header Navbar -->
+    <header class="navbar">
+      <div class="brand">
+        <div class="brand-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="9"/>
+            <path d="M12 3v9l4 4"/>
+          </svg>
+        </div>
+        <div>
+          <h1>Job Radar <span>Professional</span></h1>
+          <p class="subtitle">Buscador Inteligente Multidisciplinario de Empleo en Colombia y Remoto</p>
+        </div>
+      </div>
+      <div class="nav-actions">
+        <div class="status-indicator ready" id="statusPill">
+          <span class="status-dot"></span>
+          <span id="statusText">Sistema Listo</span>
+        </div>
+        <button class="btn btn-primary" id="runScraperBtn">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M5 3l14 9-14 9V3z"/>
+          </svg>
+          <span>Ejecutar Scraper</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Custom Search Roles Configuration Panel -->
+    <section class="roles-config-card">
+      <div class="config-header">
+        <div>
+          <h3>🎯 Puestos y Roles a Buscar</h3>
+          <p class="config-subtitle">Escribe los roles que deseas rastrear o selecciona los accesos rápidos. El radar buscará exactamente estos puestos.</p>
+        </div>
+      </div>
+
+      <div class="keywords-input-wrapper" style="display: flex; gap: 12px; flex-wrap: wrap;">
+        <input type="text" id="customKeywordsInput" value="Project Manager, Business Analyst, Data Analyst, Data Engineer, RPA Developer, QA Engineer, AI Engineer" placeholder="Escribe los roles separados por coma (Ej: Project Manager, Ingeniero Civil, Business Analyst...)" style="flex: 1; min-width: 280px;">
+        <div class="date-range-wrapper" style="min-width: 220px;">
+          <select id="dateRangeSelect" class="date-range-select" title="Selecciona el rango de fecha obligatorio para el scraper">
+            <option value="24h">⏱️ Hoy (Últimas 24 Horas)</option>
+            <option value="48h" selected>📅 Últimas 48 Horas (Recomendado)</option>
+            <option value="7d">🗓️ Última Semana (7 Días)</option>
+            <option value="14d">📆 Últimos 14 Días</option>
+            <option value="30d">🗓️ Último Mes (30 Días)</option>
+            <option value="all">♾️ Cualquier Fecha (Sin Límite)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="preset-badges-row">
+        <span class="preset-title">Añadir rápidamente:</span>
+        <button class="preset-chip" data-keyword="Project Manager">+ Project Manager</button>
+        <button class="preset-chip" data-keyword="Business Analyst">+ Business Analyst</button>
+        <button class="preset-chip" data-keyword="Ingeniero Civil">+ Ingeniero Civil</button>
+        <button class="preset-chip" data-keyword="Data Analyst">+ Data Analyst</button>
+        <button class="preset-chip" data-keyword="Data Engineer">+ Data Engineer</button>
+        <button class="preset-chip" data-keyword="RPA Developer">+ RPA Developer</button>
+        <button class="preset-chip" data-keyword="QA Engineer">+ QA Engineer</button>
+        <button class="preset-chip" data-keyword="AI Engineer">+ AI Engineer</button>
+        <button class="preset-chip" data-keyword="Scrum Master">+ Scrum Master</button>
+        <button class="preset-chip" data-keyword="Product Owner">+ Product Owner</button>
+      </div>
+    </section>
+
+    <!-- Metrics Summary Bar -->
+    <section class="metrics-grid">
+      <div class="metric-card">
+        <div class="metric-header">
+          <span class="metric-title">Total Vacantes Registradas</span>
+          <span class="metric-icon total-icon">💼</span>
+        </div>
+        <div class="metric-value" id="metricTotal">--</div>
+        <div class="metric-sub">Sincronizadas en tu Notion</div>
+      </div>
+
+      <div class="metric-card accent-data">
+        <div class="metric-header">
+          <span class="metric-title">Gestión y Datos (PM / Data)</span>
+          <span class="metric-icon ai-icon">📊</span>
+        </div>
+        <div class="metric-value" id="metricData">--</div>
+        <div class="metric-sub">PM, Data Analyst, Engineer</div>
+      </div>
+
+      <div class="metric-card accent-tech">
+        <div class="metric-header">
+          <span class="metric-title">Automatización y Dev (RPA/QA)</span>
+          <span class="metric-icon qa-icon">🤖</span>
+        </div>
+        <div class="metric-value" id="metricTech">--</div>
+        <div class="metric-sub">RPA, QA, Dev, AI</div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-header">
+          <span class="metric-title">Fuentes Activas</span>
+          <span class="metric-icon sources-icon">🌐</span>
+        </div>
+        <div class="metric-value" id="metricSources">6</div>
+        <div class="metric-sub">LinkedIn, Workana, Magneto, etc.</div>
+      </div>
+    </section>
+
+    <!-- Terminal Drawer Collapsible -->
+    <section class="terminal-section" id="terminalSection">
+      <div class="terminal-header" id="terminalHeader">
+        <div class="terminal-title">
+          <span class="terminal-dot red"></span>
+          <span class="terminal-dot yellow"></span>
+          <span class="terminal-dot green"></span>
+          <span>Terminal de Consola en Vivo (Scraper Progress)</span>
+        </div>
+        <div class="terminal-actions">
+          <button class="btn-text" id="clearLogsBtn">Limpiar Log</button>
+          <button class="btn-text" id="toggleTerminalBtn">Minimizar</button>
+        </div>
+      </div>
+      <div class="terminal-body" id="terminalConsole">
+        <div class="log-line info">[Sistema] Consola inicializada. Escribe tus roles requeridos y haz clic en "Ejecutar Scraper".</div>
+      </div>
+    </section>
+
+    <!-- Notion Runs Selector & View Modes -->
+    <section class="notion-runs-section">
+      <div class="notion-runs-header">
+        <div class="notion-runs-title">
+          <span>🎯 Corridas Registradas en Notion:</span>
+        </div>
+        <div class="view-switch-btns">
+          <button class="view-btn active" id="viewTableBtn">📋 Vista Tabla Notion</button>
+          <button class="view-btn" id="viewGridBtn">🎴 Vista Tarjetas</button>
+        </div>
+      </div>
+      <div class="notion-runs-tabs" id="notionRunsTabs">
+        <button class="run-tab active" data-run-id="all">✨ Todas las Corridas</button>
+      </div>
+    </section>
+
+    <!-- Search & Filter Controls -->
+    <section class="controls-section">
+      <div class="search-box">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"/>
+          <path d="M21 21l-4.35-4.35"/>
+        </svg>
+        <input type="text" id="searchInput" placeholder="Filtrar por puesto, empresa o ciudad...">
+      </div>
+
+      <div class="filters-row">
+        <div class="filter-group">
+          <label>Fuente:</label>
+          <select id="sourceFilter">
+            <option value="all">Todas las Fuentes</option>
+            <option value="LinkedIn">LinkedIn</option>
+            <option value="Computrabajo">Computrabajo</option>
+            <option value="Elempleo">Elempleo</option>
+            <option value="Magneto">Magneto 365</option>
+            <option value="Workana">Workana</option>
+            <option value="Glassdoor">Glassdoor</option>
+            <option value="Torre">Torre.co</option>
+            <option value="GetOnBoard">GetOnBoard</option>
+            <option value="WeRemoto">WeRemoto</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <label>Modalidad:</label>
+          <select id="modalityFilter">
+            <option value="all">Todas las Modalidades</option>
+            <option value="Remoto">Remoto</option>
+            <option value="Híbrido">Híbrido</option>
+            <option value="Presencial">Presencial</option>
+          </select>
+        </div>
+
+        <button class="btn btn-secondary" id="refreshBtn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M23 4v6h-6M1 20v-6h6"/>
+            <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+          </svg>
+          Actualizar Vista Notion
+        </button>
+      </div>
+    </section>
+
+    <!-- Jobs Section (Table & Cards) -->
+    <main class="jobs-section">
+      <div class="section-title-row">
+        <h2>Vacantes Encontradas <span class="badge-count" id="jobsCountBadge">0</span></h2>
+        <span class="last-sync-text" id="lastSyncText">Cargando datos de Notion...</span>
+      </div>
+
+      <div class="jobs-container-wrapper" id="jobsContainer">
+        <div class="loading-state">
+          <div class="spinner"></div>
+          <p>Cargando vacantes desde Notion...</p>
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <p>Job Radar Professional &copy; 2026 — Sincronizado en tiempo real con tu base de datos de Notion</p>
+    </footer>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

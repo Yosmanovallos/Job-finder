@@ -36,7 +36,7 @@ function arg(name: string): string | undefined {
 async function main(): Promise<void> {
   const root = process.env.INIT_CWD ?? process.cwd();
   const execute = process.argv.includes("--execute");
-  const sinceDays = Number.parseInt(arg("since-days") ?? "60", 10);
+  const sinceDays = Number.parseInt(arg("since-days") ?? "120", 10);
   const limit = Number.parseInt(arg("limit") ?? "300", 10);
   const statePath = resolve(root, "var/notion/oportunidades.json");
 
@@ -52,6 +52,12 @@ async function main(): Promise<void> {
     else plan.skip += 1;
   }
 
+  // Pages loaded by a previous (broader) run that no longer pass the current
+  // natural-person filter. Archived to the Notion trash (reversible), never
+  // hard-deleted; then dropped from local state so re-runs are idempotent.
+  const currentIds = new Set(opportunities.map((o) => o.externalId));
+  const staleIds = Object.keys(state.pages).filter((id) => !currentIds.has(id));
+
   const summary = {
     fuente: "SECOP II (datos.gov.co p6dx-8zbt)",
     ventana_desde: sinceIso,
@@ -61,7 +67,12 @@ async function main(): Promise<void> {
       Alta: opportunities.filter((o) => o.relevance === "Alta").length,
       Media: opportunities.filter((o) => o.relevance === "Media").length
     },
-    plan: { crear: plan.create.length, actualizar: plan.update.length, sin_cambios: plan.skip },
+    plan: {
+      crear: plan.create.length,
+      actualizar: plan.update.length,
+      sin_cambios: plan.skip,
+      archivar_obsoletas: staleIds.length
+    },
     muestra: rows.slice(0, 8).map(({ opp }) => ({
       relevancia: opp.relevance,
       entidad: opp.entidad,
@@ -73,7 +84,11 @@ async function main(): Promise<void> {
   if (!execute) {
     console.log(
       JSON.stringify(
-        { modo: "dry-run", ...summary, nota: "Sin escrituras. Corre con --execute para crear/actualizar en Notion." },
+        {
+          modo: "dry-run",
+          ...summary,
+          nota: "Sin escrituras. Corre con --execute para crear/actualizar en Notion."
+        },
         null,
         2
       )
@@ -92,7 +107,10 @@ async function main(): Promise<void> {
       state.dataSourceId = existing.dataSourceId;
     } else {
       const parent = await api.findParentPage(PARENT_PAGE_TITLE);
-      if (!parent) throw new Error(`No encuentro la página padre "${PARENT_PAGE_TITLE}" compartida con la integración.`);
+      if (!parent)
+        throw new Error(
+          `No encuentro la página padre "${PARENT_PAGE_TITLE}" compartida con la integración.`
+        );
       const created = await api.createDatabase(parent, DB_TITLE, OPPORTUNITY_SCHEMA);
       state.databaseId = created.databaseId;
       state.dataSourceId = created.dataSourceId;
@@ -100,6 +118,9 @@ async function main(): Promise<void> {
     }
   }
   const dataSourceId = state.dataSourceId!;
+  // Backfill schema properties added after the database was first created
+  // (e.g. "Tipo de contrato"). Idempotent: existing properties are untouched.
+  await api.ensureProperties(dataSourceId, OPPORTUNITY_SCHEMA);
 
   let created = 0;
   let updated = 0;
@@ -118,7 +139,26 @@ async function main(): Promise<void> {
       }
       saveState(statePath, state);
     } catch (e) {
-      errors.push({ externalId: opp.externalId, error: e instanceof Error ? e.message : String(e) });
+      errors.push({
+        externalId: opp.externalId,
+        error: e instanceof Error ? e.message : String(e)
+      });
+    }
+  }
+  saveState(statePath, state);
+
+  // Archive stale pages (previous broader run) to the Notion trash.
+  let archived = 0;
+  for (const id of staleIds) {
+    const prev = state.pages[id];
+    if (!prev) continue;
+    try {
+      await api.archivePage(prev.pageId);
+      delete state.pages[id];
+      archived += 1;
+      saveState(statePath, state);
+    } catch (e) {
+      errors.push({ externalId: id, error: e instanceof Error ? e.message : String(e) });
     }
   }
   saveState(statePath, state);
@@ -128,7 +168,12 @@ async function main(): Promise<void> {
       {
         modo: "execute",
         ...summary,
-        resultado: { creadas: created, actualizadas: updated, errores: errors.length },
+        resultado: {
+          creadas: created,
+          actualizadas: updated,
+          archivadas: archived,
+          errores: errors.length
+        },
         database_id: state.databaseId,
         data_source_id: state.dataSourceId,
         errores: errors.slice(0, 5)

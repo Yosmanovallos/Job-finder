@@ -6,7 +6,12 @@ import { readFileSync } from "node:fs";
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { loadProfile } from "@job-radar/domain";
-import { defaultScoringConfig, loadScoringConfig, rankResults, scoreJob } from "@job-radar/matching";
+import {
+  defaultScoringConfig,
+  loadScoringConfig,
+  rankResults,
+  scoreJob
+} from "@job-radar/matching";
 import { createNotionApi } from "./api.js";
 import { createFileDlq } from "./dlq.js";
 import { createFileStateStore } from "./file-state-store.js";
@@ -28,7 +33,9 @@ async function main(): Promise<void> {
   const now = new Date().toISOString();
 
   const profilePath = join(root, "config/profile.local.yaml");
-  const profile = loadProfile(existsSync(profilePath) ? profilePath : join(root, "config/profile.example.yaml"));
+  const profile = loadProfile(
+    existsSync(profilePath) ? profilePath : join(root, "config/profile.example.yaml")
+  );
   const scoringPath = join(root, "config/scoring.local.yaml");
   const scoring = existsSync(scoringPath) ? loadScoringConfig(scoringPath) : defaultScoringConfig();
 
@@ -43,19 +50,48 @@ async function main(): Promise<void> {
     decisiones[r.decision] = (decisiones[r.decision] ?? 0) + 1;
     for (const b of r.hard_blockers) blockerTally[b] = (blockerTally[b] ?? 0) + 1;
   }
-  const ranked = rankResults(results, "high_recall");
+  // --include-rejected surfaces hard-blocked jobs for MANUAL triage instead of
+  // dropping them. They still carry decision "reject", so buildNotionRow tags
+  // them Prioridad "Descartada" with the blockers spelled out in `Blockers` —
+  // the review marker. Deliberately NOT done by loosening the profile, which
+  // would regress the Fase 4 matching eval. Off by default.
+  const includeRejected = process.argv.includes("--include-rejected");
+  const ranked = includeRejected
+    ? [...results].sort((a, b) => b.score - a.score || b.confidence - a.confidence)
+    : rankResults(results, "high_recall");
   const items: SyncItem[] = ranked.map((match) => ({ job: jobById.get(match.jobId)!, match }));
 
   const statePath = resolve(root, "var/notion/vacantes-boards-state.json");
   const store = createFileStateStore(statePath);
   const plan = await planSync(items, store);
 
+  // Source-stated contract type (freelance/contract/part_time). Only Remotive
+  // and WWR declare it; RemoteOK omits it, so most jobs have no type at all.
+  const tiposEmpleo: Record<string, number> = {};
+  for (const job of jobs) {
+    for (const t of job.employmentTypes) tiposEmpleo[t] = (tiposEmpleo[t] ?? 0) + 1;
+  }
+  const freelanceLike = jobs.filter((j) =>
+    j.employmentTypes.some((t) => t === "freelance" || t === "contract")
+  );
+
   const summary = {
     fuentes: perSource,
     errores_fetch: errors,
     vacantes_qa_ai: jobs.length,
+    tipos_de_empleo: tiposEmpleo,
+    freelance_o_contract: freelanceLike.map((j) => ({
+      fuente: j.sourceId,
+      titulo: j.titleRaw.slice(0, 70),
+      tipo: j.employmentTypes.join(",")
+    })),
     decisiones,
-    top_blockers: Object.fromEntries(Object.entries(blockerTally).sort((a, b) => b[1] - a[1]).slice(0, 6)),
+    top_blockers: Object.fromEntries(
+      Object.entries(blockerTally)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 6)
+    ),
+    incluye_rechazadas: includeRejected,
     tras_scoring_no_bloqueadas: items.length,
     plan: plan.counts,
     muestra: plan.operations
@@ -67,7 +103,11 @@ async function main(): Promise<void> {
   if (!execute) {
     console.log(
       JSON.stringify(
-        { modo: "dry-run", ...summary, nota: "Sin escrituras. Corre con --execute para escribir en Vacantes." },
+        {
+          modo: "dry-run",
+          ...summary,
+          nota: "Sin escrituras. Corre con --execute para escribir en Vacantes."
+        },
         null,
         2
       )

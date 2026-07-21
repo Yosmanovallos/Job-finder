@@ -30,6 +30,9 @@ export const OPPORTUNITY_SCHEMA: Record<string, unknown> = {
   Objeto: { rich_text: {} },
   "Presupuesto (COP)": { number: { format: "number" } },
   Modalidad: { select: {} },
+  "Tipo de contrato": { select: {} },
+  "Categoría (UNSPSC)": { rich_text: {} },
+  "Proveedor (si adjudicado)": { rich_text: {} },
   Estado: { select: {} },
   Ciudad: { rich_text: {} },
   Relevancia: { select: { options: [{ name: "Alta" }, { name: "Media" }] } },
@@ -50,9 +53,7 @@ export interface OppRow {
 }
 
 function budgetText(opp: Opportunity): string {
-  return opp.presupuestoCop === null
-    ? ""
-    : `${opp.presupuestoCop.toLocaleString("es-CO")} COP`;
+  return opp.presupuestoCop === null ? "" : `${opp.presupuestoCop.toLocaleString("es-CO")} COP`;
 }
 
 export function buildOpportunityRow(opp: Opportunity): OppRow {
@@ -62,6 +63,9 @@ export function buildOpportunityRow(opp: Opportunity): OppRow {
     Objeto: richText(opp.objeto),
     "Presupuesto (COP)": { number: opp.presupuestoCop },
     Modalidad: { select: opp.modalidad ? option(opp.modalidad) : null },
+    "Tipo de contrato": { select: opp.tipoContrato ? option(opp.tipoContrato) : null },
+    "Categoría (UNSPSC)": richText(opp.categoriaUnspsc ?? ""),
+    "Proveedor (si adjudicado)": richText(opp.proveedorAdjudicado ?? ""),
     Estado: { select: opp.estado ? option(opp.estado) : null },
     Ciudad: richText(opp.ciudad ?? ""),
     Relevancia: { select: option(opp.relevance) },
@@ -78,7 +82,11 @@ export function buildOpportunityRow(opp: Opportunity): OppRow {
 }
 
 function heading(text: string): unknown {
-  return { object: "block", type: "heading_2", heading_2: { rich_text: [{ text: { content: text } }] } };
+  return {
+    object: "block",
+    type: "heading_2",
+    heading_2: { rich_text: [{ text: { content: text } }] }
+  };
 }
 function paragraph(text: string): unknown {
   return {
@@ -104,6 +112,8 @@ function buildChildren(opp: Opportunity): unknown[] {
         `Entidad: ${opp.entidad}`,
         opp.ciudad ? `Ciudad: ${opp.ciudad}` : null,
         opp.modalidad ? `Modalidad: ${opp.modalidad}` : null,
+        opp.tipoContrato ? `Tipo de contrato: ${opp.tipoContrato}` : null,
+        opp.categoriaUnspsc ? `Categoría (UNSPSC): ${opp.categoriaUnspsc}` : null,
         opp.estado ? `Estado: ${opp.estado}` : null,
         `Presupuesto: ${budgetText(opp) || "no indicado"}`,
         opp.publishedAt ? `Publicado: ${opp.publishedAt}` : null,

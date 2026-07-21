@@ -1,0 +1,22 @@
+{
+  "name": "job-radar-apify",
+  "version": "1.0.0",
+  "description": "Standalone job scraper using Apify and syncing directly to Notion",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/server.ts",
+    "dev": "tsx src/server.ts",
+    "cli": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@notionhq/client": "^5.1.0",
+    "dotenv": "^16.4.5",
+    "got-scraping": "^4.2.1",
+    "tsx": "^4.19.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "typescript": "^5.7.0"
+  }
+}

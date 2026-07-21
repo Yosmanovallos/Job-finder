@@ -19,6 +19,10 @@ export interface OppNotionApi {
     children: unknown[]
   ): Promise<{ id: string }>;
   updatePage(pageId: string, properties: Record<string, unknown>): Promise<void>;
+  /** Moves a page to the Notion trash (reversible — not a permanent delete). */
+  archivePage(pageId: string): Promise<void>;
+  /** Adds any missing schema properties to an existing data source (idempotent). */
+  ensureProperties(dataSourceId: string, properties: Record<string, unknown>): Promise<void>;
 }
 
 async function dataSourceIdOf(client: Client, databaseId: string): Promise<string> {
@@ -33,7 +37,9 @@ async function dataSourceIdOf(client: Client, databaseId: string): Promise<strin
 export function createOppNotionApi(token: string): OppNotionApi {
   const client = new Client({ auth: token });
   const plain = (arr: unknown): string =>
-    Array.isArray(arr) ? arr.map((x) => (x as { plain_text?: string }).plain_text ?? "").join("") : "";
+    Array.isArray(arr)
+      ? arr.map((x) => (x as { plain_text?: string }).plain_text ?? "").join("")
+      : "";
   return {
     async findParentPage(title) {
       let cursor: string | undefined;
@@ -47,7 +53,11 @@ export function createOppNotionApi(token: string): OppNotionApi {
         for (const r of res.results as Array<Record<string, unknown>>) {
           const props = (r.properties as Record<string, { type?: string; title?: unknown }>) ?? {};
           let name = "";
-          for (const v of Object.values(props)) if (v?.type === "title") { name = plain(v.title); break; }
+          for (const v of Object.values(props))
+            if (v?.type === "title") {
+              name = plain(v.title);
+              break;
+            }
           if (name === title) return r.id as string;
         }
         cursor = res.has_more ? (res.next_cursor ?? undefined) : undefined;
@@ -65,7 +75,9 @@ export function createOppNotionApi(token: string): OppNotionApi {
           ...(cursor ? { start_cursor: cursor } : {})
         });
         for (const r of res.results as Array<Record<string, unknown>>) {
-          const name = (((r.title as Array<{ plain_text?: string }>) ?? []) as Array<{ plain_text?: string }>)
+          const name = (
+            ((r.title as Array<{ plain_text?: string }>) ?? []) as Array<{ plain_text?: string }>
+          )
             .map((x) => x.plain_text ?? "")
             .join("");
           if (name === title) {
@@ -85,7 +97,8 @@ export function createOppNotionApi(token: string): OppNotionApi {
         initial_data_source: { properties: properties as never }
       } as never)) as { id: string; data_sources?: Array<{ id: string }> };
       const databaseId = created.id;
-      const dataSourceId = created.data_sources?.[0]?.id ?? (await dataSourceIdOf(client, databaseId));
+      const dataSourceId =
+        created.data_sources?.[0]?.id ?? (await dataSourceIdOf(client, databaseId));
       return { databaseId, dataSourceId };
     },
 
@@ -100,6 +113,21 @@ export function createOppNotionApi(token: string): OppNotionApi {
 
     async updatePage(pageId, properties) {
       await client.pages.update({ page_id: pageId, properties: properties as never });
+    },
+
+    async archivePage(pageId) {
+      await client.pages.update({ page_id: pageId, in_trash: true } as never);
+    },
+
+    async ensureProperties(dataSourceId, properties) {
+      // Never re-send the title property: Notion rejects redefining it on update.
+      const patch: Record<string, unknown> = {};
+      for (const [key, def] of Object.entries(properties)) {
+        if (def && typeof def === "object" && "title" in (def as object)) continue;
+        patch[key] = def;
+      }
+      // Notion merges by key; existing properties are untouched, new ones added.
+      await client.dataSources.update({ data_source_id: dataSourceId, properties: patch } as never);
     }
   };
 }
