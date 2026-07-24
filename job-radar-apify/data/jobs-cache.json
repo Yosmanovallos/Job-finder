@@ -1,6 +1,1023 @@
 {
   "runs": [
     {
+      "id": "run_1784923927390",
+      "name": "Lote 2 (50 Vacantes)",
+      "role": "Lote 2",
+      "timestamp": "2026-07-24T20:12:07.390Z",
+      "jobs": [
+        {
+          "jobId": "computrabajo_1",
+          "title": "Desarrollador Senior #1",
+          "company": "Empresa Tech 1",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/1",
+          "dateText": "Hace 1 hora",
+          "source": "Computrabajo",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "computrabajo_2",
+          "title": "Desarrollador Senior #2",
+          "company": "Empresa Tech 2",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/2",
+          "dateText": "Hace 1 hora",
+          "source": "Computrabajo",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "computrabajo_3",
+          "title": "Desarrollador Senior #3",
+          "company": "Empresa Tech 3",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/3",
+          "dateText": "Hace 1 hora",
+          "source": "Computrabajo",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "computrabajo_4",
+          "title": "Desarrollador Senior #4",
+          "company": "Empresa Tech 4",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/4",
+          "dateText": "Hace 1 hora",
+          "source": "Computrabajo",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "computrabajo_5",
+          "title": "Desarrollador Senior #5",
+          "company": "Empresa Tech 5",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/5",
+          "dateText": "Hace 1 hora",
+          "source": "Computrabajo",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "computrabajo_6",
+          "title": "Desarrollador Senior #6",
+          "company": "Empresa Tech 6",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/6",
+          "dateText": "Hace 1 hora",
+          "source": "Computrabajo",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "computrabajo_7",
+          "title": "Desarrollador Senior #7",
+          "company": "Empresa Tech 7",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/7",
+          "dateText": "Hace 1 hora",
+          "source": "Computrabajo",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "computrabajo_8",
+          "title": "Desarrollador Senior #8",
+          "company": "Empresa Tech 8",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/8",
+          "dateText": "Hace 1 hora",
+          "source": "Computrabajo",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "computrabajo_9",
+          "title": "Desarrollador Senior #9",
+          "company": "Empresa Tech 9",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/9",
+          "dateText": "Hace 1 hora",
+          "source": "Computrabajo",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "computrabajo_10",
+          "title": "Desarrollador Senior #10",
+          "company": "Empresa Tech 10",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/10",
+          "dateText": "Hace 1 hora",
+          "source": "Computrabajo",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "computrabajo_11",
+          "title": "Desarrollador Senior #11",
+          "company": "Empresa Tech 11",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/11",
+          "dateText": "Hace 1 hora",
+          "source": "Computrabajo",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "computrabajo_12",
+          "title": "Desarrollador Senior #12",
+          "company": "Empresa Tech 12",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/12",
+          "dateText": "Hace 1 hora",
+          "source": "Computrabajo",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "computrabajo_13",
+          "title": "Desarrollador Senior #13",
+          "company": "Empresa Tech 13",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/13",
+          "dateText": "Hace 1 hora",
+          "source": "Computrabajo",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "computrabajo_14",
+          "title": "Desarrollador Senior #14",
+          "company": "Empresa Tech 14",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/14",
+          "dateText": "Hace 1 hora",
+          "source": "Computrabajo",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "computrabajo_15",
+          "title": "Desarrollador Senior #15",
+          "company": "Empresa Tech 15",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/15",
+          "dateText": "Hace 1 hora",
+          "source": "Computrabajo",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "computrabajo_16",
+          "title": "Desarrollador Senior #16",
+          "company": "Empresa Tech 16",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/16",
+          "dateText": "Hace 1 hora",
+          "source": "Computrabajo",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "computrabajo_17",
+          "title": "Desarrollador Senior #17",
+          "company": "Empresa Tech 17",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/17",
+          "dateText": "Hace 1 hora",
+          "source": "Computrabajo",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "computrabajo_18",
+          "title": "Desarrollador Senior #18",
+          "company": "Empresa Tech 18",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/18",
+          "dateText": "Hace 1 hora",
+          "source": "Computrabajo",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "computrabajo_19",
+          "title": "Desarrollador Senior #19",
+          "company": "Empresa Tech 19",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/19",
+          "dateText": "Hace 1 hora",
+          "source": "Computrabajo",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "computrabajo_20",
+          "title": "Desarrollador Senior #20",
+          "company": "Empresa Tech 20",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/20",
+          "dateText": "Hace 1 hora",
+          "source": "Computrabajo",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "computrabajo_21",
+          "title": "Desarrollador Senior #21",
+          "company": "Empresa Tech 21",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/21",
+          "dateText": "Hace 1 hora",
+          "source": "Computrabajo",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "computrabajo_22",
+          "title": "Desarrollador Senior #22",
+          "company": "Empresa Tech 22",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/22",
+          "dateText": "Hace 1 hora",
+          "source": "Computrabajo",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "computrabajo_23",
+          "title": "Desarrollador Senior #23",
+          "company": "Empresa Tech 23",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/23",
+          "dateText": "Hace 1 hora",
+          "source": "Computrabajo",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "computrabajo_24",
+          "title": "Desarrollador Senior #24",
+          "company": "Empresa Tech 24",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/24",
+          "dateText": "Hace 1 hora",
+          "source": "Computrabajo",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "computrabajo_25",
+          "title": "Desarrollador Senior #25",
+          "company": "Empresa Tech 25",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/25",
+          "dateText": "Hace 1 hora",
+          "source": "Computrabajo",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "computrabajo_26",
+          "title": "Desarrollador Senior #26",
+          "company": "Empresa Tech 26",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/26",
+          "dateText": "Hace 1 hora",
+          "source": "Computrabajo",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "computrabajo_27",
+          "title": "Desarrollador Senior #27",
+          "company": "Empresa Tech 27",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/27",
+          "dateText": "Hace 1 hora",
+          "source": "Computrabajo",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "computrabajo_28",
+          "title": "Desarrollador Senior #28",
+          "company": "Empresa Tech 28",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/28",
+          "dateText": "Hace 1 hora",
+          "source": "Computrabajo",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "computrabajo_29",
+          "title": "Desarrollador Senior #29",
+          "company": "Empresa Tech 29",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/29",
+          "dateText": "Hace 1 hora",
+          "source": "Computrabajo",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "computrabajo_30",
+          "title": "Desarrollador Senior #30",
+          "company": "Empresa Tech 30",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/30",
+          "dateText": "Hace 1 hora",
+          "source": "Computrabajo",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "computrabajo_31",
+          "title": "Desarrollador Senior #31",
+          "company": "Empresa Tech 31",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/31",
+          "dateText": "Hace 1 hora",
+          "source": "Computrabajo",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "computrabajo_32",
+          "title": "Desarrollador Senior #32",
+          "company": "Empresa Tech 32",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/32",
+          "dateText": "Hace 1 hora",
+          "source": "Computrabajo",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "computrabajo_33",
+          "title": "Desarrollador Senior #33",
+          "company": "Empresa Tech 33",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/33",
+          "dateText": "Hace 1 hora",
+          "source": "Computrabajo",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "computrabajo_34",
+          "title": "Desarrollador Senior #34",
+          "company": "Empresa Tech 34",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/34",
+          "dateText": "Hace 1 hora",
+          "source": "Computrabajo",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "computrabajo_35",
+          "title": "Desarrollador Senior #35",
+          "company": "Empresa Tech 35",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/35",
+          "dateText": "Hace 1 hora",
+          "source": "Computrabajo",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "computrabajo_36",
+          "title": "Desarrollador Senior #36",
+          "company": "Empresa Tech 36",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/36",
+          "dateText": "Hace 1 hora",
+          "source": "Computrabajo",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "computrabajo_37",
+          "title": "Desarrollador Senior #37",
+          "company": "Empresa Tech 37",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/37",
+          "dateText": "Hace 1 hora",
+          "source": "Computrabajo",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "computrabajo_38",
+          "title": "Desarrollador Senior #38",
+          "company": "Empresa Tech 38",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/38",
+          "dateText": "Hace 1 hora",
+          "source": "Computrabajo",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "computrabajo_39",
+          "title": "Desarrollador Senior #39",
+          "company": "Empresa Tech 39",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/39",
+          "dateText": "Hace 1 hora",
+          "source": "Computrabajo",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "computrabajo_40",
+          "title": "Desarrollador Senior #40",
+          "company": "Empresa Tech 40",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/40",
+          "dateText": "Hace 1 hora",
+          "source": "Computrabajo",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "computrabajo_41",
+          "title": "Desarrollador Senior #41",
+          "company": "Empresa Tech 41",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/41",
+          "dateText": "Hace 1 hora",
+          "source": "Computrabajo",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "computrabajo_42",
+          "title": "Desarrollador Senior #42",
+          "company": "Empresa Tech 42",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/42",
+          "dateText": "Hace 1 hora",
+          "source": "Computrabajo",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "computrabajo_43",
+          "title": "Desarrollador Senior #43",
+          "company": "Empresa Tech 43",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/43",
+          "dateText": "Hace 1 hora",
+          "source": "Computrabajo",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "computrabajo_44",
+          "title": "Desarrollador Senior #44",
+          "company": "Empresa Tech 44",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/44",
+          "dateText": "Hace 1 hora",
+          "source": "Computrabajo",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "computrabajo_45",
+          "title": "Desarrollador Senior #45",
+          "company": "Empresa Tech 45",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/45",
+          "dateText": "Hace 1 hora",
+          "source": "Computrabajo",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "computrabajo_46",
+          "title": "Desarrollador Senior #46",
+          "company": "Empresa Tech 46",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/46",
+          "dateText": "Hace 1 hora",
+          "source": "Computrabajo",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "computrabajo_47",
+          "title": "Desarrollador Senior #47",
+          "company": "Empresa Tech 47",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/47",
+          "dateText": "Hace 1 hora",
+          "source": "Computrabajo",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "computrabajo_48",
+          "title": "Desarrollador Senior #48",
+          "company": "Empresa Tech 48",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/48",
+          "dateText": "Hace 1 hora",
+          "source": "Computrabajo",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "computrabajo_49",
+          "title": "Desarrollador Senior #49",
+          "company": "Empresa Tech 49",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/49",
+          "dateText": "Hace 1 hora",
+          "source": "Computrabajo",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "computrabajo_50",
+          "title": "Desarrollador Senior #50",
+          "company": "Empresa Tech 50",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/50",
+          "dateText": "Hace 1 hora",
+          "source": "Computrabajo",
+          "publishedAt": "2026-07-24"
+        }
+      ]
+    },
+    {
+      "id": "run_1784923927379",
+      "name": "Lote 1 (50 Vacantes)",
+      "role": "Lote 1",
+      "timestamp": "2026-07-24T20:12:07.379Z",
+      "jobs": [
+        {
+          "jobId": "job_1",
+          "title": "Desarrollador Senior #1",
+          "company": "Empresa Tech 1",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/1",
+          "dateText": "Hace 2 horas",
+          "source": "LinkedIn",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "job_2",
+          "title": "Desarrollador Senior #2",
+          "company": "Empresa Tech 2",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/2",
+          "dateText": "Hace 2 horas",
+          "source": "LinkedIn",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "job_3",
+          "title": "Desarrollador Senior #3",
+          "company": "Empresa Tech 3",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/3",
+          "dateText": "Hace 2 horas",
+          "source": "LinkedIn",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "job_4",
+          "title": "Desarrollador Senior #4",
+          "company": "Empresa Tech 4",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/4",
+          "dateText": "Hace 2 horas",
+          "source": "LinkedIn",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "job_5",
+          "title": "Desarrollador Senior #5",
+          "company": "Empresa Tech 5",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/5",
+          "dateText": "Hace 2 horas",
+          "source": "LinkedIn",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "job_6",
+          "title": "Desarrollador Senior #6",
+          "company": "Empresa Tech 6",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/6",
+          "dateText": "Hace 2 horas",
+          "source": "LinkedIn",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "job_7",
+          "title": "Desarrollador Senior #7",
+          "company": "Empresa Tech 7",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/7",
+          "dateText": "Hace 2 horas",
+          "source": "LinkedIn",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "job_8",
+          "title": "Desarrollador Senior #8",
+          "company": "Empresa Tech 8",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/8",
+          "dateText": "Hace 2 horas",
+          "source": "LinkedIn",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "job_9",
+          "title": "Desarrollador Senior #9",
+          "company": "Empresa Tech 9",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/9",
+          "dateText": "Hace 2 horas",
+          "source": "LinkedIn",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "job_10",
+          "title": "Desarrollador Senior #10",
+          "company": "Empresa Tech 10",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/10",
+          "dateText": "Hace 2 horas",
+          "source": "LinkedIn",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "job_11",
+          "title": "Desarrollador Senior #11",
+          "company": "Empresa Tech 11",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/11",
+          "dateText": "Hace 2 horas",
+          "source": "LinkedIn",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "job_12",
+          "title": "Desarrollador Senior #12",
+          "company": "Empresa Tech 12",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/12",
+          "dateText": "Hace 2 horas",
+          "source": "LinkedIn",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "job_13",
+          "title": "Desarrollador Senior #13",
+          "company": "Empresa Tech 13",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/13",
+          "dateText": "Hace 2 horas",
+          "source": "LinkedIn",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "job_14",
+          "title": "Desarrollador Senior #14",
+          "company": "Empresa Tech 14",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/14",
+          "dateText": "Hace 2 horas",
+          "source": "LinkedIn",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "job_15",
+          "title": "Desarrollador Senior #15",
+          "company": "Empresa Tech 15",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/15",
+          "dateText": "Hace 2 horas",
+          "source": "LinkedIn",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "job_16",
+          "title": "Desarrollador Senior #16",
+          "company": "Empresa Tech 16",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/16",
+          "dateText": "Hace 2 horas",
+          "source": "LinkedIn",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "job_17",
+          "title": "Desarrollador Senior #17",
+          "company": "Empresa Tech 17",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/17",
+          "dateText": "Hace 2 horas",
+          "source": "LinkedIn",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "job_18",
+          "title": "Desarrollador Senior #18",
+          "company": "Empresa Tech 18",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/18",
+          "dateText": "Hace 2 horas",
+          "source": "LinkedIn",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "job_19",
+          "title": "Desarrollador Senior #19",
+          "company": "Empresa Tech 19",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/19",
+          "dateText": "Hace 2 horas",
+          "source": "LinkedIn",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "job_20",
+          "title": "Desarrollador Senior #20",
+          "company": "Empresa Tech 20",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/20",
+          "dateText": "Hace 2 horas",
+          "source": "LinkedIn",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "job_21",
+          "title": "Desarrollador Senior #21",
+          "company": "Empresa Tech 21",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/21",
+          "dateText": "Hace 2 horas",
+          "source": "LinkedIn",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "job_22",
+          "title": "Desarrollador Senior #22",
+          "company": "Empresa Tech 22",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/22",
+          "dateText": "Hace 2 horas",
+          "source": "LinkedIn",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "job_23",
+          "title": "Desarrollador Senior #23",
+          "company": "Empresa Tech 23",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/23",
+          "dateText": "Hace 2 horas",
+          "source": "LinkedIn",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "job_24",
+          "title": "Desarrollador Senior #24",
+          "company": "Empresa Tech 24",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/24",
+          "dateText": "Hace 2 horas",
+          "source": "LinkedIn",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "job_25",
+          "title": "Desarrollador Senior #25",
+          "company": "Empresa Tech 25",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/25",
+          "dateText": "Hace 2 horas",
+          "source": "LinkedIn",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "job_26",
+          "title": "Desarrollador Senior #26",
+          "company": "Empresa Tech 26",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/26",
+          "dateText": "Hace 2 horas",
+          "source": "LinkedIn",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "job_27",
+          "title": "Desarrollador Senior #27",
+          "company": "Empresa Tech 27",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/27",
+          "dateText": "Hace 2 horas",
+          "source": "LinkedIn",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "job_28",
+          "title": "Desarrollador Senior #28",
+          "company": "Empresa Tech 28",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/28",
+          "dateText": "Hace 2 horas",
+          "source": "LinkedIn",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "job_29",
+          "title": "Desarrollador Senior #29",
+          "company": "Empresa Tech 29",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/29",
+          "dateText": "Hace 2 horas",
+          "source": "LinkedIn",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "job_30",
+          "title": "Desarrollador Senior #30",
+          "company": "Empresa Tech 30",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/30",
+          "dateText": "Hace 2 horas",
+          "source": "LinkedIn",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "job_31",
+          "title": "Desarrollador Senior #31",
+          "company": "Empresa Tech 31",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/31",
+          "dateText": "Hace 2 horas",
+          "source": "LinkedIn",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "job_32",
+          "title": "Desarrollador Senior #32",
+          "company": "Empresa Tech 32",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/32",
+          "dateText": "Hace 2 horas",
+          "source": "LinkedIn",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "job_33",
+          "title": "Desarrollador Senior #33",
+          "company": "Empresa Tech 33",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/33",
+          "dateText": "Hace 2 horas",
+          "source": "LinkedIn",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "job_34",
+          "title": "Desarrollador Senior #34",
+          "company": "Empresa Tech 34",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/34",
+          "dateText": "Hace 2 horas",
+          "source": "LinkedIn",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "job_35",
+          "title": "Desarrollador Senior #35",
+          "company": "Empresa Tech 35",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/35",
+          "dateText": "Hace 2 horas",
+          "source": "LinkedIn",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "job_36",
+          "title": "Desarrollador Senior #36",
+          "company": "Empresa Tech 36",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/36",
+          "dateText": "Hace 2 horas",
+          "source": "LinkedIn",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "job_37",
+          "title": "Desarrollador Senior #37",
+          "company": "Empresa Tech 37",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/37",
+          "dateText": "Hace 2 horas",
+          "source": "LinkedIn",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "job_38",
+          "title": "Desarrollador Senior #38",
+          "company": "Empresa Tech 38",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/38",
+          "dateText": "Hace 2 horas",
+          "source": "LinkedIn",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "job_39",
+          "title": "Desarrollador Senior #39",
+          "company": "Empresa Tech 39",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/39",
+          "dateText": "Hace 2 horas",
+          "source": "LinkedIn",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "job_40",
+          "title": "Desarrollador Senior #40",
+          "company": "Empresa Tech 40",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/40",
+          "dateText": "Hace 2 horas",
+          "source": "LinkedIn",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "job_41",
+          "title": "Desarrollador Senior #41",
+          "company": "Empresa Tech 41",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/41",
+          "dateText": "Hace 2 horas",
+          "source": "LinkedIn",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "job_42",
+          "title": "Desarrollador Senior #42",
+          "company": "Empresa Tech 42",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/42",
+          "dateText": "Hace 2 horas",
+          "source": "LinkedIn",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "job_43",
+          "title": "Desarrollador Senior #43",
+          "company": "Empresa Tech 43",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/43",
+          "dateText": "Hace 2 horas",
+          "source": "LinkedIn",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "job_44",
+          "title": "Desarrollador Senior #44",
+          "company": "Empresa Tech 44",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/44",
+          "dateText": "Hace 2 horas",
+          "source": "LinkedIn",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "job_45",
+          "title": "Desarrollador Senior #45",
+          "company": "Empresa Tech 45",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/45",
+          "dateText": "Hace 2 horas",
+          "source": "LinkedIn",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "job_46",
+          "title": "Desarrollador Senior #46",
+          "company": "Empresa Tech 46",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/46",
+          "dateText": "Hace 2 horas",
+          "source": "LinkedIn",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "job_47",
+          "title": "Desarrollador Senior #47",
+          "company": "Empresa Tech 47",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/47",
+          "dateText": "Hace 2 horas",
+          "source": "LinkedIn",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "job_48",
+          "title": "Desarrollador Senior #48",
+          "company": "Empresa Tech 48",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/48",
+          "dateText": "Hace 2 horas",
+          "source": "LinkedIn",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "job_49",
+          "title": "Desarrollador Senior #49",
+          "company": "Empresa Tech 49",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/49",
+          "dateText": "Hace 2 horas",
+          "source": "LinkedIn",
+          "publishedAt": "2026-07-24"
+        },
+        {
+          "jobId": "job_50",
+          "title": "Desarrollador Senior #50",
+          "company": "Empresa Tech 50",
+          "location": "Bogotá, Colombia",
+          "url": "https://www.example.com/jobs/view/50",
+          "dateText": "Hace 2 horas",
+          "source": "LinkedIn",
+          "publishedAt": "2026-07-24"
+        }
+      ]
+    },
+    "run_1784923889933",
+    {
       "id": "dbd7d570-31f7-48d4-8b1b-e73a7955b21d",
       "name": "🎯 24/07/26, 3:03 p. m. - Project Manager, Business Analyst, Data Analyst, Data Engineer, RPA Developer, QA Engineer, AI Engineer (228 Vacantes)",
       "role": "Project Manager, Business Analyst, Data Analyst, Data Engineer, RPA Developer, QA Engineer, AI Engineer",

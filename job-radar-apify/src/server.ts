@@ -3,8 +3,9 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
-import { Client } from '@notionhq/client';
 import dotenv from 'dotenv';
+import { getJobs, getRuns } from './db/job-repository.js';
+import { globalScheduler } from './queue/scheduler.js';
 
 dotenv.config();
 
@@ -13,57 +14,39 @@ const __dirname = path.dirname(__filename);
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 const PORT = process.env.PORT || 3000;
 
-const NOTION_TOKEN = process.env.NOTION_TOKEN;
-const NOTION_DATABASE_ID = process.env.NOTION_DATABASE_ID;
-
-const notion = NOTION_TOKEN ? new Client({ auth: NOTION_TOKEN }) : null;
-
 // Active SSE client connections
 const sseClients = new Set<http.ServerResponse>();
 
 function broadcastLog(message: string, level: 'info' | 'success' | 'warning' | 'error' = 'info') {
   const data = JSON.stringify({ type: 'log', message, level });
   for (const res of sseClients) {
-    res.write(`data: ${data}\n\n`);
+    try {
+      res.write(`data: ${data}\n\n`);
+    } catch (e) {
+      sseClients.delete(res);
+    }
   }
 }
-
-import { getAllCachedRuns, getAllCachedJobs } from './cache-manager.js';
-
-// Instant Runs Fetching (< 1ms - Pure Local Memory/Cache)
-async function getRunsFromNotion() {
-  return getAllCachedRuns();
-}
-
-// Instant Jobs Fetching (< 1ms - Pure Local Memory/Cache)
-async function getJobsFromNotion(targetRunId?: string) {
-  return getAllCachedJobs(targetRunId);
-}
-
-// Run scraper subprocess asynchronously with custom keywords
-let isScraperRunning = false;
 
 function triggerScraperSubprocess(customKeywords?: string[], customDateRange: string = '48h') {
-  if (isScraperRunning) {
-    broadcastLog('El scraper ya está en ejecución...', 'warning');
-    return;
-  }
-
-  isScraperRunning = true;
-  const keywordsToUse = (customKeywords && customKeywords.length > 0) 
-    ? customKeywords 
+  const keywordsToUse = (customKeywords && customKeywords.length > 0)
+    ? customKeywords
     : ["Project Manager", "Data Analyst", "Data Engineer", "RPA Developer", "QA Engineer", "AI Engineer"];
 
-  broadcastLog(`Iniciando escaneo (Filtro Fecha: ${customDateRange}) para los roles: [${keywordsToUse.join(', ')}]`, 'warning');
+  broadcastLog(`Encolando escaneo escalonado (Filtro Fecha: ${customDateRange}) para los roles: [${keywordsToUse.join(', ')}]`, 'info');
 
+  // Enqueue via globalScheduler (allows concurrent requests without blocking)
+  globalScheduler.enqueueRoles(keywordsToUse);
+
+  // Also spawn background subprocess for Notion sync compatibility if configured
   const indexPath = path.join(__dirname, 'index.ts');
   const keywordsEnv = keywordsToUse.join(',');
 
   const proc = spawn('npx', ['tsx', indexPath], {
     cwd: path.join(__dirname, '..'),
     shell: true,
-    env: { 
-      ...process.env, 
+    env: {
+      ...process.env,
       PATH: process.env.PATH,
       SEARCH_KEYWORDS: keywordsEnv,
       DATE_RANGE: customDateRange
@@ -81,9 +64,7 @@ function triggerScraperSubprocess(customKeywords?: string[], customDateRange: st
   });
 
   proc.on('close', code => {
-    isScraperRunning = false;
-    broadcastLog(`¡Proceso de escaneo y sincronización finalizado!`, 'success');
-    broadcastLog(`Scraper finalizado con código de salida ${code}.`, code === 0 ? 'success' : 'error');
+    broadcastLog(`¡Proceso de escaneo finalizado! (Código: ${code})`, code === 0 ? 'success' : 'error');
   });
 }
 
@@ -110,24 +91,36 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // 2. GET /api/runs
+  // 2. Health Check Endpoint
+  if (pathname === '/api/health' && method === 'GET') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      status: 'ok',
+      uptime: process.uptime(),
+      timestamp: new Date().toISOString(),
+      memory: process.memoryUsage(),
+      scheduler: globalScheduler.getStatus()
+    }));
+    return;
+  }
+
+  // 3. GET /api/runs
   if (pathname === '/api/runs' && method === 'GET') {
-    const runs = await getRunsFromNotion();
+    const runs = await getRuns();
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ runs, count: runs.length }));
     return;
   }
 
-  // 3. GET /api/jobs
+  // 4. GET /api/jobs
   if (pathname === '/api/jobs' && method === 'GET') {
-    const runId = parsedUrl.searchParams.get('runId') || undefined;
-    const jobs = await getJobsFromNotion(runId);
+    const jobs = await getJobs();
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ jobs, count: jobs.length }));
     return;
   }
 
-  // 4. POST /api/run-scraper
+  // 5. POST /api/run-scraper
   if (pathname === '/api/run-scraper' && method === 'POST') {
     let bodyText = '';
     req.on('data', chunk => { bodyText += chunk.toString(); });
@@ -148,12 +141,12 @@ const server = http.createServer(async (req, res) => {
 
       triggerScraperSubprocess(keywords, dateRange);
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ status: 'ok', message: 'Scraper iniciado en segundo plano' }));
+      res.end(JSON.stringify({ status: 'ok', message: 'Escaneo encolado y en ejecución' }));
     });
     return;
   }
 
-  // 5. Static Files (HTML, CSS, JS)
+  // 6. Static Files (HTML, CSS, JS)
   let filePath = path.join(PUBLIC_DIR, pathname === '/' ? 'index.html' : pathname);
 
   const ext = path.extname(filePath);
