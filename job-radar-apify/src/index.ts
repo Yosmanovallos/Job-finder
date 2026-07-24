@@ -17,7 +17,7 @@ if (!NOTION_TOKEN || !NOTION_DATABASE_ID) {
 
 const notion = new Client({ auth: NOTION_TOKEN });
 
-interface Job {
+export interface Job {
   jobId: string;
   title: string;
   company: string;
@@ -126,7 +126,7 @@ function parseDateText(dateText: string, source: string, maxDays: number = 2): {
 }
 
 // Scrape LinkedIn Guest Jobs API (paginated with dynamic DATE_RANGE filter)
-async function scrapeLinkedIn(keyword: string): Promise<Job[]> {
+export async function scrapeLinkedIn(keyword: string): Promise<Job[]> {
   const query = encodeURIComponent(keyword);
   const rangeConfig = getDateRangeConfig();
   console.log(`[LinkedIn] Scraping for keyword "${keyword}" (Filtro: ${rangeConfig.label})...`);
@@ -197,7 +197,7 @@ async function scrapeLinkedIn(keyword: string): Promise<Job[]> {
 }
 
 // Scrape Computrabajo Colombia with Google Translate Cloud Proxy Bypass (100% IP Block Protection)
-async function scrapeComputrabajo(keyword: string): Promise<Job[]> {
+export async function scrapeComputrabajo(keyword: string): Promise<Job[]> {
   const query = encodeURIComponent(keyword.replace(/\s+/g, '-'));
   const rangeConfig = getDateRangeConfig();
   console.log(`[Computrabajo] Scraping for keyword "${keyword}" (Multi-page, Filtro: ${rangeConfig.label})...`);
@@ -287,7 +287,7 @@ async function scrapeComputrabajo(keyword: string): Promise<Job[]> {
 }
 
 // Scrape Elempleo Colombia with Multi-page Pagination
-async function scrapeElempleo(keyword: string): Promise<Job[]> {
+export async function scrapeElempleo(keyword: string): Promise<Job[]> {
   console.log(`[Elempleo] Scraping for keyword "${keyword}" (Multi-page)...`);
   const jobs: Job[] = [];
 
@@ -367,7 +367,7 @@ async function scrapeElempleo(keyword: string): Promise<Job[]> {
 }
 
 // Scrape Torre.co opportunities API directly
-async function scrapeTorre(keyword: string): Promise<Job[]> {
+export async function scrapeTorre(keyword: string): Promise<Job[]> {
   console.log(`[Torre] Searching for keyword "${keyword}"...`);
   const url = "https://search.torre.co/opportunities/_search?offset=0&size=20";
   const body = {
@@ -434,7 +434,7 @@ async function scrapeTorre(keyword: string): Promise<Job[]> {
 }
 
 // Scrape Workana Colombia/Remote directly from HTML options payload.
-async function scrapeWorkana(keyword: string): Promise<Job[]> {
+export async function scrapeWorkana(keyword: string): Promise<Job[]> {
   console.log(`[Workana] Searching for keyword "${keyword}"...`);
   const query = encodeURIComponent(keyword.toLowerCase());
   const jobs: Job[] = [];
@@ -508,7 +508,7 @@ async function scrapeWorkana(keyword: string): Promise<Job[]> {
 }
 
 // Scrape Magneto365 Colombia directly from NEXT payload and JSON-LD schema
-async function scrapeMagneto(keyword: string): Promise<Job[]> {
+export async function scrapeMagneto(keyword: string): Promise<Job[]> {
   console.log(`[Magneto] Searching for keyword "${keyword}"...`);
   const query = encodeURIComponent(keyword);
   const url = `https://www.magneto365.com/co/empleos?q=${query}`;
@@ -629,7 +629,7 @@ async function scrapeMagneto(keyword: string): Promise<Job[]> {
 // site. The dedicated category pages (/categoria-de-trabajo/*) render an
 // empty CMS collection server-side and only populate client-side, so we
 // paginate the homepage instead and filter locally.
-async function scrapeWeRemoto(): Promise<Job[]> {
+export async function scrapeWeRemoto(): Promise<Job[]> {
   console.log('[WeRemoto] Scraping recent postings...');
   const jobs: Job[] = [];
   const now = new Date();
@@ -710,7 +710,7 @@ async function scrapeWeRemoto(): Promise<Job[]> {
 }
 
 // Scrape GetOnBoard (LATAM tech job board) via its free public JSON API
-async function scrapeGetOnBoard(): Promise<Job[]> {
+export async function scrapeGetOnBoard(): Promise<Job[]> {
   console.log('[GetOnBoard] Fetching categories (programming, qa, ai, product-building-management, data-science)...');
   const jobs: Job[] = [];
   const now = Date.now();
@@ -773,7 +773,7 @@ async function scrapeGetOnBoard(): Promise<Job[]> {
 // Returns the ~100 most recent postings site-wide; filtering happens locally.
 // Their API terms require linking back to the original RemoteOK URL, which we
 // do by storing item.url.
-async function scrapeRemoteOK(): Promise<Job[]> {
+export async function scrapeRemoteOK(): Promise<Job[]> {
   console.log('[RemoteOK] Fetching latest postings...');
   const jobs: Job[] = [];
   const now = Date.now();
@@ -825,7 +825,7 @@ async function scrapeRemoteOK(): Promise<Job[]> {
 
 // Scrape Remotive via its official public JSON API
 // (https://remotive.com/api/remote-jobs?search=...). No auth required.
-async function scrapeRemotive(searchTerms: string[]): Promise<Job[]> {
+export async function scrapeRemotive(searchTerms: string[]): Promise<Job[]> {
   console.log('[Remotive] Fetching postings...');
   const jobs: Job[] = [];
   const now = Date.now();
@@ -947,7 +947,7 @@ function extractBalancedObject(html: string, fromIdx: number): string | null {
 // that object and read the results array. Note: only the first result page is
 // reliable per request (Cloudflare escalates on rapid ?start=N follow-ups), so we
 // issue one request per keyword instead of paginating.
-async function scrapeIndeedLocal(keyword: string): Promise<Job[]> {
+export async function scrapeIndeedLocal(keyword: string): Promise<Job[]> {
   console.log(`[Indeed] Scraping locally for keyword "${keyword}"...`);
   const query = encodeURIComponent(keyword);
   const url = `https://co.indeed.com/jobs?q=${query}&l=Colombia&fromage=3`;
@@ -1015,7 +1015,7 @@ const GLASSDOOR_COLOMBIA_ID = 54;
 // jobTitleText, locationName and seoJobLink. Because the stream is double-escaped
 // (\\" ... \\"), we pull each field with a targeted regex per jobview chunk rather
 // than JSON-parsing the whole nested structure.
-async function scrapeGlassdoor(keyword: string): Promise<Job[]> {
+export async function scrapeGlassdoor(keyword: string): Promise<Job[]> {
   console.log(`[Glassdoor] Scraping locally for keyword "${keyword}"...`);
   const kw = keyword.trim();
   // URL span offsets: IL.0,8 = "colombia" (8 chars), KO9,<9+kwlen> = keyword span
