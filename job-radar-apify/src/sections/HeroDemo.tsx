@@ -1,7 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 import { JobCard } from "../components/JobCard.js";
+import { PaywallCard } from "../components/PaywallCard.js";
 import { FilterBar, FilterState } from "../components/FilterBar.js";
 import { StatsBar } from "../components/StatsBar.js";
+import { useAuth } from "../auth/auth-provider.js";
+import { startPaymentCheckout } from "../payments/checkout.js";
 
 const timeRanges = [
   { label: "24 horas", value: "24h" },
@@ -35,6 +38,7 @@ function SearchIcon() {
 }
 
 export default function HeroDemo() {
+  const { tier, upgradeToPro, user } = useAuth();
   const [query, setQuery] = useState("");
   const [activeRange, setActiveRange] = useState("48h");
   const [isLoading, setIsLoading] = useState(false);
@@ -91,7 +95,6 @@ export default function HeroDemo() {
   const handleFilterChange = (filters: FilterState) => {
     let result = [...allJobs];
 
-    // Search text filter
     if (filters.search.trim()) {
       const s = filters.search.toLowerCase();
       result = result.filter(j => 
@@ -101,7 +104,6 @@ export default function HeroDemo() {
       );
     }
 
-    // Source filter
     if (filters.source && filters.source !== 'all') {
       result = result.filter(j => 
         j.source === filters.source || 
@@ -110,7 +112,6 @@ export default function HeroDemo() {
       );
     }
 
-    // Modality filter
     if (filters.modality && filters.modality !== 'all') {
       const m = filters.modality.toLowerCase();
       result = result.filter(j => {
@@ -122,7 +123,6 @@ export default function HeroDemo() {
       });
     }
 
-    // Saved only filter
     if (filters.savedOnly) {
       result = result.filter(j => savedJobIds.has(j.jobId));
     }
@@ -135,6 +135,19 @@ export default function HeroDemo() {
     if (next.has(jobId)) next.delete(jobId);
     else next.add(jobId);
     setSavedJobIds(next);
+  };
+
+  const handleUnlockPro = async () => {
+    const res = await startPaymentCheckout({
+      planId: 'plan_pro_monthly',
+      currency: 'COP',
+      amount: 14900,
+      userEmail: user?.email || 'usuario@jobradar.app'
+    });
+    if (res.success) {
+      upgradeToPro();
+      alert('🎉 ¡Felicidades! Tu suscripción Pro ha sido activada exitosamente. Todas las vacantes han sido desbloqueadas.');
+    }
   };
 
   async function handleSearch() {
@@ -168,6 +181,13 @@ export default function HeroDemo() {
     if (e.key === "Enter") handleSearch();
   }
 
+  const isRecentJob = (job: any) => {
+    if (!job.publishedAt) return true;
+    const ageMs = Date.now() - new Date(job.publishedAt).getTime();
+    const ageHours = ageMs / (1000 * 60 * 60);
+    return ageHours <= 48;
+  };
+
   return (
     <section
       id="hero-demo"
@@ -185,19 +205,25 @@ export default function HeroDemo() {
       />
 
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-20">
-        {/* Badge header */}
-        <div className="flex items-center justify-center mb-6">
-          <div
-            className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium"
-            style={{
-              color: "#34D399",
-              backgroundColor: "rgba(52,211,153,0.08)",
-              border: "1px solid rgba(52,211,153,0.25)",
-            }}
-          >
-            <span className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: "#34D399" }} />
-            Scrapeador Multi-Fuente 100% Autónomo
+        {/* User Tier Status Banner */}
+        <div className="flex items-center justify-between gap-4 mb-6 p-3 rounded-xl bg-[#131519] border border-[#262A31] text-xs font-mono">
+          <div className="flex items-center gap-2">
+            <span className={`w-2.5 h-2.5 rounded-full ${tier === 'pro' ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+            <span className="text-slate-300">
+              Estado de Cuenta: <strong className={tier === 'pro' ? 'text-emerald-400 font-bold' : 'text-amber-400 font-bold'}>
+                {tier === 'pro' ? '🌟 Suscriptor Pro (Acceso Total Ilimitado)' : 'FREE (Vacantes >48h Gratuitas / 0-48h Bloqueadas)'}
+              </strong>
+            </span>
           </div>
+
+          {tier === 'free' && (
+            <button
+              onClick={handleUnlockPro}
+              className="px-3 py-1 rounded bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold font-sans text-xs transition-all shadow"
+            >
+              🔓 Desbloquear Pro por $14.900 COP
+            </button>
+          )}
         </div>
 
         {/* Hero title */}
@@ -274,19 +300,28 @@ export default function HeroDemo() {
 
           <FilterBar onFilterChange={handleFilterChange} />
 
-          {/* Job List Grid */}
+          {/* Job List Grid with 48h Freshness Paywall Rule */}
           {filteredJobs.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {filteredJobs.map((job) => (
-                <JobCard
-                  key={job.jobId || job.url}
-                  job={{
-                    ...job,
-                    isSaved: savedJobIds.has(job.jobId)
-                  }}
-                  onSaveToggle={handleSaveToggle}
-                />
-              ))}
+              {filteredJobs.map((job) => {
+                const isLocked = tier !== 'pro' && isRecentJob(job);
+                return isLocked ? (
+                  <PaywallCard
+                    key={job.jobId || job.url}
+                    job={job}
+                    onUnlockClick={handleUnlockPro}
+                  />
+                ) : (
+                  <JobCard
+                    key={job.jobId || job.url}
+                    job={{
+                      ...job,
+                      isSaved: savedJobIds.has(job.jobId)
+                    }}
+                    onSaveToggle={handleSaveToggle}
+                  />
+                );
+              })}
             </div>
           ) : (
             <div className="text-center py-16 px-4 rounded-2xl border border-[#262A31] bg-[#131519] text-slate-400 font-mono">
