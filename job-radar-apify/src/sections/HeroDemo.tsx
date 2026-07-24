@@ -1,4 +1,7 @@
 import { useState, useEffect, useRef } from "react";
+import { JobCard } from "../components/JobCard.js";
+import { FilterBar, FilterState } from "../components/FilterBar.js";
+import { StatsBar } from "../components/StatsBar.js";
 
 const timeRanges = [
   { label: "24 horas", value: "24h" },
@@ -18,34 +21,9 @@ const sources = [
   "Remotive",
   "Workana",
   "WeRemoto",
+  "Indeed",
+  "Glassdoor"
 ];
-
-interface JobItem {
-  jobId: string;
-  title: string;
-  company: string;
-  location: string;
-  url: string;
-  dateText: string;
-  source: string;
-}
-
-function CheckIcon({ size = 14 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="2,7 5.5,10.5 12,3" />
-    </svg>
-  );
-}
-
-function XIcon({ size = 14 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
-      <line x1="2" y1="2" x2="12" y2="12" />
-      <line x1="12" y1="2" x2="2" y2="12" />
-    </svg>
-  );
-}
 
 function SearchIcon() {
   return (
@@ -56,107 +34,15 @@ function SearchIcon() {
   );
 }
 
-function JobCard({ job }: { job: JobItem }) {
-  return (
-    <div
-      className="rounded-xl border p-4 transition-all duration-150 ease-out text-left"
-      style={{
-        backgroundColor: "#131519",
-        borderColor: "#262A31",
-      }}
-      onMouseEnter={(e) => {
-        (e.currentTarget as HTMLDivElement).style.borderColor = "#3A404A";
-        (e.currentTarget as HTMLDivElement).style.backgroundColor = "#1B1E24";
-      }}
-      onMouseLeave={(e) => {
-        (e.currentTarget as HTMLDivElement).style.borderColor = "#262A31";
-        (e.currentTarget as HTMLDivElement).style.backgroundColor = "#131519";
-      }}
-    >
-      <div className="flex items-center justify-between mb-2 gap-2">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span
-            className="text-xs px-2 py-0.5 rounded-full"
-            style={{
-              fontFamily: "ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace",
-              color: "#646B75",
-              backgroundColor: "#1B1E24",
-              border: "1px solid #262A31",
-            }}
-          >
-            {job.dateText || "Reciente"}
-          </span>
-          <span
-            className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full"
-            style={{
-              fontFamily: "ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace",
-              color: "#34D399",
-              backgroundColor: "rgba(52,211,153,0.10)",
-              border: "1px solid rgba(52,211,153,0.20)",
-            }}
-          >
-            <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: "#34D399" }} />
-            Verificada
-          </span>
-        </div>
-        <span
-          className="text-xs px-2.5 py-0.5 rounded-full font-medium"
-          style={{
-            fontFamily: "ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace",
-            color: "#34D399",
-            backgroundColor: "#1B1E24",
-            border: "1px solid #262A31",
-          }}
-        >
-          {job.source}
-        </span>
-      </div>
-
-      <h3 className="text-base font-semibold mb-1.5 leading-snug" style={{ color: "#F4F5F7" }}>
-        {job.title}
-      </h3>
-
-      <div className="flex items-center gap-2 mb-3 text-sm" style={{ color: "#9AA1AC" }}>
-        <span className="font-medium" style={{ color: "#F4F5F7" }}>{job.company || "Empresa confidencial"}</span>
-        <span style={{ color: "#646B75" }}>·</span>
-        <span>{job.location || "Colombia"}</span>
-      </div>
-
-      <div className="flex items-center justify-between border-t border-[#262A31] pt-3 mt-2">
-        <span className="text-xs" style={{ fontFamily: "monospace", color: "#646B75" }}>
-          Sincronizada a Notion
-        </span>
-        <a
-          href={job.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-xs px-3 py-1.5 rounded-md font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 flex items-center gap-1"
-          style={{
-            color: "#0A0B0D",
-            backgroundColor: "#34D399",
-            textDecoration: "none",
-          }}
-          onMouseEnter={(e) => {
-            (e.currentTarget as HTMLAnchorElement).style.backgroundColor = "#6EE7B7";
-          }}
-          onMouseLeave={(e) => {
-            (e.currentTarget as HTMLAnchorElement).style.backgroundColor = "#34D399";
-          }}
-        >
-          Aplicar ↗
-        </a>
-      </div>
-    </div>
-  );
-}
-
 export default function HeroDemo() {
   const [query, setQuery] = useState("");
   const [activeRange, setActiveRange] = useState("48h");
   const [isLoading, setIsLoading] = useState(false);
-  const [jobs, setJobs] = useState<JobItem[]>([]);
+  const [allJobs, setAllJobs] = useState<any[]>([]);
+  const [filteredJobs, setFilteredJobs] = useState<any[]>([]);
   const [logs, setLogs] = useState<string[]>([]);
   const [checkedSources, setCheckedSources] = useState<number>(0);
+  const [savedJobIds, setSavedJobIds] = useState<Set<string>>(new Set());
 
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -171,7 +57,8 @@ export default function HeroDemo() {
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data.jobs)) {
-          setJobs(data.jobs);
+          setAllJobs(data.jobs);
+          setFilteredJobs(data.jobs);
         }
       }
     } catch (e) {}
@@ -200,12 +87,61 @@ export default function HeroDemo() {
     };
   }, []);
 
+  // Filter handler (Instant local execution < 50ms)
+  const handleFilterChange = (filters: FilterState) => {
+    let result = [...allJobs];
+
+    // Search text filter
+    if (filters.search.trim()) {
+      const s = filters.search.toLowerCase();
+      result = result.filter(j => 
+        (j.title && j.title.toLowerCase().includes(s)) ||
+        (j.company && j.company.toLowerCase().includes(s)) ||
+        (j.location && j.location.toLowerCase().includes(s))
+      );
+    }
+
+    // Source filter
+    if (filters.source && filters.source !== 'all') {
+      result = result.filter(j => 
+        j.source === filters.source || 
+        (Array.isArray(j.sources) && j.sources.includes(filters.source)) ||
+        (Array.isArray(j.alsoIn) && j.alsoIn.includes(filters.source))
+      );
+    }
+
+    // Modality filter
+    if (filters.modality && filters.modality !== 'all') {
+      const m = filters.modality.toLowerCase();
+      result = result.filter(j => {
+        const loc = (j.location || '').toLowerCase();
+        if (m === 'remoto') return loc.includes('remoto') || loc.includes('remote');
+        if (m === 'hibrido') return loc.includes('híbrido') || loc.includes('hibrido');
+        if (m === 'presencial') return !loc.includes('remoto') && !loc.includes('remote') && !loc.includes('híbrido');
+        return true;
+      });
+    }
+
+    // Saved only filter
+    if (filters.savedOnly) {
+      result = result.filter(j => savedJobIds.has(j.jobId));
+    }
+
+    setFilteredJobs(result);
+  };
+
+  const handleSaveToggle = (jobId: string) => {
+    const next = new Set(savedJobIds);
+    if (next.has(jobId)) next.delete(jobId);
+    else next.add(jobId);
+    setSavedJobIds(next);
+  };
+
   async function handleSearch() {
     if (!query.trim() || isLoading) return;
     setIsLoading(true);
     setLogs([`Iniciando escaneo para "${query}" (${activeRange})...`]);
 
-    // Simulate incremental source check visual
     let count = 0;
     const timer = setInterval(() => {
       count++;
@@ -248,83 +184,40 @@ export default function HeroDemo() {
         }}
       />
 
-      <div
-        className="absolute inset-0 pointer-events-none"
-        aria-hidden="true"
-        style={{
-          background:
-            "radial-gradient(ellipse 70% 50% at 50% 0%, rgba(52,211,153,0.07) 0%, transparent 70%)",
-        }}
-      />
-
-      <div
-        className="relative mx-auto px-4 md:px-8 lg:px-16 py-20 md:py-28 flex flex-col items-center text-center"
-        style={{ maxWidth: "1200px" }}
-      >
-        <div
-          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full mb-8 text-xs font-mono"
-          style={{
-            color: "#34D399",
-            backgroundColor: "rgba(52,211,153,0.10)",
-            border: "1px solid rgba(52,211,153,0.25)",
-          }}
-        >
-          <span
-            className="w-2 h-2 rounded-full flex-shrink-0"
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-20">
+        {/* Badge header */}
+        <div className="flex items-center justify-center mb-6">
+          <div
+            className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium"
             style={{
-              backgroundColor: "#34D399",
-              animation: "pulse 2s cubic-bezier(0.4,0,0.6,1) infinite",
+              color: "#34D399",
+              backgroundColor: "rgba(52,211,153,0.08)",
+              border: "1px solid rgba(52,211,153,0.25)",
             }}
-          />
-          Escáner en vivo con verificación WAF & Notion Sync
+          >
+            <span className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: "#34D399" }} />
+            Scrapeador Multi-Fuente 100% Autónomo
+          </div>
         </div>
 
+        {/* Hero title */}
         <h1
-          className="font-semibold mb-5 tracking-tight leading-none"
-          style={{
-            fontSize: "clamp(2rem, 5vw, 3.5rem)",
-            letterSpacing: "-0.02em",
-            lineHeight: 1.1,
-            color: "#F4F5F7",
-            maxWidth: "820px",
-          }}
+          className="text-center text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-white mb-4"
+          style={{ fontFamily: "'Space Grotesk', sans-serif" }}
         >
-          Deja de llegar tarde a las vacantes
+          Encuentra todas las vacantes de Colombia{" "}
+          <span style={{ color: "#34D399" }}>en un solo lugar</span>
         </h1>
 
-        <p
-          className="mb-10 text-base md:text-lg leading-relaxed"
-          style={{
-            color: "#9AA1AC",
-            maxWidth: "620px",
-            lineHeight: 1.65,
-          }}
-        >
-          Escribe el rol que buscas. Job Radar consulta más de 10 portales a la vez, elimina duplicados, verifica que cada oferta siga activa y te entrega solo lo publicado en las últimas horas.
+        <p className="text-center text-base sm:text-lg text-slate-400 max-w-2xl mx-auto mb-10">
+          Escaneamos 12 portales simultáneamente en tiempo real. Deduplicado automático por SHA256.
         </p>
 
-        <div
-          className="w-full rounded-2xl p-5 md:p-6 shadow-2xl"
-          style={{
-            maxWidth: "780px",
-            backgroundColor: "#131519",
-            border: "1px solid #262A31",
-          }}
-        >
-          <div
-            className="flex items-center justify-between mb-4 font-mono text-xs"
-            style={{ color: "#646B75" }}
-          >
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: "#34D399" }} />
-              job-radar / búsqueda en vivo
-            </div>
-            {isLoading && <span className="text-[#34D399] animate-pulse">Escaneando portales...</span>}
-          </div>
-
-          <div className="flex flex-col sm:flex-row gap-3 mb-4">
-            <div className="relative flex-1">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: "#646B75" }}>
+        {/* Search Bar */}
+        <div className="max-w-3xl mx-auto mb-8">
+          <div className="flex flex-col sm:flex-row items-stretch gap-2 p-2 rounded-2xl border border-[#262A31] bg-[#131519] shadow-2xl">
+            <div className="relative flex-1 flex items-center">
+              <span className="absolute left-4 text-slate-400">
                 <SearchIcon />
               </span>
               <input
@@ -333,83 +226,74 @@ export default function HeroDemo() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Ej: cuidadora de abuelos o abuelas, analista de datos, UX designer"
-                className="w-full pl-9 pr-4 py-3 rounded-lg text-sm transition-all duration-150 focus-visible:outline-none focus-visible:ring-2"
-                style={{
-                  backgroundColor: "#1B1E24",
-                  border: "1px solid #262A31",
-                  color: "#F4F5F7",
-                  minHeight: "44px",
-                }}
+                placeholder="Ej. Analista de Datos, QA Engineer, Project Manager..."
+                className="w-full bg-transparent pl-11 pr-4 py-3 text-slate-100 placeholder-slate-500 text-sm focus:outline-none font-sans"
               />
             </div>
-            <button
-              onClick={handleSearch}
-              disabled={!query.trim() || isLoading}
-              className="px-6 py-3 rounded-lg text-sm font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 disabled:opacity-50 sm:w-auto w-full flex items-center justify-center gap-2"
-              style={{
-                backgroundColor: "#34D399",
-                color: "#0A0B0D",
-                minHeight: "44px",
-              }}
-            >
-              {isLoading ? (
-                <>
-                  <span className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
-                  Escaneando...
-                </>
-              ) : (
-                "🚀 Ejecutar Scraper"
-              )}
-            </button>
-          </div>
 
-          <div className="flex flex-wrap items-center gap-2 mb-5">
-            <span className="text-xs font-mono text-[#646B75] mr-1">Rango:</span>
-            {timeRanges.map((range) => {
-              const isActive = activeRange === range.value;
-              return (
-                <button
-                  key={range.value}
-                  onClick={() => setActiveRange(range.value)}
-                  className="px-3 py-1.5 rounded-full text-xs font-mono transition-all duration-150"
-                  style={{
-                    backgroundColor: isActive ? "rgba(52,211,153,0.10)" : "transparent",
-                    border: isActive ? "1px solid rgba(52,211,153,0.35)" : "1px solid #262A31",
-                    color: isActive ? "#34D399" : "#646B75",
+            <div className="flex items-center gap-2">
+              <select
+                value={activeRange}
+                onChange={(e) => setActiveRange(e.target.value)}
+                className="px-3 py-3 bg-[#0A0B0D] border border-[#262A31] rounded-xl text-xs text-slate-300 font-mono focus:outline-none"
+              >
+                {timeRanges.map((r) => (
+                  <option key={r.value} value={r.value}>
+                    {r.label}
+                  </option>
+                ))}
+              </select>
+
+              <button
+                onClick={handleSearch}
+                disabled={isLoading}
+                className="px-6 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50 whitespace-nowrap"
+              >
+                {isLoading ? "Escaneando..." : "Escanear Vacantes"}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Terminal Logs (if running) */}
+        {logs.length > 0 && (
+          <div className="max-w-3xl mx-auto mb-8 p-4 rounded-xl bg-[#0A0B0D] border border-[#262A31] font-mono text-xs text-emerald-400 space-y-1 max-h-40 overflow-y-auto">
+            {logs.map((log, idx) => (
+              <div key={idx}>▸ {log}</div>
+            ))}
+          </div>
+        )}
+
+        {/* FilterBar & StatsBar */}
+        <div className="mt-8">
+          <StatsBar 
+            totalJobs={allJobs.length}
+            filteredJobs={filteredJobs.length}
+            duplicatesRemoved={Math.max(0, allJobs.length - filteredJobs.length)}
+          />
+
+          <FilterBar onFilterChange={handleFilterChange} />
+
+          {/* Job List Grid */}
+          {filteredJobs.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {filteredJobs.map((job) => (
+                <JobCard
+                  key={job.jobId || job.url}
+                  job={{
+                    ...job,
+                    isSaved: savedJobIds.has(job.jobId)
                   }}
-                >
-                  {range.label}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Terminal Logs Window */}
-          {logs.length > 0 && (
-            <div className="mb-5 p-3 rounded-lg text-left font-mono text-xs max-h-36 overflow-y-auto" style={{ backgroundColor: "#0A0B0D", border: "1px solid #262A31", color: "#34D399" }}>
-              <div className="text-[#646B75] mb-1">=== Consola de Escaneo ===</div>
-              {logs.map((log, idx) => (
-                <div key={idx} className="whitespace-pre-wrap">{log}</div>
+                  onSaveToggle={handleSaveToggle}
+                />
               ))}
             </div>
+          ) : (
+            <div className="text-center py-16 px-4 rounded-2xl border border-[#262A31] bg-[#131519] text-slate-400 font-mono">
+              <span className="text-3xl block mb-2">🔍</span>
+              No se encontraron vacantes con los filtros seleccionados.
+            </div>
           )}
-
-          {/* Job List */}
-          <div className="flex items-center justify-between mb-3 text-xs font-mono text-[#646B75]">
-            <span>{jobs.length} vacantes encontradas · Sincronizadas</span>
-            <span className="text-[#34D399]">100% Activas</span>
-          </div>
-
-          <div className="flex flex-col gap-3 max-h-[500px] overflow-y-auto pr-1">
-            {jobs.length === 0 ? (
-              <div className="p-8 text-center border border-dashed border-[#262A31] rounded-xl text-[#646B75] font-mono text-xs">
-                No hay vacantes cargadas aún. Realiza una búsqueda arriba para comenzar.
-              </div>
-            ) : (
-              jobs.map((job) => <JobCard key={job.jobId} job={job} />)
-            )}
-          </div>
         </div>
       </div>
     </section>
