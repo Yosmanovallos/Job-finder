@@ -1,0 +1,32 @@
+name: Job Radar 24/7 Social Media Auto-Publisher
+
+on:
+  schedule:
+    - cron: '*/15 * * * *' # Executes every 15 minutes at $0 USD cost
+  workflow_dispatch:
+
+jobs:
+  publish-social-digests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Dependencies
+        run: |
+          cd job-radar-apify
+          npm ci || npm install
+
+      - name: Run Social Auto-Publisher Worker
+        env:
+          TWITTER_API_KEY: ${{ secrets.TWITTER_API_KEY }}
+          TWITTER_API_SECRET: ${{ secrets.TWITTER_API_SECRET }}
+          META_ACCESS_TOKEN: ${{ secrets.META_ACCESS_TOKEN }}
+        run: |
+          cd job-radar-apify
+          npx tsx -e "import { publishPendingDigests } from './src/social/publisher.js'; publishPendingDigests().then(res => console.log('Publish result:', res));"
