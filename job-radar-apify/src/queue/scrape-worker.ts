@@ -1,6 +1,6 @@
 import { allAdapters, Job } from '../sources/index.js';
 import { saveJobs } from '../db/job-repository.js';
-import { expandRoleKeywords } from '../ai-role-agent.js';
+import { generateRoleKeywordsWithAI } from '../ai-role-agent.js';
 
 interface WorkerJobOptions {
   roleName: string;
@@ -39,7 +39,7 @@ export class ScrapeWorker {
     console.log(`\n⚙️ [ScrapeWorker] Procesando rol: "${roleName}" (Concurrencia activa: ${this.activeJobsCount + 1}/${this.maxConcurrency})...`);
 
     // Expand role keywords using ai-role-agent.ts
-    const keywordsToUse = expandRoleKeywords(roleName);
+    const keywordsToUse = generateRoleKeywordsWithAI([roleName]);
     console.log(`🔍 [ScrapeWorker] Variantes generadas para "${roleName}": [${keywordsToUse.join(', ')}]`);
 
     const accumulatedJobs: Job[] = [];

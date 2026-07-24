@@ -1,10 +1,10 @@
 {
   "runs": [
     {
-      "id": "run_1784923927390",
+      "id": "run_1784924141821",
       "name": "Lote 2 (50 Vacantes)",
       "role": "Lote 2",
-      "timestamp": "2026-07-24T20:12:07.390Z",
+      "timestamp": "2026-07-24T20:15:41.821Z",
       "jobs": [
         {
           "jobId": "computrabajo_1",
@@ -509,10 +509,10 @@
       ]
     },
     {
-      "id": "run_1784923927379",
+      "id": "run_1784924141811",
       "name": "Lote 1 (50 Vacantes)",
       "role": "Lote 1",
-      "timestamp": "2026-07-24T20:12:07.379Z",
+      "timestamp": "2026-07-24T20:15:41.811Z",
       "jobs": [
         {
           "jobId": "job_1",

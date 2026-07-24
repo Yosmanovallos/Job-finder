@@ -66,8 +66,9 @@ export function getAllCachedJobs(runId?: string): any[] {
   const urlsSeen = new Set<string>();
 
   for (const r of cache.runs) {
+    if (!Array.isArray(r.jobs)) continue;
     for (const j of r.jobs) {
-      if (!urlsSeen.has(j.url)) {
+      if (j && j.url && !urlsSeen.has(j.url)) {
         urlsSeen.add(j.url);
         all.push({
           ...j,
