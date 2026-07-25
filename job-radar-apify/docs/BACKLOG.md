@@ -30,37 +30,45 @@ cualquier campaña de adquisición (ver `product-vision-scaling` en memoria) —
 si el correo de confirmación no llega, el usuario nunca puede completar el
 registro.
 
-## Separar el scraper del proceso web (CRÍTICO — mitigado con un stopgap)
+## Separar el scraper del proceso web (RESUELTO — 2026-07-25)
 
-**Qué:** `src/queue/cron.ts` + `src/queue/scheduler.ts` corren el scraping
-(hasta 12 roles cada 5 min, 3 en paralelo) dentro del mismo proceso Node que
-sirve el sitio web y el login. El 2026-07-25, en producción (Render free
-tier), esto causó `FATAL ERROR: Reached heap limit — JavaScript heap out of
-memory` (exit code 134 / SIGABRT) de forma recurrente — cada vez que el
-proceso moría, se caía TODO: login, dashboard, checkout, todo, no solo el
+**Qué era:** `src/queue/cron.ts` + `src/queue/scheduler.ts` corrían el
+scraping (hasta 12 roles cada 5 min, 3 en paralelo) dentro del mismo proceso
+Node que sirve el sitio web y el login. El 2026-07-25, en producción (Render
+free tier), esto causó `FATAL ERROR: Reached heap limit — JavaScript heap
+out of memory` (exit code 134 / SIGABRT) de forma recurrente — cada vez que
+el proceso moría, se caía TODO: login, dashboard, checkout, todo, no solo el
 scraper.
 
-**Stopgap ya aplicado (no es la solución):** el usuario apagó `ENABLE_CRON`
-en Render → Environment. Esto detiene el scraping automático en background y
-mantiene el sitio estable, pero también detiene la actualización del corpus
-de vacantes. El botón manual de "Ejecutar escaneo" del dashboard (si se usa)
-comparte el mismo riesgo — corre en el mismo proceso.
+**Cómo quedó resuelto:** el scraping corre por completo fuera del proceso
+web, vía GitHub Actions (`.github/workflows/scrape-jobs.yml`, cada 15 min,
+gratis por repo público) invocando `job-radar-apify/scripts/run-scrape-tick.ts`
+— un script de un solo ciclo, sin reintentos internos (un rol que supera su
+timeout de 5 min simplemente queda "debido" para el siguiente tick, en vez de
+reintentarse en el mismo proceso). Escribe a la misma Postgres/Supabase que
+lee el servicio web. `src/server.ts` ya no importa `queue/scheduler.js` ni
+`queue/cron.js` en absoluto — `queue/cron.ts` se borró, `queue/scheduler.ts`
+quedó reducido a solo `DEFAULT_ROLES_200`. `ENABLE_CRON` se quitó del
+`render.yaml` (ya no existe el código que lo leía). El botón manual
+`/api/run-scraper` ya no genera un subproceso en el web dyno — solo marca el
+rol como "debido ahora" en Postgres (`markRoleForImmediateRescan`) para que
+lo recoja el siguiente tick programado. El workflow tiene un guard de
+concurrencia (`concurrency: group, cancel-in-progress: false`) para que dos
+ticks no se solapen escaneando los mismos roles a la vez.
 
 **Por qué importa:** es la arquitectura correcta que ya estaba prevista en la
 visión de producto (ver `product-vision-scaling` en memoria): "queue con
 concurrencia controlada... los usuarios leen del store, nunca disparan
-scrapes en vivo". Retomar esto también es requisito para escalar a los 200+
-roles de la visión — con 30 roles ya tumbó el proceso; con 200 sería peor.
+scrapes en vivo". Con 30 roles ya tumbaba el proceso; con 200 hubiera sido
+peor — con la separación, el límite de memoria del runner de GitHub Actions
+ya no puede afectar el servicio web en absoluto.
 
-**Qué hacer cuando se retome:** mover `globalScheduler`/`startCronScheduler`
-a un servicio de Render separado (Background Worker o Cron Job), con su
-propio proceso y memoria, que escriba a la misma Postgres/Supabase pero no
-comparta heap con el servicio web. El servicio web deja de importar
-`queue/cron.ts` por completo.
-
-**Debe estar resuelto antes de:** reactivar `ENABLE_CRON=true`, y antes de
-intentar escalar más allá de los ~30 roles actuales (`DEFAULT_ROLES_200` en
-`scheduler.ts`, que hoy solo tiene 30).
+**Pendiente relacionado, no bloqueante:** `DEFAULT_ROLES_200` (en
+`src/queue/scheduler.ts`) hoy solo tiene 30 roles, no 200 — escalar a la lista
+completa es seguro ahora que el scraping no comparte proceso con la web, pero
+sigue limitado por lo que Indeed/Workana toleren (ver sus entradas en
+`docs/source-catalog/`) y por el volumen real que soporte el runner gratuito
+de GitHub Actions.
 
 ## GitHub Action del Social Auto-Publisher rota (falla desde antes del 2026-07-25)
 
@@ -112,6 +120,7 @@ free en vacantes recientes, no explica que "ninguno" de los filtros funcione
 para una cuenta Pro con datos completos.
 
 **Qué hacer cuando se retome:**
+
 1. Reproducir con pasos concretos del usuario: qué filtro, qué valor
    seleccionado, resultado visto vs. esperado (sin eso, no hay repro).
 2. Considerar extraer la lógica de `handleFilterChange` a una función pura
