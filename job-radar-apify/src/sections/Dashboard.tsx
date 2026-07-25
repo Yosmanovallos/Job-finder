@@ -9,6 +9,25 @@ import { useAuth } from "../auth/auth-provider.js";
 
 type CheckoutBannerState = "confirming" | "success" | "pending" | null;
 
+const ROLE_STOPWORDS = new Set(["de", "la", "el", "los", "las", "en", "y", "del", "para"]);
+
+// role_origin only records which of the 30 searched roles happened to
+// discover a job's URL first (the dedup upsert never updates it on later
+// re-discovery), and some sources match keyword variants loosely enough that
+// a totally unrelated posting can end up permanently stamped with the wrong
+// role_origin. Filtering on that field alone let jobs like "Jefe de
+// enfermería" show up under a "QA Engineer" filter. Requiring the title to
+// actually contain a meaningful word from the role name is a real relevance
+// check instead of trusting that noisy stored field.
+function jobMatchesRole(role: string, job: any): boolean {
+  const title = (job.title || "").toLowerCase();
+  const words = role
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((w) => w.length > 1 && !ROLE_STOPWORDS.has(w));
+  return words.some((w) => title.includes(w));
+}
+
 export default function Dashboard() {
   const { tier, isAuthenticated, accessToken, user, refreshTier } = useAuth();
   const navigate = useNavigate();
@@ -147,8 +166,7 @@ export default function Dashboard() {
     }
 
     if (filters.selectedRoles && filters.selectedRoles.length > 0) {
-      const roleSet = new Set(filters.selectedRoles);
-      result = result.filter((j) => j.role_origin && roleSet.has(j.role_origin));
+      result = result.filter((j) => filters.selectedRoles.some((role) => jobMatchesRole(role, j)));
     }
 
     if (filters.savedOnly) {
