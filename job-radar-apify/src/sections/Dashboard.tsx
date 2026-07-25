@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { PRO_MONTHLY_PRICE_COP, formatCOP } from "../config.js";
 import { JobCard } from "../components/JobCard.js";
 import { PaywallCard } from "../components/PaywallCard.js";
@@ -32,11 +32,14 @@ export default function Dashboard() {
   useEffect(() => {
     if (searchParams.get("checkout") !== "return") return;
 
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
-      next.delete("checkout");
-      return next;
-    }, { replace: true });
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("checkout");
+        return next;
+      },
+      { replace: true }
+    );
 
     if (tier === "pro") {
       setCheckoutBanner("success");
@@ -51,7 +54,15 @@ export default function Dashboard() {
       // `tier` here is stale-closed; re-read via a fresh call isn't possible
       // without a ref, so this just caps the polling window and lets the
       // effect below promote "confirming" -> "success" once tier updates.
-      if (attempts >= 5) clearInterval(interval);
+      if (attempts >= 5) {
+        clearInterval(interval);
+        // Still not "success" after the whole window means the webhook
+        // never landed — stop silently spinning forever and say so instead
+        // (previously stuck on "Confirmando..." with no way out). The
+        // functional update is a no-op if the other effect already flipped
+        // this to "success" in the meantime.
+        setCheckoutBanner((prev) => (prev === "confirming" ? "pending" : prev));
+      }
     }, 2000);
 
     return () => clearInterval(interval);
@@ -75,8 +86,8 @@ export default function Dashboard() {
     setIsLoading(true);
     try {
       const headers: Record<string, string> = {};
-      if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
-      const res = await fetch('/api/jobs', { headers });
+      if (accessToken) headers["Authorization"] = `Bearer ${accessToken}`;
+      const res = await fetch("/api/jobs", { headers });
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data.jobs)) {
@@ -96,35 +107,39 @@ export default function Dashboard() {
 
     if (filters.search.trim()) {
       const s = filters.search.toLowerCase();
-      result = result.filter(j =>
-        (j.title && j.title.toLowerCase().includes(s)) ||
-        (j.company && j.company.toLowerCase().includes(s)) ||
-        (j.location && j.location.toLowerCase().includes(s))
+      result = result.filter(
+        (j) =>
+          (j.title && j.title.toLowerCase().includes(s)) ||
+          (j.company && j.company.toLowerCase().includes(s)) ||
+          (j.location && j.location.toLowerCase().includes(s))
       );
     }
 
-    if (filters.source && filters.source !== 'all') {
-      result = result.filter(j =>
-        j.source === filters.source ||
-        (Array.isArray(j.sources) && j.sources.includes(filters.source)) ||
-        (Array.isArray(j.alsoIn) && j.alsoIn.includes(filters.source))
+    if (filters.source && filters.source !== "all") {
+      result = result.filter(
+        (j) =>
+          j.source === filters.source ||
+          (Array.isArray(j.sources) && j.sources.includes(filters.source)) ||
+          (Array.isArray(j.alsoIn) && j.alsoIn.includes(filters.source))
       );
     }
 
-    if (filters.modality && filters.modality !== 'all') {
+    if (filters.modality && filters.modality !== "all") {
       const m = filters.modality.toLowerCase();
-      result = result.filter(j => {
-        const loc = (j.location || '').toLowerCase();
-        if (m === 'remoto') return loc.includes('remoto') || loc.includes('remote');
-        if (m === 'hibrido') return loc.includes('híbrido') || loc.includes('hibrido');
-        if (m === 'presencial') return !loc.includes('remoto') && !loc.includes('remote') && !loc.includes('híbrido');
+      result = result.filter((j) => {
+        const loc = (j.location || "").toLowerCase();
+        if (m === "remoto") return loc.includes("remoto") || loc.includes("remote");
+        if (m === "hibrido") return loc.includes("híbrido") || loc.includes("hibrido");
+        if (m === "presencial")
+          return !loc.includes("remoto") && !loc.includes("remote") && !loc.includes("híbrido");
         return true;
       });
     }
 
-    if (filters.freshness && filters.freshness !== 'all') {
-      const maxAgeHours = filters.freshness === '24h' ? 24 : filters.freshness === '48h' ? 48 : 24 * 7;
-      result = result.filter(j => {
+    if (filters.freshness && filters.freshness !== "all") {
+      const maxAgeHours =
+        filters.freshness === "24h" ? 24 : filters.freshness === "48h" ? 48 : 24 * 7;
+      result = result.filter((j) => {
         if (!j.publishedAt) return false;
         const ageHours = (Date.now() - new Date(j.publishedAt).getTime()) / (1000 * 60 * 60);
         return ageHours <= maxAgeHours;
@@ -132,11 +147,11 @@ export default function Dashboard() {
     }
 
     if (filters.savedOnly) {
-      result = result.filter(j => savedJobIds.has(j.jobId));
+      result = result.filter((j) => savedJobIds.has(j.jobId));
     }
 
     if (filters.appliedOnly) {
-      result = result.filter(j => appliedJobIds.has(j.jobId));
+      result = result.filter((j) => appliedJobIds.has(j.jobId));
     }
 
     setFilteredJobs(result);
@@ -157,7 +172,10 @@ export default function Dashboard() {
   };
 
   return (
-    <section className="relative w-full overflow-x-hidden min-h-screen" style={{ backgroundColor: "#0A0B0D" }}>
+    <section
+      className="relative w-full overflow-x-hidden min-h-screen"
+      style={{ backgroundColor: "#0A0B0D" }}
+    >
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-20">
         {checkoutBanner && (
           <div
@@ -174,23 +192,44 @@ export default function Dashboard() {
               </>
             )}
             {checkoutBanner === "success" && <>🎉 ¡Listo! Ya eres suscriptor Pro.</>}
+            {checkoutBanner === "pending" && (
+              <>
+                ⏳ Tu pago sigue en proceso de confirmación — puede tardar unos minutos. Si no se
+                actualiza, recarga la página más tarde o revisa el historial de pagos en{" "}
+                <Link to="/cuenta" className="underline">
+                  Mi cuenta
+                </Link>
+                .
+              </>
+            )}
           </div>
         )}
 
         {/* User Tier Status Banner */}
         <div className="flex items-center justify-between gap-4 mb-6 p-3 rounded-xl bg-[#131519] border border-[#262A31] text-xs font-mono">
           <div className="flex items-center gap-2">
-            <span className={`w-2.5 h-2.5 rounded-full ${tier === 'pro' ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+            <span
+              className={`w-2.5 h-2.5 rounded-full ${tier === "pro" ? "bg-emerald-400 animate-pulse" : "bg-amber-400"}`}
+            />
             <span className="text-slate-300">
-              Estado de Cuenta: <strong className={tier === 'pro' ? 'text-emerald-400 font-bold' : 'text-amber-400 font-bold'}>
-                {tier === 'pro' ? `🌟 Suscriptor Pro (${user?.email})` : isAuthenticated ? 'FREE (Vacantes >48h Gratuitas / 0-48h Bloqueadas)' : 'Explorando sin cuenta (Vacantes >48h Gratuitas)'}
+              Estado de Cuenta:{" "}
+              <strong
+                className={
+                  tier === "pro" ? "text-emerald-400 font-bold" : "text-amber-400 font-bold"
+                }
+              >
+                {tier === "pro"
+                  ? `🌟 Suscriptor Pro (${user?.email})`
+                  : isAuthenticated
+                    ? "FREE (Vacantes >48h Gratuitas / 0-48h Bloqueadas)"
+                    : "Explorando sin cuenta (Vacantes >48h Gratuitas)"}
               </strong>
             </span>
           </div>
 
-          {tier === 'free' && (
+          {tier === "free" && (
             <button
-              onClick={() => navigate('/pricing')}
+              onClick={() => navigate("/pricing")}
               className="px-3 py-1 rounded bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold font-sans text-xs transition-all shadow"
             >
               🔓 Desbloquear Pro por {formatCOP(PRO_MONTHLY_PRICE_COP)} COP
@@ -223,12 +262,12 @@ export default function Dashboard() {
             </div>
           ) : filteredJobs.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {filteredJobs.map((job) => (
+              {filteredJobs.map((job) =>
                 job.isLocked ? (
                   <PaywallCard
                     key={job.jobId || job.url}
                     job={job}
-                    onUnlockClick={() => navigate('/pricing')}
+                    onUnlockClick={() => navigate("/pricing")}
                   />
                 ) : (
                   <JobCard
@@ -242,7 +281,7 @@ export default function Dashboard() {
                     onAppliedToggle={handleAppliedToggle}
                   />
                 )
-              ))}
+              )}
             </div>
           ) : (
             <div className="text-center py-16 px-4 rounded-2xl border border-[#262A31] bg-[#131519] text-slate-400 font-mono">
