@@ -6,6 +6,7 @@ import { PaywallCard } from "../components/PaywallCard.js";
 import { FilterBar, FilterState } from "../components/FilterBar.js";
 import { StatsBar } from "../components/StatsBar.js";
 import { useAuth } from "../auth/auth-provider.js";
+import { DEFAULT_ROLES_200 } from "../queue/scheduler.js";
 
 type CheckoutBannerState = "confirming" | "success" | "pending" | null;
 
@@ -16,16 +17,43 @@ const ROLE_STOPWORDS = new Set(["de", "la", "el", "los", "las", "en", "y", "del"
 // re-discovery), and some sources match keyword variants loosely enough that
 // a totally unrelated posting can end up permanently stamped with the wrong
 // role_origin. Filtering on that field alone let jobs like "Jefe de
-// enfermería" show up under a "QA Engineer" filter. Requiring the title to
-// actually contain a meaningful word from the role name is a real relevance
-// check instead of trusting that noisy stored field.
+// enfermería" show up under a "QA Engineer" filter.
+//
+// A first attempt at fixing this (matching if the title contains ANY
+// significant word from the role name) was still badly broken: "QA Engineer"
+// and "Data Engineer" and "AI Engineer" all share the word "engineer", so
+// matching on it alone made every one of those roles match every "Engineer"
+// job site-wide — verified against the real corpus, "QA Engineer" matched 89
+// titles that way, only 8 of which were actually QA-related.
+//
+// Word frequency across all configured roles is computed once so a word
+// shared by 2+ roles (engineer, data, analyst, manager, auxiliar, designer,
+// desarrollador, ...) is never trusted alone — only a role's genuinely
+// distinctive word(s) can trigger a match by themselves. If every word in a
+// role happens to be shared with another role (e.g. "Data Engineer" — both
+// "data" and "engineer" are generic), it falls back to requiring all of them
+// together instead of any one, which is stricter but still far more precise
+// than matching on a single generic word.
+const ROLE_WORD_FREQUENCY: Record<string, number> = {};
+for (const role of DEFAULT_ROLES_200) {
+  const words = new Set(
+    role
+      .toLowerCase()
+      .split(/\s+/)
+      .filter((w) => w.length > 1 && !ROLE_STOPWORDS.has(w))
+  );
+  for (const w of words) ROLE_WORD_FREQUENCY[w] = (ROLE_WORD_FREQUENCY[w] || 0) + 1;
+}
+
 function jobMatchesRole(role: string, job: any): boolean {
   const title = (job.title || "").toLowerCase();
   const words = role
     .toLowerCase()
     .split(/\s+/)
     .filter((w) => w.length > 1 && !ROLE_STOPWORDS.has(w));
-  return words.some((w) => title.includes(w));
+  const distinctive = words.filter((w) => (ROLE_WORD_FREQUENCY[w] || 0) < 2);
+  if (distinctive.length > 0) return distinctive.some((w) => title.includes(w));
+  return words.every((w) => title.includes(w));
 }
 
 export default function Dashboard() {
@@ -141,6 +169,16 @@ export default function Dashboard() {
           (Array.isArray(j.sources) && j.sources.includes(filters.source)) ||
           (Array.isArray(j.alsoIn) && j.alsoIn.includes(filters.source))
       );
+    }
+
+    if (filters.city && filters.city !== "all") {
+      const normalize = (s: string) =>
+        s
+          .normalize("NFD")
+          .replace(/[̀-ͯ]/g, "")
+          .toLowerCase();
+      const cityNorm = normalize(filters.city);
+      result = result.filter((j) => j.location && normalize(j.location).includes(cityNorm));
     }
 
     if (filters.modality && filters.modality !== "all") {

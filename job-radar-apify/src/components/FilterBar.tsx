@@ -9,7 +9,24 @@ export interface FilterState {
   savedOnly: boolean;
   appliedOnly: boolean;
   selectedRoles: string[];
+  city: string;
 }
+
+// Raw `location` values are messy free text (hundreds of variants like
+// "Bogotá, D.C., Capital District, Colombia" vs plain "Bogotá"), so this is a
+// substring bucket per major city rather than an exact-match dropdown over
+// the raw field.
+export const CITY_OPTIONS = [
+  "Bogotá",
+  "Medellín",
+  "Cali",
+  "Barranquilla",
+  "Cartagena",
+  "Bucaramanga",
+  "Pereira",
+  "Manizales",
+  "Remoto"
+];
 
 export interface FilterBarProps {
   onFilterChange: (filters: FilterState) => void;
@@ -23,6 +40,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({ onFilterChange, availableS
   const [freshness, setFreshness] = useState("all");
   const [savedOnly, setSavedOnly] = useState(false);
   const [appliedOnly, setAppliedOnly] = useState(false);
+  const [city, setCity] = useState("all");
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
   const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
   const [roleSearch, setRoleSearch] = useState("");
@@ -48,7 +66,8 @@ export const FilterBar: React.FC<FilterBarProps> = ({ onFilterChange, availableS
       freshness: newPartial.freshness !== undefined ? newPartial.freshness : freshness,
       savedOnly: newPartial.savedOnly !== undefined ? newPartial.savedOnly : savedOnly,
       appliedOnly: newPartial.appliedOnly !== undefined ? newPartial.appliedOnly : appliedOnly,
-      selectedRoles: newPartial.selectedRoles !== undefined ? newPartial.selectedRoles : selectedRoles
+      selectedRoles: newPartial.selectedRoles !== undefined ? newPartial.selectedRoles : selectedRoles,
+      city: newPartial.city !== undefined ? newPartial.city : city
     };
 
     if (newPartial.search !== undefined) setSearch(newPartial.search);
@@ -58,6 +77,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({ onFilterChange, availableS
     if (newPartial.savedOnly !== undefined) setSavedOnly(newPartial.savedOnly);
     if (newPartial.appliedOnly !== undefined) setAppliedOnly(newPartial.appliedOnly);
     if (newPartial.selectedRoles !== undefined) setSelectedRoles(newPartial.selectedRoles);
+    if (newPartial.city !== undefined) setCity(newPartial.city);
 
     onFilterChange(updated);
   };
@@ -136,7 +156,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({ onFilterChange, availableS
       </div>
 
       {/* Select Filters Row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs font-mono">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 text-xs font-mono">
         {/* Source Selector */}
         <div>
           <label className="block text-slate-500 mb-1">Fuente / Portal:</label>
@@ -148,6 +168,23 @@ export const FilterBar: React.FC<FilterBarProps> = ({ onFilterChange, availableS
             {sourcesList.map((s) => (
               <option key={s} value={s}>
                 {s === "all" ? "🌐 Todas las Fuentes" : s}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* City Selector */}
+        <div>
+          <label className="block text-slate-500 mb-1">Ciudad:</label>
+          <select
+            value={city}
+            onChange={(e) => updateFilters({ city: e.target.value })}
+            className="w-full px-3 py-1.5 bg-[#0A0B0D] border border-[#262A31] rounded-lg text-slate-200 focus:outline-none focus:border-emerald-500/50"
+          >
+            <option value="all">📍 Todas las Ciudades</option>
+            {CITY_OPTIONS.map((c) => (
+              <option key={c} value={c}>
+                {c}
               </option>
             ))}
           </select>
