@@ -238,11 +238,7 @@ export default function Dashboard() {
         </div>
 
         <div className="mt-4">
-          <StatsBar
-            totalJobs={allJobs.length}
-            filteredJobs={filteredJobs.length}
-            duplicatesRemoved={Math.max(0, allJobs.length - filteredJobs.length)}
-          />
+          <StatsBar totalJobs={allJobs.length} filteredJobs={filteredJobs.length} />
 
           <FilterBar onFilterChange={handleFilterChange} />
 

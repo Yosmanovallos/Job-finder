@@ -3,14 +3,12 @@ import React from 'react';
 export interface StatsBarProps {
   totalJobs: number;
   filteredJobs: number;
-  duplicatesRemoved?: number;
   lastUpdatedText?: string;
 }
 
 export const StatsBar: React.FC<StatsBarProps> = ({
   totalJobs,
   filteredJobs,
-  duplicatesRemoved = 0,
   lastUpdatedText = 'Hace instantes'
 }) => {
   const verifiedPercentage = totalJobs > 0 ? 100 : 0;
@@ -28,12 +26,6 @@ export const StatsBar: React.FC<StatsBarProps> = ({
         <span className="text-slate-600">|</span>
         <span className="text-emerald-400">
           <strong>{verifiedPercentage}%</strong> Verificadas
-        </span>
-
-        {/* Duplicates Removed */}
-        <span className="text-slate-600">|</span>
-        <span>
-          <strong className="text-slate-200">{duplicatesRemoved}</strong> Duplicadas eliminadas
         </span>
       </div>
 

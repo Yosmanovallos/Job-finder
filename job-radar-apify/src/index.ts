@@ -126,13 +126,20 @@ function getDateRangeConfig(range: string = process.env.DATE_RANGE || "48h") {
 }
 
 // Convert date text to standard YYYY-MM-DD
+// Returns a full ISO timestamp (not just a calendar date) — `published_at` is
+// TIMESTAMPTZ, and the dashboard's 24h/48h freshness filter computes an exact
+// age-in-hours from it. Truncating to YYYY-MM-DD (the previous behavior)
+// collapsed everything from "1 hour ago" to "23 hours ago" into the same
+// midnight-UTC bucket, throwing away the very precision that filter needs —
+// a job scraped at 23:00 could get recorded as if posted at 00:00 that same
+// day, shifting its computed age by up to a day at the boundary.
 function parseDateText(
   dateText: string,
   source: string,
   maxDays: number = 2
 ): { date: string; valid: boolean } {
   const now = new Date();
-  let daysAgo = 0;
+  let hoursAgo = 0;
   let valid = false;
 
   const text = dateText.toLowerCase();
@@ -144,13 +151,14 @@ function parseDateText(
     text.includes("segundo") ||
     text.includes("minute") ||
     text.includes("minuto") ||
-    text.includes("hour") ||
-    text.includes("hora") ||
     text.includes("now") ||
     text.includes("hoy")
   ) {
-    daysAgo = 0;
+    hoursAgo = 0;
     valid = true;
+  } else if (text.includes("hour") || text.includes("hora")) {
+    hoursAgo = num;
+    valid = hoursAgo <= maxDays * 24;
   } else if (
     text.includes("yesterday") ||
     text.includes("ayer") ||
@@ -158,19 +166,19 @@ function parseDateText(
     text.includes("1 día") ||
     text.includes("1 dia")
   ) {
-    daysAgo = 1;
+    hoursAgo = 24;
     valid = true;
   } else if (text.includes("day") || text.includes("día") || text.includes("dia")) {
-    daysAgo = num;
+    hoursAgo = num * 24;
     valid = num <= maxDays;
   } else if (text.includes("week") || text.includes("semana")) {
-    daysAgo = num * 7;
-    valid = daysAgo <= maxDays;
+    hoursAgo = num * 7 * 24;
+    valid = num * 7 <= maxDays;
   } else if (text.includes("month") || text.includes("mes")) {
-    daysAgo = num * 30;
-    valid = daysAgo <= maxDays;
+    hoursAgo = num * 30 * 24;
+    valid = num * 30 <= maxDays;
   } else {
-    daysAgo = 0;
+    hoursAgo = 0;
     valid = true;
   }
 
@@ -178,11 +186,8 @@ function parseDateText(
     return { date: "", valid: false };
   }
 
-  const targetDate = new Date(now.getTime() - daysAgo * 24 * 60 * 60 * 1000);
-  const yyyy = targetDate.getFullYear();
-  const mm = String(targetDate.getMonth() + 1).padStart(2, "0");
-  const dd = String(targetDate.getDate()).padStart(2, "0");
-  return { date: `${yyyy}-${mm}-${dd}`, valid: true };
+  const targetDate = new Date(now.getTime() - hoursAgo * 60 * 60 * 1000);
+  return { date: targetDate.toISOString(), valid: true };
 }
 
 // Scrape LinkedIn Guest Jobs API (paginated with dynamic DATE_RANGE filter)
@@ -233,7 +238,7 @@ export async function scrapeLinkedIn(keyword: string): Promise<Job[]> {
           : "Colombia";
 
         const dateMatch = item.match(/<time[^>]*>([^<]+)<\/time>/);
-        const dateText = dateMatch ? dateMatch[1].trim() : "1 day ago";
+        const dateText = dateMatch ? htmlEntities(dateMatch[1].trim()) : "1 day ago";
 
         const urlMatch = item.match(/href="([^"]+)"/);
         const jobUrl = urlMatch ? urlMatch[1].split("?")[0] : "";
@@ -333,7 +338,7 @@ export async function scrapeComputrabajo(keyword: string): Promise<Job[]> {
           : "Colombia";
 
         const dateMatch = item.match(/<p class="fs13 fc_aux mt15">\s*([^<]+)\s*<\/p>/i);
-        const dateText = dateMatch ? dateMatch[1].trim() : "Hoy";
+        const dateText = dateMatch ? htmlEntities(dateMatch[1].trim()) : "Hoy";
 
         const dateParsed = parseDateText(dateText, "Computrabajo", rangeConfig.maxDays);
 
@@ -414,7 +419,7 @@ export async function scrapeElempleo(keyword: string): Promise<Job[]> {
           const jobUrl = `https://www.elempleo.com${relativeUrl}`;
 
           const dateMatch = item.match(/js-offer-date[^>]*>[^]*?<\/i>\s*([^<]+)\s*<\/span>/);
-          const dateText = dateMatch ? dateMatch[1].trim() : "Hoy";
+          const dateText = dateMatch ? htmlEntities(dateMatch[1].trim()) : "Hoy";
 
           const dateParsed = parseDateText(dateText, "Elempleo");
 
@@ -486,10 +491,6 @@ export async function scrapeTorre(keyword: string): Promise<Job[]> {
         const isRemote = item.remote === true || locations.length === 0;
 
         if (isColombia || isRemote) {
-          const yyyy = createdDate.getFullYear();
-          const mm = String(createdDate.getMonth() + 1).padStart(2, "0");
-          const dd = String(createdDate.getDate()).padStart(2, "0");
-
           jobs.push({
             jobId: item.id,
             title: htmlEntities(item.objective || "Oportunidad Torre"),
@@ -498,7 +499,10 @@ export async function scrapeTorre(keyword: string): Promise<Job[]> {
             url: `https://torre.ai/jobs/${item.id}`,
             dateText: "Reciente",
             source: "Torre",
-            publishedAt: `${yyyy}-${mm}-${dd}`
+            // Full timestamp, not just the calendar date — Torre's API gives
+            // real hour/minute precision via `item.created`; truncating it
+            // discards exactly what the 24h/48h dashboard filter needs.
+            publishedAt: createdDate.toISOString()
           });
         }
       }
@@ -577,7 +581,7 @@ export async function scrapeWorkana(keyword: string): Promise<Job[]> {
 
         const countryText = item.country ? item.country.replace(/<[^>]+>/g, "").trim() : "Colombia";
         const dateText = item.publishedDate
-          ? item.publishedDate.replace("Publicado: ", "").trim()
+          ? htmlEntities(item.publishedDate.replace("Publicado: ", "").trim())
           : "Hoy";
         const dateParsed = parseDateText(dateText, "Workana");
 
@@ -879,11 +883,6 @@ export async function scrapeGetOnBoard(): Promise<Job[]> {
         const isColombia = countries.some((c) => c.toLowerCase().includes("colombia"));
         if (!isRemote && !isColombia) continue;
 
-        const publishedDate = new Date(publishedMs);
-        const yyyy = publishedDate.getFullYear();
-        const mm = String(publishedDate.getMonth() + 1).padStart(2, "0");
-        const dd = String(publishedDate.getDate()).padStart(2, "0");
-
         jobs.push({
           jobId: item.id,
           title: htmlEntities(attrs.title),
@@ -894,7 +893,7 @@ export async function scrapeGetOnBoard(): Promise<Job[]> {
           url: `https://www.getonbrd.com/jobs/${item.id}`,
           dateText: "Reciente",
           source: "GetOnBoard",
-          publishedAt: `${yyyy}-${mm}-${dd}`
+          publishedAt: new Date(publishedMs).toISOString()
         });
       }
     }
@@ -937,11 +936,6 @@ export async function scrapeRemoteOK(): Promise<Job[]> {
       const ageInDays = (now - item.epoch * 1000) / (1000 * 60 * 60 * 24);
       if (ageInDays > 2) continue;
 
-      const publishedDate = new Date(item.epoch * 1000);
-      const yyyy = publishedDate.getFullYear();
-      const mm = String(publishedDate.getMonth() + 1).padStart(2, "0");
-      const dd = String(publishedDate.getDate()).padStart(2, "0");
-
       jobs.push({
         jobId: String(item.id),
         title: htmlEntities(item.position),
@@ -950,7 +944,7 @@ export async function scrapeRemoteOK(): Promise<Job[]> {
         url: item.url,
         dateText: "Reciente",
         source: "RemoteOK",
-        publishedAt: `${yyyy}-${mm}-${dd}`
+        publishedAt: new Date(item.epoch * 1000).toISOString()
       });
     }
   } catch (error) {
@@ -992,10 +986,6 @@ export async function scrapeRemotive(searchTerms: string[]): Promise<Job[]> {
         const ageInDays = (now - publishedDate.getTime()) / (1000 * 60 * 60 * 24);
         if (ageInDays > 2) continue;
 
-        const yyyy = publishedDate.getFullYear();
-        const mm = String(publishedDate.getMonth() + 1).padStart(2, "0");
-        const dd = String(publishedDate.getDate()).padStart(2, "0");
-
         jobs.push({
           jobId: String(item.id),
           title: htmlEntities(item.title),
@@ -1004,7 +994,7 @@ export async function scrapeRemotive(searchTerms: string[]): Promise<Job[]> {
           url: item.url,
           dateText: "Reciente",
           source: "Remotive",
-          publishedAt: `${yyyy}-${mm}-${dd}`
+          publishedAt: publishedDate.toISOString()
         });
       }
     }
@@ -1145,8 +1135,7 @@ export async function scrapeIndeedLocal(keyword: string): Promise<Job[]> {
       if (r.pubDate) {
         const ageInDays = (now - r.pubDate) / (1000 * 60 * 60 * 24);
         if (ageInDays > 2) continue;
-        const d = new Date(r.pubDate);
-        publishedAt = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+        publishedAt = new Date(r.pubDate).toISOString();
       } else {
         continue;
       }
@@ -1230,8 +1219,10 @@ export async function scrapeGlassdoor(keyword: string): Promise<Job[]> {
           : "";
       if (!link) continue;
 
-      const d = new Date(now - ageInDays * 24 * 60 * 60 * 1000);
-      const publishedAt = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      // Glassdoor only gives ageInDays as a whole number, so this is genuinely
+      // day-level precision at the source — not a case of discarding data we
+      // have, unlike the other sources fixed alongside this.
+      const publishedAt = new Date(now - ageInDays * 24 * 60 * 60 * 1000).toISOString();
 
       jobs.push({
         jobId: listingId ? String(listingId) : link,

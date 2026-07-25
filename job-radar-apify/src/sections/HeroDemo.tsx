@@ -2,19 +2,25 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { JobCard } from "../components/JobCard.js";
 import { PaywallCard } from "../components/PaywallCard.js";
+import { useAuth } from "../auth/auth-provider.js";
 
 export default function HeroDemo() {
   const navigate = useNavigate();
+  const { accessToken } = useAuth();
   const [previewJobs, setPreviewJobs] = useState<any[]>([]);
 
-  // Public preview: unauthenticated read of the corpus, same masking rules
-  // free users get — no scrape is triggered by visiting the landing page.
+  // Preview of the corpus: tier is resolved server-side from the session
+  // token, same as the dashboard — a logged-in Pro visitor sees their real
+  // unlocked preview here instead of the generic locked marketing teaser.
+  // No scrape is triggered by visiting the landing page either way.
   useEffect(() => {
-    fetch("/api/jobs")
+    const headers: Record<string, string> = {};
+    if (accessToken) headers["Authorization"] = `Bearer ${accessToken}`;
+    fetch("/api/jobs", { headers })
       .then((res) => (res.ok ? res.json() : { jobs: [] }))
       .then((data) => setPreviewJobs(Array.isArray(data.jobs) ? data.jobs.slice(0, 4) : []))
       .catch(() => {});
-  }, []);
+  }, [accessToken]);
 
   return (
     <section
