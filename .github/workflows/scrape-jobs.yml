@@ -18,7 +18,12 @@ concurrency:
 jobs:
   scrape-tick:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    # The script has its own internal 20-min soft deadline (run-scrape-tick.ts)
+    # after which it exits cleanly on its own — this ceiling just needs enough
+    # margin above that plus checkout/install overhead so GitHub's hard kill
+    # is a last resort, not the normal way a run ends (a hard kill mid-run
+    # already caused a real data-loss bug once, see scrape-worker.ts).
+    timeout-minutes: 27
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4

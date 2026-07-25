@@ -146,6 +146,11 @@ export default function Dashboard() {
       });
     }
 
+    if (filters.selectedRoles && filters.selectedRoles.length > 0) {
+      const roleSet = new Set(filters.selectedRoles);
+      result = result.filter((j) => j.role_origin && roleSet.has(j.role_origin));
+    }
+
     if (filters.savedOnly) {
       result = result.filter((j) => savedJobIds.has(j.jobId));
     }

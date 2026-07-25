@@ -22,6 +22,15 @@ dotenv.config();
 const MAX_ROLES_PER_RUN = 8;
 const CONCURRENCY = 2;
 const PER_ROLE_TIMEOUT_MS = 5 * 60 * 1000;
+// Below the workflow's own `timeout-minutes: 25` with real margin. Without
+// this, a role needing all its sources at once can push the "wait for
+// stragglers" step past that ceiling — GitHub then hard-cancels the whole
+// job mid-scrape (confirmed happening in production, run 30170319327,
+// conclusion "cancelled"), which loses the in-flight role's cadence update
+// and any of its adapters not yet reached. Its already-fetched sources are
+// still safe now (scrape-worker.ts saves per-adapter, not per-role), but
+// exiting on our own terms is still better than being killed outright.
+const OVERALL_DEADLINE_MS = 20 * 60 * 1000;
 
 const worker = new ScrapeWorker(CONCURRENCY);
 const adapterByName = new Map<string, SourceAdapter>(allAdapters.map((a) => [a.name, a]));
@@ -148,6 +157,7 @@ function writeSummary(results: RoleResult[], deletedOld: number) {
 }
 
 async function main() {
+  const startedAt = Date.now();
   await seedSearchRoles(DEFAULT_ROLES_200);
 
   const due = await getDueRoleSources(SOURCE_CADENCE_MS);
@@ -179,14 +189,24 @@ async function main() {
   writeSummary(results, deletedOld);
 
   // Report and move on at the per-role timeout pace above, but don't let a
-  // straggler that finishes just after its timeout lose its scraped data —
-  // wait for every launched scrape to actually settle before the pool closes.
-  // GitHub Actions' own timeout-minutes is the outer backstop if one truly hangs.
+  // straggler that finishes just after its timeout lose its markRoleSourceRun
+  // update — wait for every launched scrape to actually settle, bounded by
+  // our own deadline so we exit cleanly instead of being hard-cancelled.
   if (trackedPromises.length > 0) {
-    console.log(
-      `⏳ [Tick] Esperando a que terminen de guardar ${trackedPromises.length} scrapes en curso (incluyendo timeouts) antes de cerrar la conexión...`
-    );
-    await Promise.allSettled(trackedPromises);
+    const remainingMs = OVERALL_DEADLINE_MS - (Date.now() - startedAt);
+    if (remainingMs <= 0) {
+      console.warn(
+        `⚠️ [Tick] Presupuesto de ${OVERALL_DEADLINE_MS / 60000} min agotado — cerrando sin esperar a los ${trackedPromises.length} scrapes restantes (ya guardaron lo que alcanzaron a traer por fuente).`
+      );
+    } else {
+      console.log(
+        `⏳ [Tick] Esperando hasta ${Math.round(remainingMs / 1000)}s más a que terminen ${trackedPromises.length} scrapes en curso...`
+      );
+      await Promise.race([
+        Promise.allSettled(trackedPromises),
+        new Promise((resolve) => setTimeout(resolve, remainingMs))
+      ]);
+    }
   }
 
   await pool.end();

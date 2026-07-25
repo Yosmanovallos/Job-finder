@@ -61,17 +61,32 @@ export class ScrapeWorker {
       `🔍 [ScrapeWorker] Variantes generadas para "${roleName}": [${keywordsToUse.join(", ")}]`
     );
 
-    const accumulatedJobs: Job[] = [];
+    let totalJobs = 0;
+    let savedCount = 0;
+    let duplicateCount = 0;
     const perSource: Record<string, { fetched: number; error?: string }> = {};
 
+    // Saved per-adapter, immediately after each fetch — not batched until the
+    // whole role finishes. A role needing all 12 sources can take 10-15+ min
+    // sequentially, and a one-shot tick process can be killed mid-role (a
+    // GitHub Actions job hitting its own timeout-minutes ceiling, confirmed
+    // happening in production 2026-07-25). Saving at the very end meant a
+    // kill at source #8 of 12 lost 100% of that role's work, not just the
+    // unfinished part — this way, whatever already fetched is already safely
+    // in Postgres by the time anything might cut the process off.
     for (const adapter of adapters) {
       try {
         const results = await adapter.fetch(keywordsToUse, dateRange);
         const fetched = Array.isArray(results) ? results.length : 0;
-        if (Array.isArray(results)) {
-          accumulatedJobs.push(...results);
-        }
+        totalJobs += fetched;
         perSource[adapter.name] = { fetched };
+
+        if (fetched > 0) {
+          const saved = await saveJobs(results, roleName);
+          savedCount += saved.savedCount;
+          duplicateCount += saved.duplicateCount;
+        }
+
         await markRoleSourceRun(roleName, adapter.name);
       } catch (err: any) {
         console.error(
@@ -82,17 +97,14 @@ export class ScrapeWorker {
       }
     }
 
-    // Save to repository with deduplication
-    const { savedCount, duplicateCount } = await saveJobs(accumulatedJobs, roleName);
-
     console.log(
-      `✅ [ScrapeWorker] Rol "${roleName}" completado: ${accumulatedJobs.length} vacantes encontradas (${savedCount} nuevas, ${duplicateCount} duplicadas fusionadas).`
+      `✅ [ScrapeWorker] Rol "${roleName}" completado: ${totalJobs} vacantes encontradas (${savedCount} nuevas, ${duplicateCount} duplicadas fusionadas).`
     );
 
     this.checkMemory();
     return {
       roleName,
-      totalJobs: accumulatedJobs.length,
+      totalJobs,
       savedCount,
       duplicateCount,
       perSource

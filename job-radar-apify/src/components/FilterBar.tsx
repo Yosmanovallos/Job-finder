@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
+import { DEFAULT_ROLES_200 } from "../queue/scheduler.js";
 
 export interface FilterState {
   search: string;
@@ -7,6 +8,7 @@ export interface FilterState {
   freshness: string;
   savedOnly: boolean;
   appliedOnly: boolean;
+  selectedRoles: string[];
 }
 
 export interface FilterBarProps {
@@ -21,6 +23,22 @@ export const FilterBar: React.FC<FilterBarProps> = ({ onFilterChange, availableS
   const [freshness, setFreshness] = useState("all");
   const [savedOnly, setSavedOnly] = useState(false);
   const [appliedOnly, setAppliedOnly] = useState(false);
+  const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
+  const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
+  const [roleSearch, setRoleSearch] = useState("");
+  const roleDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close the role dropdown on an outside click, same UX pattern as any
+  // standard multi-select popover.
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (roleDropdownRef.current && !roleDropdownRef.current.contains(e.target as Node)) {
+        setRoleDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const updateFilters = (newPartial: Partial<FilterState>) => {
     const updated: FilterState = {
@@ -29,7 +47,8 @@ export const FilterBar: React.FC<FilterBarProps> = ({ onFilterChange, availableS
       modality: newPartial.modality !== undefined ? newPartial.modality : modality,
       freshness: newPartial.freshness !== undefined ? newPartial.freshness : freshness,
       savedOnly: newPartial.savedOnly !== undefined ? newPartial.savedOnly : savedOnly,
-      appliedOnly: newPartial.appliedOnly !== undefined ? newPartial.appliedOnly : appliedOnly
+      appliedOnly: newPartial.appliedOnly !== undefined ? newPartial.appliedOnly : appliedOnly,
+      selectedRoles: newPartial.selectedRoles !== undefined ? newPartial.selectedRoles : selectedRoles
     };
 
     if (newPartial.search !== undefined) setSearch(newPartial.search);
@@ -38,9 +57,21 @@ export const FilterBar: React.FC<FilterBarProps> = ({ onFilterChange, availableS
     if (newPartial.freshness !== undefined) setFreshness(newPartial.freshness);
     if (newPartial.savedOnly !== undefined) setSavedOnly(newPartial.savedOnly);
     if (newPartial.appliedOnly !== undefined) setAppliedOnly(newPartial.appliedOnly);
+    if (newPartial.selectedRoles !== undefined) setSelectedRoles(newPartial.selectedRoles);
 
     onFilterChange(updated);
   };
+
+  const toggleRole = (role: string) => {
+    const next = selectedRoles.includes(role)
+      ? selectedRoles.filter((r) => r !== role)
+      : [...selectedRoles, role];
+    updateFilters({ selectedRoles: next });
+  };
+
+  const filteredRoleOptions = DEFAULT_ROLES_200.filter((r) =>
+    r.toLowerCase().includes(roleSearch.toLowerCase())
+  );
 
   const sourcesList = [
     "all",
@@ -105,7 +136,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({ onFilterChange, availableS
       </div>
 
       {/* Select Filters Row */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-xs font-mono">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs font-mono">
         {/* Source Selector */}
         <div>
           <label className="block text-slate-500 mb-1">Fuente / Portal:</label>
@@ -150,6 +181,74 @@ export const FilterBar: React.FC<FilterBarProps> = ({ onFilterChange, availableS
             <option value="48h">⚡ Últimas 48 Horas</option>
             <option value="7d">📅 Última Semana (7d)</option>
           </select>
+        </div>
+
+        {/* Role Multi-Select Dropdown */}
+        <div className="relative" ref={roleDropdownRef}>
+          <label className="block text-slate-500 mb-1">Rol buscado:</label>
+          <button
+            type="button"
+            onClick={() => setRoleDropdownOpen((v) => !v)}
+            className="w-full px-3 py-1.5 bg-[#0A0B0D] border border-[#262A31] rounded-lg text-slate-200 text-left focus:outline-none focus:border-emerald-500/50 flex items-center justify-between gap-2"
+          >
+            <span className="truncate">
+              {selectedRoles.length === 0
+                ? "🧑‍💼 Todos los Roles"
+                : `🧑‍💼 ${selectedRoles.length} rol${selectedRoles.length > 1 ? "es" : ""}`}
+            </span>
+            <span className="text-slate-500 shrink-0">{roleDropdownOpen ? "▲" : "▼"}</span>
+          </button>
+
+          {roleDropdownOpen && (
+            <div className="absolute z-20 mt-1 w-full min-w-[240px] bg-[#0A0B0D] border border-[#262A31] rounded-lg shadow-xl p-2">
+              <input
+                type="text"
+                value={roleSearch}
+                onChange={(e) => setRoleSearch(e.target.value)}
+                placeholder="Buscar rol..."
+                autoFocus
+                className="w-full px-2 py-1.5 mb-2 bg-[#131519] border border-[#262A31] rounded text-slate-200 text-xs focus:outline-none focus:border-emerald-500/50"
+              />
+
+              <div className="flex items-center justify-between mb-2 text-[11px] text-slate-400">
+                <button
+                  type="button"
+                  onClick={() => updateFilters({ selectedRoles: [...DEFAULT_ROLES_200] })}
+                  className="hover:text-emerald-400"
+                >
+                  Seleccionar todos
+                </button>
+                <button
+                  type="button"
+                  onClick={() => updateFilters({ selectedRoles: [] })}
+                  className="hover:text-emerald-400"
+                >
+                  Limpiar
+                </button>
+              </div>
+
+              <div className="max-h-56 overflow-y-auto space-y-0.5">
+                {filteredRoleOptions.length === 0 ? (
+                  <p className="text-slate-500 text-[11px] px-1 py-2">Sin coincidencias.</p>
+                ) : (
+                  filteredRoleOptions.map((role) => (
+                    <label
+                      key={role}
+                      className="flex items-center gap-2 px-1.5 py-1 rounded hover:bg-[#1F232B] cursor-pointer text-slate-200 text-[11px]"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedRoles.includes(role)}
+                        onChange={() => toggleRole(role)}
+                        className="accent-emerald-500 shrink-0"
+                      />
+                      <span className="truncate">{role}</span>
+                    </label>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
