@@ -5,6 +5,7 @@ node_modules/
 # Build output
 dist/
 *.tsbuildinfo
+job-radar-apify/public/
 
 # Env and secrets
 .env

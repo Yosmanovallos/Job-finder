@@ -10,7 +10,7 @@ const sources = [
   "RemoteOK",
   "Remotive",
   "Workana",
-  "WeRemoto",
+  "WeRemoto"
 ];
 
 const problems = [
@@ -18,52 +18,48 @@ const problems = [
     icon: Browsers,
     title: "Diez pestañas abiertas",
     description:
-      "Cada portal tiene su propio buscador, sus propios filtros y su propia forma de mentir sobre la fecha de publicación.",
+      "Cada portal tiene su propio buscador, sus propios filtros y su propia forma de mentir sobre la fecha de publicación."
   },
   {
     icon: Copy,
     title: "La misma vacante cuatro veces",
     description:
-      "Los portales se copian entre sí. Aplicas dos veces al mismo puesto sin saberlo, perdiendo tiempo y credibilidad.",
+      "Los portales se copian entre sí. Aplicas dos veces al mismo puesto sin saberlo, perdiendo tiempo y credibilidad."
   },
   {
     icon: LinkBreak,
     title: "Ofertas que ya no existen",
     description:
-      "Publicaciones cerradas hace semanas que siguen apareciendo como si estuvieran abiertas. Descubres el error al hacer clic.",
-  },
+      "Publicaciones cerradas hace semanas que siguen apareciendo como si estuvieran abiertas. Descubres el error al hacer clic."
+  }
 ];
 
 export default function SourcesAndProblem() {
   return (
     <section
-      id="sources-and-problem"
+      id="fuentes"
       className="bg-muted"
       style={{
         borderTop: "1px solid #262A31",
-        borderBottom: "1px solid #262A31",
+        borderBottom: "1px solid #262A31"
       }}
     >
       {/* Sources Strip */}
       <div
         style={{
           borderBottom: "1px solid #262A31",
-          background: "#131519",
+          background: "#131519"
         }}
       >
-        <div
-          className="mx-auto px-4 md:px-8 lg:px-16"
-          style={{ maxWidth: "1200px" }}
-        >
+        <div className="mx-auto px-4 md:px-8 lg:px-16" style={{ maxWidth: "1200px" }}>
           <div className="flex flex-col sm:flex-row sm:items-center gap-3 py-5">
             {/* Label */}
             <span
               className="shrink-0 text-xs uppercase tracking-widest"
               style={{
-                fontFamily:
-                  "ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace",
+                fontFamily: "ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace",
                 color: "#646B75",
-                letterSpacing: "0.12em",
+                letterSpacing: "0.12em"
               }}
             >
               Conectado a
@@ -81,14 +77,14 @@ export default function SourcesAndProblem() {
               <div
                 className="pointer-events-none absolute left-0 top-0 bottom-0 w-6 z-10 hidden sm:block"
                 style={{
-                  background: "linear-gradient(to right, #131519, transparent)",
+                  background: "linear-gradient(to right, #131519, transparent)"
                 }}
               />
               {/* Right gradient mask */}
               <div
                 className="pointer-events-none absolute right-0 top-0 bottom-0 w-8 z-10"
                 style={{
-                  background: "linear-gradient(to left, #131519, transparent)",
+                  background: "linear-gradient(to left, #131519, transparent)"
                 }}
               />
 
@@ -98,7 +94,7 @@ export default function SourcesAndProblem() {
                   scrollbarWidth: "none",
                   msOverflowStyle: "none",
                   WebkitOverflowScrolling: "touch",
-                  paddingBottom: "2px",
+                  paddingBottom: "2px"
                 }}
               >
                 {sources.map((source) => (
@@ -112,7 +108,7 @@ export default function SourcesAndProblem() {
                       background: "#1B1E24",
                       border: "1px solid #262A31",
                       borderRadius: "999px",
-                      fontSize: "0.8125rem",
+                      fontSize: "0.8125rem"
                     }}
                   >
                     {source}
@@ -125,19 +121,15 @@ export default function SourcesAndProblem() {
       </div>
 
       {/* Problem Section */}
-      <div
-        className="mx-auto px-4 md:px-8 lg:px-16 py-16 md:py-20"
-        style={{ maxWidth: "1200px" }}
-      >
+      <div className="mx-auto px-4 md:px-8 lg:px-16 py-16 md:py-20" style={{ maxWidth: "1200px" }}>
         {/* Section heading block */}
         <div className="mb-10 md:mb-12">
           <span
             className="inline-block mb-4 text-xs uppercase tracking-widest"
             style={{
-              fontFamily:
-                "ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace",
+              fontFamily: "ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace",
               color: "#646B75",
-              letterSpacing: "0.12em",
+              letterSpacing: "0.12em"
             }}
           >
             El problema
@@ -148,7 +140,7 @@ export default function SourcesAndProblem() {
               fontSize: "clamp(1.5rem, 3vw, 2.25rem)",
               letterSpacing: "-0.01em",
               color: "#F4F5F7",
-              maxWidth: "640px",
+              maxWidth: "640px"
             }}
           >
             Buscar empleo hoy es un trabajo de tiempo completo
@@ -164,7 +156,7 @@ export default function SourcesAndProblem() {
               style={{
                 background: "#131519",
                 border: "1px solid #262A31",
-                borderRadius: "12px",
+                borderRadius: "12px"
               }}
               onMouseEnter={(e) => {
                 const el = e.currentTarget as HTMLDivElement;
@@ -184,7 +176,7 @@ export default function SourcesAndProblem() {
                   borderTop: "1px solid #34D399",
                   borderLeft: "1px solid #34D399",
                   borderTopLeftRadius: "12px",
-                  opacity: 0.35,
+                  opacity: 0.35
                 }}
               />
 
@@ -192,10 +184,9 @@ export default function SourcesAndProblem() {
               <span
                 className="text-xs"
                 style={{
-                  fontFamily:
-                    "ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace",
+                  fontFamily: "ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace",
                   color: "#646B75",
-                  fontSize: "0.8125rem",
+                  fontSize: "0.8125rem"
                 }}
               >
                 {String(index + 1).padStart(2, "0")}
@@ -206,7 +197,7 @@ export default function SourcesAndProblem() {
                 className="flex items-center justify-center w-10 h-10 rounded-lg"
                 style={{
                   background: "rgba(52,211,153,0.10)",
-                  border: "1px solid rgba(52,211,153,0.20)",
+                  border: "1px solid rgba(52,211,153,0.20)"
                 }}
               >
                 <Icon weight="duotone" size={20} style={{ color: "#34D399" }} />
@@ -218,7 +209,7 @@ export default function SourcesAndProblem() {
                   className="font-heading font-semibold leading-snug"
                   style={{
                     fontSize: "1.125rem",
-                    color: "#F4F5F7",
+                    color: "#F4F5F7"
                   }}
                 >
                   {title}
@@ -228,7 +219,7 @@ export default function SourcesAndProblem() {
                   style={{
                     fontSize: "0.9375rem",
                     color: "#9AA1AC",
-                    lineHeight: "1.65",
+                    lineHeight: "1.65"
                   }}
                 >
                   {description}

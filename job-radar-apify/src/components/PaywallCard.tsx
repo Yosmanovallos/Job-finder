@@ -1,5 +1,6 @@
-import React from 'react';
-import { Job } from '../sources/types.js';
+import React from "react";
+import { Job } from "../sources/types.js";
+import { PRO_MONTHLY_PRICE_COP, formatCOP } from "../config.js";
 
 export interface PaywallCardProps {
   job: Job & {
@@ -9,7 +10,8 @@ export interface PaywallCardProps {
 }
 
 export const PaywallCard: React.FC<PaywallCardProps> = ({ job, onUnlockClick }) => {
-  const otherSources = job.alsoIn || (Array.isArray(job.sources) ? job.sources.filter(s => s !== job.source) : []);
+  const otherSources =
+    job.alsoIn || (Array.isArray(job.sources) ? job.sources.filter((s) => s !== job.source) : []);
 
   return (
     <div className="group relative rounded-xl border border-[#262A31] bg-[#131519] p-5 transition-all duration-200 overflow-hidden text-left">
@@ -26,27 +28,25 @@ export const PaywallCard: React.FC<PaywallCardProps> = ({ job, onUnlockClick }) 
 
           {otherSources.length > 0 && (
             <span className="text-slate-400 font-sans text-[11px]">
-              también en: <strong className="text-emerald-400 font-mono">{otherSources.join(', ')}</strong>
+              también en:{" "}
+              <strong className="text-emerald-400 font-mono">{otherSources.join(", ")}</strong>
             </span>
           )}
         </div>
 
-        <span className="text-slate-400 text-[11px] font-bold">
-          ⚡ Publicada recientemente
-        </span>
+        <span className="text-slate-400 text-[11px] font-bold">⚡ Publicada recientemente</span>
       </div>
 
       {/* Visible Title */}
-      <h3 className="font-heading font-semibold text-lg text-slate-100 mb-2">
-        {job.title}
-      </h3>
+      <h3 className="font-heading font-semibold text-lg text-slate-100 mb-2">{job.title}</h3>
 
-      {/* Blurred Sensitive Content (Company & Location & Application Details) */}
+      {/* Blurred Sensitive Content — the server withholds these fields for locked
+          jobs, so when unset we show a generic placeholder instead of inventing data. */}
       <div className="relative my-3 p-3 rounded-lg bg-[#0A0B0D] border border-[#1F232B]">
         <div className="filter blur-[5px] select-none pointer-events-none opacity-40 space-y-1 text-xs font-mono text-slate-300">
-          <div>🏢 Empresa Confidencial Lider de Telecomunicaciones S.A.S</div>
-          <div>📍 Bogotá - Medellín (Híbrido) · Rango: $4.500.000 - $6.500.000 COP</div>
-          <div>🔗 https://www.linkedin.com/jobs/view/9876543210</div>
+          <div>🏢 {job.company || "Empresa oculta hasta desbloquear"}</div>
+          <div>📍 {job.location || "Ubicación oculta hasta desbloquear"}</div>
+          <div>🔗 {job.url || "Enlace oculto hasta desbloquear"}</div>
         </div>
 
         {/* Lock Overlay Banner */}
@@ -63,7 +63,8 @@ export const PaywallCard: React.FC<PaywallCardProps> = ({ job, onUnlockClick }) 
       {/* CTA Unlock Button */}
       <div className="pt-2 flex items-center justify-between">
         <span className="text-xs text-slate-400 font-mono">
-          Plan Pro: <strong className="text-emerald-400">$14.900 COP / mes</strong>
+          Plan Pro:{" "}
+          <strong className="text-emerald-400">{formatCOP(PRO_MONTHLY_PRICE_COP)} COP / mes</strong>
         </span>
 
         <button

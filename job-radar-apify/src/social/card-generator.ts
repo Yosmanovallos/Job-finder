@@ -1,4 +1,5 @@
-import { SocialDigest } from './digest-generator.js';
+import { SocialDigest } from "./digest-generator.js";
+import { SITE_DOMAIN } from "../config.js";
 
 /**
  * Renders a square 1080x1080 SVG visual Card image styled with `anima-project` design tokens:
@@ -11,8 +12,11 @@ import { SocialDigest } from './digest-generator.js';
  */
 export function generateCardSvg(digest: SocialDigest): string {
   const { category, jobCount, companies, sources } = digest;
-  const companyListStr = companies.length > 0 ? companies.join(' · ') : 'Empresas destacadas';
-  const sourcesBadges = sources.slice(0, 4).map(s => `<tspan fill="#34D399" font-weight="bold">[${s}]</tspan>`).join('  ');
+  const companyListStr = companies.length > 0 ? companies.join(" · ") : "Empresas destacadas";
+  const sourcesBadges = sources
+    .slice(0, 4)
+    .map((s) => `<tspan fill="#34D399" font-weight="bold">[${s}]</tspan>`)
+    .join("  ");
 
   return `<svg width="1080" height="1080" viewBox="0 0 1080 1080" fill="none" xmlns="http://www.w3.org/2000/svg">
   <!-- Background with grid pattern -->
@@ -53,11 +57,11 @@ export function generateCardSvg(digest: SocialDigest): string {
 
   <!-- Footer Banner / CTA -->
   <rect x="90" y="820" width="900" height="120" fill="rgba(52,211,153,0.12)" stroke="rgba(52,211,153,0.30)" stroke-width="2"/>
-  <text x="150" y="890" fill="#34D399" font-family="'Space Grotesk', sans-serif" font-size="34" font-weight="700">Aplica primero en 👉 jobradar.app</text>
+  <text x="150" y="890" fill="#34D399" font-family="'Space Grotesk', sans-serif" font-size="34" font-weight="700">Aplica primero en 👉 ${SITE_DOMAIN}</text>
 </svg>`;
 }
 
 export function generateCardBuffer(digest: SocialDigest): Buffer {
   const svgString = generateCardSvg(digest);
-  return Buffer.from(svgString, 'utf-8');
+  return Buffer.from(svgString, "utf-8");
 }

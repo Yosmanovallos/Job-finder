@@ -1,47 +1,75 @@
-export interface CheckoutOptions {
-  planId: string;
-  currency: 'COP' | 'USD';
-  amount: number;
-  userEmail?: string;
+import crypto from "crypto";
+import dotenv from "dotenv";
+import { createPendingTransaction } from "../db/job-repository.js";
+import { PRO_MONTHLY_PRICE_COP_CENTS } from "../config.js";
+
+dotenv.config();
+
+const WOMPI_PUBLIC_KEY = process.env.WOMPI_PUBLIC_KEY;
+const WOMPI_INTEGRITY_SECRET = process.env.WOMPI_INTEGRITY_SECRET;
+
+export interface StartCheckoutInput {
+  userId: string;
+  userEmail: string;
 }
 
-export interface CheckoutResult {
-  success: boolean;
-  checkoutUrl: string;
-  transactionId: string;
+export interface StartCheckoutResult {
+  publicKey: string;
+  reference: string;
+  amountInCents: number;
+  currency: "COP";
+  signatureIntegrity: string;
 }
 
-/**
- * Initiates payment checkout flow for Job Radar Pro subscription.
- */
-export async function startPaymentCheckout(options: CheckoutOptions): Promise<CheckoutResult> {
-  console.log(`\n💳 [PaymentCheckout] Iniciando transacción de pago para plan "${options.planId}" (${options.amount} ${options.currency})...`);
-
-  const mockTransactionId = `tx_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-
-  // Stripe / Wompi checkout URL simulation
-  const checkoutUrl = options.currency === 'COP'
-    ? `https://checkout.wompi.co/l/${mockTransactionId}`
-    : `https://checkout.stripe.com/pay/${mockTransactionId}`;
-
-  console.log(`✅ [PaymentCheckout] Sesión de pago generada exitosamente: ${checkoutUrl}`);
-
-  return {
-    success: true,
-    checkoutUrl,
-    transactionId: mockTransactionId
-  };
+function assertWompiConfigured(): void {
+  if (!WOMPI_PUBLIC_KEY || !WOMPI_INTEGRITY_SECRET) {
+    throw new Error(
+      "[Wompi] Faltan WOMPI_PUBLIC_KEY o WOMPI_INTEGRITY_SECRET en job-radar-apify/.env"
+    );
+  }
 }
 
 /**
- * Simulates webhook confirmation when payment is approved.
+ * Builds the Wompi Web Checkout integrity signature (reference + amount_in_cents
+ * + currency + integrity secret, SHA256). Wompi requires this be computed
+ * server-side only — the integrity secret must never reach the frontend.
  */
-export async function confirmPaymentWebhook(transactionId: string, userEmail: string): Promise<{ status: string; tier: string }> {
-  console.log(`\n🔔 [PaymentWebhook] Webhook recibido para transacción "${transactionId}" (Usuario: ${userEmail}).`);
-  console.log(`🎉 [PaymentWebhook] Pago aprobado. Actualizando suscripción a tier "pro".`);
+function buildIntegritySignature(
+  reference: string,
+  amountInCents: number,
+  currency: string
+): string {
+  const raw = `${reference}${amountInCents}${currency}${WOMPI_INTEGRITY_SECRET}`;
+  return crypto.createHash("sha256").update(raw).digest("hex");
+}
+
+/**
+ * Starts a Wompi Web Checkout session for the Job Radar Pro monthly plan.
+ * Persists a 'pending' transaction row keyed by the reference so the webhook
+ * can later confirm it idempotently.
+ */
+export async function startPaymentCheckout(
+  input: StartCheckoutInput
+): Promise<StartCheckoutResult> {
+  assertWompiConfigured();
+
+  const reference = `jobradar_pro_${input.userId}_${Date.now()}`;
+  const amountInCents = PRO_MONTHLY_PRICE_COP_CENTS;
+  const currency = "COP" as const;
+
+  await createPendingTransaction({ userId: input.userId, reference, amountInCents, currency });
+
+  const signatureIntegrity = buildIntegritySignature(reference, amountInCents, currency);
+
+  console.log(
+    `💳 [Checkout] Sesión Wompi creada para ${input.userEmail} — referencia ${reference}`
+  );
 
   return {
-    status: 'approved',
-    tier: 'pro'
+    publicKey: WOMPI_PUBLIC_KEY!,
+    reference,
+    amountInCents,
+    currency,
+    signatureIntegrity
   };
 }

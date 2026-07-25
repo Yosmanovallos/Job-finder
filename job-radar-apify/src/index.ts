@@ -1,8 +1,9 @@
-import { Client } from '@notionhq/client';
-import dotenv from 'dotenv';
-import { gotScraping } from 'got-scraping';
-import { htmlEntities } from './utils.js';
-import { saveRunToCache } from './cache-manager.js';
+import { Client } from "@notionhq/client";
+import dotenv from "dotenv";
+import { gotScraping } from "got-scraping";
+import { fileURLToPath } from "url";
+import { htmlEntities } from "./utils.js";
+import { saveRunToCache } from "./cache-manager.js";
 
 dotenv.config();
 
@@ -11,7 +12,7 @@ const NOTION_DATABASE_ID = process.env.NOTION_DATABASE_ID;
 const APIFY_TOKEN = process.env.APIFY_TOKEN;
 
 if (!NOTION_TOKEN || !NOTION_DATABASE_ID) {
-  console.error('Error: NOTION_TOKEN or NOTION_DATABASE_ID is not defined in .env file.');
+  console.error("Error: NOTION_TOKEN or NOTION_DATABASE_ID is not defined in .env file.");
   process.exit(1);
 }
 
@@ -24,7 +25,19 @@ export interface Job {
   location: string;
   url: string;
   dateText: string;
-  source: 'LinkedIn' | 'Computrabajo' | 'Elempleo' | 'Torre' | 'Indeed' | 'Workana' | 'Magneto' | 'WeRemoto' | 'GetOnBoard' | 'RemoteOK' | 'Remotive' | 'Glassdoor';
+  source:
+    | "LinkedIn"
+    | "Computrabajo"
+    | "Elempleo"
+    | "Torre"
+    | "Indeed"
+    | "Workana"
+    | "Magneto"
+    | "WeRemoto"
+    | "GetOnBoard"
+    | "RemoteOK"
+    | "Remotive"
+    | "Glassdoor";
   publishedAt: string; // YYYY-MM-DD
 }
 
@@ -33,16 +46,21 @@ let dbProperties: Record<string, string> = {};
 
 async function fetchDatabaseSchema() {
   try {
-    const response = await (notion as any).dataSources.retrieve({ data_source_id: NOTION_DATABASE_ID! });
-    console.log('[Notion] Connected successfully as Data Source! Schema retrieved.');
+    const response = await (notion as any).dataSources.retrieve({
+      data_source_id: NOTION_DATABASE_ID!
+    });
+    console.log("[Notion] Connected successfully as Data Source! Schema retrieved.");
     dbProperties = {};
     const raw = response.properties ?? {};
     for (const [key, val] of Object.entries(raw)) {
       dbProperties[key] = (val as any).type;
     }
-    console.log('[Notion] Available properties:', Object.keys(dbProperties).join(', '));
+    console.log("[Notion] Available properties:", Object.keys(dbProperties).join(", "));
   } catch (error) {
-    console.error('[Notion] Error fetching data source schema. Check NOTION_TOKEN and NOTION_DATABASE_ID:', error);
+    console.error(
+      "[Notion] Error fetching data source schema. Check NOTION_TOKEN and NOTION_DATABASE_ID:",
+      error
+    );
     process.exit(1);
   }
 }
@@ -50,7 +68,7 @@ async function fetchDatabaseSchema() {
 // Check if a job already exists in Notion
 async function jobExists(url: string): Promise<boolean> {
   try {
-    if (!dbProperties['URL']) {
+    if (!dbProperties["URL"]) {
       return false;
     }
     const response = await (notion as any).dataSources.query({
@@ -70,22 +88,48 @@ async function jobExists(url: string): Promise<boolean> {
 }
 
 // Date Range Configuration Helper
-const DATE_RANGE = process.env.DATE_RANGE || '48h';
+const DATE_RANGE = process.env.DATE_RANGE || "48h";
 
-function getDateRangeConfig(range: string = process.env.DATE_RANGE || '48h') {
+function getDateRangeConfig(range: string = process.env.DATE_RANGE || "48h") {
   switch (range) {
-    case '24h': return { maxDays: 1, linkedinTpr: 'r86400', workanaPub: '24h', label: 'Hoy (Últimas 24 Horas)' };
-    case '48h': return { maxDays: 2, linkedinTpr: 'r172800', workanaPub: '48h', label: 'Últimas 48 Horas' };
-    case '7d':  return { maxDays: 7, linkedinTpr: 'r604800', workanaPub: '1w', label: 'Última Semana (7 Días)' };
-    case '14d': return { maxDays: 14, linkedinTpr: 'r1209600', workanaPub: '1w', label: 'Últimos 14 Días' };
-    case '30d': return { maxDays: 30, linkedinTpr: 'r2592000', workanaPub: '1m', label: 'Último Mes (30 Días)' };
-    case 'all': return { maxDays: 365, linkedinTpr: '', workanaPub: 'all', label: 'Cualquier Fecha' };
-    default:    return { maxDays: 2, linkedinTpr: 'r172800', workanaPub: '48h', label: 'Últimas 48 Horas' };
+    case "24h":
+      return {
+        maxDays: 1,
+        linkedinTpr: "r86400",
+        workanaPub: "24h",
+        label: "Hoy (Últimas 24 Horas)"
+      };
+    case "48h":
+      return { maxDays: 2, linkedinTpr: "r172800", workanaPub: "48h", label: "Últimas 48 Horas" };
+    case "7d":
+      return {
+        maxDays: 7,
+        linkedinTpr: "r604800",
+        workanaPub: "1w",
+        label: "Última Semana (7 Días)"
+      };
+    case "14d":
+      return { maxDays: 14, linkedinTpr: "r1209600", workanaPub: "1w", label: "Últimos 14 Días" };
+    case "30d":
+      return {
+        maxDays: 30,
+        linkedinTpr: "r2592000",
+        workanaPub: "1m",
+        label: "Último Mes (30 Días)"
+      };
+    case "all":
+      return { maxDays: 365, linkedinTpr: "", workanaPub: "all", label: "Cualquier Fecha" };
+    default:
+      return { maxDays: 2, linkedinTpr: "r172800", workanaPub: "48h", label: "Últimas 48 Horas" };
   }
 }
 
 // Convert date text to standard YYYY-MM-DD
-function parseDateText(dateText: string, source: string, maxDays: number = 2): { date: string, valid: boolean } {
+function parseDateText(
+  dateText: string,
+  source: string,
+  maxDays: number = 2
+): { date: string; valid: boolean } {
   const now = new Date();
   let daysAgo = 0;
   let valid = false;
@@ -94,19 +138,34 @@ function parseDateText(dateText: string, source: string, maxDays: number = 2): {
   const numMatch = text.match(/(\d+)/);
   const num = numMatch ? parseInt(numMatch[1], 10) : 1;
 
-  if (text.includes('second') || text.includes('segundo') || text.includes('minute') || text.includes('minuto') || text.includes('hour') || text.includes('hora') || text.includes('now') || text.includes('hoy')) {
+  if (
+    text.includes("second") ||
+    text.includes("segundo") ||
+    text.includes("minute") ||
+    text.includes("minuto") ||
+    text.includes("hour") ||
+    text.includes("hora") ||
+    text.includes("now") ||
+    text.includes("hoy")
+  ) {
     daysAgo = 0;
     valid = true;
-  } else if (text.includes('yesterday') || text.includes('ayer') || text.includes('1 day') || text.includes('1 día') || text.includes('1 dia')) {
+  } else if (
+    text.includes("yesterday") ||
+    text.includes("ayer") ||
+    text.includes("1 day") ||
+    text.includes("1 día") ||
+    text.includes("1 dia")
+  ) {
     daysAgo = 1;
     valid = true;
-  } else if (text.includes('day') || text.includes('día') || text.includes('dia')) {
+  } else if (text.includes("day") || text.includes("día") || text.includes("dia")) {
     daysAgo = num;
     valid = num <= maxDays;
-  } else if (text.includes('week') || text.includes('semana')) {
+  } else if (text.includes("week") || text.includes("semana")) {
     daysAgo = num * 7;
     valid = daysAgo <= maxDays;
-  } else if (text.includes('month') || text.includes('mes')) {
+  } else if (text.includes("month") || text.includes("mes")) {
     daysAgo = num * 30;
     valid = daysAgo <= maxDays;
   } else {
@@ -115,13 +174,13 @@ function parseDateText(dateText: string, source: string, maxDays: number = 2): {
   }
 
   if (!valid) {
-    return { date: '', valid: false };
+    return { date: "", valid: false };
   }
 
   const targetDate = new Date(now.getTime() - daysAgo * 24 * 60 * 60 * 1000);
   const yyyy = targetDate.getFullYear();
-  const mm = String(targetDate.getMonth() + 1).padStart(2, '0');
-  const dd = String(targetDate.getDate()).padStart(2, '0');
+  const mm = String(targetDate.getMonth() + 1).padStart(2, "0");
+  const dd = String(targetDate.getDate()).padStart(2, "0");
   return { date: `${yyyy}-${mm}-${dd}`, valid: true };
 }
 
@@ -132,19 +191,21 @@ export async function scrapeLinkedIn(keyword: string): Promise<Job[]> {
   console.log(`[LinkedIn] Scraping for keyword "${keyword}" (Filtro: ${rangeConfig.label})...`);
   const jobs: Job[] = [];
 
-  const tprParam = rangeConfig.linkedinTpr ? `&f_TPR=${rangeConfig.linkedinTpr}` : '';
+  const tprParam = rangeConfig.linkedinTpr ? `&f_TPR=${rangeConfig.linkedinTpr}` : "";
 
   try {
     for (const start of [0, 25, 50]) {
       const url = `https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords=${query}&location=Colombia${tprParam}&start=${start}`;
       const response = await fetch(url, {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         }
       });
 
       if (!response.ok) {
-        if (start === 0) console.warn(`[LinkedIn] Failed: ${response.status} ${response.statusText}`);
+        if (start === 0)
+          console.warn(`[LinkedIn] Failed: ${response.status} ${response.statusText}`);
         break;
       }
 
@@ -155,24 +216,28 @@ export async function scrapeLinkedIn(keyword: string): Promise<Job[]> {
       for (let i = 1; i < items.length; i++) {
         const item = items[i];
         const urnMatch = item.match(/data-entity-urn="urn:li:jobPosting:(\d+)"/);
-        const jobId = urnMatch ? urnMatch[1] : '';
-        
-        const titleMatch = item.match(/<h3 class="base-search-card__title">[^]*?<\/h3>/);
-        const title = titleMatch ? htmlEntities(titleMatch[0].replace(/<[^>]+>/g, '').trim()) : '';
-        
-        const companyMatch = item.match(/<h4 class="base-search-card__subtitle">[^]*?<\/h4>/);
-        const company = companyMatch ? htmlEntities(companyMatch[0].replace(/<[^>]+>/g, '').trim()) : 'Confidencial';
-        
-        const locMatch = item.match(/<span class="job-search-card__location">[^]*?<\/span>/);
-        const location = locMatch ? htmlEntities(locMatch[0].replace(/<[^>]+>/g, '').trim()) : 'Colombia';
-        
-        const dateMatch = item.match(/<time[^>]*>([^<]+)<\/time>/);
-        const dateText = dateMatch ? dateMatch[1].trim() : '1 day ago';
-        
-        const urlMatch = item.match(/href="([^"]+)"/);
-        const jobUrl = urlMatch ? urlMatch[1].split('?')[0] : '';
+        const jobId = urnMatch ? urnMatch[1] : "";
 
-        const dateParsed = parseDateText(dateText, 'LinkedIn', rangeConfig.maxDays);
+        const titleMatch = item.match(/<h3 class="base-search-card__title">[^]*?<\/h3>/);
+        const title = titleMatch ? htmlEntities(titleMatch[0].replace(/<[^>]+>/g, "").trim()) : "";
+
+        const companyMatch = item.match(/<h4 class="base-search-card__subtitle">[^]*?<\/h4>/);
+        const company = companyMatch
+          ? htmlEntities(companyMatch[0].replace(/<[^>]+>/g, "").trim())
+          : "Confidencial";
+
+        const locMatch = item.match(/<span class="job-search-card__location">[^]*?<\/span>/);
+        const location = locMatch
+          ? htmlEntities(locMatch[0].replace(/<[^>]+>/g, "").trim())
+          : "Colombia";
+
+        const dateMatch = item.match(/<time[^>]*>([^<]+)<\/time>/);
+        const dateText = dateMatch ? dateMatch[1].trim() : "1 day ago";
+
+        const urlMatch = item.match(/href="([^"]+)"/);
+        const jobUrl = urlMatch ? urlMatch[1].split("?")[0] : "";
+
+        const dateParsed = parseDateText(dateText, "LinkedIn", rangeConfig.maxDays);
 
         if (jobId && title && dateParsed.valid) {
           jobs.push({
@@ -182,7 +247,7 @@ export async function scrapeLinkedIn(keyword: string): Promise<Job[]> {
             location,
             url: jobUrl,
             dateText,
-            source: 'LinkedIn',
+            source: "LinkedIn",
             publishedAt: dateParsed.date
           });
         }
@@ -191,16 +256,18 @@ export async function scrapeLinkedIn(keyword: string): Promise<Job[]> {
     console.log(`[LinkedIn] Found ${jobs.length} jobs.`);
     return jobs;
   } catch (error) {
-    console.error('[LinkedIn] Fetch error:', error);
+    console.error("[LinkedIn] Fetch error:", error);
     return jobs;
   }
 }
 
 // Scrape Computrabajo Colombia with Google Translate Cloud Proxy Bypass (100% IP Block Protection)
 export async function scrapeComputrabajo(keyword: string): Promise<Job[]> {
-  const query = encodeURIComponent(keyword.replace(/\s+/g, '-'));
+  const query = encodeURIComponent(keyword.replace(/\s+/g, "-"));
   const rangeConfig = getDateRangeConfig();
-  console.log(`[Computrabajo] Scraping for keyword "${keyword}" (Multi-page, Filtro: ${rangeConfig.label})...`);
+  console.log(
+    `[Computrabajo] Scraping for keyword "${keyword}" (Multi-page, Filtro: ${rangeConfig.label})...`
+  );
   const jobs: Job[] = [];
 
   try {
@@ -208,12 +275,13 @@ export async function scrapeComputrabajo(keyword: string): Promise<Job[]> {
       const pathPart = page === 1 ? `trabajo-de-${query}` : `trabajo-de-${query}?p=${page}`;
       const proxyUrl = `https://www-computrabajo-com-co.translate.goog/${pathPart}?_x_tr_sl=es&_x_tr_tl=en&_x_tr_hl=es`;
 
-      let html = '';
+      let html = "";
       try {
         const proxyRes = await fetch(proxyUrl, {
           headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept-Language': 'es-CO,es;q=0.9'
+            "User-Agent":
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept-Language": "es-CO,es;q=0.9"
           }
         });
         if (proxyRes.ok) {
@@ -230,37 +298,43 @@ export async function scrapeComputrabajo(keyword: string): Promise<Job[]> {
 
       for (let i = 1; i < articles.length; i++) {
         const item = articles[i];
-        const titleLinkMatch = item.match(/<a class="[^"]*js-o-link[^"]*" href="([^"]+)">\s*([^<]+)\s*<\/a>/i) ||
-                               item.match(/href="([^"]*oferta-de-trabajo-[^"]+)"[^>]*>\s*([^<]+)\s*<\/a>/i);
+        const titleLinkMatch =
+          item.match(/<a class="[^"]*js-o-link[^"]*" href="([^"]+)">\s*([^<]+)\s*<\/a>/i) ||
+          item.match(/href="([^"]*oferta-de-trabajo-[^"]+)"[^>]*>\s*([^<]+)\s*<\/a>/i);
         if (!titleLinkMatch) continue;
 
         const rawHref = titleLinkMatch[1];
         const title = htmlEntities(titleLinkMatch[2].trim());
-        
-        const cleanPath = rawHref
-          .replace('https://co-computrabajo-com.translate.goog', '')
-          .replace('https://www-computrabajo-com-co.translate.goog', '')
-          .split('?')[0]
-          .split('#')[0];
 
-        const cleanPathFormatted = cleanPath.startsWith('/') ? cleanPath : `/${cleanPath}`;
+        const cleanPath = rawHref
+          .replace("https://co-computrabajo-com.translate.goog", "")
+          .replace("https://www-computrabajo-com-co.translate.goog", "")
+          .split("?")[0]
+          .split("#")[0];
+
+        const cleanPathFormatted = cleanPath.startsWith("/") ? cleanPath : `/${cleanPath}`;
         const canonicalUrl = `https://www.computrabajo.com.co${cleanPathFormatted}`;
         const jobUrl = `https://www.google.com/url?q=${encodeURIComponent(canonicalUrl)}`;
 
         const idMatch = rawHref.match(/-([A-F0-9]{32})/i);
         const jobId = idMatch ? idMatch[1] : `ct-${Math.random()}`;
 
-        const companyMatch = item.match(/offer-grid-article-company-url[^>]*>\s*([^<]+)\s*<\/a>/i) ||
-                             item.match(/class="fc_base t_ellipsis"[^>]*>\s*([^<]+)\s*<\/a>/i);
-        const company = companyMatch ? htmlEntities(companyMatch[1].trim()) : 'Confidencial';
+        const companyMatch =
+          item.match(/offer-grid-article-company-url[^>]*>\s*([^<]+)\s*<\/a>/i) ||
+          item.match(/class="fc_base t_ellipsis"[^>]*>\s*([^<]+)\s*<\/a>/i);
+        const company = companyMatch ? htmlEntities(companyMatch[1].trim()) : "Confidencial";
 
-        const locMatch = item.match(/<p class="fs16 fc_base mt5">\s*<span class="mr10">\s*([^<]+)\s*<\/span>/i);
-        const location = locMatch ? htmlEntities(locMatch[1].replace(/\s+/g, ' ').trim()) : 'Colombia';
+        const locMatch = item.match(
+          /<p class="fs16 fc_base mt5">\s*<span class="mr10">\s*([^<]+)\s*<\/span>/i
+        );
+        const location = locMatch
+          ? htmlEntities(locMatch[1].replace(/\s+/g, " ").trim())
+          : "Colombia";
 
         const dateMatch = item.match(/<p class="fs13 fc_aux mt15">\s*([^<]+)\s*<\/p>/i);
-        const dateText = dateMatch ? dateMatch[1].trim() : 'Hoy';
+        const dateText = dateMatch ? dateMatch[1].trim() : "Hoy";
 
-        const dateParsed = parseDateText(dateText, 'Computrabajo', rangeConfig.maxDays);
+        const dateParsed = parseDateText(dateText, "Computrabajo", rangeConfig.maxDays);
 
         if (jobId && title && dateParsed.valid) {
           jobs.push({
@@ -270,18 +344,18 @@ export async function scrapeComputrabajo(keyword: string): Promise<Job[]> {
             location,
             url: jobUrl,
             dateText,
-            source: 'Computrabajo',
+            source: "Computrabajo",
             publishedAt: dateParsed.date
           });
         }
       }
 
-      await new Promise(r => setTimeout(r, 400));
+      await new Promise((r) => setTimeout(r, 400));
     }
     console.log(`[Computrabajo] Found ${jobs.length} jobs across pages.`);
     return jobs;
   } catch (error) {
-    console.error('[Computrabajo] Fetch error:', error);
+    console.error("[Computrabajo] Fetch error:", error);
     return jobs;
   }
 }
@@ -297,17 +371,19 @@ export async function scrapeElempleo(keyword: string): Promise<Job[]> {
 
       const response = await fetch(url, {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         }
       });
 
       if (!response.ok) {
-        if (page === 1) console.warn(`[Elempleo] Failed: ${response.status} ${response.statusText}`);
+        if (page === 1)
+          console.warn(`[Elempleo] Failed: ${response.status} ${response.statusText}`);
         break;
       }
 
       const html = await response.text();
-      const items = html.split('result-item mb-3 bg-white');
+      const items = html.split("result-item mb-3 bg-white");
       if (items.length <= 1) break;
 
       for (let i = 1; i < items.length; i++) {
@@ -316,30 +392,30 @@ export async function scrapeElempleo(keyword: string): Promise<Job[]> {
         if (!dataMatch) continue;
 
         const jsonStr = dataMatch[1]
-          .replaceAll('&quot;', '"')
-          .replaceAll('&#225;', 'á')
-          .replaceAll('&#233;', 'é')
-          .replaceAll('&#237;', 'í')
-          .replaceAll('&#243;', 'ó')
-          .replaceAll('&#250;', 'ú')
-          .replaceAll('&#241;', 'ñ')
-          .replaceAll('&#193;', 'Á')
-          .replaceAll('&#201;', 'É')
-          .replaceAll('&#205;', 'Í')
-          .replaceAll('&#211;', 'Ó')
-          .replaceAll('&#218;', 'Ú')
-          .replaceAll('&#209;', 'Ñ');
+          .replaceAll("&quot;", '"')
+          .replaceAll("&#225;", "á")
+          .replaceAll("&#233;", "é")
+          .replaceAll("&#237;", "í")
+          .replaceAll("&#243;", "ó")
+          .replaceAll("&#250;", "ú")
+          .replaceAll("&#241;", "ñ")
+          .replaceAll("&#193;", "Á")
+          .replaceAll("&#201;", "É")
+          .replaceAll("&#205;", "Í")
+          .replaceAll("&#211;", "Ó")
+          .replaceAll("&#218;", "Ú")
+          .replaceAll("&#209;", "Ñ");
 
         try {
           const data = JSON.parse(jsonStr);
           const urlMatch = item.match(/data-url="([^"]+)"/);
-          const relativeUrl = urlMatch ? urlMatch[1] : '';
+          const relativeUrl = urlMatch ? urlMatch[1] : "";
           const jobUrl = `https://www.elempleo.com${relativeUrl}`;
 
           const dateMatch = item.match(/js-offer-date[^>]*>[^]*?<\/i>\s*([^<]+)\s*<\/span>/);
-          const dateText = dateMatch ? dateMatch[1].trim() : 'Hoy';
+          const dateText = dateMatch ? dateMatch[1].trim() : "Hoy";
 
-          const dateParsed = parseDateText(dateText, 'Elempleo');
+          const dateParsed = parseDateText(dateText, "Elempleo");
 
           if (data.id && data.title && dateParsed.valid) {
             jobs.push({
@@ -349,7 +425,7 @@ export async function scrapeElempleo(keyword: string): Promise<Job[]> {
               location: htmlEntities(data.location),
               url: jobUrl,
               dateText,
-              source: 'Elempleo',
+              source: "Elempleo",
               publishedAt: dateParsed.date
             });
           }
@@ -361,7 +437,7 @@ export async function scrapeElempleo(keyword: string): Promise<Job[]> {
     console.log(`[Elempleo] Found ${jobs.length} jobs across pages.`);
     return jobs;
   } catch (error) {
-    console.error('[Elempleo] Fetch error:', error);
+    console.error("[Elempleo] Fetch error:", error);
     return jobs;
   }
 }
@@ -371,15 +447,16 @@ export async function scrapeTorre(keyword: string): Promise<Job[]> {
   console.log(`[Torre] Searching for keyword "${keyword}"...`);
   const url = "https://search.torre.co/opportunities/_search?offset=0&size=20";
   const body = {
-    "skill/role": { "text": keyword, "experience": "1-plus-year" }
+    "skill/role": { text: keyword, experience: "1-plus-year" }
   };
 
   try {
     const response = await fetch(url, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        "Content-Type": "application/json",
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
       },
       body: JSON.stringify(body)
     });
@@ -404,22 +481,22 @@ export async function scrapeTorre(keyword: string): Promise<Job[]> {
         }
 
         const locations = item.locations || [];
-        const isColombia = locations.some((loc: string) => loc.toLowerCase().includes('colombia'));
+        const isColombia = locations.some((loc: string) => loc.toLowerCase().includes("colombia"));
         const isRemote = item.remote === true || locations.length === 0;
 
         if (isColombia || isRemote) {
           const yyyy = createdDate.getFullYear();
-          const mm = String(createdDate.getMonth() + 1).padStart(2, '0');
-          const dd = String(createdDate.getDate()).padStart(2, '0');
-          
+          const mm = String(createdDate.getMonth() + 1).padStart(2, "0");
+          const dd = String(createdDate.getDate()).padStart(2, "0");
+
           jobs.push({
             jobId: item.id,
-            title: htmlEntities(item.objective || 'Oportunidad Torre'),
-            company: htmlEntities(item.organizations?.[0]?.name || 'Confidencial'),
-            location: isRemote ? 'Remoto' : locations.join(', '),
+            title: htmlEntities(item.objective || "Oportunidad Torre"),
+            company: htmlEntities(item.organizations?.[0]?.name || "Confidencial"),
+            location: isRemote ? "Remoto" : locations.join(", "),
             url: `https://torre.ai/jobs/${item.id}`,
-            dateText: 'Reciente',
-            source: 'Torre',
+            dateText: "Reciente",
+            source: "Torre",
             publishedAt: `${yyyy}-${mm}-${dd}`
           });
         }
@@ -428,7 +505,7 @@ export async function scrapeTorre(keyword: string): Promise<Job[]> {
     console.log(`[Torre] Found ${jobs.length} jobs.`);
     return jobs;
   } catch (error) {
-    console.error('[Torre] Fetch error:', error);
+    console.error("[Torre] Fetch error:", error);
     return [];
   }
 }
@@ -444,7 +521,8 @@ export async function scrapeWorkana(keyword: string): Promise<Job[]> {
       const url = `https://www.workana.com/jobs?query=${query}&publication=1w&page=${page}`;
       const response = await fetch(url, {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         }
       });
 
@@ -461,7 +539,7 @@ export async function scrapeWorkana(keyword: string): Promise<Job[]> {
       const valueStart = startIdx + startKey.length;
       const endIdx = html.indexOf("'", valueStart);
       const rawValue = html.substring(valueStart, endIdx);
-      const decodedValue = rawValue.replaceAll('&quot;', '"').replaceAll('&#39;', "'");
+      const decodedValue = rawValue.replaceAll("&quot;", '"').replaceAll("&#39;", "'");
 
       try {
         const parsed = JSON.parse(decodedValue);
@@ -470,24 +548,32 @@ export async function scrapeWorkana(keyword: string): Promise<Job[]> {
 
         for (const item of results) {
           const titleMatch = item.title ? item.title.match(/title="([^"]+)"/) : null;
-          const title = titleMatch ? titleMatch[1] : (item.title || '').replace(/<[^>]+>/g, '').trim();
+          const title = titleMatch
+            ? titleMatch[1]
+            : (item.title || "").replace(/<[^>]+>/g, "").trim();
 
           const urlMatch = item.title ? item.title.match(/href="([^"]+)"/) : null;
-          const jobUrl = urlMatch ? `https://www.workana.com${urlMatch[1]}` : `https://www.workana.com/job/${item.slug}`;
+          const jobUrl = urlMatch
+            ? `https://www.workana.com${urlMatch[1]}`
+            : `https://www.workana.com/job/${item.slug}`;
 
-          const countryText = item.country ? item.country.replace(/<[^>]+>/g, '').trim() : 'Colombia';
-          const dateText = item.publishedDate ? item.publishedDate.replace('Publicado: ', '').trim() : 'Hoy';
-          const dateParsed = parseDateText(dateText, 'Workana');
+          const countryText = item.country
+            ? item.country.replace(/<[^>]+>/g, "").trim()
+            : "Colombia";
+          const dateText = item.publishedDate
+            ? item.publishedDate.replace("Publicado: ", "").trim()
+            : "Hoy";
+          const dateParsed = parseDateText(dateText, "Workana");
 
           if (title && dateParsed.valid) {
             jobs.push({
               jobId: item.slug || String(Math.random()),
               title: htmlEntities(title),
-              company: htmlEntities(item.authorName || 'Confidencial'),
+              company: htmlEntities(item.authorName || "Confidencial"),
               location: htmlEntities(countryText),
               url: jobUrl,
               dateText,
-              source: 'Workana',
+              source: "Workana",
               publishedAt: dateParsed.date
             });
           }
@@ -502,7 +588,7 @@ export async function scrapeWorkana(keyword: string): Promise<Job[]> {
     console.log(`[Workana] Found ${jobs.length} jobs (filtered by date).`);
     return jobs;
   } catch (error) {
-    console.error('[Workana] Fetch error:', error);
+    console.error("[Workana] Fetch error:", error);
     return jobs;
   }
 }
@@ -518,7 +604,8 @@ export async function scrapeMagneto(keyword: string): Promise<Job[]> {
   try {
     const response = await fetch(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
       }
     });
 
@@ -531,15 +618,12 @@ export async function scrapeMagneto(keyword: string): Promise<Job[]> {
 
     // 1. Next.js payload search results (rows)
     const matches = html.match(/self\.__next_f\.push\(\[1,"([\s\S]*?)"\]\)/g) || [];
-    let combined = '';
+    let combined = "";
     for (const m of matches) {
-      combined += m.replace('self.__next_f.push([1,"', '').replace('"])', '');
+      combined += m.replace('self.__next_f.push([1,"', "").replace('"])', "");
     }
 
-    const unescaped = combined
-      .replaceAll('\\"', '"')
-      .replaceAll('\\/', '/')
-      .replaceAll('\\n', ' ');
+    const unescaped = combined.replaceAll('\\"', '"').replaceAll("\\/", "/").replaceAll("\\n", " ");
 
     const startKey = '"rows":[';
     const startIdx = unescaped.indexOf(startKey);
@@ -548,10 +632,13 @@ export async function scrapeMagneto(keyword: string): Promise<Job[]> {
       let bracketCount = 0;
       let endIdx = -1;
       for (let i = arrayStartIdx; i < unescaped.length; i++) {
-        if (unescaped[i] === '[') bracketCount++;
-        else if (unescaped[i] === ']') {
+        if (unescaped[i] === "[") bracketCount++;
+        else if (unescaped[i] === "]") {
           bracketCount--;
-          if (bracketCount === 0) { endIdx = i; break; }
+          if (bracketCount === 0) {
+            endIdx = i;
+            break;
+          }
         }
       }
       if (endIdx !== -1) {
@@ -560,16 +647,16 @@ export async function scrapeMagneto(keyword: string): Promise<Job[]> {
           if (Array.isArray(rows)) {
             for (const r of rows) {
               const isRemote = r.isRemote === true;
-              const locationText = isRemote ? 'Remoto' : (r.cities || []).join(', ') || 'Colombia';
+              const locationText = isRemote ? "Remoto" : (r.cities || []).join(", ") || "Colombia";
               jobs.push({
                 jobId: String(r.id || Math.random()),
-                title: htmlEntities(r.title || 'Oferta Magneto'),
-                company: htmlEntities(r.companyName || 'Confidencial'),
+                title: htmlEntities(r.title || "Oferta Magneto"),
+                company: htmlEntities(r.companyName || "Confidencial"),
                 location: htmlEntities(locationText),
                 url: `https://www.magneto365.com/co/empleos/${r.jobSlug}`,
-                dateText: 'Reciente',
-                source: 'Magneto',
-                publishedAt: new Date().toISOString().split('T')[0]
+                dateText: "Reciente",
+                source: "Magneto",
+                publishedAt: new Date().toISOString().split("T")[0]
               });
             }
           }
@@ -579,31 +666,37 @@ export async function scrapeMagneto(keyword: string): Promise<Job[]> {
 
     // 2. Schema.org fallback if Next.js rows missing
     if (jobs.length === 0) {
-      const ldJsonMatches = html.match(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi) || [];
+      const ldJsonMatches =
+        html.match(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi) || [];
       for (const script of ldJsonMatches) {
         if (script.includes('"ItemList"')) {
           try {
-            const content = script.replace(/<script[^>]*>/i, '').replace(/<\/script>/i, '').trim();
+            const content = script
+              .replace(/<script[^>]*>/i, "")
+              .replace(/<\/script>/i, "")
+              .trim();
             const parsed = JSON.parse(content);
             if (parsed.itemListElement && Array.isArray(parsed.itemListElement)) {
               for (const el of parsed.itemListElement) {
-                if (el.url && el.url.includes('/empleos/')) {
+                if (el.url && el.url.includes("/empleos/")) {
                   const jobUrl = el.url;
-                  const slug = jobUrl.split('/empleos/')[1] || '';
-                  const parts = slug.split('-');
-                  const titleWords = parts.filter(p => !/^\d+$/.test(p));
-                  const title = titleWords.map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-                  
+                  const slug = jobUrl.split("/empleos/")[1] || "";
+                  const parts = slug.split("-");
+                  const titleWords = parts.filter((p) => !/^\d+$/.test(p));
+                  const title = titleWords
+                    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+                    .join(" ");
+
                   if (title && title.length > 3) {
                     jobs.push({
                       jobId: slug || String(Math.random()),
                       title: htmlEntities(title),
-                      company: 'Magneto Empresa',
-                      location: 'Colombia',
+                      company: "Magneto Empresa",
+                      location: "Colombia",
                       url: jobUrl,
-                      dateText: 'Hoy',
-                      source: 'Magneto',
-                      publishedAt: new Date().toISOString().split('T')[0]
+                      dateText: "Hoy",
+                      source: "Magneto",
+                      publishedAt: new Date().toISOString().split("T")[0]
                     });
                   }
                 }
@@ -617,7 +710,7 @@ export async function scrapeMagneto(keyword: string): Promise<Job[]> {
     console.log(`[Magneto] Found ${jobs.length} jobs.`);
     return jobs;
   } catch (error) {
-    console.error('[Magneto] Fetch error:', error);
+    console.error("[Magneto] Fetch error:", error);
     return jobs;
   }
 }
@@ -630,37 +723,55 @@ export async function scrapeMagneto(keyword: string): Promise<Job[]> {
 // empty CMS collection server-side and only populate client-side, so we
 // paginate the homepage instead and filter locally.
 export async function scrapeWeRemoto(): Promise<Job[]> {
-  console.log('[WeRemoto] Scraping recent postings...');
+  console.log("[WeRemoto] Scraping recent postings...");
   const jobs: Job[] = [];
   const now = new Date();
   const monthMap: Record<string, number> = {
-    jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
-    jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11
+    jan: 0,
+    feb: 1,
+    mar: 2,
+    apr: 3,
+    may: 4,
+    jun: 5,
+    jul: 6,
+    aug: 7,
+    sep: 8,
+    oct: 9,
+    nov: 10,
+    dec: 11
   };
 
   try {
     for (let page = 1; page <= 8; page++) {
-      const url = page === 1 ? 'https://www.weremoto.com/' : `https://www.weremoto.com/?c370efcf_page=${page}`;
+      const url =
+        page === 1
+          ? "https://www.weremoto.com/"
+          : `https://www.weremoto.com/?c370efcf_page=${page}`;
       const response = await fetch(url, {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         }
       });
 
       if (!response.ok) {
-        console.warn(`[WeRemoto] Failed on page ${page}: ${response.status} ${response.statusText}`);
+        console.warn(
+          `[WeRemoto] Failed on page ${page}: ${response.status} ${response.statusText}`
+        );
         break;
       }
 
       const html = await response.text();
-      const items = html.split('job-item-accordion w-dyn-item');
+      const items = html.split("job-item-accordion w-dyn-item");
       if (items.length <= 1) break; // No more paginated items
 
       for (let i = 1; i < items.length; i++) {
         const item = items[i];
         const titleMatch = item.match(/class="job-title">([^<]+)</);
         const companyMatch = item.match(/class="company-name">([^<]+)</);
-        const hrefMatch = item.match(/href="(\/job-posts\/[^"]+)"\s+target="_blank"\s+class="job-button-view/);
+        const hrefMatch = item.match(
+          /href="(\/job-posts\/[^"]+)"\s+target="_blank"\s+class="job-button-view/
+        );
         const dateMatch = item.match(/class="date _2">([^<]+)</);
 
         if (!titleMatch || !hrefMatch || !dateMatch) continue;
@@ -668,8 +779,8 @@ export async function scrapeWeRemoto(): Promise<Job[]> {
         // Location can appear as an invisible empty conditional div followed
         // by the real value, so pick the first non-empty match in the chunk.
         const locMatches = [...item.matchAll(/class="remoto[^"]*">([^<]*)</g)];
-        const nonEmptyLoc = locMatches.map(m => m[1].trim()).find(v => v.length > 0);
-        const location = nonEmptyLoc ? htmlEntities(nonEmptyLoc) : 'Remoto';
+        const nonEmptyLoc = locMatches.map((m) => m[1].trim()).find((v) => v.length > 0);
+        const location = nonEmptyLoc ? htmlEntities(nonEmptyLoc) : "Remoto";
 
         const dm = dateMatch[1].trim().match(/^([A-Za-z]{3})\s+(\d{1,2})$/);
         if (!dm) continue;
@@ -687,23 +798,23 @@ export async function scrapeWeRemoto(): Promise<Job[]> {
         if (ageInDays > 2 || ageInDays < -0.5) continue;
 
         const yyyy = candidate.getFullYear();
-        const mm = String(candidate.getMonth() + 1).padStart(2, '0');
-        const dd = String(candidate.getDate()).padStart(2, '0');
+        const mm = String(candidate.getMonth() + 1).padStart(2, "0");
+        const dd = String(candidate.getDate()).padStart(2, "0");
 
         jobs.push({
-          jobId: hrefMatch[1].replace('/job-posts/', ''),
+          jobId: hrefMatch[1].replace("/job-posts/", ""),
           title: htmlEntities(titleMatch[1].trim()),
-          company: companyMatch ? htmlEntities(companyMatch[1].trim()) : 'Confidencial',
+          company: companyMatch ? htmlEntities(companyMatch[1].trim()) : "Confidencial",
           location,
           url: `https://www.weremoto.com${hrefMatch[1]}`,
           dateText: dateMatch[1].trim(),
-          source: 'WeRemoto',
+          source: "WeRemoto",
           publishedAt: `${yyyy}-${mm}-${dd}`
         });
       }
     }
   } catch (error) {
-    console.error('[WeRemoto] Fetch error:', error);
+    console.error("[WeRemoto] Fetch error:", error);
   }
   console.log(`[WeRemoto] Found ${jobs.length} jobs (filtered by date).`);
   return jobs;
@@ -711,21 +822,32 @@ export async function scrapeWeRemoto(): Promise<Job[]> {
 
 // Scrape GetOnBoard (LATAM tech job board) via its free public JSON API
 export async function scrapeGetOnBoard(): Promise<Job[]> {
-  console.log('[GetOnBoard] Fetching categories (programming, qa, ai, product-building-management, data-science)...');
+  console.log(
+    "[GetOnBoard] Fetching categories (programming, qa, ai, product-building-management, data-science)..."
+  );
   const jobs: Job[] = [];
   const now = Date.now();
 
   try {
-    for (const category of ['machine-learning-ai', 'programming', 'sysadmin-devops-qa', 'product-building-management', 'data-science-analytics']) {
+    for (const category of [
+      "machine-learning-ai",
+      "programming",
+      "sysadmin-devops-qa",
+      "product-building-management",
+      "data-science-analytics"
+    ]) {
       const url = `https://www.getonbrd.com/api/v0/categories/${category}/jobs?per_page=100`;
       const response = await fetch(url, {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         }
       });
 
       if (!response.ok) {
-        console.warn(`[GetOnBoard] Failed for ${category}: ${response.status} ${response.statusText}`);
+        console.warn(
+          `[GetOnBoard] Failed for ${category}: ${response.status} ${response.statusText}`
+        );
         continue;
       }
 
@@ -742,28 +864,30 @@ export async function scrapeGetOnBoard(): Promise<Job[]> {
 
         const countries: string[] = attrs.countries || [];
         const isRemote = attrs.remote === true;
-        const isColombia = countries.some(c => c.toLowerCase().includes('colombia'));
+        const isColombia = countries.some((c) => c.toLowerCase().includes("colombia"));
         if (!isRemote && !isColombia) continue;
 
         const publishedDate = new Date(publishedMs);
         const yyyy = publishedDate.getFullYear();
-        const mm = String(publishedDate.getMonth() + 1).padStart(2, '0');
-        const dd = String(publishedDate.getDate()).padStart(2, '0');
+        const mm = String(publishedDate.getMonth() + 1).padStart(2, "0");
+        const dd = String(publishedDate.getDate()).padStart(2, "0");
 
         jobs.push({
           jobId: item.id,
           title: htmlEntities(attrs.title),
-          company: htmlEntities(attrs.company_name || item.relationships?.company?.data?.id || 'Confidencial'),
-          location: isRemote ? 'Remoto' : countries.join(', '),
+          company: htmlEntities(
+            attrs.company_name || item.relationships?.company?.data?.id || "Confidencial"
+          ),
+          location: isRemote ? "Remoto" : countries.join(", "),
           url: `https://www.getonbrd.com/jobs/${item.id}`,
-          dateText: 'Reciente',
-          source: 'GetOnBoard',
+          dateText: "Reciente",
+          source: "GetOnBoard",
           publishedAt: `${yyyy}-${mm}-${dd}`
         });
       }
     }
   } catch (error) {
-    console.error('[GetOnBoard] Fetch error:', error);
+    console.error("[GetOnBoard] Fetch error:", error);
   }
   console.log(`[GetOnBoard] Found ${jobs.length} jobs (filtered by date/region).`);
   return jobs;
@@ -774,14 +898,15 @@ export async function scrapeGetOnBoard(): Promise<Job[]> {
 // Their API terms require linking back to the original RemoteOK URL, which we
 // do by storing item.url.
 export async function scrapeRemoteOK(): Promise<Job[]> {
-  console.log('[RemoteOK] Fetching latest postings...');
+  console.log("[RemoteOK] Fetching latest postings...");
   const jobs: Job[] = [];
   const now = Date.now();
 
   try {
-    const response = await fetch('https://remoteok.com/api', {
+    const response = await fetch("https://remoteok.com/api", {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
       }
     });
 
@@ -802,22 +927,22 @@ export async function scrapeRemoteOK(): Promise<Job[]> {
 
       const publishedDate = new Date(item.epoch * 1000);
       const yyyy = publishedDate.getFullYear();
-      const mm = String(publishedDate.getMonth() + 1).padStart(2, '0');
-      const dd = String(publishedDate.getDate()).padStart(2, '0');
+      const mm = String(publishedDate.getMonth() + 1).padStart(2, "0");
+      const dd = String(publishedDate.getDate()).padStart(2, "0");
 
       jobs.push({
         jobId: String(item.id),
         title: htmlEntities(item.position),
-        company: htmlEntities(item.company || 'Confidencial'),
-        location: htmlEntities(item.location || 'Remote'),
+        company: htmlEntities(item.company || "Confidencial"),
+        location: htmlEntities(item.location || "Remote"),
         url: item.url,
-        dateText: 'Reciente',
-        source: 'RemoteOK',
+        dateText: "Reciente",
+        source: "RemoteOK",
         publishedAt: `${yyyy}-${mm}-${dd}`
       });
     }
   } catch (error) {
-    console.error('[RemoteOK] Fetch error:', error);
+    console.error("[RemoteOK] Fetch error:", error);
   }
   console.log(`[RemoteOK] Found ${jobs.length} jobs (filtered by date).`);
   return jobs;
@@ -826,7 +951,7 @@ export async function scrapeRemoteOK(): Promise<Job[]> {
 // Scrape Remotive via its official public JSON API
 // (https://remotive.com/api/remote-jobs?search=...). No auth required.
 export async function scrapeRemotive(searchTerms: string[]): Promise<Job[]> {
-  console.log('[Remotive] Fetching postings...');
+  console.log("[Remotive] Fetching postings...");
   const jobs: Job[] = [];
   const now = Date.now();
 
@@ -835,7 +960,8 @@ export async function scrapeRemotive(searchTerms: string[]): Promise<Job[]> {
       const url = `https://remotive.com/api/remote-jobs?search=${encodeURIComponent(term)}&limit=50`;
       const response = await fetch(url, {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         }
       });
 
@@ -855,23 +981,23 @@ export async function scrapeRemotive(searchTerms: string[]): Promise<Job[]> {
         if (ageInDays > 2) continue;
 
         const yyyy = publishedDate.getFullYear();
-        const mm = String(publishedDate.getMonth() + 1).padStart(2, '0');
-        const dd = String(publishedDate.getDate()).padStart(2, '0');
+        const mm = String(publishedDate.getMonth() + 1).padStart(2, "0");
+        const dd = String(publishedDate.getDate()).padStart(2, "0");
 
         jobs.push({
           jobId: String(item.id),
           title: htmlEntities(item.title),
-          company: htmlEntities(item.company_name || 'Confidencial'),
-          location: htmlEntities(item.candidate_required_location || 'Remote'),
+          company: htmlEntities(item.company_name || "Confidencial"),
+          location: htmlEntities(item.candidate_required_location || "Remote"),
           url: item.url,
-          dateText: 'Reciente',
-          source: 'Remotive',
+          dateText: "Reciente",
+          source: "Remotive",
           publishedAt: `${yyyy}-${mm}-${dd}`
         });
       }
     }
   } catch (error) {
-    console.error('[Remotive] Fetch error:', error);
+    console.error("[Remotive] Fetch error:", error);
   }
   console.log(`[Remotive] Found ${jobs.length} jobs (filtered by date).`);
   return jobs;
@@ -895,9 +1021,9 @@ async function gsFetch(url: string, label: string, attempts = 3): Promise<string
         timeout: { request: 30000 },
         retry: { limit: 0 },
         headerGeneratorOptions: {
-          browsers: [{ name: 'chrome', minVersion: 118 }],
-          operatingSystems: ['windows'],
-          locales: ['es-CO', 'es', 'en-US']
+          browsers: [{ name: "chrome", minVersion: 118 }],
+          operatingSystems: ["windows"],
+          locales: ["es-CO", "es", "en-US"]
         }
       });
       if (response.statusCode === 200) return response.body;
@@ -906,13 +1032,16 @@ async function gsFetch(url: string, label: string, attempts = 3): Promise<string
         return null;
       }
       // Backoff before a fresh-fingerprint retry (1.5s, 3s, 4.5s, ...)
-      await new Promise(r => setTimeout(r, 1500 * attempt));
+      await new Promise((r) => setTimeout(r, 1500 * attempt));
     } catch (error: any) {
       if (attempt === attempts) {
-        console.error(`[${label}] Fetch error after ${attempts} attempts:`, error?.message || error);
+        console.error(
+          `[${label}] Fetch error after ${attempts} attempts:`,
+          error?.message || error
+        );
         return null;
       }
-      await new Promise(r => setTimeout(r, 1500 * attempt));
+      await new Promise((r) => setTimeout(r, 1500 * attempt));
     }
   }
   return null;
@@ -921,20 +1050,25 @@ async function gsFetch(url: string, label: string, attempts = 3): Promise<string
 // Extract a balanced {...} JSON object starting at the first '{' after fromIdx,
 // respecting strings/escapes. Used to pull embedded provider payloads out of HTML.
 function extractBalancedObject(html: string, fromIdx: number): string | null {
-  let i = html.indexOf('{', fromIdx);
+  let i = html.indexOf("{", fromIdx);
   if (i === -1) return null;
   const objStart = i;
-  let depth = 0, inStr = false, esc = false;
+  let depth = 0,
+    inStr = false,
+    esc = false;
   for (; i < html.length; i++) {
     const c = html[i];
     if (inStr) {
       if (esc) esc = false;
-      else if (c === '\\') esc = true;
+      else if (c === "\\") esc = true;
       else if (c === '"') inStr = false;
     } else {
       if (c === '"') inStr = true;
-      else if (c === '{') depth++;
-      else if (c === '}') { depth--; if (depth === 0) return html.slice(objStart, i + 1); }
+      else if (c === "{") depth++;
+      else if (c === "}") {
+        depth--;
+        if (depth === 0) return html.slice(objStart, i + 1);
+      }
     }
   }
   return null;
@@ -955,13 +1089,13 @@ export async function scrapeIndeedLocal(keyword: string): Promise<Job[]> {
   const now = Date.now();
 
   try {
-    const html = await gsFetch(url, 'Indeed');
+    const html = await gsFetch(url, "Indeed");
     if (!html) return [];
 
     const marker = 'window.mosaic.providerData["mosaic-provider-jobcards"]=';
     const markerIdx = html.indexOf(marker);
     if (markerIdx === -1) {
-      console.warn('[Indeed] jobcards payload not found (layout changed or blocked).');
+      console.warn("[Indeed] jobcards payload not found (layout changed or blocked).");
       return [];
     }
 
@@ -981,25 +1115,25 @@ export async function scrapeIndeedLocal(keyword: string): Promise<Job[]> {
         const ageInDays = (now - r.pubDate) / (1000 * 60 * 60 * 24);
         if (ageInDays > 2) continue;
         const d = new Date(r.pubDate);
-        publishedAt = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        publishedAt = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
       } else {
         continue;
       }
 
-      const location = r.remoteLocation ? 'Remoto' : (r.formattedLocation || 'Colombia');
+      const location = r.remoteLocation ? "Remoto" : r.formattedLocation || "Colombia";
       jobs.push({
         jobId: r.jobkey,
         title: htmlEntities(r.title),
-        company: htmlEntities(r.company || 'Confidencial'),
+        company: htmlEntities(r.company || "Confidencial"),
         location: htmlEntities(location),
         url: `https://co.indeed.com/viewjob?jk=${r.jobkey}`,
-        dateText: r.formattedRelativeTime || 'Reciente',
-        source: 'Indeed',
+        dateText: r.formattedRelativeTime || "Reciente",
+        source: "Indeed",
         publishedAt
       });
     }
   } catch (error: any) {
-    console.error('[Indeed] Fetch error:', error?.message || error);
+    console.error("[Indeed] Fetch error:", error?.message || error);
   }
   console.log(`[Indeed] Found ${jobs.length} jobs (filtered by date).`);
   return jobs;
@@ -1020,7 +1154,7 @@ export async function scrapeGlassdoor(keyword: string): Promise<Job[]> {
   const kw = keyword.trim();
   // URL span offsets: IL.0,8 = "colombia" (8 chars), KO9,<9+kwlen> = keyword span
   const koEnd = 9 + kw.length;
-  const slug = `colombia-${kw.toLowerCase().replace(/\s+/g, '-')}-jobs`;
+  const slug = `colombia-${kw.toLowerCase().replace(/\s+/g, "-")}-jobs`;
   const url = `https://www.glassdoor.com/Job/${slug}-SRCH_IL.0,8_IN${GLASSDOOR_COLOMBIA_ID}_KO9,${koEnd}.htm?fromAge=3`;
   const jobs: Job[] = [];
 
@@ -1033,10 +1167,15 @@ export async function scrapeGlassdoor(keyword: string): Promise<Job[]> {
     return m ? parseInt(m[1], 10) : null;
   };
   const unescapeFlight = (s: string): string =>
-    s.replace(/\\u0026/g, '&').replace(/\\u003c/g, '<').replace(/\\u003e/g, '>').replace(/\\\//g, '/').replace(/\\"/g, '"');
+    s
+      .replace(/\\u0026/g, "&")
+      .replace(/\\u003c/g, "<")
+      .replace(/\\u003e/g, ">")
+      .replace(/\\\//g, "/")
+      .replace(/\\"/g, '"');
 
   try {
-    const html = await gsFetch(url, 'Glassdoor');
+    const html = await gsFetch(url, "Glassdoor");
     if (!html) return [];
 
     const chunks = html.split('\\"jobview\\":');
@@ -1044,19 +1183,23 @@ export async function scrapeGlassdoor(keyword: string): Promise<Job[]> {
 
     for (let i = 1; i < chunks.length; i++) {
       const chunk = chunks[i];
-      const ageInDays = numField(chunk, 'ageInDays');
-      const title = field(chunk, 'jobTitleText');
+      const ageInDays = numField(chunk, "ageInDays");
+      const title = field(chunk, "jobTitleText");
       if (ageInDays === null || ageInDays > 2 || !title) continue;
 
-      const company = field(chunk, 'employerNameFromSearch') || 'Confidencial';
-      const location = field(chunk, 'locationName') || 'Colombia';
-      const listingId = numField(chunk, 'listingId');
-      let link = field(chunk, 'seoJobLink');
-      link = link ? unescapeFlight(link) : (listingId ? `https://www.glassdoor.com/job-listing/index.htm?jl=${listingId}` : '');
+      const company = field(chunk, "employerNameFromSearch") || "Confidencial";
+      const location = field(chunk, "locationName") || "Colombia";
+      const listingId = numField(chunk, "listingId");
+      let link = field(chunk, "seoJobLink");
+      link = link
+        ? unescapeFlight(link)
+        : listingId
+          ? `https://www.glassdoor.com/job-listing/index.htm?jl=${listingId}`
+          : "";
       if (!link) continue;
 
       const d = new Date(now - ageInDays * 24 * 60 * 60 * 1000);
-      const publishedAt = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const publishedAt = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
       jobs.push({
         jobId: listingId ? String(listingId) : link,
@@ -1065,12 +1208,12 @@ export async function scrapeGlassdoor(keyword: string): Promise<Job[]> {
         location: htmlEntities(unescapeFlight(location)),
         url: link,
         dateText: `hace ${ageInDays} día(s)`,
-        source: 'Glassdoor',
+        source: "Glassdoor",
         publishedAt
       });
     }
   } catch (error: any) {
-    console.error('[Glassdoor] Fetch error:', error?.message || error);
+    console.error("[Glassdoor] Fetch error:", error?.message || error);
   }
   console.log(`[Glassdoor] Found ${jobs.length} jobs (filtered by date).`);
   return jobs;
@@ -1079,12 +1222,12 @@ export async function scrapeGlassdoor(keyword: string): Promise<Job[]> {
 // Scrape Indeed via Apify (Optimized single run with combined query)
 async function scrapeIndeedCombined(combinedKeyword: string): Promise<Job[]> {
   if (!APIFY_TOKEN) {
-    console.log('[Indeed] APIFY_TOKEN not set. Skipping Indeed.');
+    console.log("[Indeed] APIFY_TOKEN not set. Skipping Indeed.");
     return [];
   }
 
   console.log(`[Indeed] Triggering single Apify run with combined query: "${combinedKeyword}"...`);
-  
+
   const input = {
     includeKeyword: combinedKeyword,
     locationName: "Colombia",
@@ -1093,12 +1236,12 @@ async function scrapeIndeedCombined(combinedKeyword: string): Promise<Job[]> {
   };
 
   const startUrl = `https://api.apify.com/v2/acts/orgupdate~indeed-jobs-scraper/runs?token=${APIFY_TOKEN}`;
-  
+
   try {
     const response = await fetch(startUrl, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json"
       },
       body: JSON.stringify(input)
     });
@@ -1113,48 +1256,48 @@ async function scrapeIndeedCombined(combinedKeyword: string): Promise<Job[]> {
     const datasetId = startData.data.defaultDatasetId;
 
     console.log(`[Indeed] Apify run ${runId} started. Waiting for results...`);
-    
+
     // Poll status until done (max 2 minutes)
     let attempts = 0;
     while (attempts < 15) {
-      await new Promise(r => setTimeout(r, 8000));
+      await new Promise((r) => setTimeout(r, 8000));
       const statusUrl = `https://api.apify.com/v2/actor-runs/${runId}?token=${APIFY_TOKEN}`;
       const statusResp = await fetch(statusUrl);
       if (!statusResp.ok) break;
       const statusData = await statusResp.json();
-      
+
       const status = statusData.data.status;
       console.log(`[Indeed] Run status: ${status}`);
-      
-      if (status === 'SUCCEEDED') {
+
+      if (status === "SUCCEEDED") {
         const datasetUrl = `https://api.apify.com/v2/datasets/${datasetId}/items?token=${APIFY_TOKEN}`;
         const datasetResp = await fetch(datasetUrl);
         if (datasetResp.ok) {
           const items = await datasetResp.json();
           const jobs: Job[] = [];
           const now = new Date();
-          
+
           for (const item of items) {
-            const location = item.location || '';
-            const title = item.job_title || '';
-            
+            const location = item.location || "";
+            const title = item.job_title || "";
+
             const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
             const yyyy = yesterday.getFullYear();
-            const mm = String(yesterday.getMonth() + 1).padStart(2, '0');
-            const dd = String(yesterday.getDate()).padStart(2, '0');
+            const mm = String(yesterday.getMonth() + 1).padStart(2, "0");
+            const dd = String(yesterday.getDate()).padStart(2, "0");
 
-            const urlStr = item.URL || '';
+            const urlStr = item.URL || "";
             const jkMatch = urlStr.match(/jk=([a-f0-9]+)/);
             const jobId = jkMatch ? jkMatch[1] : Math.random().toString(36).substring(7);
 
             jobs.push({
               jobId,
               title: htmlEntities(title),
-              company: htmlEntities(item.company_name || 'Confidencial'),
+              company: htmlEntities(item.company_name || "Confidencial"),
               location: htmlEntities(location),
               url: urlStr,
-              dateText: 'Reciente',
-              source: 'Indeed',
+              dateText: "Reciente",
+              source: "Indeed",
               publishedAt: `${yyyy}-${mm}-${dd}`
             });
           }
@@ -1162,7 +1305,7 @@ async function scrapeIndeedCombined(combinedKeyword: string): Promise<Job[]> {
           return jobs;
         }
         break;
-      } else if (status === 'FAILED' || status === 'ABORTED' || status === 'TIMED-OUT') {
+      } else if (status === "FAILED" || status === "ABORTED" || status === "TIMED-OUT") {
         console.warn(`[Indeed] Run failed with status: ${status}`);
         break;
       }
@@ -1170,38 +1313,46 @@ async function scrapeIndeedCombined(combinedKeyword: string): Promise<Job[]> {
     }
     return [];
   } catch (error) {
-    console.error('[Indeed] Fetch error:', error);
+    console.error("[Indeed] Fetch error:", error);
     return [];
   }
 }
 
-import { generateRoleKeywordsWithAI } from './ai-role-agent.js';
+import { generateRoleKeywordsWithAI } from "./ai-role-agent.js";
 
 // Parent page ID for "radar de empleo" workspace page
-const NOTION_PARENT_PAGE_ID = '3a1ffe7c-41af-800b-a8f6-d897759c21df';
+const NOTION_PARENT_PAGE_ID = "3a1ffe7c-41af-800b-a8f6-d897759c21df";
 
 // Sync job to dedicated Notion database for this run
 async function syncToNotion(job: Job, targetDataSourceId: string) {
   try {
-    let modality = 'Desconocida';
+    let modality = "Desconocida";
     const textToSearch = `${job.title} ${job.location}`.toLowerCase();
-    if (textToSearch.includes('remot') || textToSearch.includes('teletrabajo') || textToSearch.includes('home office')) {
-      modality = 'Remoto';
-    } else if (textToSearch.includes('hibrid') || textToSearch.includes('hybrid')) {
-      modality = 'Híbrido';
-    } else if (textToSearch.includes('presencial') || textToSearch.includes('oficina') || textToSearch.includes('sitio')) {
-      modality = 'Presencial';
+    if (
+      textToSearch.includes("remot") ||
+      textToSearch.includes("teletrabajo") ||
+      textToSearch.includes("home office")
+    ) {
+      modality = "Remoto";
+    } else if (textToSearch.includes("hibrid") || textToSearch.includes("hybrid")) {
+      modality = "Híbrido";
+    } else if (
+      textToSearch.includes("presencial") ||
+      textToSearch.includes("oficina") ||
+      textToSearch.includes("sitio")
+    ) {
+      modality = "Presencial";
     }
 
     await notion.pages.create({
       parent: { type: "data_source_id", data_source_id: targetDataSourceId },
       properties: {
-        "Nombre": { title: [{ text: { content: job.title } }] },
-        "Empresa": { rich_text: [{ text: { content: job.company } }] },
-        "Ubicación": { rich_text: [{ text: { content: job.location } }] },
-        "Modalidad": { select: { name: modality } },
+        Nombre: { title: [{ text: { content: job.title } }] },
+        Empresa: { rich_text: [{ text: { content: job.company } }] },
+        Ubicación: { rich_text: [{ text: { content: job.location } }] },
+        Modalidad: { select: { name: modality } },
         "Fuente principal": { select: { name: job.source } },
-        "Aplicar": { url: job.url },
+        Aplicar: { url: job.url },
         "Fecha publicada": { date: { start: job.publishedAt } }
       } as any
     });
@@ -1211,18 +1362,36 @@ async function syncToNotion(job: Job, targetDataSourceId: string) {
   }
 }
 
-const COLOMBIA_SCOPED_SOURCES = new Set<Job['source']>([
-  'LinkedIn', 'Computrabajo', 'Elempleo', 'Indeed', 'Glassdoor', 'Magneto', 'Torre', 'GetOnBoard'
+const COLOMBIA_SCOPED_SOURCES = new Set<Job["source"]>([
+  "LinkedIn",
+  "Computrabajo",
+  "Elempleo",
+  "Indeed",
+  "Glassdoor",
+  "Magneto",
+  "Torre",
+  "GetOnBoard"
 ]);
 
 function isColombiaOrRemote(location: string): boolean {
   const loc = location.toLowerCase();
-  return loc.includes('colombia') || loc.includes('medellin') || loc.includes('medellín') ||
-    loc.includes('remoto') || loc.includes('remote') ||
-    loc.includes('worldwide') || loc.includes('anywhere') || loc.includes('global') ||
-    loc.includes('latam') || loc.includes('latin america') || loc.includes('américa latina') ||
-    loc.includes('america latina') || loc.includes('americas') || loc.includes('américas') ||
-    loc.includes('south america');
+  return (
+    loc.includes("colombia") ||
+    loc.includes("medellin") ||
+    loc.includes("medellín") ||
+    loc.includes("remoto") ||
+    loc.includes("remote") ||
+    loc.includes("worldwide") ||
+    loc.includes("anywhere") ||
+    loc.includes("global") ||
+    loc.includes("latam") ||
+    loc.includes("latin america") ||
+    loc.includes("américa latina") ||
+    loc.includes("america latina") ||
+    loc.includes("americas") ||
+    loc.includes("américas") ||
+    loc.includes("south america")
+  );
 }
 
 function passesLocation(job: Job): boolean {
@@ -1230,43 +1399,67 @@ function passesLocation(job: Job): boolean {
   return isColombiaOrRemote(job.location);
 }
 
-const DRY_RUN = process.env.DRY_RUN === 'true';
+const DRY_RUN = process.env.DRY_RUN === "true";
 
 async function main() {
-  console.log(`=== STARTING LOCAL + HYBRID JOB SCRAPER (COLOMBIA / PAST 48 HOURS)${DRY_RUN ? ' [DRY RUN]' : ''} ===`);
+  console.log(
+    `=== STARTING LOCAL + HYBRID JOB SCRAPER (COLOMBIA / PAST 48 HOURS)${DRY_RUN ? " [DRY RUN]" : ""} ===`
+  );
 
   // Read keywords dynamically from SEARCH_KEYWORDS env var or use defaults
-  const rawSearchKeywords = process.env.SEARCH_KEYWORDS || "Project Manager, Business Analyst, Data Analyst, Data Engineer, RPA Developer, QA Engineer, AI Engineer";
-  const userRequestedKeywords = rawSearchKeywords.split(',').map(s => s.trim()).filter(Boolean);
-  
+  const rawSearchKeywords =
+    process.env.SEARCH_KEYWORDS ||
+    "Project Manager, Business Analyst, Data Analyst, Data Engineer, RPA Developer, QA Engineer, AI Engineer";
+  const userRequestedKeywords = rawSearchKeywords
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
   // Expand search keywords dynamically using AI Role Agent (English & Spanish synonyms)
   const expandedKeywords = generateRoleKeywordsWithAI(userRequestedKeywords);
-  const searchTerms = Array.from(new Set([...userRequestedKeywords, ...expandedKeywords])).slice(0, 12);
+  const searchTerms = Array.from(new Set([...userRequestedKeywords, ...expandedKeywords])).slice(
+    0,
+    12
+  );
 
-  console.log(`[AI Role Agent] Requested roles: [${userRequestedKeywords.join(', ')}]`);
-  console.log(`[AI Role Agent] Dynamically expanded search terms (${searchTerms.length}): [${searchTerms.join(', ')}]`);
+  console.log(`[AI Role Agent] Requested roles: [${userRequestedKeywords.join(", ")}]`);
+  console.log(
+    `[AI Role Agent] Dynamically expanded search terms (${searchTerms.length}): [${searchTerms.join(", ")}]`
+  );
 
   let allJobs: Job[] = [];
 
   // 1. Scrape free local platforms in parallel across all terms concurrently
-  console.log('\n--- Phase 1: Local free scraping (LinkedIn, Computrabajo, Elempleo, Torre, Workana, Magneto) ---');
+  console.log(
+    "\n--- Phase 1: Local free scraping (LinkedIn, Computrabajo, Elempleo, Torre, Workana, Magneto) ---"
+  );
   const phase1Promises = searchTerms.map(async (keyword) => {
-    const [linkedinJobs, computrabajoJobs, elempleoJobs, torreJobs, workanaJobs, magnetoJobs] = await Promise.all([
-      scrapeLinkedIn(keyword),
-      scrapeComputrabajo(keyword),
-      scrapeElempleo(keyword),
-      scrapeTorre(keyword),
-      scrapeWorkana(keyword),
-      scrapeMagneto(keyword)
-    ]);
-    return [...linkedinJobs, ...computrabajoJobs, ...elempleoJobs, ...torreJobs, ...workanaJobs, ...magnetoJobs];
+    const [linkedinJobs, computrabajoJobs, elempleoJobs, torreJobs, workanaJobs, magnetoJobs] =
+      await Promise.all([
+        scrapeLinkedIn(keyword),
+        scrapeComputrabajo(keyword),
+        scrapeElempleo(keyword),
+        scrapeTorre(keyword),
+        scrapeWorkana(keyword),
+        scrapeMagneto(keyword)
+      ]);
+    return [
+      ...linkedinJobs,
+      ...computrabajoJobs,
+      ...elempleoJobs,
+      ...torreJobs,
+      ...workanaJobs,
+      ...magnetoJobs
+    ];
   });
 
   const phase1Results = await Promise.all(phase1Promises);
   allJobs = allJobs.concat(phase1Results.flat());
 
   // 1b & 1c. WeRemoto and Global Public APIs in parallel
-  console.log('\n--- Phase 1b & 1c: Free public APIs (WeRemoto, GetOnBoard, RemoteOK, Remotive) ---');
+  console.log(
+    "\n--- Phase 1b & 1c: Free public APIs (WeRemoto, GetOnBoard, RemoteOK, Remotive) ---"
+  );
   const [weRemotoJobs, getOnBoardJobs, remoteOkJobs, remotiveJobs] = await Promise.all([
     scrapeWeRemoto(),
     scrapeGetOnBoard(),
@@ -1276,7 +1469,7 @@ async function main() {
   allJobs = allJobs.concat(weRemotoJobs, getOnBoardJobs, remoteOkJobs, remotiveJobs);
 
   // 2. Indeed + Glassdoor scraped LOCALLY in parallel
-  console.log('\n--- Phase 2: Local Cloudflare-bypass scraping (Indeed, Glassdoor) ---');
+  console.log("\n--- Phase 2: Local Cloudflare-bypass scraping (Indeed, Glassdoor) ---");
   const cfKeywords = searchTerms.slice(0, 4);
   const phase2Promises = cfKeywords.map(async (keyword) => {
     const [indeedJobs, glassdoorJobs] = await Promise.all([
@@ -1301,20 +1494,37 @@ async function main() {
   }
 
   console.log(`\n=== SCRAPING COMPLETE ===`);
-  console.log('Found ' + allJobs.length + ' total jobs across all keywords.');
-  console.log('Deduplicated to ' + uniqueJobs.length + ' unique jobs.');
+  console.log("Found " + allJobs.length + " total jobs across all keywords.");
+  console.log("Deduplicated to " + uniqueJobs.length + " unique jobs.");
 
   // Semantic relevance filter matching requested roles or expanded synonyms
-  const relevantJobs = uniqueJobs.filter(job => {
+  const relevantJobs = uniqueJobs.filter((job) => {
     const titleLower = job.title.toLowerCase();
-    
+
     // Negative keywords: filter out manual/unrelated roles
     const negativeKeywords = [
-      'operario', 'soldador', 'bodega', 'produccion', 'producción', 'alimentos', 'minicargador', 
-      'mecanico', 'mecánico', 'quimico', 'químico', 'enfermera', 'enfermero', 'medico', 
-      'soldadura', 'vendedor', 'secrtaria', 'secretaria', 'docente', 'recolector'
+      "operario",
+      "soldador",
+      "bodega",
+      "produccion",
+      "producción",
+      "alimentos",
+      "minicargador",
+      "mecanico",
+      "mecánico",
+      "quimico",
+      "químico",
+      "enfermera",
+      "enfermero",
+      "medico",
+      "soldadura",
+      "vendedor",
+      "secrtaria",
+      "secretaria",
+      "docente",
+      "recolector"
     ];
-    if (negativeKeywords.some(neg => titleLower.includes(neg))) {
+    if (negativeKeywords.some((neg) => titleLower.includes(neg))) {
       return false;
     }
 
@@ -1323,26 +1533,36 @@ async function main() {
     }
 
     // Match any of expanded keywords or core role tokens
-    return expandedKeywords.some(syn => {
+    return expandedKeywords.some((syn) => {
       const s = syn.toLowerCase();
-      if (s === 'qa') return /\bqa\b/.test(titleLower);
-      if (s === 'ai' || s === 'ia') return /\bai\b|\bia\b/.test(titleLower) || titleLower.includes('inteligencia artificial');
-      if (s === 'ba') return /\bba\b/.test(titleLower);
-      if (s === 'pm') return /\bpm\b/.test(titleLower);
-      if (s === 'pmo') return /\bpmo\b/.test(titleLower);
-      return titleLower.includes(s) || s.split(' ').every(word => word.length > 2 && titleLower.includes(word));
+      if (s === "qa") return /\bqa\b/.test(titleLower);
+      if (s === "ai" || s === "ia")
+        return /\bai\b|\bia\b/.test(titleLower) || titleLower.includes("inteligencia artificial");
+      if (s === "ba") return /\bba\b/.test(titleLower);
+      if (s === "pm") return /\bpm\b/.test(titleLower);
+      if (s === "pmo") return /\bpmo\b/.test(titleLower);
+      return (
+        titleLower.includes(s) ||
+        s.split(" ").every((word) => word.length > 2 && titleLower.includes(word))
+      );
     });
   });
 
-  console.log('Filtered to ' + relevantJobs.length + ' relevant jobs matching AI Role Agent profile.');
+  console.log(
+    "Filtered to " + relevantJobs.length + " relevant jobs matching AI Role Agent profile."
+  );
 
-  const dateStr = new Date().toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' });
-  const runDbTitle = `🎯 ${dateStr} - ${userRequestedKeywords.join(', ')} (${relevantJobs.length} Vacantes)`;
+  const dateStr = new Date().toLocaleString("es-CO", { dateStyle: "short", timeStyle: "short" });
+  const runDbTitle = `🎯 ${dateStr} - ${userRequestedKeywords.join(", ")} (${relevantJobs.length} Vacantes)`;
 
   if (DRY_RUN) {
-    console.log(`\n=== DRY RUN: would create Notion DB "${runDbTitle}" and sync ${relevantJobs.length} jobs ===`);
+    console.log(
+      `\n=== DRY RUN: would create Notion DB "${runDbTitle}" and sync ${relevantJobs.length} jobs ===`
+    );
     for (const job of relevantJobs) {
-      console.log(`- [${job.source}] ${job.title} @ ${job.company} (${job.location}) — ${job.publishedAt} — ${job.url}`);
+      console.log(
+        `- [${job.source}] ${job.title} @ ${job.company} (${job.location}) — ${job.publishedAt} — ${job.url}`
+      );
     }
     console.log(`\n=== JOB RADAR DRY RUN COMPLETE ===`);
     return;
@@ -1358,21 +1578,23 @@ async function main() {
         title: [{ type: "text", text: { content: runDbTitle } }],
         initial_data_source: {
           properties: {
-            "Nombre": { title: {} },
-            "Empresa": { rich_text: {} },
-            "Ubicación": { rich_text: {} },
-            "Modalidad": { select: {} },
+            Nombre: { title: {} },
+            Empresa: { rich_text: {} },
+            Ubicación: { rich_text: {} },
+            Modalidad: { select: {} },
             "Fuente principal": { select: {} },
-            "Aplicar": { url: {} },
+            Aplicar: { url: {} },
             "Fecha publicada": { date: {} }
           }
         }
       });
 
       targetDataSourceId = newDb.data_sources?.[0]?.id || newDb.id;
-      console.log(`[Notion] Successfully created dedicated database with ID: ${targetDataSourceId}`);
+      console.log(
+        `[Notion] Successfully created dedicated database with ID: ${targetDataSourceId}`
+      );
     } catch (e: any) {
-      console.error('[Notion] Error creating dedicated database:', e.message);
+      console.error("[Notion] Error creating dedicated database:", e.message);
     }
   }
 
@@ -1381,7 +1603,7 @@ async function main() {
     const BATCH_SIZE = 5;
     for (let i = 0; i < relevantJobs.length; i += BATCH_SIZE) {
       const batch = relevantJobs.slice(i, i + BATCH_SIZE);
-      await Promise.all(batch.map(job => syncToNotion(job, targetDataSourceId!)));
+      await Promise.all(batch.map((job) => syncToNotion(job, targetDataSourceId!)));
     }
   }
 
@@ -1390,9 +1612,9 @@ async function main() {
   saveRunToCache({
     id: runId,
     name: runDbTitle,
-    role: userRequestedKeywords.join(', '),
+    role: userRequestedKeywords.join(", "),
     timestamp: new Date().toISOString(),
-    jobs: relevantJobs.map(j => ({
+    jobs: relevantJobs.map((j) => ({
       ...j,
       runId,
       runName: runDbTitle
@@ -1402,4 +1624,11 @@ async function main() {
   console.log(`\n=== JOB RADAR SYNC COMPLETE ===`);
 }
 
-main();
+// Every src/sources/*.ts adapter imports its scraper function from this file,
+// so importing index.ts as a library (e.g. via server.ts -> scheduler ->
+// scrape-worker -> sources) must NOT re-run the CLI. Only run main() when
+// this file is the actual entrypoint (`tsx src/index.ts`), not on import.
+const isDirectEntrypoint = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
+if (isDirectEntrypoint) {
+  main();
+}

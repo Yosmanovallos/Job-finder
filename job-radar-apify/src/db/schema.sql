@@ -59,3 +59,29 @@ CREATE TABLE IF NOT EXISTS social_posts (
 );
 
 CREATE INDEX IF NOT EXISTS idx_social_posts_status ON social_posts (status) WHERE status = 'pending';
+
+-- 5. Tabla `transactions`: Historial de pagos Wompi, idempotencia de webhooks
+CREATE TABLE IF NOT EXISTS transactions (
+    id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id              UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    reference            VARCHAR(255) UNIQUE NOT NULL,     -- Referencia generada por nosotros
+    wompi_transaction_id VARCHAR(255) UNIQUE,               -- ID de Wompi, llega en el webhook
+    status               VARCHAR(20) DEFAULT 'pending',     -- 'pending' | 'approved' | 'declined' | 'error'
+    amount_in_cents      BIGINT NOT NULL,
+    currency              VARCHAR(10) NOT NULL,
+    created_at            TIMESTAMPTZ DEFAULT NOW(),
+    updated_at            TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON transactions (user_id);
+CREATE INDEX IF NOT EXISTS idx_transactions_reference ON transactions (reference);
+
+-- 6. Tabla `role_source_runs`: última corrida por (rol, fuente) — permite
+-- cadencia distinta por fuente en vez de por rol (search_roles.last_run_at
+-- no alcanza para eso).
+CREATE TABLE IF NOT EXISTS role_source_runs (
+    role_name    VARCHAR(255) NOT NULL,
+    source_name  VARCHAR(100) NOT NULL,
+    last_run_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (role_name, source_name)
+);

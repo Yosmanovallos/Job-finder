@@ -1,0 +1,47 @@
+# Render Blueprint — job-radar-apify
+# https://render.com/docs/blueprint-spec
+#
+# This repo is a monorepo; the app lives in job-radar-apify/ (rootDir below).
+# No secret VALUES live here — every sensitive key is `sync: false`, meaning
+# Render prompts for it once in the dashboard and never stores it in git.
+
+services:
+  - type: web
+    name: job-radar-apify
+    runtime: node
+    rootDir: job-radar-apify
+    region: oregon
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm run server
+    healthCheckPath: /api/health
+    envVars:
+      # Not a secret — production wants the cron actually running.
+      - key: ENABLE_CRON
+        value: "true"
+
+      # Postgres (Supabase) connection string.
+      - key: DATABASE_URL
+        sync: false
+
+      # Supabase Auth (also used client-side, hence the VITE_ prefix).
+      - key: VITE_SUPABASE_URL
+        sync: false
+      - key: VITE_SUPABASE_ANON_KEY
+        sync: false
+
+      # Wompi payment gateway.
+      - key: WOMPI_PUBLIC_KEY
+        sync: false
+      - key: WOMPI_PRIVATE_KEY
+        sync: false
+      - key: WOMPI_EVENTS_SECRET
+        sync: false
+      - key: WOMPI_INTEGRITY_SECRET
+        sync: false
+
+      # Notion export (optional feature, not required for the app to boot).
+      - key: NOTION_TOKEN
+        sync: false
+      - key: NOTION_DATABASE_ID
+        sync: false

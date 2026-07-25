@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
+import { hoverStyle } from "../lib/hover-style.js";
 
 const navLinks = [
   { label: "Cómo funciona", href: "#como-funciona" },
   { label: "Fuentes", href: "#fuentes" },
   { label: "Precios", href: "#precios" },
-  { label: "Preguntas", href: "#preguntas" },
+  { label: "Preguntas", href: "#preguntas" }
 ];
 
 export default function Header() {
@@ -33,7 +35,7 @@ export default function Header() {
         backgroundColor: "rgba(10, 11, 13, 0.85)",
         backdropFilter: "blur(12px)",
         WebkitBackdropFilter: "blur(12px)",
-        borderBottom: "1px solid #262A31",
+        borderBottom: "1px solid #262A31"
       }}
     >
       {/* Main nav bar */}
@@ -48,7 +50,7 @@ export default function Header() {
           style={{
             color: "#F4F5F7",
             ringColor: "#34D399",
-            ringOffsetColor: "#0A0B0D",
+            ringOffsetColor: "#0A0B0D"
           }}
           aria-label="Job Radar — inicio"
         >
@@ -76,7 +78,7 @@ export default function Header() {
                 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
               fontSize: "1rem",
               color: "#F4F5F7",
-              letterSpacing: "-0.01em",
+              letterSpacing: "-0.01em"
             }}
           >
             Job Radar
@@ -85,14 +87,13 @@ export default function Header() {
           <span
             className="hidden lg:inline-block"
             style={{
-              fontFamily:
-                'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
+              fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
               fontSize: "0.6875rem",
               color: "#646B75",
               letterSpacing: "0.08em",
               textTransform: "uppercase",
               marginLeft: "4px",
-              paddingTop: "2px",
+              paddingTop: "2px"
             }}
           >
             v1.0
@@ -100,10 +101,7 @@ export default function Header() {
         </a>
 
         {/* Desktop center nav */}
-        <nav
-          className="hidden lg:flex items-center gap-1"
-          aria-label="Navegación principal"
-        >
+        <nav className="hidden lg:flex items-center gap-1" aria-label="Navegación principal">
           {navLinks.map((link) => (
             <a
               key={link.href}
@@ -117,14 +115,9 @@ export default function Header() {
                 textDecoration: "none",
                 minHeight: "44px",
                 display: "flex",
-                alignItems: "center",
+                alignItems: "center"
               }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLAnchorElement).style.color = "#F4F5F7";
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLAnchorElement).style.color = "#9AA1AC";
-              }}
+              {...hoverStyle<HTMLAnchorElement>({ color: "#F4F5F7" }, { color: "#9AA1AC" })}
             >
               {link.label}
             </a>
@@ -133,8 +126,8 @@ export default function Header() {
 
         {/* Desktop right actions */}
         <div className="hidden lg:flex items-center gap-2">
-          <a
-            href="#precios"
+          <Link
+            to="/login"
             className="px-4 py-2 rounded-sm transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
             style={{
               fontFamily:
@@ -147,25 +140,17 @@ export default function Header() {
               display: "flex",
               alignItems: "center",
               textDecoration: "none",
-              backgroundColor: "transparent",
+              backgroundColor: "transparent"
             }}
-            onMouseEnter={(e) => {
-              const el = e.currentTarget as HTMLAnchorElement;
-              el.style.color = "#F4F5F7";
-              el.style.borderColor = "#3A404A";
-              el.style.backgroundColor = "#131519";
-            }}
-            onMouseLeave={(e) => {
-              const el = e.currentTarget as HTMLAnchorElement;
-              el.style.color = "#9AA1AC";
-              el.style.borderColor = "#262A31";
-              el.style.backgroundColor = "transparent";
-            }}
+            {...hoverStyle<HTMLAnchorElement>(
+              { color: "#F4F5F7", borderColor: "#3A404A", backgroundColor: "#131519" },
+              { color: "#9AA1AC", borderColor: "#262A31", backgroundColor: "transparent" }
+            )}
           >
             Iniciar sesión
-          </a>
-          <a
-            href="#hero-demo"
+          </Link>
+          <Link
+            to="/dashboard"
             className="px-5 py-2 font-semibold rounded-sm transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
             style={{
               fontFamily:
@@ -178,19 +163,15 @@ export default function Header() {
               display: "flex",
               alignItems: "center",
               textDecoration: "none",
-              fontWeight: 600,
+              fontWeight: 600
             }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLAnchorElement).style.backgroundColor =
-                "#6EE7B7";
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLAnchorElement).style.backgroundColor =
-                "#34D399";
-            }}
+            {...hoverStyle<HTMLAnchorElement>(
+              { backgroundColor: "#6EE7B7" },
+              { backgroundColor: "#34D399" }
+            )}
           >
             Probar gratis
-          </a>
+          </Link>
         </div>
 
         {/* Mobile hamburger */}
@@ -202,21 +183,15 @@ export default function Header() {
             color: "#9AA1AC",
             backgroundColor: "transparent",
             border: "1px solid #262A31",
-            borderRadius: "8px",
+            borderRadius: "8px"
           }}
           aria-expanded={mobileNavOpen}
           aria-label={mobileNavOpen ? "Cerrar menú" : "Abrir menú"}
           onClick={() => setMobileNavOpen((prev) => !prev)}
-          onMouseEnter={(e) => {
-            const el = e.currentTarget as HTMLButtonElement;
-            el.style.color = "#F4F5F7";
-            el.style.borderColor = "#3A404A";
-          }}
-          onMouseLeave={(e) => {
-            const el = e.currentTarget as HTMLButtonElement;
-            el.style.color = "#9AA1AC";
-            el.style.borderColor = "#262A31";
-          }}
+          {...hoverStyle<HTMLButtonElement>(
+            { color: "#F4F5F7", borderColor: "#3A404A" },
+            { color: "#9AA1AC", borderColor: "#262A31" }
+          )}
         >
           {mobileNavOpen ? (
             /* X icon */
@@ -260,7 +235,7 @@ export default function Header() {
           style={{
             backgroundColor: "#131519",
             borderTop: "1px solid #262A31",
-            borderBottom: "1px solid #262A31",
+            borderBottom: "1px solid #262A31"
           }}
           role="dialog"
           aria-modal="true"
@@ -270,22 +245,18 @@ export default function Header() {
           <div
             className="px-4 pt-4 pb-2"
             style={{
-              fontFamily:
-                'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
+              fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
               fontSize: "0.6875rem",
               color: "#646B75",
               letterSpacing: "0.1em",
               textTransform: "uppercase",
-              borderBottom: "1px solid #262A31",
+              borderBottom: "1px solid #262A31"
             }}
           >
             — navegación
           </div>
 
-          <nav
-            className="flex flex-col px-4 py-3 gap-1"
-            aria-label="Navegación móvil"
-          >
+          <nav className="flex flex-col px-4 py-3 gap-1" aria-label="Navegación móvil">
             {navLinks.map((link) => (
               <a
                 key={link.href}
@@ -299,18 +270,12 @@ export default function Header() {
                   color: "#9AA1AC",
                   textDecoration: "none",
                   minHeight: "48px",
-                  padding: "0 8px",
+                  padding: "0 8px"
                 }}
-                onMouseEnter={(e) => {
-                  const el = e.currentTarget as HTMLAnchorElement;
-                  el.style.color = "#F4F5F7";
-                  el.style.backgroundColor = "#1B1E24";
-                }}
-                onMouseLeave={(e) => {
-                  const el = e.currentTarget as HTMLAnchorElement;
-                  el.style.color = "#9AA1AC";
-                  el.style.backgroundColor = "transparent";
-                }}
+                {...hoverStyle<HTMLAnchorElement>(
+                  { color: "#F4F5F7", backgroundColor: "#1B1E24" },
+                  { color: "#9AA1AC", backgroundColor: "transparent" }
+                )}
               >
                 {link.label}
               </a>
@@ -322,8 +287,8 @@ export default function Header() {
 
           {/* Mobile actions */}
           <div className="flex flex-col gap-3 px-4 py-4">
-            <a
-              href="#precios"
+            <Link
+              to="/login"
               onClick={handleNavClick}
               className="flex items-center justify-center rounded-sm transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
               style={{
@@ -335,25 +300,17 @@ export default function Header() {
                 borderRadius: "8px",
                 minHeight: "48px",
                 textDecoration: "none",
-                backgroundColor: "transparent",
+                backgroundColor: "transparent"
               }}
-              onMouseEnter={(e) => {
-                const el = e.currentTarget as HTMLAnchorElement;
-                el.style.color = "#F4F5F7";
-                el.style.borderColor = "#3A404A";
-                el.style.backgroundColor = "#1B1E24";
-              }}
-              onMouseLeave={(e) => {
-                const el = e.currentTarget as HTMLAnchorElement;
-                el.style.color = "#9AA1AC";
-                el.style.borderColor = "#262A31";
-                el.style.backgroundColor = "transparent";
-              }}
+              {...hoverStyle<HTMLAnchorElement>(
+                { color: "#F4F5F7", borderColor: "#3A404A", backgroundColor: "#1B1E24" },
+                { color: "#9AA1AC", borderColor: "#262A31", backgroundColor: "transparent" }
+              )}
             >
               Iniciar sesión
-            </a>
-            <a
-              href="#hero-demo"
+            </Link>
+            <Link
+              to="/dashboard"
               onClick={handleNavClick}
               className="flex items-center justify-center font-semibold rounded-sm transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
               style={{
@@ -365,31 +322,26 @@ export default function Header() {
                 borderRadius: "8px",
                 minHeight: "48px",
                 textDecoration: "none",
-                fontWeight: 600,
+                fontWeight: 600
               }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLAnchorElement).style.backgroundColor =
-                  "#6EE7B7";
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLAnchorElement).style.backgroundColor =
-                  "#34D399";
-              }}
+              {...hoverStyle<HTMLAnchorElement>(
+                { backgroundColor: "#6EE7B7" },
+                { backgroundColor: "#34D399" }
+              )}
             >
               Probar gratis
-            </a>
+            </Link>
           </div>
 
           {/* Bottom mono system line */}
           <div
             className="px-4 py-2"
             style={{
-              fontFamily:
-                'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
+              fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
               fontSize: "0.6875rem",
               color: "#646B75",
               letterSpacing: "0.08em",
-              borderTop: "1px solid #262A31",
+              borderTop: "1px solid #262A31"
             }}
           >
             sys://job-radar/nav · v1.0

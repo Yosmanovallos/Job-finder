@@ -1,4 +1,5 @@
-import { Job } from '../sources/types.js';
+import { Job } from "../sources/types.js";
+import { SITE_DOMAIN } from "../config.js";
 
 export interface SocialDigest {
   category: string;
@@ -24,14 +25,14 @@ export function slugifyCategory(category: string): string {
  */
 export function generateSocialDigest(category: string, jobs: Job[]): SocialDigest {
   const categorySlug = slugifyCategory(category);
-  const utmUrl = `https://jobradar.app/${categorySlug}?utm_source=social&utm_medium=digest`;
+  const utmUrl = `https://${SITE_DOMAIN}/${categorySlug}?utm_source=social&utm_medium=digest`;
 
   // Deduplicate companies
   const companySet = new Set<string>();
   const sourceSet = new Set<string>();
 
   for (const job of jobs) {
-    if (job.company && job.company !== 'Confidencial') {
+    if (job.company && job.company !== "Confidencial") {
       companySet.add(job.company);
     }
     if (job.source) {
@@ -40,12 +41,13 @@ export function generateSocialDigest(category: string, jobs: Job[]): SocialDiges
   }
 
   const topCompanies = Array.from(companySet).slice(0, 3);
-  const companyStr = topCompanies.length > 0 ? topCompanies.join(', ') : 'Confidenciales y más';
-  const sourcesStr = Array.from(sourceSet).join(', ');
+  const companyStr = topCompanies.length > 0 ? topCompanies.join(", ") : "Confidenciales y más";
+  const sourcesStr = Array.from(sourceSet).join(", ");
 
   // Twitter Copy (Max 280 characters)
-  const hashtag = `#${categorySlug.replace(/-/g, '')}`;
-  let twitterCopy = `🔥 ${jobs.length} nuevas vacantes de ${category} hoy\n` +
+  const hashtag = `#${categorySlug.replace(/-/g, "")}`;
+  let twitterCopy =
+    `🔥 ${jobs.length} nuevas vacantes de ${category} hoy\n` +
     `\n` +
     `Verificadas y reciéntes.\n` +
     `Empresas: ${companyStr}\n` +
@@ -54,13 +56,15 @@ export function generateSocialDigest(category: string, jobs: Job[]): SocialDiges
 
   // Truncate if exceeds 280 chars
   if (twitterCopy.length > 280) {
-    twitterCopy = `🔥 ${jobs.length} nuevas vacantes de ${category} hoy\n` +
+    twitterCopy =
+      `🔥 ${jobs.length} nuevas vacantes de ${category} hoy\n` +
       `Verificadas y recientes.\n` +
       `👉 Aplica aquí: ${utmUrl} ${hashtag}`;
   }
 
   // Instagram / Facebook Copy (Richer markdown format)
-  const instagramCopy = `🚀 ¡NUEVO DIGEST DE EMPLEOS DE HOY!\n\n` +
+  const instagramCopy =
+    `🚀 ¡NUEVO DIGEST DE EMPLEOS DE HOY!\n\n` +
     `📌 Categoría: ${category}\n` +
     `💼 ${jobs.length} vacantes encontradas y verificadas en las últimas horas.\n\n` +
     `🏢 Algunas empresas contratando: ${companyStr}\n` +
