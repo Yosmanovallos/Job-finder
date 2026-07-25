@@ -62,6 +62,32 @@ comparta heap con el servicio web. El servicio web deja de importar
 intentar escalar más allá de los ~30 roles actuales (`DEFAULT_ROLES_200` en
 `scheduler.ts`, que hoy solo tiene 30).
 
+## GitHub Action del Social Auto-Publisher rota (falla desde antes del 2026-07-25)
+
+**Qué:** `.github/workflows/social-publish.yml` (cron cada 15 min) falla
+siempre con `Error: Cannot find module './src/social/publisher.js'`.
+Confirmado con `gh run list` que viene fallando desde al menos las 04:38 UTC
+del 2026-07-25 — no relacionado con el trabajo de auth de esta sesión.
+
+**Por qué pasa:** el step "Run Social Auto-Publisher Worker" corre
+`npx tsx -e "import { publishPendingDigests } from './src/social/publisher.js'; ..."`
+— un import inline vía `-e`. El archivo real es `publisher.ts` (no hay
+compilado `.js`). En cualquier archivo real del repo el mapeo `.js` → `.ts`
+de `tsx` funciona (`tsx src/server.ts` importando `"./db/job-repository.js"`,
+por ejemplo), pero con `-e` (código inline, sin archivo real de por medio) esa
+resolución de rutas relativas no aplica igual y truena con "Cannot find
+module".
+
+**Qué hacer cuando se retome:** reemplazar el `-e` inline por un script real,
+p. ej. `job-radar-apify/scripts/run-social-publisher.ts` que haga el import y
+llame a `publishPendingDigests()`, y cambiar el step del workflow a
+`npx tsx scripts/run-social-publisher.ts` — mismo patrón que ya usa el resto
+del repo (`tsx src/server.ts`, `tsx src/index.ts`) en vez del inline eval.
+
+**Debe estar resuelto antes de:** depender de que los digests a redes
+sociales se publiquen solos — ahora mismo la publicación automática lleva
+horas (probablemente días) sin correr nunca con éxito.
+
 ## Otros pendientes menores (no bloquean nada, quedan para cuando haya espacio)
 
 - **Avatar de usuario**: Fase 3 del flujo de auth dejó el nombre editable
