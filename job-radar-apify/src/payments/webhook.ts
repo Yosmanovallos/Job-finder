@@ -1,13 +1,13 @@
-import crypto from 'crypto';
-import dotenv from 'dotenv';
-import { markTransactionApproved, upgradeUserToPro } from '../db/job-repository.js';
+import crypto from "crypto";
+import dotenv from "dotenv";
+import { markTransactionApproved, upgradeUserToPro } from "../db/job-repository.js";
 
 dotenv.config();
 
 const WOMPI_EVENTS_SECRET = process.env.WOMPI_EVENTS_SECRET;
 
 if (!WOMPI_EVENTS_SECRET) {
-  throw new Error('[Wompi] Falta WOMPI_EVENTS_SECRET en job-radar-apify/.env');
+  throw new Error("[Wompi] Falta WOMPI_EVENTS_SECRET en job-radar-apify/.env");
 }
 
 export interface WompiEventPayload {
@@ -29,7 +29,12 @@ export interface WompiEventPayload {
 }
 
 function getNestedValue(obj: any, path: string): string {
-  return path.split('.').reduce((acc, key) => (acc == null ? acc : acc[key]), obj)?.toString() ?? '';
+  return (
+    path
+      .split(".")
+      .reduce((acc, key) => (acc == null ? acc : acc[key]), obj)
+      ?.toString() ?? ""
+  );
 }
 
 /**
@@ -41,9 +46,11 @@ function getNestedValue(obj: any, path: string): string {
 export function verifyWompiSignature(payload: WompiEventPayload): boolean {
   if (!payload?.signature?.properties?.length || !payload.signature.checksum) return false;
 
-  const concatenated = payload.signature.properties.map(prop => getNestedValue(payload, prop)).join('');
+  const concatenated = payload.signature.properties
+    .map((prop) => getNestedValue(payload.data, prop))
+    .join("");
   const raw = `${concatenated}${payload.timestamp}${WOMPI_EVENTS_SECRET}`;
-  const expected = crypto.createHash('sha256').update(raw).digest('hex');
+  const expected = crypto.createHash("sha256").update(raw).digest("hex");
 
   return expected === payload.signature.checksum;
 }
@@ -55,14 +62,16 @@ const PRO_SUBSCRIPTION_DAYS = 30;
  * transaction marks it approved idempotently (a retry that already succeeded
  * is a no-op) and upgrades the paying user to 'pro' for 30 days.
  */
-export async function handleWompiWebhook(payload: WompiEventPayload): Promise<{ verified: boolean }> {
+export async function handleWompiWebhook(
+  payload: WompiEventPayload
+): Promise<{ verified: boolean }> {
   if (!verifyWompiSignature(payload)) {
-    console.warn('[WompiWebhook] Firma inválida — evento rechazado.');
+    console.warn("[WompiWebhook] Firma inválida — evento rechazado.");
     return { verified: false };
   }
 
   const transaction = payload.data?.transaction;
-  if (!transaction || transaction.status !== 'APPROVED') {
+  if (!transaction || transaction.status !== "APPROVED") {
     return { verified: true };
   }
 
@@ -74,7 +83,9 @@ export async function handleWompiWebhook(payload: WompiEventPayload): Promise<{ 
   const until = new Date(Date.now() + PRO_SUBSCRIPTION_DAYS * 24 * 60 * 60 * 1000);
   await upgradeUserToPro(result.userId, until);
 
-  console.log(`🎉 [WompiWebhook] Transacción ${transaction.reference} aprobada — usuario ${result.userId} promovido a Pro hasta ${until.toISOString()}.`);
+  console.log(
+    `🎉 [WompiWebhook] Transacción ${transaction.reference} aprobada — usuario ${result.userId} promovido a Pro hasta ${until.toISOString()}.`
+  );
 
   return { verified: true };
 }

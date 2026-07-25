@@ -20,7 +20,7 @@ if (!WOMPI_EVENTS_SECRET) {
   process.exit(1);
 }
 
-const PROPERTIES = ["data.transaction.id", "data.transaction.status", "data.transaction.amount_in_cents"];
+const PROPERTIES = ["transaction.id", "transaction.status", "transaction.amount_in_cents"];
 
 function buildPayload(
   wompiTransactionId: string,
