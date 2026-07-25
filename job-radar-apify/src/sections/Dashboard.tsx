@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { PRO_MONTHLY_PRICE_COP, formatCOP } from "../config.js";
 import { JobCard } from "../components/JobCard.js";
 import { PaywallCard } from "../components/PaywallCard.js";
@@ -7,19 +7,69 @@ import { FilterBar, FilterState } from "../components/FilterBar.js";
 import { StatsBar } from "../components/StatsBar.js";
 import { useAuth } from "../auth/auth-provider.js";
 
+type CheckoutBannerState = "confirming" | "success" | "pending" | null;
+
 export default function Dashboard() {
-  const { tier, isAuthenticated, accessToken, user } = useAuth();
+  const { tier, isAuthenticated, accessToken, user, refreshTier } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [allJobs, setAllJobs] = useState<any[]>([]);
   const [filteredJobs, setFilteredJobs] = useState<any[]>([]);
   const [savedJobIds, setSavedJobIds] = useState<Set<string>>(new Set());
   const [appliedJobIds, setAppliedJobIds] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
+  const [checkoutBanner, setCheckoutBanner] = useState<CheckoutBannerState>(null);
 
   useEffect(() => {
     fetchJobs();
     // Re-fetch whenever auth/tier resolves so Pro sessions get unmasked data
   }, [accessToken]);
+
+  // Wompi redirects back here with ?checkout=return after the sandbox
+  // payment. The webhook that actually flips the tier to 'pro' can take a
+  // moment to land, so we poll a few times instead of just trusting a
+  // single stale read right after the redirect.
+  useEffect(() => {
+    if (searchParams.get("checkout") !== "return") return;
+
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete("checkout");
+      return next;
+    }, { replace: true });
+
+    if (tier === "pro") {
+      setCheckoutBanner("success");
+      return;
+    }
+
+    setCheckoutBanner("confirming");
+    let attempts = 0;
+    const interval = setInterval(async () => {
+      attempts += 1;
+      await refreshTier();
+      // `tier` here is stale-closed; re-read via a fresh call isn't possible
+      // without a ref, so this just caps the polling window and lets the
+      // effect below promote "confirming" -> "success" once tier updates.
+      if (attempts >= 5) clearInterval(interval);
+    }, 2000);
+
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (checkoutBanner === "confirming" && tier === "pro") {
+      setCheckoutBanner("success");
+    }
+  }, [tier, checkoutBanner]);
+
+  useEffect(() => {
+    if (checkoutBanner === "success") {
+      const timeout = setTimeout(() => setCheckoutBanner(null), 6000);
+      return () => clearTimeout(timeout);
+    }
+  }, [checkoutBanner]);
 
   async function fetchJobs() {
     setIsLoading(true);
@@ -109,6 +159,24 @@ export default function Dashboard() {
   return (
     <section className="relative w-full overflow-x-hidden min-h-screen" style={{ backgroundColor: "#0A0B0D" }}>
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-20">
+        {checkoutBanner && (
+          <div
+            className={`mb-4 p-3 rounded-xl text-xs font-mono flex items-center gap-2 ${
+              checkoutBanner === "success"
+                ? "bg-emerald-500/10 border border-emerald-500/30 text-emerald-300"
+                : "bg-amber-500/10 border border-amber-500/30 text-amber-300"
+            }`}
+          >
+            {checkoutBanner === "confirming" && (
+              <>
+                <span className="w-3 h-3 rounded-full border-2 border-amber-300 border-t-transparent animate-spin" />
+                Confirmando tu pago con Wompi...
+              </>
+            )}
+            {checkoutBanner === "success" && <>🎉 ¡Listo! Ya eres suscriptor Pro.</>}
+          </div>
+        )}
+
         {/* User Tier Status Banner */}
         <div className="flex items-center justify-between gap-4 mb-6 p-3 rounded-xl bg-[#131519] border border-[#262A31] text-xs font-mono">
           <div className="flex items-center gap-2">

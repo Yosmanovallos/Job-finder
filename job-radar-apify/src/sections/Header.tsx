@@ -1,16 +1,18 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { hoverStyle } from "../lib/hover-style.js";
+import { useAuth } from "../auth/auth-provider.js";
 
 const navLinks = [
-  { label: "Cómo funciona", href: "#como-funciona" },
-  { label: "Fuentes", href: "#fuentes" },
-  { label: "Precios", href: "#precios" },
-  { label: "Preguntas", href: "#preguntas" }
+  { label: "Cómo funciona", to: "/como-funciona" },
+  { label: "Fuentes", to: "/fuentes" },
+  { label: "Precios", to: "/pricing" },
+  { label: "Preguntas", to: "/preguntas" }
 ];
 
 export default function Header() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const { isAuthenticated, tier, user } = useAuth();
 
   useEffect(() => {
     if (mobileNavOpen) {
@@ -26,6 +28,8 @@ export default function Header() {
   const handleNavClick = () => {
     setMobileNavOpen(false);
   };
+
+  const accountLabel = tier === "pro" ? `🌟 ${user?.email}` : user?.email || "Mi cuenta";
 
   return (
     <header
@@ -44,8 +48,8 @@ export default function Header() {
         style={{ maxWidth: "1200px", height: "64px" }}
       >
         {/* Brand */}
-        <a
-          href="#top"
+        <Link
+          to="/"
           className="flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 rounded-sm"
           style={{
             color: "#F4F5F7",
@@ -98,14 +102,14 @@ export default function Header() {
           >
             v1.0
           </span>
-        </a>
+        </Link>
 
         {/* Desktop center nav */}
         <nav className="hidden lg:flex items-center gap-1" aria-label="Navegación principal">
           {navLinks.map((link) => (
-            <a
-              key={link.href}
-              href={link.href}
+            <Link
+              key={link.to}
+              to={link.to}
               className="relative px-4 py-2 rounded-sm transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
               style={{
                 fontFamily:
@@ -120,58 +124,83 @@ export default function Header() {
               {...hoverStyle<HTMLAnchorElement>({ color: "#F4F5F7" }, { color: "#9AA1AC" })}
             >
               {link.label}
-            </a>
+            </Link>
           ))}
         </nav>
 
         {/* Desktop right actions */}
         <div className="hidden lg:flex items-center gap-2">
-          <Link
-            to="/login"
-            className="px-4 py-2 rounded-sm transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-            style={{
-              fontFamily:
-                'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-              fontSize: "0.9375rem",
-              color: "#9AA1AC",
-              border: "1px solid #262A31",
-              borderRadius: "8px",
-              minHeight: "44px",
-              display: "flex",
-              alignItems: "center",
-              textDecoration: "none",
-              backgroundColor: "transparent"
-            }}
-            {...hoverStyle<HTMLAnchorElement>(
-              { color: "#F4F5F7", borderColor: "#3A404A", backgroundColor: "#131519" },
-              { color: "#9AA1AC", borderColor: "#262A31", backgroundColor: "transparent" }
-            )}
-          >
-            Iniciar sesión
-          </Link>
-          <Link
-            to="/dashboard"
-            className="px-5 py-2 font-semibold rounded-sm transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-            style={{
-              fontFamily:
-                'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-              fontSize: "0.9375rem",
-              color: "#0A0B0D",
-              backgroundColor: "#34D399",
-              borderRadius: "8px",
-              minHeight: "44px",
-              display: "flex",
-              alignItems: "center",
-              textDecoration: "none",
-              fontWeight: 600
-            }}
-            {...hoverStyle<HTMLAnchorElement>(
-              { backgroundColor: "#6EE7B7" },
-              { backgroundColor: "#34D399" }
-            )}
-          >
-            Probar gratis
-          </Link>
+          {isAuthenticated ? (
+            <Link
+              to="/cuenta"
+              className="px-4 py-2 rounded-sm transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 font-mono text-xs"
+              style={{
+                color: "#F4F5F7",
+                border: "1px solid #262A31",
+                borderRadius: "8px",
+                minHeight: "44px",
+                display: "flex",
+                alignItems: "center",
+                textDecoration: "none",
+                backgroundColor: "transparent"
+              }}
+              {...hoverStyle<HTMLAnchorElement>(
+                { borderColor: "#3A404A", backgroundColor: "#131519" },
+                { borderColor: "#262A31", backgroundColor: "transparent" }
+              )}
+            >
+              {accountLabel}
+            </Link>
+          ) : (
+            <>
+              <Link
+                to="/login"
+                className="px-4 py-2 rounded-sm transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+                style={{
+                  fontFamily:
+                    'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+                  fontSize: "0.9375rem",
+                  color: "#9AA1AC",
+                  border: "1px solid #262A31",
+                  borderRadius: "8px",
+                  minHeight: "44px",
+                  display: "flex",
+                  alignItems: "center",
+                  textDecoration: "none",
+                  backgroundColor: "transparent"
+                }}
+                {...hoverStyle<HTMLAnchorElement>(
+                  { color: "#F4F5F7", borderColor: "#3A404A", backgroundColor: "#131519" },
+                  { color: "#9AA1AC", borderColor: "#262A31", backgroundColor: "transparent" }
+                )}
+              >
+                Iniciar sesión
+              </Link>
+              <Link
+                to="/dashboard"
+                className="px-5 py-2 font-semibold rounded-sm transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+                style={{
+                  fontFamily:
+                    'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+                  fontSize: "0.9375rem",
+                  color: "#0A0B0D",
+                  backgroundColor: "#34D399",
+                  borderRadius: "8px",
+                  minHeight: "44px",
+                  display: "flex",
+                  alignItems: "center",
+                  textDecoration: "none",
+                  fontWeight: 600
+                }}
+                {...hoverStyle<HTMLAnchorElement>(
+                  { backgroundColor: "#6EE7B7" },
+                  { backgroundColor: "#34D399" }
+                )}
+              >
+                Probar gratis
+              </Link>
+            </>
+          )}
         </div>
 
         {/* Mobile hamburger */}
@@ -258,9 +287,9 @@ export default function Header() {
 
           <nav className="flex flex-col px-4 py-3 gap-1" aria-label="Navegación móvil">
             {navLinks.map((link) => (
-              <a
-                key={link.href}
-                href={link.href}
+              <Link
+                key={link.to}
+                to={link.to}
                 onClick={handleNavClick}
                 className="flex items-center rounded-sm transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
                 style={{
@@ -278,7 +307,7 @@ export default function Header() {
                 )}
               >
                 {link.label}
-              </a>
+              </Link>
             ))}
           </nav>
 
@@ -287,50 +316,74 @@ export default function Header() {
 
           {/* Mobile actions */}
           <div className="flex flex-col gap-3 px-4 py-4">
-            <Link
-              to="/login"
-              onClick={handleNavClick}
-              className="flex items-center justify-center rounded-sm transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-              style={{
-                fontFamily:
-                  'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-                fontSize: "1rem",
-                color: "#9AA1AC",
-                border: "1px solid #262A31",
-                borderRadius: "8px",
-                minHeight: "48px",
-                textDecoration: "none",
-                backgroundColor: "transparent"
-              }}
-              {...hoverStyle<HTMLAnchorElement>(
-                { color: "#F4F5F7", borderColor: "#3A404A", backgroundColor: "#1B1E24" },
-                { color: "#9AA1AC", borderColor: "#262A31", backgroundColor: "transparent" }
-              )}
-            >
-              Iniciar sesión
-            </Link>
-            <Link
-              to="/dashboard"
-              onClick={handleNavClick}
-              className="flex items-center justify-center font-semibold rounded-sm transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-              style={{
-                fontFamily:
-                  'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-                fontSize: "1rem",
-                color: "#0A0B0D",
-                backgroundColor: "#34D399",
-                borderRadius: "8px",
-                minHeight: "48px",
-                textDecoration: "none",
-                fontWeight: 600
-              }}
-              {...hoverStyle<HTMLAnchorElement>(
-                { backgroundColor: "#6EE7B7" },
-                { backgroundColor: "#34D399" }
-              )}
-            >
-              Probar gratis
-            </Link>
+            {isAuthenticated ? (
+              <Link
+                to="/cuenta"
+                onClick={handleNavClick}
+                className="flex items-center justify-center rounded-sm transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 font-mono text-sm"
+                style={{
+                  color: "#F4F5F7",
+                  border: "1px solid #262A31",
+                  borderRadius: "8px",
+                  minHeight: "48px",
+                  textDecoration: "none",
+                  backgroundColor: "transparent"
+                }}
+                {...hoverStyle<HTMLAnchorElement>(
+                  { borderColor: "#3A404A", backgroundColor: "#1B1E24" },
+                  { borderColor: "#262A31", backgroundColor: "transparent" }
+                )}
+              >
+                {accountLabel}
+              </Link>
+            ) : (
+              <>
+                <Link
+                  to="/login"
+                  onClick={handleNavClick}
+                  className="flex items-center justify-center rounded-sm transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+                  style={{
+                    fontFamily:
+                      'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+                    fontSize: "1rem",
+                    color: "#9AA1AC",
+                    border: "1px solid #262A31",
+                    borderRadius: "8px",
+                    minHeight: "48px",
+                    textDecoration: "none",
+                    backgroundColor: "transparent"
+                  }}
+                  {...hoverStyle<HTMLAnchorElement>(
+                    { color: "#F4F5F7", borderColor: "#3A404A", backgroundColor: "#1B1E24" },
+                    { color: "#9AA1AC", borderColor: "#262A31", backgroundColor: "transparent" }
+                  )}
+                >
+                  Iniciar sesión
+                </Link>
+                <Link
+                  to="/dashboard"
+                  onClick={handleNavClick}
+                  className="flex items-center justify-center font-semibold rounded-sm transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+                  style={{
+                    fontFamily:
+                      'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+                    fontSize: "1rem",
+                    color: "#0A0B0D",
+                    backgroundColor: "#34D399",
+                    borderRadius: "8px",
+                    minHeight: "48px",
+                    textDecoration: "none",
+                    fontWeight: 600
+                  }}
+                  {...hoverStyle<HTMLAnchorElement>(
+                    { backgroundColor: "#6EE7B7" },
+                    { backgroundColor: "#34D399" }
+                  )}
+                >
+                  Probar gratis
+                </Link>
+              </>
+            )}
           </div>
 
           {/* Bottom mono system line */}

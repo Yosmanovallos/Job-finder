@@ -5,6 +5,7 @@ import HeroDemo from "./sections/HeroDemo.js";
 import SourcesAndProblem from "./sections/SourcesAndProblem.js";
 import ComparisonAndProcess from "./sections/ComparisonAndProcess.js";
 import ProductFeaturesPricingFaq from "./sections/ProductFeaturesPricingFaq.js";
+import Faq from "./sections/Faq.js";
 import Footer from "./sections/Footer.js";
 import { AuthProvider } from "./auth/auth-provider.js";
 
@@ -14,6 +15,7 @@ const Dashboard = lazy(() => import("./sections/Dashboard.js"));
 const Login = lazy(() => import("./sections/Login.js"));
 const Pricing = lazy(() => import("./sections/Pricing.js"));
 const Legal = lazy(() => import("./sections/Legal.js"));
+const Account = lazy(() => import("./sections/Account.js"));
 
 function Landing() {
   return (
@@ -54,6 +56,10 @@ export default function App() {
                 <Route path="/legal/privacidad" element={<Legal type="privacidad" />} />
                 <Route path="/legal/uso-aceptable" element={<Legal type="uso-aceptable" />} />
                 <Route path="/legal/cookies" element={<Legal type="cookies" />} />
+                <Route path="/cuenta" element={<Account />} />
+                <Route path="/como-funciona" element={<ComparisonAndProcess />} />
+                <Route path="/fuentes" element={<SourcesAndProblem />} />
+                <Route path="/preguntas" element={<Faq />} />
               </Routes>
             </Suspense>
           </main>

@@ -3,25 +3,25 @@ import { hoverStyle } from "../lib/hover-style.js";
 
 // Navigation data
 const navLinks = [
-  { label: "Cómo funciona", href: "#como-funciona" },
-  { label: "Fuentes", href: "#fuentes" },
-  { label: "Precios", href: "#precios" },
-  { label: "Preguntas", href: "#preguntas" }
+  { label: "Cómo funciona", href: "/como-funciona" },
+  { label: "Fuentes", href: "/fuentes" },
+  { label: "Precios", href: "/pricing" },
+  { label: "Preguntas", href: "/preguntas" }
 ];
 
 const productLinks = [
-  { label: "Búsqueda inteligente", href: "#hero-demo" },
-  { label: "Deduplicación", href: "#product-features-pricing-faq" },
-  { label: "Verificación de vigencia", href: "#product-features-pricing-faq" },
-  { label: "Paywall de frescura 48h", href: "#product-features-pricing-faq" },
-  { label: "Guardar y marcar aplicadas", href: "#product-features-pricing-faq" }
+  { label: "Búsqueda inteligente", href: "/#hero-demo" },
+  { label: "Deduplicación", href: "/#product-features-pricing-faq" },
+  { label: "Verificación de vigencia", href: "/#product-features-pricing-faq" },
+  { label: "Paywall de frescura 48h", href: "/#product-features-pricing-faq" },
+  { label: "Guardar y marcar aplicadas", href: "/#product-features-pricing-faq" }
 ];
 
 const resourceLinks = [
-  { label: "Preguntas frecuentes", href: "#preguntas" },
-  { label: "Cómo funciona", href: "#como-funciona" },
-  { label: "Fuentes de datos", href: "#fuentes" },
-  { label: "Guía de inicio rápido", href: "#hero-demo" }
+  { label: "Preguntas frecuentes", href: "/preguntas" },
+  { label: "Cómo funciona", href: "/como-funciona" },
+  { label: "Fuentes de datos", href: "/fuentes" },
+  { label: "Guía de inicio rápido", href: "/#hero-demo" }
 ];
 
 const legalLinks = [
@@ -138,8 +138,8 @@ export default function Footer() {
               <ul className="space-y-3">
                 {productLinks.map((link) => (
                   <li key={link.label}>
-                    <a
-                      href={link.href}
+                    <Link
+                      to={link.href}
                       className="text-sm transition-colors duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 rounded-sm"
                       style={{
                         color: "#9AA1AC",
@@ -151,7 +151,7 @@ export default function Footer() {
                       {...hoverStyle<HTMLAnchorElement>({ color: "#F4F5F7" }, { color: "#9AA1AC" })}
                     >
                       {link.label}
-                    </a>
+                    </Link>
                   </li>
                 ))}
               </ul>
@@ -174,8 +174,8 @@ export default function Footer() {
               <ul className="space-y-3">
                 {resourceLinks.map((link) => (
                   <li key={link.label}>
-                    <a
-                      href={link.href}
+                    <Link
+                      to={link.href}
                       className="transition-colors duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 rounded-sm"
                       style={{
                         color: "#9AA1AC",
@@ -187,7 +187,7 @@ export default function Footer() {
                       {...hoverStyle<HTMLAnchorElement>({ color: "#F4F5F7" }, { color: "#9AA1AC" })}
                     >
                       {link.label}
-                    </a>
+                    </Link>
                   </li>
                 ))}
               </ul>
@@ -302,9 +302,9 @@ export default function Footer() {
             {/* Nav links */}
             <nav className="flex items-center gap-4 flex-wrap justify-center">
               {navLinks.map((link) => (
-                <a
+                <Link
                   key={link.label}
-                  href={link.href}
+                  to={link.href}
                   className="text-xs transition-colors duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 rounded-sm"
                   style={{
                     color: "#646B75",
@@ -315,7 +315,7 @@ export default function Footer() {
                   {...hoverStyle<HTMLAnchorElement>({ color: "#9AA1AC" }, { color: "#646B75" })}
                 >
                   {link.label}
-                </a>
+                </Link>
               ))}
             </nav>
           </div>
