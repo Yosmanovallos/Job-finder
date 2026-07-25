@@ -54,7 +54,10 @@ async function tryGetProSession(): Promise<string | null> {
   if (!supabaseUrl || !supabaseAnonKey) return null;
 
   const supabase = createClient(supabaseUrl, supabaseAnonKey);
-  const email = `paywall_test_${Date.now()}@example.com`;
+  // mailinator.com is a real, publicly-viewable inbox domain — Supabase's
+  // email validator rejects "@example.com" outright ("Email address is
+  // invalid"), which silently skipped Test 4 on every run before this fix.
+  const email = `paywall_test_${Date.now()}@mailinator.com`;
   const password = `Test${Date.now()}!aA`;
 
   await supabase.auth.signUp({ email, password });

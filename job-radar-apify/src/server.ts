@@ -4,7 +4,13 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { spawn } from "child_process";
 import dotenv from "dotenv";
-import { getJobs, getRuns, maskLockedFields } from "./db/job-repository.js";
+import {
+  getJobs,
+  getRuns,
+  maskLockedFields,
+  updateUserName,
+  getTransactionsForUser
+} from "./db/job-repository.js";
 import { globalScheduler } from "./queue/scheduler.js";
 import { verifySession } from "./auth/verify-session.js";
 import { startPaymentCheckout } from "./payments/checkout.js";
@@ -150,7 +156,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // 4b. GET /api/me — returns the caller's verified tier (never trusts the client)
+  // 4b. GET /api/me — returns the caller's verified profile/tier (never trusts the client)
   if (pathname === "/api/me" && method === "GET") {
     const session = await verifySession(req);
     if (!session) {
@@ -159,7 +165,74 @@ const server = http.createServer(async (req, res) => {
       return;
     }
     res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ id: session.id, email: session.email, tier: session.tier }));
+    res.end(
+      JSON.stringify({
+        id: session.id,
+        email: session.email,
+        name: session.name,
+        tier: session.tier,
+        subscriptionEnd: session.subscriptionEnd
+      })
+    );
+    return;
+  }
+
+  // 4c. PATCH /api/me — lets a user edit their own display name. The id
+  // updated is always the one verifySession resolved from the JWT, never
+  // anything from the request body.
+  if (pathname === "/api/me" && method === "PATCH") {
+    const session = await verifySession(req);
+    if (!session) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "No autenticado" }));
+      return;
+    }
+
+    let bodyText = "";
+    req.on("data", (chunk) => {
+      bodyText += chunk.toString();
+    });
+    req.on("end", async () => {
+      try {
+        const parsed = JSON.parse(bodyText || "{}");
+        const name = typeof parsed.name === "string" ? parsed.name.trim().slice(0, 255) : "";
+        if (!name) {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "El nombre no puede estar vacío" }));
+          return;
+        }
+
+        const updated = await updateUserName(session.id, name);
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(
+          JSON.stringify({
+            id: updated.id,
+            email: updated.email,
+            name: updated.name,
+            tier: updated.subscriptionTier,
+            subscriptionEnd: updated.subscriptionEnd
+          })
+        );
+      } catch (e: any) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: e?.message || "Solicitud inválida" }));
+      }
+    });
+    return;
+  }
+
+  // 4d. GET /api/transactions — payment history for the caller's own Account
+  // page, scoped to their verified id (never a client-supplied one).
+  if (pathname === "/api/transactions" && method === "GET") {
+    const session = await verifySession(req);
+    if (!session) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "No autenticado" }));
+      return;
+    }
+    const transactions = await getTransactionsForUser(session.id);
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ transactions }));
     return;
   }
 

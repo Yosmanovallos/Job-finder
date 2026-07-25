@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { hoverStyle } from "../lib/hover-style.js";
 import { useAuth } from "../auth/auth-provider.js";
 
@@ -13,6 +13,13 @@ const navLinks = [
 export default function Header() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const { isAuthenticated, tier, user, loading } = useAuth();
+  const location = useLocation();
+  // Skip return_to when already on an auth-flow page — logging in from
+  // /login itself, or from the post-OAuth callback, shouldn't loop back there.
+  const skipReturnTo = ["/login", "/auth/callback", "/reset-password"].includes(location.pathname);
+  const loginHref = skipReturnTo
+    ? "/login"
+    : `/login?return_to=${encodeURIComponent(location.pathname + location.search)}`;
 
   useEffect(() => {
     if (mobileNavOpen) {
@@ -158,7 +165,7 @@ export default function Header() {
           ) : (
             <>
               <Link
-                to="/login"
+                to={loginHref}
                 className="px-4 py-2 rounded-sm transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
                 style={{
                   fontFamily:
@@ -343,7 +350,7 @@ export default function Header() {
             ) : (
               <>
                 <Link
-                  to="/login"
+                  to={loginHref}
                   onClick={handleNavClick}
                   className="flex items-center justify-center rounded-sm transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
                   style={{

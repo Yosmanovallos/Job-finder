@@ -138,29 +138,28 @@ export default function Pricing() {
               ))}
             </ul>
 
-            {tier === "pro" ? (
+            {tier === "pro" && (
               <p className="text-center text-sm text-emerald-400 font-mono py-3">
                 🎉 Ya eres suscriptor Pro
               </p>
-            ) : (
-              <>
-                <button
-                  onClick={handleSubscribe}
-                  disabled={busy}
-                  className="px-4 py-3 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {busy ? (
-                    <>
-                      <span className="w-3.5 h-3.5 rounded-full border-2 border-slate-950 border-t-transparent animate-spin" />
-                      Redirigiendo a Wompi...
-                    </>
-                  ) : (
-                    proPlan.cta
-                  )}
-                </button>
-                {error && <p className="text-xs text-red-400 font-mono mt-3 text-center">{error}</p>}
-              </>
             )}
+            <button
+              onClick={handleSubscribe}
+              disabled={busy}
+              className="px-4 py-3 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {busy ? (
+                <>
+                  <span className="w-3.5 h-3.5 rounded-full border-2 border-slate-950 border-t-transparent animate-spin" />
+                  Redirigiendo a Wompi...
+                </>
+              ) : tier === "pro" ? (
+                "Renovar ahora (30 días más)"
+              ) : (
+                proPlan.cta
+              )}
+            </button>
+            {error && <p className="text-xs text-red-400 font-mono mt-3 text-center">{error}</p>}
           </div>
         </div>
 

@@ -8,11 +8,14 @@ import ProductFeaturesPricingFaq from "./sections/ProductFeaturesPricingFaq.js";
 import Faq from "./sections/Faq.js";
 import Footer from "./sections/Footer.js";
 import { AuthProvider } from "./auth/auth-provider.js";
+import RequireAuth from "./auth/require-auth.js";
 
 // Code-split everything past the landing page — visitors hitting "/" (the
 // most common entrypoint) don't pay for Dashboard/Login/Pricing/Legal JS.
 const Dashboard = lazy(() => import("./sections/Dashboard.js"));
 const Login = lazy(() => import("./sections/Login.js"));
+const ResetPassword = lazy(() => import("./sections/ResetPassword.js"));
+const AuthCallback = lazy(() => import("./sections/AuthCallback.js"));
 const Pricing = lazy(() => import("./sections/Pricing.js"));
 const Legal = lazy(() => import("./sections/Legal.js"));
 const Account = lazy(() => import("./sections/Account.js"));
@@ -51,12 +54,21 @@ export default function App() {
                 <Route path="/" element={<Landing />} />
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/login" element={<Login />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
+                <Route path="/auth/callback" element={<AuthCallback />} />
                 <Route path="/pricing" element={<Pricing />} />
                 <Route path="/legal/terminos" element={<Legal type="terminos" />} />
                 <Route path="/legal/privacidad" element={<Legal type="privacidad" />} />
                 <Route path="/legal/uso-aceptable" element={<Legal type="uso-aceptable" />} />
                 <Route path="/legal/cookies" element={<Legal type="cookies" />} />
-                <Route path="/cuenta" element={<Account />} />
+                <Route
+                  path="/cuenta"
+                  element={
+                    <RequireAuth>
+                      <Account />
+                    </RequireAuth>
+                  }
+                />
                 <Route path="/como-funciona" element={<ComparisonAndProcess />} />
                 <Route path="/fuentes" element={<SourcesAndProblem />} />
                 <Route path="/preguntas" element={<Faq />} />

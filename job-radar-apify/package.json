@@ -17,6 +17,8 @@
     "test:adapters": "tsx tests/validate-adapters.ts",
     "test:dedupe": "tsx tests/validate-db-dedupe.ts",
     "test:paywall": "tsx tests/validate-paywall-auth.ts",
+    "test:password-reset": "tsx tests/validate-password-reset.ts",
+    "test:payment-flow": "tsx tests/validate-payment-flow.ts",
     "test:dashboard-filters": "tsx tests/validate-dashboard-filters.ts",
     "test:social-publisher": "tsx tests/validate-social-publisher.ts"
   },

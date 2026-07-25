@@ -6,10 +6,14 @@ import path from "path";
 export default defineConfig({
   plugins: [react()],
   publicDir: "./static",
-  base: "./",
+  // Absolute, not "./" — index.html is served (via server.ts's SPA fallback)
+  // at any route depth (/legal/terminos, /dashboard, ...); a relative base
+  // resolves against the current path's directory, so two-segment routes
+  // requested "./assets/x.js" from the wrong directory and 404'd.
+  base: "/",
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "src"),
-    },
-  },
+      "@": path.resolve(__dirname, "src")
+    }
+  }
 });

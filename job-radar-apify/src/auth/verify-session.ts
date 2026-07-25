@@ -19,7 +19,9 @@ const supabaseServer = createClient(supabaseUrl, supabaseAnonKey);
 export interface VerifiedSession {
   id: string;
   email: string;
+  name: string | null;
   tier: 'free' | 'pro';
+  subscriptionEnd: string | null;
 }
 
 function extractBearerToken(req: IncomingMessage): string | null {
@@ -42,5 +44,11 @@ export async function verifySession(req: IncomingMessage): Promise<VerifiedSessi
   if (error || !data.user) return null;
 
   const appUser = await getOrCreateUser(data.user.id, data.user.email || '', data.user.user_metadata?.full_name);
-  return { id: appUser.id, email: appUser.email, tier: appUser.subscriptionTier };
+  return {
+    id: appUser.id,
+    email: appUser.email,
+    name: appUser.name,
+    tier: appUser.subscriptionTier,
+    subscriptionEnd: appUser.subscriptionEnd
+  };
 }
