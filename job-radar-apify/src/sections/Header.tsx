@@ -12,7 +12,7 @@ const navLinks = [
 
 export default function Header() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const { isAuthenticated, tier, user } = useAuth();
+  const { isAuthenticated, tier, user, loading } = useAuth();
 
   useEffect(() => {
     if (mobileNavOpen) {
@@ -130,7 +130,11 @@ export default function Header() {
 
         {/* Desktop right actions */}
         <div className="hidden lg:flex items-center gap-2">
-          {isAuthenticated ? (
+          {loading ? (
+            // Avoid a flash of "logged out" while the session (incl. an OAuth
+            // redirect hash) is still being resolved on first paint.
+            <div className="w-24" style={{ height: "44px" }} />
+          ) : isAuthenticated ? (
             <Link
               to="/cuenta"
               className="px-4 py-2 rounded-sm transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 font-mono text-xs"
@@ -316,7 +320,7 @@ export default function Header() {
 
           {/* Mobile actions */}
           <div className="flex flex-col gap-3 px-4 py-4">
-            {isAuthenticated ? (
+            {loading ? null : isAuthenticated ? (
               <Link
                 to="/cuenta"
                 onClick={handleNavClick}
