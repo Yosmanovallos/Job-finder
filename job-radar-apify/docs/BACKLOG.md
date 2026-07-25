@@ -88,6 +88,47 @@ del repo (`tsx src/server.ts`, `tsx src/index.ts`) en vez del inline eval.
 sociales se publiquen solos — ahora mismo la publicación automática lleva
 horas (probablemente días) sin correr nunca con éxito.
 
+## Filtros del Dashboard — reporte sin reproducir aún (2026-07-25)
+
+**Qué:** el usuario reportó que "ninguno de los filtros del Dashboard funciona
+correctamente" (Fuente/Portal, Modalidad, Frescura/Publicación, búsqueda de
+texto, Ver Guardadas, Ver Aplicadas), probado sobre las ~100 vacantes que
+había antes de que la tabla `jobs` quedara vacía por un test. No se pudo
+reproducir en vivo en esta sesión: no hay navegador headless disponible en
+este entorno (Playwright falla por librerías del sistema faltantes —
+`libnspr4.so` — y no hay sudo sin contraseña para instalarlas), y
+`tests/validate-dashboard-filters.ts` no sirve para diagnosticar porque
+reimplementa su propia copia de la lógica de filtrado en vez de importar la
+real de `src/sections/Dashboard.tsx` — pasa siempre, sin importar si el
+código real está roto.
+
+**Bug concreto ya confirmado (parcial, no explica el reporte completo):** el
+filtro de Modalidad (`handleFilterChange` en `Dashboard.tsx`) lee
+`job.location`, pero para usuarios **free** esa vacante <48h llega con
+`location: null` por el enmascarado del paywall (`maskLockedFields`). Con
+`location` nulo, el filtro "Remoto"/"Híbrido" siempre falla y "Presencial"
+siempre pasa, sin importar la modalidad real — pero esto solo afecta cuentas
+free en vacantes recientes, no explica que "ninguno" de los filtros funcione
+para una cuenta Pro con datos completos.
+
+**Qué hacer cuando se retome:**
+1. Reproducir con pasos concretos del usuario: qué filtro, qué valor
+   seleccionado, resultado visto vs. esperado (sin eso, no hay repro).
+2. Considerar extraer la lógica de `handleFilterChange` a una función pura
+   exportada (hoy vive inline en el componente) para poder testearla de
+   verdad, y reescribir `validate-dashboard-filters.ts` para importar esa
+   función real en vez de reimplementarla.
+3. Arreglar el filtro de Modalidad para que no dependa de campos que el
+   paywall puede haber nulificado (ej. usar un campo de modalidad estructurado
+   si existe, o excluir vacantes bloqueadas del filtro de modalidad).
+4. Para poder ver la UI en este entorno en el futuro, instalar las libs que
+   pide Playwright (`libnspr4`, `libnss3`, etc.) con sudo interactivo del
+   usuario, o usar un entorno con navegador disponible.
+
+**Debe estar resuelto antes de:** confiar en los filtros del Dashboard como
+funcionalidad "verificada" — hoy la única señal automatizada
+(`test:dashboard-filters`) es falsa confianza.
+
 ## Otros pendientes menores (no bloquean nada, quedan para cuando haya espacio)
 
 - **Avatar de usuario**: Fase 3 del flujo de auth dejó el nombre editable
