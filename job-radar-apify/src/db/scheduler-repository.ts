@@ -56,6 +56,17 @@ export async function getDueRoleSources(cadenceMs: Record<string, number>): Prom
   return due;
 }
 
+/**
+ * Forces a role to be picked up by the next scheduled tick, regardless of its
+ * sources' normal cadence — used by the authenticated manual "rescan" trigger.
+ * Scraping itself always runs out-of-process (GitHub Actions), never inline
+ * on the web request, so this just clears the role's cadence bookkeeping
+ * instead of running anything synchronously.
+ */
+export async function markRoleForImmediateRescan(roleName: string): Promise<void> {
+  await pool.query(`DELETE FROM role_source_runs WHERE role_name = $1`, [roleName]);
+}
+
 export async function markRoleSourceRun(roleName: string, sourceName: string): Promise<void> {
   await pool.query(
     `INSERT INTO role_source_runs (role_name, source_name, last_run_at)

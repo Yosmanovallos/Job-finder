@@ -4,6 +4,14 @@
 # This repo is a monorepo; the app lives in job-radar-apify/ (rootDir below).
 # No secret VALUES live here — every sensitive key is `sync: false`, meaning
 # Render prompts for it once in the dashboard and never stores it in git.
+#
+# Scraping does NOT run on this web service — it previously did (an in-process
+# cron via ENABLE_CRON) and caused repeated out-of-memory crashes that took
+# down login/dashboard/checkout along with the scraper (2026-07-25, see
+# job-radar-apify/docs/BACKLOG.md). Scraping now runs entirely out-of-process
+# via .github/workflows/scrape-jobs.yml (GitHub Actions, every 15 min),
+# writing to the same Postgres this service reads from. This web service only
+# ever serves the site and reads the DB — it must never import queue/scheduler.
 
 services:
   - type: web
@@ -16,10 +24,6 @@ services:
     startCommand: npm run server
     healthCheckPath: /api/health
     envVars:
-      # Not a secret — production wants the cron actually running.
-      - key: ENABLE_CRON
-        value: "true"
-
       # Postgres (Supabase) connection string.
       - key: DATABASE_URL
         sync: false

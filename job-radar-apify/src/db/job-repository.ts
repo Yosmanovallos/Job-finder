@@ -96,6 +96,16 @@ export async function saveJobs(
   return { savedCount, duplicateCount };
 }
 
+// The active corpus is inherently bounded — `purgeOldJobs` deletes anything
+// older than 30 days — so this comfortably covers the full corpus in one
+// response without needing real pagination. The dashboard's filters are
+// designed to run instantly client-side over the whole array (see
+// `tests/validate-dashboard-filters.ts`); a default this low used to mean
+// `/api/jobs` silently returned only the 100 most-recent jobs, so any search
+// or filter that didn't match one of those happened to return nothing even
+// though matching jobs existed elsewhere in the table.
+const DEFAULT_JOBS_LIMIT = 5000;
+
 /**
  * Retrieves jobs from Postgres with real, unmasked data — used by internal
  * consumers (social digest generator, admin tooling, tests) that need the
@@ -104,7 +114,10 @@ export async function saveJobs(
  * masking itself lives in `maskLockedFields`, applied only to the public
  * `/api/jobs` HTTP response — never here, so internal jobs never see nulls.
  */
-export async function getJobs(limit: number = 100, offset: number = 0): Promise<any[]> {
+export async function getJobs(
+  limit: number = DEFAULT_JOBS_LIMIT,
+  offset: number = 0
+): Promise<any[]> {
   const result = await pool.query(
     `SELECT id, url_hash, title, company, location, url, source, sources, date_text, published_at, role_origin,
             (published_at > NOW() - INTERVAL '48 hours') AS is_locked

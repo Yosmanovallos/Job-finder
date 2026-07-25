@@ -1,0 +1,43 @@
+name: Job Radar Scraper Tick
+
+on:
+  schedule:
+    - cron: '*/15 * * * *' # Executes every 15 minutes at $0 USD cost (public repo)
+  workflow_dispatch:
+
+# If a tick is still running when the next 15-min trigger fires (e.g. some
+# roles hit their timeout), queue the new run instead of letting it start
+# concurrently — two overlapping ticks would independently query "what's due"
+# and could both scrape the same role/source pair at the same moment,
+# doubling request volume right after today's pacing fixes for Indeed/Workana.
+# cancel-in-progress: false so the in-flight run is never killed mid-scrape.
+concurrency:
+  group: scrape-jobs-tick
+  cancel-in-progress: false
+
+jobs:
+  scrape-tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Dependencies
+        run: |
+          cd job-radar-apify
+          npm ci || npm install
+
+      - name: Run Scraper Tick
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
+        run: |
+          cd job-radar-apify
+          npx tsx scripts/run-scrape-tick.ts

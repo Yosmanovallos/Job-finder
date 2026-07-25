@@ -4,6 +4,7 @@ import { gotScraping } from "got-scraping";
 import { fileURLToPath } from "url";
 import { htmlEntities } from "./utils.js";
 import { saveRunToCache } from "./cache-manager.js";
+import { FetchBlockedError } from "./engine/resilient-fetch.js";
 
 dotenv.config();
 
@@ -516,81 +517,92 @@ export async function scrapeWorkana(keyword: string): Promise<Job[]> {
   const query = encodeURIComponent(keyword.toLowerCase());
   const jobs: Job[] = [];
 
-  try {
-    for (let page = 1; page <= 5; page++) {
-      const url = `https://www.workana.com/jobs?query=${query}&publication=1w&page=${page}`;
-      const response = await fetch(url, {
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-        }
-      });
-
-      if (!response.ok) {
-        if (page === 1) console.warn(`[Workana] Failed: ${response.status} ${response.statusText}`);
-        break;
+  // A page 1 failure means this keyword returned nothing at all — that must
+  // propagate to executeWithResilience so the circuit breaker can see it
+  // (previously it only logged a warning and returned an empty array, which
+  // looked identical to "fetched fine, no matches" — same root-cause class as
+  // the Indeed fix above, see docs/source-catalog/workana.md). A page 2+
+  // failure is left as-is (silently stops paginating): that's the normal
+  // "no more result pages" case, not a distinct fetch failure worth signaling.
+  // JSON-parsing issues (site layout changed) are a different root cause and
+  // still degrade to "stop paginating, keep what we have" rather than throwing.
+  for (let page = 1; page <= 5; page++) {
+    const url = `https://www.workana.com/jobs?query=${query}&publication=1w&page=${page}`;
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
       }
+    });
 
-      const html = await response.text();
-      const startKey = ":results-initials='";
-      const startIdx = html.indexOf(startKey);
-      if (startIdx === -1) break;
-
-      const valueStart = startIdx + startKey.length;
-      const endIdx = html.indexOf("'", valueStart);
-      const rawValue = html.substring(valueStart, endIdx);
-      const decodedValue = rawValue.replaceAll("&quot;", '"').replaceAll("&#39;", "'");
-
-      try {
-        const parsed = JSON.parse(decodedValue);
-        const results = parsed.results;
-        if (!Array.isArray(results) || results.length === 0) break;
-
-        for (const item of results) {
-          const titleMatch = item.title ? item.title.match(/title="([^"]+)"/) : null;
-          const title = titleMatch
-            ? titleMatch[1]
-            : (item.title || "").replace(/<[^>]+>/g, "").trim();
-
-          const urlMatch = item.title ? item.title.match(/href="([^"]+)"/) : null;
-          const jobUrl = urlMatch
-            ? `https://www.workana.com${urlMatch[1]}`
-            : `https://www.workana.com/job/${item.slug}`;
-
-          const countryText = item.country
-            ? item.country.replace(/<[^>]+>/g, "").trim()
-            : "Colombia";
-          const dateText = item.publishedDate
-            ? item.publishedDate.replace("Publicado: ", "").trim()
-            : "Hoy";
-          const dateParsed = parseDateText(dateText, "Workana");
-
-          if (title && dateParsed.valid) {
-            jobs.push({
-              jobId: item.slug || String(Math.random()),
-              title: htmlEntities(title),
-              company: htmlEntities(item.authorName || "Confidencial"),
-              location: htmlEntities(countryText),
-              url: jobUrl,
-              dateText,
-              source: "Workana",
-              publishedAt: dateParsed.date
-            });
-          }
+    if (!response.ok) {
+      if (page === 1) {
+        if (response.status === 401 || response.status === 403) {
+          console.warn(
+            `[Workana] Blocked: ${response.status} ${response.statusText} — not retrying.`
+          );
+          throw new FetchBlockedError("Workana", response.status);
         }
-
-        const totalPages = parsed.pagination?.pages ?? page;
-        if (page >= totalPages) break;
-      } catch (e) {
-        break;
+        console.warn(`[Workana] Failed: ${response.status} ${response.statusText}`);
+        throw new Error(`[Workana] HTTP ${response.status}`);
       }
+      break;
     }
-    console.log(`[Workana] Found ${jobs.length} jobs (filtered by date).`);
-    return jobs;
-  } catch (error) {
-    console.error("[Workana] Fetch error:", error);
-    return jobs;
+
+    const html = await response.text();
+    const startKey = ":results-initials='";
+    const startIdx = html.indexOf(startKey);
+    if (startIdx === -1) break;
+
+    const valueStart = startIdx + startKey.length;
+    const endIdx = html.indexOf("'", valueStart);
+    const rawValue = html.substring(valueStart, endIdx);
+    const decodedValue = rawValue.replaceAll("&quot;", '"').replaceAll("&#39;", "'");
+
+    try {
+      const parsed = JSON.parse(decodedValue);
+      const results = parsed.results;
+      if (!Array.isArray(results) || results.length === 0) break;
+
+      for (const item of results) {
+        const titleMatch = item.title ? item.title.match(/title="([^"]+)"/) : null;
+        const title = titleMatch
+          ? titleMatch[1]
+          : (item.title || "").replace(/<[^>]+>/g, "").trim();
+
+        const urlMatch = item.title ? item.title.match(/href="([^"]+)"/) : null;
+        const jobUrl = urlMatch
+          ? `https://www.workana.com${urlMatch[1]}`
+          : `https://www.workana.com/job/${item.slug}`;
+
+        const countryText = item.country ? item.country.replace(/<[^>]+>/g, "").trim() : "Colombia";
+        const dateText = item.publishedDate
+          ? item.publishedDate.replace("Publicado: ", "").trim()
+          : "Hoy";
+        const dateParsed = parseDateText(dateText, "Workana");
+
+        if (title && dateParsed.valid) {
+          jobs.push({
+            jobId: item.slug || String(Math.random()),
+            title: htmlEntities(title),
+            company: htmlEntities(item.authorName || "Confidencial"),
+            location: htmlEntities(countryText),
+            url: jobUrl,
+            dateText,
+            source: "Workana",
+            publishedAt: dateParsed.date
+          });
+        }
+      }
+
+      const totalPages = parsed.pagination?.pages ?? page;
+      if (page >= totalPages) break;
+    } catch (e) {
+      break;
+    }
   }
+  console.log(`[Workana] Found ${jobs.length} jobs (filtered by date).`);
+  return jobs;
 }
 
 // Scrape Magneto365 Colombia directly from NEXT payload and JSON-LD schema
@@ -1009,11 +1021,17 @@ export async function scrapeRemotive(searchTerms: string[]): Promise<Job[]> {
 // the official API requires an approved OAuth application. Workana + RemoteOK
 // + Remotive cover the freelance/remote segment for free instead.
 
-// got-scraping fetch with manual retry/backoff. Each attempt issues a fresh call
-// so got-scraping generates a new browser fingerprint — this is what recovers from
-// Cloudflare's intermittent 403s under bursty traffic (retrying the SAME
-// fingerprint just gets blocked again). Returns the body on HTTP 200, else null.
-async function gsFetch(url: string, label: string, attempts = 3): Promise<string | null> {
+// got-scraping fetch with manual retry/backoff for genuinely transient failures
+// (429/5xx/network errors). A 401/403 is a definitive deny, not a hiccup —
+// retrying it wastes requests against a source that already said no, so it
+// throws immediately instead of spending the retry budget on it. Every other
+// exhausted-retry path also throws (instead of returning null) so callers
+// wrapped in executeWithResilience actually see the failure — previously this
+// returned null silently, which every caller treated as "fetch worked, just
+// got 0 results," so the circuit breaker never saw a failure and never opened
+// (confirmed root cause of Indeed getting hammered on every keyword even
+// after it started blocking every request — see docs/source-catalog/indeed.md).
+async function gsFetch(url: string, label: string, attempts = 3): Promise<string> {
   for (let attempt = 1; attempt <= attempts; attempt++) {
     try {
       const response = await gotScraping({
@@ -1027,24 +1045,30 @@ async function gsFetch(url: string, label: string, attempts = 3): Promise<string
         }
       });
       if (response.statusCode === 200) return response.body;
+      if (response.statusCode === 401 || response.statusCode === 403) {
+        console.warn(`[${label}] Blocked: HTTP ${response.statusCode} — not retrying.`);
+        throw new FetchBlockedError(label, response.statusCode);
+      }
       if (attempt === attempts) {
         console.warn(`[${label}] Failed after ${attempts} attempts: HTTP ${response.statusCode}`);
-        return null;
+        throw new Error(`[${label}] HTTP ${response.statusCode} after ${attempts} attempts`);
       }
-      // Backoff before a fresh-fingerprint retry (1.5s, 3s, 4.5s, ...)
+      // Backoff before a fresh-fingerprint retry (1.5s, 3s, 4.5s, ...) — only
+      // reached for transient statuses (429/5xx), never for a 401/403 deny.
       await new Promise((r) => setTimeout(r, 1500 * attempt));
     } catch (error: any) {
+      if (error instanceof FetchBlockedError) throw error;
       if (attempt === attempts) {
         console.error(
           `[${label}] Fetch error after ${attempts} attempts:`,
           error?.message || error
         );
-        return null;
+        throw error;
       }
       await new Promise((r) => setTimeout(r, 1500 * attempt));
     }
   }
-  return null;
+  throw new Error(`[${label}] Unreachable`);
 }
 
 // Extract a balanced {...} JSON object starting at the first '{' after fromIdx,
@@ -1088,14 +1112,21 @@ export async function scrapeIndeedLocal(keyword: string): Promise<Job[]> {
   const jobs: Job[] = [];
   const now = Date.now();
 
-  try {
-    const html = await gsFetch(url, "Indeed");
-    if (!html) return [];
+  // Deliberately NOT wrapped in try/catch: a real fetch failure (blocked,
+  // network error, exhausted retries) must propagate so executeWithResilience
+  // sees it and the circuit breaker can actually open. Swallowing it here
+  // (the previous behavior) made every failure look like "fetched fine, 0
+  // jobs" to the caller — see the comment on gsFetch for why that mattered.
+  const html = await gsFetch(url, "Indeed");
 
+  // Parsing issues are a different root cause (site layout changed) that a
+  // circuit-breaker backoff wouldn't fix either way, so they're handled
+  // separately and still degrade to an empty result rather than throwing.
+  try {
     const marker = 'window.mosaic.providerData["mosaic-provider-jobcards"]=';
     const markerIdx = html.indexOf(marker);
     if (markerIdx === -1) {
-      console.warn("[Indeed] jobcards payload not found (layout changed or blocked).");
+      console.warn("[Indeed] jobcards payload not found (layout changed).");
       return [];
     }
 
@@ -1133,7 +1164,8 @@ export async function scrapeIndeedLocal(keyword: string): Promise<Job[]> {
       });
     }
   } catch (error: any) {
-    console.error("[Indeed] Fetch error:", error?.message || error);
+    console.error("[Indeed] Parse error:", error?.message || error);
+    return [];
   }
   console.log(`[Indeed] Found ${jobs.length} jobs (filtered by date).`);
   return jobs;

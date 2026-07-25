@@ -16,7 +16,12 @@ export const SOURCE_CADENCE_MS: Record<string, number> = {
   GetOnBoard: 8 * HOUR_MS,
   Remotive: 8 * HOUR_MS,
   WeRemoto: 12 * HOUR_MS,
-  Indeed: 12 * HOUR_MS,
+  // Indeed and Workana both started returning 403 Forbidden on every request
+  // during testing (2026-07-25) — pushed out further than the other 12h/24h
+  // sources on top of the fanout cap in their adapters, to cut total request
+  // volume against them while docs/source-catalog/{indeed,workana}.md is
+  // researched for a compliant API/feed alternative.
+  Indeed: 24 * HOUR_MS,
   Glassdoor: 12 * HOUR_MS,
-  Workana: 24 * HOUR_MS,
+  Workana: 48 * HOUR_MS
 };

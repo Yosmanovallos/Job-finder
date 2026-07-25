@@ -41,9 +41,13 @@ export class ScrapeWorker {
   /**
    * Executes a single scraping job for a role across all registered SourceAdapters.
    */
-  async processRoleJob(
-    options: WorkerJobOptions
-  ): Promise<{ roleName: string; totalJobs: number; savedCount: number; duplicateCount: number }> {
+  async processRoleJob(options: WorkerJobOptions): Promise<{
+    roleName: string;
+    totalJobs: number;
+    savedCount: number;
+    duplicateCount: number;
+    perSource: Record<string, { fetched: number; error?: string }>;
+  }> {
     this.checkMemory();
 
     const { roleName, dateRange = "48h", adapters = allAdapters } = options;
@@ -58,19 +62,23 @@ export class ScrapeWorker {
     );
 
     const accumulatedJobs: Job[] = [];
+    const perSource: Record<string, { fetched: number; error?: string }> = {};
 
     for (const adapter of adapters) {
       try {
         const results = await adapter.fetch(keywordsToUse, dateRange);
+        const fetched = Array.isArray(results) ? results.length : 0;
         if (Array.isArray(results)) {
           accumulatedJobs.push(...results);
         }
+        perSource[adapter.name] = { fetched };
         await markRoleSourceRun(roleName, adapter.name);
       } catch (err: any) {
         console.error(
           `❌ [ScrapeWorker] Error en adaptador ${adapter.name} procesando "${roleName}":`,
           err?.message || err
         );
+        perSource[adapter.name] = { fetched: 0, error: err?.message || String(err) };
       }
     }
 
@@ -86,7 +94,8 @@ export class ScrapeWorker {
       roleName,
       totalJobs: accumulatedJobs.length,
       savedCount,
-      duplicateCount
+      duplicateCount,
+      perSource
     };
   }
 }
