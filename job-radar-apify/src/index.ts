@@ -1195,10 +1195,15 @@ export async function scrapeGlassdoor(keyword: string): Promise<Job[]> {
       .replace(/\\\//g, "/")
       .replace(/\\"/g, '"');
 
-  try {
-    const html = await gsFetch(url, "Glassdoor");
-    if (!html) return [];
+  // Deliberately NOT wrapped in try/catch: a real fetch failure (blocked,
+  // network error, exhausted retries) must propagate so executeWithResilience
+  // sees it and the circuit breaker can open — same fix already applied to
+  // Indeed after it started blocking. Previously this swallowed the error
+  // and returned [], which looked like "fetched fine, 0 jobs" to every
+  // caller, so the circuit breaker never saw Glassdoor's failures either.
+  const html = await gsFetch(url, "Glassdoor");
 
+  try {
     const chunks = html.split('\\"jobview\\":');
     const now = Date.now();
 
@@ -1236,7 +1241,8 @@ export async function scrapeGlassdoor(keyword: string): Promise<Job[]> {
       });
     }
   } catch (error: any) {
-    console.error("[Glassdoor] Fetch error:", error?.message || error);
+    console.error("[Glassdoor] Parse error:", error?.message || error);
+    return [];
   }
   console.log(`[Glassdoor] Found ${jobs.length} jobs (filtered by date).`);
   return jobs;
