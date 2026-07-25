@@ -143,7 +143,7 @@ export async function getJobs(limit: number = 100, offset: number = 0): Promise<
  * the frontend can render a truthful (not invented) teaser.
  */
 export function maskLockedFields(jobs: any[], tier: SubscriptionTier): any[] {
-  if (tier === "pro") return jobs;
+  if (tier === "pro") return jobs.map((job) => ({ ...job, isLocked: false }));
   return jobs.map((job) => {
     if (!job.isLocked) return job;
     return { ...job, company: null, location: null, url: null, dateText: null };

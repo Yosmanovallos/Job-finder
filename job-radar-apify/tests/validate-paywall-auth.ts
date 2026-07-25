@@ -3,7 +3,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 import { createClient } from "@supabase/supabase-js";
-import { saveJobs, clearRepository } from "../src/db/job-repository.js";
+import { saveJobs, clearRepository, getJobs, maskLockedFields } from "../src/db/job-repository.js";
 import { Job } from "../src/sources/types.js";
 
 dotenv.config();
@@ -141,6 +141,26 @@ async function runPaywallAuthValidation() {
       process.exit(1);
     }
     console.log(`✅ [PASSED] Vacante >48h llega completa para todos.`);
+
+    // Test 1b: maskLockedFields must clear isLocked for 'pro', not just unmask
+    // fields — otherwise the frontend still renders the PaywallCard overlay
+    // for Pro users on a <48h job even though the real data came through.
+    console.log(`\n🔍 [Test 1b] maskLockedFields(jobs, 'pro') debe apagar isLocked...`);
+    const rawJobs = await getJobs();
+    const rawRecent = rawJobs.find((j: any) => j.title === recentJob.title);
+    if (!rawRecent?.isLocked) {
+      console.error(`❌ [FAILED] La vacante <48h debería llegar de getJobs() con isLocked=true.`);
+      process.exit(1);
+    }
+    const proJobs = maskLockedFields(rawJobs, "pro");
+    const proRecent = proJobs.find((j: any) => j.title === recentJob.title);
+    if (proRecent.isLocked !== false) {
+      console.error(
+        `❌ [FAILED] Para tier 'pro', isLocked debe quedar en false — llegó ${proRecent.isLocked}.`
+      );
+      process.exit(1);
+    }
+    console.log(`✅ [PASSED] Un usuario Pro ya no ve isLocked=true en ninguna vacante.`);
 
     // Test 2: GET /api/me without a token must be 401
     console.log(`\n🔍 [Test 2] GET /api/me sin token...`);
