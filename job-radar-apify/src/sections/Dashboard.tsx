@@ -7,6 +7,7 @@ import { FilterBar, FilterState } from "../components/FilterBar.js";
 import { StatsBar } from "../components/StatsBar.js";
 import { useAuth } from "../auth/auth-provider.js";
 import { DEFAULT_ROLES_200 } from "../queue/scheduler.js";
+import { TRANSLATION_MAP } from "../ai-role-agent.js";
 
 type CheckoutBannerState = "confirming" | "success" | "pending" | null;
 
@@ -26,31 +27,44 @@ const ROLE_STOPWORDS = new Set(["de", "la", "el", "los", "las", "en", "y", "del"
 // job site-wide — verified against the real corpus, "QA Engineer" matched 89
 // titles that way, only 8 of which were actually QA-related.
 //
-// Word frequency across all configured roles is computed once so a word
-// shared by 2+ roles (engineer, data, analyst, manager, auxiliar, designer,
-// desarrollador, ...) is never trusted alone — only a role's genuinely
-// distinctive word(s) can trigger a match by themselves. If every word in a
-// role happens to be shared with another role (e.g. "Data Engineer" — both
-// "data" and "engineer" are generic), it falls back to requiring all of them
-// together instead of any one, which is stricter but still far more precise
-// than matching on a single generic word.
-const ROLE_WORD_FREQUENCY: Record<string, number> = {};
-for (const role of DEFAULT_ROLES_200) {
-  const words = new Set(
-    role
-      .toLowerCase()
-      .split(/\s+/)
-      .filter((w) => w.length > 1 && !ROLE_STOPWORDS.has(w))
-  );
-  for (const w of words) ROLE_WORD_FREQUENCY[w] = (ROLE_WORD_FREQUENCY[w] || 0) + 1;
-}
-
-function jobMatchesRole(role: string, job: any): boolean {
-  const title = (job.title || "").toLowerCase();
+// A word alone isn't enough vocabulary either — a title can legitimately be
+// "Ingeniero de Calidad" for what we search as "QA Engineer", with zero words
+// literally in common. Each role's own words are expanded through the same
+// synonym dictionary the scraper uses to generate search keywords
+// (ai-role-agent.ts), so a title only has to match the role in EITHER
+// language/phrasing, not the exact words used in the role's display name.
+function expandRoleWords(role: string): string[] {
   const words = role
     .toLowerCase()
     .split(/\s+/)
     .filter((w) => w.length > 1 && !ROLE_STOPWORDS.has(w));
+  const expanded = new Set(words);
+  for (const w of words) {
+    const synonyms = TRANSLATION_MAP[w];
+    if (synonyms) for (const s of synonyms) expanded.add(s);
+  }
+  return Array.from(expanded);
+}
+
+// Word frequency across all configured roles' EXPANDED vocabularies is
+// computed once so a word shared by 2+ roles (engineer, data, analyst,
+// manager, auxiliar, designer, desarrollador, ingeniero, ...) is never
+// trusted alone — only a role's genuinely distinctive word(s) can trigger a
+// match by themselves. If every word in a role happens to be shared with
+// another role (e.g. "Data Engineer" — both "data" and "engineer" are
+// generic), it falls back to requiring all of them together instead of any
+// one, which is stricter but still far more precise than matching on a
+// single generic word.
+const ROLE_WORD_FREQUENCY: Record<string, number> = {};
+for (const role of DEFAULT_ROLES_200) {
+  for (const w of new Set(expandRoleWords(role))) {
+    ROLE_WORD_FREQUENCY[w] = (ROLE_WORD_FREQUENCY[w] || 0) + 1;
+  }
+}
+
+function jobMatchesRole(role: string, job: any): boolean {
+  const title = (job.title || "").toLowerCase();
+  const words = expandRoleWords(role);
   const distinctive = words.filter((w) => (ROLE_WORD_FREQUENCY[w] || 0) < 2);
   if (distinctive.length > 0) return distinctive.some((w) => title.includes(w));
   return words.every((w) => title.includes(w));
