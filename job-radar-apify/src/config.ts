@@ -8,7 +8,7 @@
 export const PRO_MONTHLY_PRICE_COP = 14900;
 export const PRO_MONTHLY_PRICE_COP_CENTS = PRO_MONTHLY_PRICE_COP * 100;
 
-export const SITE_DOMAIN = 'jobradar.app';
+export const SITE_DOMAIN = 'buscotrabajo.co';
 
 export function formatCOP(amount: number): string {
   return `$${amount.toLocaleString('es-CO')}`;

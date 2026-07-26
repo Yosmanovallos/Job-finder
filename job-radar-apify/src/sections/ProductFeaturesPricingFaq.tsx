@@ -630,7 +630,7 @@ export default function ProductFeaturesPricingFaq() {
                   border: "1px solid #262A31"
                 }}
               >
-                app.jobradar.co/dashboard
+                app.buscotrabajo.co/dashboard
               </div>
             </div>
 
