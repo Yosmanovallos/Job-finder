@@ -30,6 +30,10 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [checkoutBanner, setCheckoutBanner] = useState<CheckoutBannerState>(null);
+  // Filters render inline as a sidebar on desktop, but on mobile they used to
+  // stack above the job list — pushing every result below the fold behind a
+  // wall of accordions. Below lg they now live behind this toggle instead.
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
   const sentinelRef = useRef<HTMLDivElement>(null);
   // Guards the fetch effect against a stale response landing after a newer
@@ -201,6 +205,22 @@ export default function Dashboard() {
     return true;
   });
 
+  const activeFilterCount =
+    filters.sources.length +
+    filters.cities.length +
+    filters.selectedRoles.length +
+    (filters.modality !== "all" ? 1 : 0) +
+    (filters.freshness !== "all" ? 1 : 0) +
+    (filters.savedOnly ? 1 : 0) +
+    (filters.appliedOnly ? 1 : 0);
+
+  useEffect(() => {
+    document.body.style.overflow = mobileFiltersOpen ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [mobileFiltersOpen]);
+
   return (
     <section
       className="relative w-full overflow-x-hidden min-h-screen"
@@ -264,9 +284,9 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Top search bar */}
-        <div className="mb-4">
-          <div className="relative">
+        {/* Top search bar + mobile filters trigger */}
+        <div className="mb-4 flex gap-2">
+          <div className="relative flex-1">
             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-ink-faint">🔍</span>
             <input
               type="text"
@@ -276,10 +296,55 @@ export default function Dashboard() {
               className="w-full pl-11 pr-4 py-3 bg-[#ffffff] border border-[#e6e8e4] rounded-xl text-foreground placeholder-slate-500 text-sm focus:outline-none focus:border-primary/50"
             />
           </div>
+          <button
+            type="button"
+            onClick={() => setMobileFiltersOpen(true)}
+            className="lg:hidden shrink-0 relative px-4 py-3 rounded-xl border border-[#e6e8e4] bg-[#ffffff] text-sm font-medium text-foreground"
+          >
+            🔧 Filtros
+            {activeFilterCount > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-primary text-primary-foreground text-[10px] font-mono font-bold flex items-center justify-center">
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
         </div>
 
         <div className="flex flex-col lg:flex-row gap-6">
-          <FilterBar filters={filters} onFilterChange={setFilters} />
+          <div className="hidden lg:block">
+            <FilterBar filters={filters} onFilterChange={setFilters} />
+          </div>
+
+          {/* Mobile filter sheet — full-screen overlay instead of an inline
+              block, so the job list is never pushed below a wall of
+              accordions on small screens. */}
+          {mobileFiltersOpen && (
+            <div className="lg:hidden fixed inset-0 z-50 bg-[#fafafa] flex flex-col">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-[#e6e8e4] bg-[#ffffff] shrink-0">
+                <h2 className="font-heading font-semibold text-base text-foreground">Filtros</h2>
+                <button
+                  type="button"
+                  onClick={() => setMobileFiltersOpen(false)}
+                  aria-label="Cerrar filtros"
+                  className="w-9 h-9 rounded-lg border border-[#e6e8e4] flex items-center justify-center text-lg"
+                >
+                  ×
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-4">
+                <FilterBar filters={filters} onFilterChange={setFilters} />
+              </div>
+              <div className="shrink-0 p-4 border-t border-[#e6e8e4] bg-[#ffffff]">
+                <button
+                  type="button"
+                  onClick={() => setMobileFiltersOpen(false)}
+                  className="w-full py-3 rounded-lg bg-primary text-primary-foreground font-semibold text-sm"
+                >
+                  Ver {total} resultado{total === 1 ? "" : "s"}
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="flex-1 min-w-0">
             <StatsBar totalJobs={total} filteredJobs={visibleJobs.length} />
