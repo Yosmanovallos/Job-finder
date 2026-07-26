@@ -1,4 +1,4 @@
-import { SourceAdapter, Job } from './types.js';
+import { SourceAdapter, Job, deduplicateJobs } from './types.js';
 import { scrapeMagneto } from '../index.js';
 import { executeWithResilience } from '../engine/resilient-fetch.js';
 import { jitterDelay } from '../engine/jitter-delay.js';
@@ -12,6 +12,6 @@ export const magnetoAdapter: SourceAdapter = {
       const results = await executeWithResilience('Magneto', () => scrapeMagneto(keywords[i]));
       allJobs.push(...results);
     }
-    return allJobs;
+    return deduplicateJobs(allJobs);
   }
 };

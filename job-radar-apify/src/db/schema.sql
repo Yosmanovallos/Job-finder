@@ -9,6 +9,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE TABLE IF NOT EXISTS jobs (
     id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     url_hash      VARCHAR(64) UNIQUE NOT NULL,      -- SHA-256 de la URL normalizada
+    content_fingerprint VARCHAR(64),                 -- SHA-256 de (title+company+location) normalizado, dedup secundaria
     title         VARCHAR(500) NOT NULL,
     company       VARCHAR(255) DEFAULT 'Confidencial',
     location      VARCHAR(255) DEFAULT 'Colombia',
@@ -27,6 +28,8 @@ CREATE INDEX IF NOT EXISTS idx_jobs_published_at ON jobs (published_at DESC);
 CREATE INDEX IF NOT EXISTS idx_jobs_url_hash ON jobs (url_hash);
 CREATE INDEX IF NOT EXISTS idx_jobs_sources ON jobs USING GIN (sources);
 CREATE INDEX IF NOT EXISTS idx_jobs_created_at ON jobs (created_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_jobs_content_fingerprint
+  ON jobs (content_fingerprint) WHERE content_fingerprint IS NOT NULL;
 
 -- 2. Tabla `search_roles`: Monitoreo de 200+ roles y sinónimos
 CREATE TABLE IF NOT EXISTS search_roles (

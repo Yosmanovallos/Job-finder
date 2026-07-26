@@ -1,4 +1,4 @@
-import { SourceAdapter, Job } from "./types.js";
+import { SourceAdapter, Job, deduplicateJobs } from "./types.js";
 import { scrapeGlassdoor } from "../index.js";
 import { executeWithResilience } from "../engine/resilient-fetch.js";
 import { jitterDelay } from "../engine/jitter-delay.js";
@@ -19,6 +19,6 @@ export const glassdoorAdapter: SourceAdapter = {
       const results = await executeWithResilience("Glassdoor", () => scrapeGlassdoor(limited[i]));
       allJobs.push(...results);
     }
-    return allJobs;
+    return deduplicateJobs(allJobs);
   }
 };

@@ -9,13 +9,49 @@ dotenv.config();
 
 export type SubscriptionTier = "free" | "pro";
 
-// SHA256 helper for url_hash
+// SHA256 helper for url_hash — now unwraps Google Translate proxy URLs and
+// strips tracking/session params so the same underlying posting always
+// produces the same hash regardless of which keyword search found it.
 export function computeUrlHash(url: string): string {
-  const normalized = url
+  let cleaned = url.trim();
+
+  // Unwrap Google redirect wrapper (used by Computrabajo proxy)
+  const googleRedirectMatch = cleaned.match(/google\.com\/url\?q=([^&]+)/);
+  if (googleRedirectMatch) {
+    cleaned = decodeURIComponent(googleRedirectMatch[1]);
+  }
+
+  // Unwrap Google Translate proxy domains → original host
+  cleaned = cleaned.replace(
+    /https?:\/\/[\w.-]*\.translate\.goog\//,
+    "https://translated.host/"
+  );
+
+  const normalized = cleaned
     .toLowerCase()
     .trim()
     .replace(/^https?:\/\//, "")
-    .replace(/\/$/, "");
+    .replace(/\/$/, "")
+    // Strip Google Translate params
+    .replace(/[?&]_x_tr_[^&]*/g, "")
+    // Strip common tracking/session params
+    .replace(/[?&](utm_\w+|ref|fbclid|gclid)=[^&]*/g, "")
+    // Clean trailing ? or & left after param stripping
+    .replace(/[?&]$/, "");
+
+  return crypto.createHash("sha256").update(normalized).digest("hex");
+}
+
+/**
+ * Secondary dedup key based on content (title + company + location).
+ * Catches the same posting even when its URL varies between searches.
+ */
+export function computeContentFingerprint(job: Job): string {
+  const normalized = [
+    job.title.toLowerCase().trim(),
+    (job.company || "confidencial").toLowerCase().trim(),
+    (job.location || "colombia").toLowerCase().trim()
+  ].join("|");
   return crypto.createHash("sha256").update(normalized).digest("hex");
 }
 
@@ -41,14 +77,39 @@ export async function saveJobs(
 
   for (const job of valid) {
     const hash = computeUrlHash(job.url);
+    const fingerprint = computeContentFingerprint(job);
     const publishedAt =
       job.publishedAt && !isNaN(new Date(job.publishedAt).getTime())
         ? new Date(job.publishedAt).toISOString()
         : new Date().toISOString();
 
+    // Check content fingerprint FIRST — if a job with the same
+    // title+company+location already exists (regardless of URL), just
+    // merge the source and skip insertion entirely.
+    const existingByFingerprint = await pool.query(
+      `SELECT id, url_hash, sources, source FROM jobs
+       WHERE content_fingerprint = $1 AND url_hash != $2 AND is_active = TRUE
+       LIMIT 1`,
+      [fingerprint, hash]
+    );
+
+    if (existingByFingerprint.rows.length > 0) {
+      // Duplicate by content: merge source into the existing record
+      const existing = existingByFingerprint.rows[0];
+      const sources: string[] = Array.isArray(existing.sources) ? existing.sources : [];
+      if (!sources.includes(job.source)) {
+        await pool.query(
+          `UPDATE jobs SET sources = sources || to_jsonb($2::text) WHERE id = $1`,
+          [existing.id, job.source]
+        );
+      }
+      duplicateCount++;
+      continue;
+    }
+
     const result = await pool.query(
-      `INSERT INTO jobs (url_hash, title, company, location, url, source, sources, date_text, published_at, role_origin)
-       VALUES ($1, $2, $3, $4, $5, $6, jsonb_build_array($10::text), $7, $8, $9)
+      `INSERT INTO jobs (url_hash, content_fingerprint, title, company, location, url, source, sources, date_text, published_at, role_origin)
+       VALUES ($1, $11, $2, $3, $4, $5, $6, jsonb_build_array($10::text), $7, $8, $9)
        ON CONFLICT (url_hash) DO UPDATE SET
          sources = CASE
            WHEN jobs.sources @> to_jsonb(EXCLUDED.source::text) THEN jobs.sources
@@ -65,7 +126,8 @@ export async function saveJobs(
         job.dateText,
         publishedAt,
         roleOrigin,
-        job.source
+        job.source,
+        fingerprint
       ]
     );
 
@@ -118,11 +180,20 @@ export async function getJobs(
   limit: number = DEFAULT_JOBS_LIMIT,
   offset: number = 0
 ): Promise<any[]> {
+  // DISTINCT ON (title, company, location) ensures the dashboard never shows
+  // visual duplicates, regardless of how many URL variants exist in the table.
+  // The subquery deduplicates, picking the most-recently-published row for
+  // each unique (title, company, location) group; the outer query re-sorts
+  // chronologically so the dashboard's default order is preserved.
   const result = await pool.query(
-    `SELECT id, url_hash, title, company, location, url, source, sources, date_text, published_at, role_origin,
-            (published_at > NOW() - INTERVAL '48 hours') AS is_locked
-     FROM jobs
-     WHERE is_active = TRUE
+    `SELECT * FROM (
+       SELECT DISTINCT ON (lower(trim(title)), lower(trim(COALESCE(company, 'confidencial'))), lower(trim(COALESCE(location, 'colombia'))))
+              id, url_hash, title, company, location, url, source, sources, date_text, published_at, role_origin,
+              (published_at > NOW() - INTERVAL '48 hours') AS is_locked
+       FROM jobs
+       WHERE is_active = TRUE
+       ORDER BY lower(trim(title)), lower(trim(COALESCE(company, 'confidencial'))), lower(trim(COALESCE(location, 'colombia'))), published_at DESC
+     ) deduped
      ORDER BY published_at DESC
      LIMIT $1 OFFSET $2`,
     [limit, offset]

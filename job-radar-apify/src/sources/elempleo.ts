@@ -1,4 +1,4 @@
-import { SourceAdapter, Job } from './types.js';
+import { SourceAdapter, Job, deduplicateJobs } from './types.js';
 import { scrapeElempleo } from '../index.js';
 import { executeWithResilience } from '../engine/resilient-fetch.js';
 import { jitterDelay } from '../engine/jitter-delay.js';
@@ -12,6 +12,6 @@ export const elempleoAdapter: SourceAdapter = {
       const results = await executeWithResilience('Elempleo', () => scrapeElempleo(keywords[i]));
       allJobs.push(...results);
     }
-    return allJobs;
+    return deduplicateJobs(allJobs);
   }
 };
