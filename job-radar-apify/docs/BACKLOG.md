@@ -70,31 +70,57 @@ sigue limitado por lo que Indeed/Workana toleren (ver sus entradas en
 `docs/source-catalog/`) y por el volumen real que soporte el runner gratuito
 de GitHub Actions.
 
-## GitHub Action del Social Auto-Publisher rota (falla desde antes del 2026-07-25)
+## Social Auto-Publisher: era un bug de wiring, pero además nunca publicó nada real (2026-07-26)
 
-**Qué:** `.github/workflows/social-publish.yml` (cron cada 15 min) falla
-siempre con `Error: Cannot find module './src/social/publisher.js'`.
-Confirmado con `gh run list` que viene fallando desde al menos las 04:38 UTC
-del 2026-07-25 — no relacionado con el trabajo de auth de esta sesión.
+**Qué era el bug original:** `.github/workflows/social-publish.yml` (cron
+cada 15 min) fallaba siempre con `Error: Cannot find module
+'./src/social/publisher.js'` — confirmado con `gh run list` desde al menos
+las 04:38 UTC del 2026-07-25. Causa: el step corría
+`npx tsx -e "import { publishPendingDigests } from './src/social/publisher.js'; ..."`,
+un import inline vía `-e`. El mapeo `.js` → `.ts` de `tsx` (el que sí
+funciona en `tsx src/server.ts` importando `./db/job-repository.js`) no
+aplica igual a código pasado por `-e` sin un archivo real de por medio.
 
-**Por qué pasa:** el step "Run Social Auto-Publisher Worker" corre
-`npx tsx -e "import { publishPendingDigests } from './src/social/publisher.js'; ..."`
-— un import inline vía `-e`. El archivo real es `publisher.ts` (no hay
-compilado `.js`). En cualquier archivo real del repo el mapeo `.js` → `.ts`
-de `tsx` funciona (`tsx src/server.ts` importando `"./db/job-repository.js"`,
-por ejemplo), pero con `-e` (código inline, sin archivo real de por medio) esa
-resolución de rutas relativas no aplica igual y truena con "Cannot find
-module".
+**Ya arreglado (2026-07-26):** `scripts/run-social-publisher.ts` hace el
+import real y llama a `publishPendingDigests()`; el workflow ahora corre
+`npx tsx scripts/run-social-publisher.ts`, mismo patrón que el resto del
+repo. También le faltaba `DATABASE_URL` en el `env:` del step — `getJobs()`
+la necesita y sin ella habría fallado igual aunque el import se arreglara.
 
-**Qué hacer cuando se retome:** reemplazar el `-e` inline por un script real,
-p. ej. `job-radar-apify/scripts/run-social-publisher.ts` que haga el import y
-llame a `publishPendingDigests()`, y cambiar el step del workflow a
-`npx tsx scripts/run-social-publisher.ts` — mismo patrón que ya usa el resto
-del repo (`tsx src/server.ts`, `tsx src/index.ts`) en vez del inline eval.
+**Lo que apareció al revisar a fondo — esto es lo que de verdad bloquea
+"depender de que se publique solo":** `src/social/publisher.ts` **nunca
+llamó una API real de Twitter/Meta**. El código dice literalmente
+`// Simulate API dispatch to Twitter/Meta` y arma un `mockPostId` falso;
+no hay ninguna llamada HTTP a esas plataformas en todo el archivo, y
+`TWITTER_API_KEY`/`TWITTER_API_SECRET`/`META_ACCESS_TOKEN` no existen como
+secrets del repo (confirmado con `gh secret list`). Arreglar solo el bug de
+import habría dejado el workflow en verde publicando contenido falso — peor
+que el rojo anterior, porque un check verde aparenta que sí está
+publicando.
+
+Además, el control de "ya publicado, no repetir" (`publishedSocialPosts`)
+vive en un array en memoria a nivel de módulo — como cada corrida de
+GitHub Actions es un proceso nuevo, ese array se reinicia cada 15 min. Aun
+conectado a APIs reales, volvería a "publicar" la misma categoría en cada
+tick para siempre. La tabla `social_posts` en `schema.sql` existe
+exactamente para este propósito y el código nunca la usa.
+
+**Decisión (2026-07-26):** se quitó el trigger `schedule` del workflow —
+solo queda `workflow_dispatch` para poder correrlo a mano cuando se
+retome. No tiene sentido dejarlo en cron cada 15 min sin hacer nada útil.
+
+**Qué hacer cuando se retome de verdad:**
+1. Conseguir credenciales reales de X (Twitter) Developer Portal y Meta for
+   Developers, agregarlas como secrets del repo.
+2. Reemplazar el bloque "Simulate API dispatch" en `publisher.ts` por
+   llamadas HTTP reales a esas APIs.
+3. Persistir el estado de "ya publicado" en la tabla `social_posts` en vez
+   del array en memoria, para que sobreviva entre corridas.
+4. Recién ahí volver a agregar el trigger `schedule` al workflow.
 
 **Debe estar resuelto antes de:** depender de que los digests a redes
-sociales se publiquen solos — ahora mismo la publicación automática lleva
-horas (probablemente días) sin correr nunca con éxito.
+sociales se publiquen solos — hoy no publican nada, ni fallando ni
+funcionando.
 
 ## Filtros del Dashboard — reporte sin reproducir aún (2026-07-25)
 

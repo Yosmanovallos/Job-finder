@@ -1,8 +1,18 @@
 name: Job Radar 24/7 Social Media Auto-Publisher
 
+# No `schedule` trigger on purpose (2026-07-26): src/social/publisher.ts only
+# simulates posting (`// Simulate API dispatch to Twitter/Meta`, a fake
+# `mockPostId`) — there's no real Twitter/Meta API call anywhere in that
+# file, and TWITTER_API_KEY/TWITTER_API_SECRET/META_ACCESS_TOKEN don't exist
+# as repo secrets. Running this on a cron was a red X every 15 min for code
+# that, even fixed, would only produce fake "posted" log lines — worse, a
+# green check would look like it's really posting when it isn't. It also
+# tracks "already posted" in an in-memory array that resets every run, so it
+# would re-simulate the same category forever even once wired to real APIs
+# (schema.sql's `social_posts` table exists for this and is unused).
+# workflow_dispatch stays so it can be run by hand once real API credentials
+# and persistence are built.
 on:
-  schedule:
-    - cron: '*/15 * * * *' # Executes every 15 minutes at $0 USD cost
   workflow_dispatch:
 
 jobs:
@@ -24,9 +34,10 @@ jobs:
 
       - name: Run Social Auto-Publisher Worker
         env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
           TWITTER_API_KEY: ${{ secrets.TWITTER_API_KEY }}
           TWITTER_API_SECRET: ${{ secrets.TWITTER_API_SECRET }}
           META_ACCESS_TOKEN: ${{ secrets.META_ACCESS_TOKEN }}
         run: |
           cd job-radar-apify
-          npx tsx -e "import { publishPendingDigests } from './src/social/publisher.js'; publishPendingDigests().then(res => console.log('Publish result:', res));"
+          npx tsx scripts/run-social-publisher.ts
