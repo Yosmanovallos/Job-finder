@@ -2,7 +2,7 @@ name: Job Radar Scraper Tick
 
 on:
   schedule:
-    - cron: '*/15 * * * *' # Executes every 15 minutes at $0 USD cost (public repo)
+    - cron: "*/15 * * * *" # Executes every 15 minutes at $0 USD cost (public repo)
   workflow_dispatch:
 
 # If a tick is still running when the next 15-min trigger fires (e.g. some
@@ -31,7 +31,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "20"
 
       - name: Install Dependencies
         run: |
@@ -43,6 +43,8 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
           NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
+          # Optional — Jooble adapter no-ops (returns 0 jobs) if unset.
+          JOOBLE_API_KEY: ${{ secrets.JOOBLE_API_KEY }}
         run: |
           cd job-radar-apify
           npx tsx scripts/run-scrape-tick.ts

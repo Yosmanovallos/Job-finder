@@ -1,14 +1,17 @@
 import fs from "fs";
 import dotenv from "dotenv";
 import { allAdapters, SourceAdapter } from "../src/sources/index.js";
-import { SOURCE_CADENCE_MS } from "../src/queue/source-cadence.js";
+import { SOURCE_CADENCE_MS, GLOBAL_SOURCE_CADENCE_MS } from "../src/queue/source-cadence.js";
 import { DEFAULT_ROLES_200 } from "../src/queue/scheduler.js";
 import { ScrapeWorker } from "../src/queue/scrape-worker.js";
 import {
   seedSearchRoles,
   getDueRoleSources,
+  getDueGlobalSources,
+  markGlobalSourceRun,
   purgeOldJobs
 } from "../src/db/scheduler-repository.js";
+import { saveJobs } from "../src/db/job-repository.js";
 import { pool } from "../src/db/client.js";
 
 dotenv.config();
@@ -22,6 +25,12 @@ dotenv.config();
 const MAX_ROLES_PER_RUN = 8;
 const CONCURRENCY = 2;
 const PER_ROLE_TIMEOUT_MS = 5 * 60 * 1000;
+// Same reasoning as PER_ROLE_TIMEOUT_MS, applied to the global-catalog step
+// (RemoteOK/GetOnBoard/Jooble/WeRemoto — see runGlobalCatalogSources). That
+// step runs before any per-role work is attempted; without its own bound, a
+// hang there (WeRemoto pages sequentially through up to 8 requests) could
+// burn the whole tick's budget before a single role gets a turn.
+const GLOBAL_CATALOG_TIMEOUT_MS = 3 * 60 * 1000;
 // Below the workflow's own `timeout-minutes: 25` with real margin. Without
 // this, a role needing all its sources at once can push the "wait for
 // stragglers" step past that ceiling — GitHub then hard-cancels the whole
@@ -99,6 +108,83 @@ async function runBatched(
   return results;
 }
 
+/**
+ * Runs catalog-wide sources (RemoteOK, GetOnBoard, WeRemoto, Jooble) once
+ * per due source, not once per role — see getDueGlobalSources. Reuses the
+ * RoleResult shape purely so the existing writeSummary/reporting path can
+ * fold this in without a second code path.
+ */
+async function runGlobalCatalogSources(): Promise<RoleResult | null> {
+  const dueSources = await getDueGlobalSources(GLOBAL_SOURCE_CADENCE_MS);
+  if (dueSources.length === 0) return null;
+
+  console.log(`🌐 [Tick] Fuentes de catálogo global vencidas: [${dueSources.join(", ")}]`);
+
+  const perSource: Record<string, { fetched: number; error?: string }> = {};
+  let savedCount = 0;
+  let duplicateCount = 0;
+
+  for (const sourceName of dueSources) {
+    const adapter = adapterByName.get(sourceName);
+    if (!adapter) continue;
+    try {
+      const results = await adapter.fetch([], "48h");
+      const fetched = Array.isArray(results) ? results.length : 0;
+      perSource[sourceName] = { fetched };
+
+      if (fetched > 0) {
+        const saved = await saveJobs(results, "General");
+        savedCount += saved.savedCount;
+        duplicateCount += saved.duplicateCount;
+      }
+
+      await markGlobalSourceRun(sourceName);
+    } catch (err: any) {
+      console.error(`❌ [Tick] Fuente global ${sourceName} falló:`, err?.message || err);
+      perSource[sourceName] = { fetched: 0, error: err?.message || String(err) };
+    }
+  }
+
+  return {
+    roleName: "(catálogo global — todas las fuentes que ignoran keywords)",
+    savedCount,
+    duplicateCount,
+    perSource,
+    timedOut: false
+  };
+}
+
+/**
+ * Bounds runGlobalCatalogSources the same way runWithTimeout bounds a role:
+ * Promise.race never cancels the loser, so on a timeout the fetch/save keeps
+ * running in the background — it's pushed onto trackedPromises so main()
+ * waits for it (bounded by OVERALL_DEADLINE_MS) before closing the pool,
+ * instead of letting its eventual saveJobs/markGlobalSourceRun call fail
+ * against an already-closed pool.
+ */
+async function runGlobalCatalogSourcesWithTimeout(
+  trackedPromises: Promise<any>[]
+): Promise<RoleResult | null> {
+  const workPromise = runGlobalCatalogSources().catch((err) => {
+    console.error(`❌ [Tick] Catálogo global falló:`, err?.message || err);
+    return null;
+  });
+  trackedPromises.push(workPromise);
+
+  const timeoutPromise = new Promise<"timeout">((resolve) =>
+    setTimeout(() => resolve("timeout"), GLOBAL_CATALOG_TIMEOUT_MS)
+  );
+
+  const result = await Promise.race([workPromise, timeoutPromise]);
+  if (result === "timeout") {
+    console.warn(
+      `⏱️ [Tick] Catálogo global superó los ${GLOBAL_CATALOG_TIMEOUT_MS / 60000} min — se deja pendiente, el siguiente tick lo recoge (lo ya guardado antes del corte queda persistido).`
+    );
+    return null;
+  }
+  return result;
+}
+
 function writeSummary(results: RoleResult[], deletedOld: number) {
   const perSourceTotals: Record<string, { fetched: number; errors: number }> = {};
   let totalSaved = 0;
@@ -160,30 +246,41 @@ async function main() {
   const startedAt = Date.now();
   await seedSearchRoles(DEFAULT_ROLES_200);
 
+  const trackedPromises: Promise<any>[] = [];
+
+  // Independent of per-role due-ness below: these sources ignore role and
+  // keywords entirely, so they run on their own source-level cadence
+  // regardless of whether any role has due per-role sources this tick.
+  // Bounded by its own timeout so a hang here can't eat the per-role budget
+  // below (see GLOBAL_CATALOG_TIMEOUT_MS) — trackedPromises is shared with
+  // the per-role path so main() waits for a straggler either way before
+  // closing the pool.
+  const globalResult = await runGlobalCatalogSourcesWithTimeout(trackedPromises);
+
   const due = await getDueRoleSources(SOURCE_CADENCE_MS);
+  const results: RoleResult[] = [];
+
   if (due.size === 0) {
     console.log("🕒 [Tick] Ningún rol/fuente vencido en este ciclo.");
-    writeSummary([], 0);
-    await pool.end();
-    return;
+  } else {
+    const items = Array.from(due.entries())
+      .slice(0, MAX_ROLES_PER_RUN)
+      .map(([roleName, sourceNames]) => ({
+        roleName,
+        adapters: sourceNames
+          .map((name) => adapterByName.get(name))
+          .filter((a): a is SourceAdapter => !!a)
+      }))
+      .filter((item) => item.adapters.length > 0);
+
+    console.log(
+      `🕒 [Tick] ${due.size} roles con fuentes vencidas — procesando ${items.length} (tope ${MAX_ROLES_PER_RUN}/tick, el resto se recoge en el próximo).`
+    );
+
+    results.push(...(await runBatched(items, trackedPromises)));
   }
 
-  const items = Array.from(due.entries())
-    .slice(0, MAX_ROLES_PER_RUN)
-    .map(([roleName, sourceNames]) => ({
-      roleName,
-      adapters: sourceNames
-        .map((name) => adapterByName.get(name))
-        .filter((a): a is SourceAdapter => !!a)
-    }))
-    .filter((item) => item.adapters.length > 0);
-
-  console.log(
-    `🕒 [Tick] ${due.size} roles con fuentes vencidas — procesando ${items.length} (tope ${MAX_ROLES_PER_RUN}/tick, el resto se recoge en el próximo).`
-  );
-
-  const trackedPromises: Promise<any>[] = [];
-  const results = await runBatched(items, trackedPromises);
+  if (globalResult) results.push(globalResult);
   const deletedOld = await purgeOldJobs();
 
   writeSummary(results, deletedOld);

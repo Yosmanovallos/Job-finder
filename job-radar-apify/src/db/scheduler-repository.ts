@@ -1,4 +1,4 @@
-import { pool } from './client.js';
+import { pool } from "./client.js";
 
 /**
  * Idempotent upsert of the known role list into `search_roles` — safe to
@@ -7,16 +7,17 @@ import { pool } from './client.js';
  */
 export async function seedSearchRoles(roleNames: string[]): Promise<void> {
   for (const name of roleNames) {
-    await pool.query(
-      `INSERT INTO search_roles (name) VALUES ($1) ON CONFLICT (name) DO NOTHING`,
-      [name]
-    );
+    await pool.query(`INSERT INTO search_roles (name) VALUES ($1) ON CONFLICT (name) DO NOTHING`, [
+      name
+    ]);
   }
 }
 
 export async function getActiveRoleNames(): Promise<string[]> {
-  const result = await pool.query(`SELECT name FROM search_roles WHERE is_active = TRUE ORDER BY name`);
-  return result.rows.map(r => r.name);
+  const result = await pool.query(
+    `SELECT name FROM search_roles WHERE is_active = TRUE ORDER BY name`
+  );
+  return result.rows.map((r) => r.name);
 }
 
 /**
@@ -24,7 +25,9 @@ export async function getActiveRoleNames(): Promise<string[]> {
  * (never run, or last run longer ago than that source's configured
  * cadence). Grouped by role so the cron can enqueue one work item per role.
  */
-export async function getDueRoleSources(cadenceMs: Record<string, number>): Promise<Map<string, string[]>> {
+export async function getDueRoleSources(
+  cadenceMs: Record<string, number>
+): Promise<Map<string, string[]>> {
   const roles = await getActiveRoleNames();
   const due = new Map<string, string[]>();
   if (roles.length === 0) return due;
@@ -74,6 +77,46 @@ export async function markRoleSourceRun(roleName: string, sourceName: string): P
      ON CONFLICT (role_name, source_name) DO UPDATE SET last_run_at = NOW()`,
     [roleName, sourceName]
   );
+}
+
+// Sentinel "role" used to track cadence for catalog-wide sources that ignore
+// role/keywords entirely (RemoteOK, GetOnBoard, WeRemoto, Jooble) — see
+// getDueGlobalSources below. Not a real row in `search_roles`; it only ever
+// appears as a role_name in `role_source_runs`.
+const GLOBAL_ROLE_SENTINEL = "__global__";
+
+/**
+ * Due-check for sources whose adapter returns the same feed no matter which
+ * role asks (they don't take keywords). Tracking their cadence per-role like
+ * getDueRoleSources does would re-fetch the identical catalog once per every
+ * active role — wasted requests for zero extra coverage. These instead share
+ * one cadence entry per source, under the sentinel "role" above, so each
+ * runs once per cadence window regardless of how many roles are active.
+ */
+export async function getDueGlobalSources(cadenceMs: Record<string, number>): Promise<string[]> {
+  const sourceNames = Object.keys(cadenceMs);
+  if (sourceNames.length === 0) return [];
+
+  const result = await pool.query(
+    `SELECT source_name, last_run_at FROM role_source_runs
+     WHERE role_name = $1 AND source_name = ANY($2)`,
+    [GLOBAL_ROLE_SENTINEL, sourceNames]
+  );
+
+  const lastRun = new Map<string, number>();
+  for (const row of result.rows) {
+    lastRun.set(row.source_name, new Date(row.last_run_at).getTime());
+  }
+
+  const now = Date.now();
+  return sourceNames.filter((source) => {
+    const lastRunAt = lastRun.get(source);
+    return lastRunAt === undefined || now - lastRunAt >= cadenceMs[source];
+  });
+}
+
+export async function markGlobalSourceRun(sourceName: string): Promise<void> {
+  await markRoleSourceRun(GLOBAL_ROLE_SENTINEL, sourceName);
 }
 
 /** Cron C — keeps the corpus bounded to the last 30 days. */

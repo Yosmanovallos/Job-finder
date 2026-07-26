@@ -1,4 +1,5 @@
 import { Job } from "../sources/types.js";
+import { pool } from "../db/client.js";
 
 /**
  * Thrown by a scraper when a source returns a definitive deny (401/403) —
@@ -14,53 +15,68 @@ export class FetchBlockedError extends Error {
   }
 }
 
-interface CircuitState {
-  failures: number;
-  openUntil: number;
-}
+const FAILURE_THRESHOLD = 3;
+// Persisted (not per-process) circuit breaker: each GitHub Actions tick is a
+// fresh Node process, so an in-memory breaker forgets a source was blocked
+// the instant that process exits — the next tick, 15 min later, retries from
+// zero. 30 min covers roughly two tick cycles: long enough that a source
+// which just took 3 real denials isn't hammered again immediately, short
+// enough that a transient block self-heals the same day without a manual
+// reset.
+const DEGRADED_TIMEOUT_MS = 30 * 60 * 1000;
 
-const circuitStates: Record<string, CircuitState> = {};
-const DEGRADED_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+export async function isSourceDegraded(sourceName: string): Promise<boolean> {
+  const result = await pool.query(
+    `SELECT open_until FROM source_circuit_state WHERE source_name = $1`,
+    [sourceName]
+  );
+  const row = result.rows[0];
+  if (!row || !row.open_until) return false;
 
-export function isSourceDegraded(sourceName: string): boolean {
-  const state = circuitStates[sourceName];
-  if (!state) return false;
-  if (Date.now() < state.openUntil) {
+  if (new Date(row.open_until).getTime() > Date.now()) {
     return true;
   }
-  // Reset after timeout expires
-  if (state.openUntil > 0 && Date.now() >= state.openUntil) {
-    console.log(
-      `🟢 [Circuit Breaker] ${sourceName}: El período de recuperación finalizó. Reactivando fuente.`
-    );
-    circuitStates[sourceName] = { failures: 0, openUntil: 0 };
-  }
+
+  console.log(
+    `🟢 [Circuit Breaker] ${sourceName}: El período de recuperación finalizó. Reactivando fuente.`
+  );
+  await pool.query(
+    `UPDATE source_circuit_state SET failures = 0, open_until = NULL WHERE source_name = $1`,
+    [sourceName]
+  );
   return false;
 }
 
-export function recordFailure(sourceName: string) {
-  if (!circuitStates[sourceName]) {
-    circuitStates[sourceName] = { failures: 0, openUntil: 0 };
-  }
-  circuitStates[sourceName].failures++;
-  const count = circuitStates[sourceName].failures;
-  console.warn(`⚠️ [Circuit Breaker] ${sourceName}: Registrado fallo ${count}/3.`);
+export async function recordFailure(sourceName: string): Promise<void> {
+  const result = await pool.query(
+    `INSERT INTO source_circuit_state (source_name, failures)
+     VALUES ($1, 1)
+     ON CONFLICT (source_name) DO UPDATE SET failures = source_circuit_state.failures + 1
+     RETURNING failures`,
+    [sourceName]
+  );
+  const failures = result.rows[0].failures;
+  console.warn(
+    `⚠️ [Circuit Breaker] ${sourceName}: Registrado fallo ${failures}/${FAILURE_THRESHOLD}.`
+  );
 
-  if (count >= 3) {
-    circuitStates[sourceName].openUntil = Date.now() + DEGRADED_TIMEOUT_MS;
+  if (failures >= FAILURE_THRESHOLD) {
+    const openUntil = new Date(Date.now() + DEGRADED_TIMEOUT_MS);
+    await pool.query(`UPDATE source_circuit_state SET open_until = $2 WHERE source_name = $1`, [
+      sourceName,
+      openUntil
+    ]);
     console.error(
-      `🚨 [Circuit Breaker] ${sourceName}: 3 fallos consecutivos. Marcado como DEGRADADO por 5 minutos (hasta ${new Date(circuitStates[sourceName].openUntil).toLocaleTimeString()}).`
+      `🚨 [Circuit Breaker] ${sourceName}: ${FAILURE_THRESHOLD} fallos consecutivos. Marcado como DEGRADADO hasta ${openUntil.toLocaleTimeString()} (persiste entre ticks).`
     );
   }
 }
 
-export function recordSuccess(sourceName: string) {
-  if (circuitStates[sourceName] && circuitStates[sourceName].failures > 0) {
-    console.log(
-      `✅ [Circuit Breaker] ${sourceName}: Ejecución exitosa. Restableciendo contador de fallos.`
-    );
-    circuitStates[sourceName] = { failures: 0, openUntil: 0 };
-  }
+export async function recordSuccess(sourceName: string): Promise<void> {
+  await pool.query(
+    `UPDATE source_circuit_state SET failures = 0, open_until = NULL WHERE source_name = $1`,
+    [sourceName]
+  );
 }
 
 /**
@@ -72,7 +88,7 @@ export async function executeWithResilience(
   fetcher: () => Promise<Job[]>,
   maxRetries: number = 3
 ): Promise<Job[]> {
-  if (isSourceDegraded(sourceName)) {
+  if (await isSourceDegraded(sourceName)) {
     console.warn(
       `[ResilientEngine] ${sourceName} está en estado DEGRADADO (Circuit Breaker ABIERTO). Omitiendo ejecución sin detener el sistema.`
     );
@@ -85,7 +101,7 @@ export async function executeWithResilience(
     try {
       const results = await fetcher();
       if (Array.isArray(results)) {
-        recordSuccess(sourceName);
+        await recordSuccess(sourceName);
         return results;
       }
       throw new Error(`Resultado inválido (esperado Array de Jobs)`);
@@ -95,7 +111,7 @@ export async function executeWithResilience(
       );
       if (err instanceof FetchBlockedError) {
         console.warn(`🚫 [ResilientEngine] ${sourceName}: deny definitivo — no se reintenta.`);
-        recordFailure(sourceName);
+        await recordFailure(sourceName);
         return [];
       }
       if (attempt < maxRetries) {
@@ -103,7 +119,7 @@ export async function executeWithResilience(
         console.log(`⏳ [ResilientEngine] Reintentando ${sourceName} en ${delay / 1000}s...`);
         await new Promise((res) => setTimeout(res, delay));
       } else {
-        recordFailure(sourceName);
+        await recordFailure(sourceName);
       }
     }
   }

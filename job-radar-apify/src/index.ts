@@ -19,6 +19,24 @@ if (!NOTION_TOKEN || !NOTION_DATABASE_ID) {
 
 const notion = new Client({ auth: NOTION_TOKEN });
 
+// Every raw-fetch scraper below used to send the exact same hardcoded
+// User-Agent (and an already-stale Chrome version) on every request across
+// every source — a fixed string is itself a bot fingerprint, independent of
+// request timing. Picking one at random per call spreads requests across a
+// handful of plausible, current real-browser signatures instead.
+const USER_AGENTS = [
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15",
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0",
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
+];
+
+function pickUserAgent(): string {
+  return USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
+}
+
 export interface Job {
   jobId: string;
   title: string;
@@ -38,7 +56,8 @@ export interface Job {
     | "GetOnBoard"
     | "RemoteOK"
     | "Remotive"
-    | "Glassdoor";
+    | "Glassdoor"
+    | "Jooble";
   publishedAt: string; // YYYY-MM-DD
 }
 
@@ -204,8 +223,7 @@ export async function scrapeLinkedIn(keyword: string): Promise<Job[]> {
       const url = `https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords=${query}&location=Colombia${tprParam}&start=${start}`;
       const response = await fetch(url, {
         headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+          "User-Agent": pickUserAgent()
         }
       });
 
@@ -285,8 +303,7 @@ export async function scrapeComputrabajo(keyword: string): Promise<Job[]> {
       try {
         const proxyRes = await fetch(proxyUrl, {
           headers: {
-            "User-Agent":
-              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "User-Agent": pickUserAgent(),
             "Accept-Language": "es-CO,es;q=0.9"
           }
         });
@@ -377,8 +394,7 @@ export async function scrapeElempleo(keyword: string): Promise<Job[]> {
 
       const response = await fetch(url, {
         headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+          "User-Agent": pickUserAgent()
         }
       });
 
@@ -461,8 +477,7 @@ export async function scrapeTorre(keyword: string): Promise<Job[]> {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        "User-Agent": pickUserAgent()
       },
       body: JSON.stringify(body)
     });
@@ -534,8 +549,7 @@ export async function scrapeWorkana(keyword: string): Promise<Job[]> {
     const url = `https://www.workana.com/jobs?query=${query}&publication=1w&page=${page}`;
     const response = await fetch(url, {
       headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        "User-Agent": pickUserAgent()
       }
     });
 
@@ -620,8 +634,7 @@ export async function scrapeMagneto(keyword: string): Promise<Job[]> {
   try {
     const response = await fetch(url, {
       headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        "User-Agent": pickUserAgent()
       }
     });
 
@@ -765,8 +778,7 @@ export async function scrapeWeRemoto(): Promise<Job[]> {
           : `https://www.weremoto.com/?c370efcf_page=${page}`;
       const response = await fetch(url, {
         headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+          "User-Agent": pickUserAgent()
         }
       });
 
@@ -855,8 +867,7 @@ export async function scrapeGetOnBoard(): Promise<Job[]> {
       const url = `https://www.getonbrd.com/api/v0/categories/${category}/jobs?per_page=100`;
       const response = await fetch(url, {
         headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+          "User-Agent": pickUserAgent()
         }
       });
 
@@ -916,8 +927,7 @@ export async function scrapeRemoteOK(): Promise<Job[]> {
   try {
     const response = await fetch("https://remoteok.com/api", {
       headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        "User-Agent": pickUserAgent()
       }
     });
 
@@ -966,8 +976,7 @@ export async function scrapeRemotive(searchTerms: string[]): Promise<Job[]> {
       const url = `https://remotive.com/api/remote-jobs?search=${encodeURIComponent(term)}&limit=50`;
       const response = await fetch(url, {
         headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+          "User-Agent": pickUserAgent()
         }
       });
 
@@ -1002,6 +1011,70 @@ export async function scrapeRemotive(searchTerms: string[]): Promise<Job[]> {
     console.error("[Remotive] Fetch error:", error);
   }
   console.log(`[Remotive] Found ${jobs.length} jobs (filtered by date).`);
+  return jobs;
+}
+
+// Scrape Jooble via its official REST API (https://jooble.org/api/about).
+// Requires a free API key (JOOBLE_API_KEY) — optional integration, the
+// adapter no-ops (returns []) without one instead of failing the tick.
+//
+// Jooble's documented request schema marks `keywords` as required, but
+// doesn't say whether an empty string is accepted as "no keyword filter".
+// This sends `keywords: ""` deliberately, matching the RemoteOK/GetOnBoard/
+// WeRemoto pattern of one full-catalog fetch per window instead of one
+// request per role/keyword (see GLOBAL_SOURCE_CADENCE_MS). If Jooble
+// actually rejects the blank keyword, this fails closed (0 jobs, surfaced
+// by the tick's "posible bloqueo" warning) rather than silently — same
+// integration risk as any external API assumption not covered by fixtures.
+export async function scrapeJooble(): Promise<Job[]> {
+  const apiKey = process.env.JOOBLE_API_KEY;
+  if (!apiKey) {
+    console.warn("[Jooble] JOOBLE_API_KEY no configurada — omitiendo (fuente opcional).");
+    return [];
+  }
+
+  console.log("[Jooble] Fetching postings...");
+  const jobs: Job[] = [];
+  const now = Date.now();
+
+  try {
+    const response = await fetch(`https://jooble.org/api/${apiKey}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ keywords: "", location: "Colombia" })
+    });
+
+    if (!response.ok) {
+      console.warn(`[Jooble] Failed: ${response.status} ${response.statusText}`);
+      return [];
+    }
+
+    const data = await response.json();
+    if (!Array.isArray(data.jobs)) return [];
+
+    for (const item of data.jobs) {
+      if (!item.id || !item.title || !item.updated) continue;
+
+      const publishedDate = new Date(item.updated);
+      if (isNaN(publishedDate.getTime())) continue;
+      const ageInDays = (now - publishedDate.getTime()) / (1000 * 60 * 60 * 24);
+      if (ageInDays > 2) continue;
+
+      jobs.push({
+        jobId: String(item.id),
+        title: htmlEntities(item.title),
+        company: htmlEntities(item.company || "Confidencial"),
+        location: htmlEntities(item.location || "Colombia"),
+        url: item.link,
+        dateText: "Reciente",
+        source: "Jooble",
+        publishedAt: publishedDate.toISOString()
+      });
+    }
+  } catch (error) {
+    console.error("[Jooble] Fetch error:", error);
+  }
+  console.log(`[Jooble] Found ${jobs.length} jobs (filtered by date).`);
   return jobs;
 }
 

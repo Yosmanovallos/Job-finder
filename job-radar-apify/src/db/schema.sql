@@ -86,10 +86,26 @@ CREATE INDEX IF NOT EXISTS idx_transactions_reference ON transactions (reference
 
 -- 6. Tabla `role_source_runs`: última corrida por (rol, fuente) — permite
 -- cadencia distinta por fuente en vez de por rol (search_roles.last_run_at
--- no alcanza para eso).
+-- no alcanza para eso). También se reusa con role_name = '__global__' para
+-- fuentes de catálogo completo (RemoteOK, GetOnBoard, WeRemoto, Jooble) que
+-- ignoran el rol/keywords y se corren una sola vez por ventana, no una vez
+-- por cada uno de los ~30 roles activos.
 CREATE TABLE IF NOT EXISTS role_source_runs (
     role_name    VARCHAR(255) NOT NULL,
     source_name  VARCHAR(100) NOT NULL,
     last_run_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     PRIMARY KEY (role_name, source_name)
+);
+
+-- 7. Tabla `source_circuit_state`: circuit breaker persistido entre corridas.
+-- Cada tick de GitHub Actions es un proceso Node nuevo — un breaker en
+-- memoria (como el anterior) olvida cualquier bloqueo apenas termina el
+-- proceso, así que una fuente con 403 real se reintenta desde cero en cada
+-- tick de 15 min para siempre. Persistiendo aquí, 3 fallos consecutivos
+-- abren el circuito por DEGRADED_TIMEOUT_MS real (ver resilient-fetch.ts),
+-- across ticks, no solo dentro de uno.
+CREATE TABLE IF NOT EXISTS source_circuit_state (
+    source_name  VARCHAR(100) PRIMARY KEY,
+    failures     INTEGER NOT NULL DEFAULT 0,
+    open_until   TIMESTAMPTZ
 );
