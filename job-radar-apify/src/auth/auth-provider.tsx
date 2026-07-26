@@ -17,12 +17,19 @@ export interface AuthContextType {
   isAuthenticated: boolean;
   loading: boolean;
   accessToken: string | null;
+  // null = onboarding step not seen yet (new signup); array (even empty)
+  // once the user has gone through the "¿qué puestos buscas?" step.
+  preferredRoles: string[] | null;
+  // True once /api/me has resolved at least once for the current session —
+  // distinguishes "not onboarded" from "haven't checked yet".
+  profileLoaded: boolean;
   loginWithGoogle: (returnTo?: string) => Promise<void>;
   loginWithEmail: (email: string, password: string) => Promise<{ error?: string }>;
   signUpWithEmail: (email: string, password: string) => Promise<{ error?: string }>;
   logout: () => Promise<void>;
   refreshTier: () => Promise<void>;
   updateProfileName: (name: string) => Promise<{ error?: string }>;
+  saveProfileRoles: (roles: string[]) => Promise<{ error?: string }>;
   sendPasswordReset: (email: string) => Promise<{ error?: string }>;
   updatePassword: (newPassword: string) => Promise<{ error?: string }>;
   resendConfirmation: (email: string) => Promise<{ error?: string }>;
@@ -43,6 +50,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [tier, setTier] = useState<"free" | "pro">("free");
   const [subscriptionEnd, setSubscriptionEnd] = useState<string | undefined>(undefined);
   const [dbName, setDbName] = useState<string | undefined>(undefined);
+  const [preferredRoles, setPreferredRoles] = useState<string[] | null>(null);
+  // Distinct from `loading` (session resolution): tracks whether the /api/me
+  // round trip has settled at least once for the current session, so callers
+  // can tell "not onboarded yet" (preferredRoles === null, profileLoaded)
+  // apart from "haven't checked yet" (preferredRoles === null, !profileLoaded).
+  const [profileLoaded, setProfileLoaded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [configError, setConfigError] = useState(false);
   const [passwordRecovery, setPasswordRecovery] = useState(false);
@@ -57,8 +70,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setTier(data.tier);
       setSubscriptionEnd(data.subscriptionEnd);
       setDbName(data.name || undefined);
+      setPreferredRoles(Array.isArray(data.preferredRoles) ? data.preferredRoles : null);
     } catch (e) {
       console.warn("[Auth] No se pudo verificar el tier con el servidor:", e);
+    } finally {
+      setProfileLoaded(true);
     }
   };
 
@@ -88,6 +104,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setTier("free");
         setSubscriptionEnd(undefined);
         setDbName(undefined);
+        setPreferredRoles(null);
+        setProfileLoaded(false);
       }
     });
 
@@ -213,6 +231,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const saveProfileRoles = async (roles: string[]) => {
+    if (!session) return { error: "No autenticado" };
+    try {
+      const res = await fetch("/api/me/roles", {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ roles })
+      });
+      const data = await res.json();
+      if (!res.ok) return { error: data?.error || "No se pudieron guardar los puestos" };
+      setPreferredRoles(Array.isArray(data.preferredRoles) ? data.preferredRoles : []);
+      return {};
+    } catch (e: any) {
+      return { error: e?.message || "No se pudieron guardar los puestos" };
+    }
+  };
+
   const user: UserProfile | null = session?.user
     ? {
         id: session.user.id,
@@ -234,12 +272,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isAuthenticated: !!session,
         loading,
         accessToken: session?.access_token || null,
+        preferredRoles,
+        profileLoaded,
         loginWithGoogle,
         loginWithEmail,
         signUpWithEmail,
         logout,
         refreshTier,
         updateProfileName,
+        saveProfileRoles,
         sendPasswordReset,
         updatePassword,
         resendConfirmation,

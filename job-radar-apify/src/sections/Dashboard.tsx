@@ -1,90 +1,136 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
-import { PRO_MONTHLY_PRICE_COP, formatCOP } from "../config.js";
+import { PRO_MONTHLY_PRICE_COP, formatCOP, PAYWALL_ENABLED } from "../config.js";
 import { JobCard } from "../components/JobCard.js";
 import { PaywallCard } from "../components/PaywallCard.js";
-import { FilterBar, FilterState } from "../components/FilterBar.js";
+import { FilterBar, FilterState, EMPTY_FILTERS } from "../components/FilterBar.js";
 import { StatsBar } from "../components/StatsBar.js";
 import { useAuth } from "../auth/auth-provider.js";
-import { DEFAULT_ROLES_200 } from "../queue/scheduler.js";
-import { TRANSLATION_MAP } from "../ai-role-agent.js";
 
 type CheckoutBannerState = "confirming" | "success" | "pending" | null;
 
-const ROLE_STOPWORDS = new Set(["de", "la", "el", "los", "las", "en", "y", "del", "para"]);
-
-// role_origin only records which of the 30 searched roles happened to
-// discover a job's URL first (the dedup upsert never updates it on later
-// re-discovery), and some sources match keyword variants loosely enough that
-// a totally unrelated posting can end up permanently stamped with the wrong
-// role_origin. Filtering on that field alone let jobs like "Jefe de
-// enfermería" show up under a "QA Engineer" filter.
-//
-// A first attempt at fixing this (matching if the title contains ANY
-// significant word from the role name) was still badly broken: "QA Engineer"
-// and "Data Engineer" and "AI Engineer" all share the word "engineer", so
-// matching on it alone made every one of those roles match every "Engineer"
-// job site-wide — verified against the real corpus, "QA Engineer" matched 89
-// titles that way, only 8 of which were actually QA-related.
-//
-// A word alone isn't enough vocabulary either — a title can legitimately be
-// "Ingeniero de Calidad" for what we search as "QA Engineer", with zero words
-// literally in common. Each role's own words are expanded through the same
-// synonym dictionary the scraper uses to generate search keywords
-// (ai-role-agent.ts), so a title only has to match the role in EITHER
-// language/phrasing, not the exact words used in the role's display name.
-function expandRoleWords(role: string): string[] {
-  const words = role
-    .toLowerCase()
-    .split(/\s+/)
-    .filter((w) => w.length > 1 && !ROLE_STOPWORDS.has(w));
-  const expanded = new Set(words);
-  for (const w of words) {
-    const synonyms = TRANSLATION_MAP[w];
-    if (synonyms) for (const s of synonyms) expanded.add(s);
-  }
-  return Array.from(expanded);
-}
-
-// Word frequency across all configured roles' EXPANDED vocabularies is
-// computed once so a word shared by 2+ roles (engineer, data, analyst,
-// manager, auxiliar, designer, desarrollador, ingeniero, ...) is never
-// trusted alone — only a role's genuinely distinctive word(s) can trigger a
-// match by themselves. If every word in a role happens to be shared with
-// another role (e.g. "Data Engineer" — both "data" and "engineer" are
-// generic), it falls back to requiring all of them together instead of any
-// one, which is stricter but still far more precise than matching on a
-// single generic word.
-const ROLE_WORD_FREQUENCY: Record<string, number> = {};
-for (const role of DEFAULT_ROLES_200) {
-  for (const w of new Set(expandRoleWords(role))) {
-    ROLE_WORD_FREQUENCY[w] = (ROLE_WORD_FREQUENCY[w] || 0) + 1;
-  }
-}
-
-function jobMatchesRole(role: string, job: any): boolean {
-  const title = (job.title || "").toLowerCase();
-  const words = expandRoleWords(role);
-  const distinctive = words.filter((w) => (ROLE_WORD_FREQUENCY[w] || 0) < 2);
-  if (distinctive.length > 0) return distinctive.some((w) => title.includes(w));
-  return words.every((w) => title.includes(w));
-}
+const PAGE_SIZE = 24;
+// Debounce the free-text search box so we don't fire a request per keystroke
+// — everything else (checkboxes/radios) triggers immediately since those are
+// discrete, deliberate clicks.
+const SEARCH_DEBOUNCE_MS = 350;
 
 export default function Dashboard() {
   const { tier, isAuthenticated, accessToken, user, refreshTier } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [allJobs, setAllJobs] = useState<any[]>([]);
-  const [filteredJobs, setFilteredJobs] = useState<any[]>([]);
+
+  const [filters, setFilters] = useState<FilterState>(EMPTY_FILTERS);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [jobs, setJobs] = useState<any[]>([]);
+  const [total, setTotal] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
   const [savedJobIds, setSavedJobIds] = useState<Set<string>>(new Set());
   const [appliedJobIds, setAppliedJobIds] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [checkoutBanner, setCheckoutBanner] = useState<CheckoutBannerState>(null);
 
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  // Guards the fetch effect against a stale response landing after a newer
+  // filter change already started a fresh request (fast typing/clicking).
+  const requestIdRef = useRef(0);
+
   useEffect(() => {
-    fetchJobs();
-    // Re-fetch whenever auth/tier resolves so Pro sessions get unmasked data
-  }, [accessToken]);
+    const t = setTimeout(() => setDebouncedSearch(filters.search), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(t);
+  }, [filters.search]);
+
+  const effectiveFilters = useMemo(
+    () => ({ ...filters, search: debouncedSearch }),
+    [filters, debouncedSearch]
+  );
+  const filterKey = JSON.stringify(effectiveFilters);
+
+  const buildQuery = useCallback(
+    (offset: number) => {
+      const params = new URLSearchParams();
+      if (effectiveFilters.search.trim()) params.set("search", effectiveFilters.search.trim());
+      effectiveFilters.sources.forEach((s) => params.append("sources", s));
+      effectiveFilters.cities.forEach((c) => params.append("cities", c));
+      if (effectiveFilters.modality !== "all") params.set("modality", effectiveFilters.modality);
+      if (effectiveFilters.freshness !== "all") params.set("freshness", effectiveFilters.freshness);
+      effectiveFilters.selectedRoles.forEach((r) => params.append("roles", r));
+      params.set("limit", String(PAGE_SIZE));
+      params.set("offset", String(offset));
+      return params.toString();
+    },
+    [effectiveFilters]
+  );
+
+  // Personal filters (saved/applied) aren't persisted server-side today, so
+  // they only ever apply to whatever's already been loaded in this session —
+  // scrolling further wouldn't surface more matches, so infinite scroll is
+  // paused while either is active instead of pretending to paginate them.
+  const personalFilterActive = filters.savedOnly || filters.appliedOnly;
+
+  // Reset + fetch the first page whenever a filter changes.
+  useEffect(() => {
+    const myRequestId = ++requestIdRef.current;
+    setIsLoading(true);
+    setJobs([]);
+
+    const headers: Record<string, string> = {};
+    if (accessToken) headers["Authorization"] = `Bearer ${accessToken}`;
+
+    fetch(`/api/jobs?${buildQuery(0)}`, { headers })
+      .then((res) => (res.ok ? res.json() : { jobs: [], total: 0, hasMore: false }))
+      .then((data) => {
+        if (myRequestId !== requestIdRef.current) return;
+        setJobs(Array.isArray(data.jobs) ? data.jobs : []);
+        setTotal(data.total || 0);
+        setHasMore(!!data.hasMore);
+      })
+      .catch(() => {
+        if (myRequestId !== requestIdRef.current) return;
+        setJobs([]);
+        setTotal(0);
+        setHasMore(false);
+      })
+      .finally(() => {
+        if (myRequestId === requestIdRef.current) setIsLoading(false);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accessToken, filterKey]);
+
+  const loadMore = useCallback(() => {
+    if (isLoadingMore || !hasMore || personalFilterActive) return;
+    const myRequestId = requestIdRef.current;
+    setIsLoadingMore(true);
+
+    const headers: Record<string, string> = {};
+    if (accessToken) headers["Authorization"] = `Bearer ${accessToken}`;
+
+    fetch(`/api/jobs?${buildQuery(jobs.length)}`, { headers })
+      .then((res) => (res.ok ? res.json() : { jobs: [], hasMore: false }))
+      .then((data) => {
+        if (myRequestId !== requestIdRef.current) return;
+        setJobs((prev) => [...prev, ...(Array.isArray(data.jobs) ? data.jobs : [])]);
+        setHasMore(!!data.hasMore);
+      })
+      .catch(() => {})
+      .finally(() => setIsLoadingMore(false));
+  }, [accessToken, buildQuery, jobs.length, hasMore, isLoadingMore, personalFilterActive]);
+
+  // Infinite scroll: fetch the next page once the sentinel at the bottom of
+  // the list enters the viewport.
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) loadMore();
+      },
+      { rootMargin: "400px" }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [loadMore]);
 
   // Wompi redirects back here with ?checkout=return after the sandbox
   // payment. The webhook that actually flips the tier to 'pro' can take a
@@ -112,16 +158,8 @@ export default function Dashboard() {
     const interval = setInterval(async () => {
       attempts += 1;
       await refreshTier();
-      // `tier` here is stale-closed; re-read via a fresh call isn't possible
-      // without a ref, so this just caps the polling window and lets the
-      // effect below promote "confirming" -> "success" once tier updates.
       if (attempts >= 5) {
         clearInterval(interval);
-        // Still not "success" after the whole window means the webhook
-        // never landed — stop silently spinning forever and say so instead
-        // (previously stuck on "Confirmando..." with no way out). The
-        // functional update is a no-op if the other effect already flipped
-        // this to "success" in the meantime.
         setCheckoutBanner((prev) => (prev === "confirming" ? "pending" : prev));
       }
     }, 2000);
@@ -143,95 +181,6 @@ export default function Dashboard() {
     }
   }, [checkoutBanner]);
 
-  async function fetchJobs() {
-    setIsLoading(true);
-    try {
-      const headers: Record<string, string> = {};
-      if (accessToken) headers["Authorization"] = `Bearer ${accessToken}`;
-      const res = await fetch("/api/jobs", { headers });
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data.jobs)) {
-          setAllJobs(data.jobs);
-          setFilteredJobs(data.jobs);
-        }
-      }
-    } catch (e) {
-      // no-op — an empty list with the "no results" state below is enough signal
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
-  const handleFilterChange = (filters: FilterState) => {
-    let result = [...allJobs];
-
-    if (filters.search.trim()) {
-      const s = filters.search.toLowerCase();
-      result = result.filter(
-        (j) =>
-          (j.title && j.title.toLowerCase().includes(s)) ||
-          (j.company && j.company.toLowerCase().includes(s)) ||
-          (j.location && j.location.toLowerCase().includes(s))
-      );
-    }
-
-    if (filters.source && filters.source !== "all") {
-      result = result.filter(
-        (j) =>
-          j.source === filters.source ||
-          (Array.isArray(j.sources) && j.sources.includes(filters.source)) ||
-          (Array.isArray(j.alsoIn) && j.alsoIn.includes(filters.source))
-      );
-    }
-
-    if (filters.city && filters.city !== "all") {
-      const normalize = (s: string) =>
-        s
-          .normalize("NFD")
-          .replace(/[̀-ͯ]/g, "")
-          .toLowerCase();
-      const cityNorm = normalize(filters.city);
-      result = result.filter((j) => j.location && normalize(j.location).includes(cityNorm));
-    }
-
-    if (filters.modality && filters.modality !== "all") {
-      const m = filters.modality.toLowerCase();
-      result = result.filter((j) => {
-        const loc = (j.location || "").toLowerCase();
-        if (m === "remoto") return loc.includes("remoto") || loc.includes("remote");
-        if (m === "hibrido") return loc.includes("híbrido") || loc.includes("hibrido");
-        if (m === "presencial")
-          return !loc.includes("remoto") && !loc.includes("remote") && !loc.includes("híbrido");
-        return true;
-      });
-    }
-
-    if (filters.freshness && filters.freshness !== "all") {
-      const maxAgeHours =
-        filters.freshness === "24h" ? 24 : filters.freshness === "48h" ? 48 : 24 * 7;
-      result = result.filter((j) => {
-        if (!j.publishedAt) return false;
-        const ageHours = (Date.now() - new Date(j.publishedAt).getTime()) / (1000 * 60 * 60);
-        return ageHours <= maxAgeHours;
-      });
-    }
-
-    if (filters.selectedRoles && filters.selectedRoles.length > 0) {
-      result = result.filter((j) => filters.selectedRoles.some((role) => jobMatchesRole(role, j)));
-    }
-
-    if (filters.savedOnly) {
-      result = result.filter((j) => savedJobIds.has(j.jobId));
-    }
-
-    if (filters.appliedOnly) {
-      result = result.filter((j) => appliedJobIds.has(j.jobId));
-    }
-
-    setFilteredJobs(result);
-  };
-
   const handleSaveToggle = (jobId: string) => {
     const next = new Set(savedJobIds);
     if (next.has(jobId)) next.delete(jobId);
@@ -246,23 +195,29 @@ export default function Dashboard() {
     setAppliedJobIds(next);
   };
 
+  const visibleJobs = jobs.filter((j) => {
+    if (filters.savedOnly && !savedJobIds.has(j.jobId)) return false;
+    if (filters.appliedOnly && !appliedJobIds.has(j.jobId)) return false;
+    return true;
+  });
+
   return (
     <section
       className="relative w-full overflow-x-hidden min-h-screen"
-      style={{ backgroundColor: "#0A0B0D" }}
+      style={{ backgroundColor: "#fafafa" }}
     >
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-20">
         {checkoutBanner && (
           <div
             className={`mb-4 p-3 rounded-xl text-xs font-mono flex items-center gap-2 ${
               checkoutBanner === "success"
-                ? "bg-emerald-500/10 border border-emerald-500/30 text-emerald-300"
-                : "bg-amber-500/10 border border-amber-500/30 text-amber-300"
+                ? "bg-primary/10 border border-primary/30 text-primary"
+                : "bg-accent/10 border border-accent/30 text-accent"
             }`}
           >
             {checkoutBanner === "confirming" && (
               <>
-                <span className="w-3 h-3 rounded-full border-2 border-amber-300 border-t-transparent animate-spin" />
+                <span className="w-3 h-3 rounded-full border-2 border-accent border-t-transparent animate-spin" />
                 Confirmando tu pago con Wompi...
               </>
             )}
@@ -280,86 +235,113 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* User Tier Status Banner */}
-        <div className="flex items-center justify-between gap-4 mb-6 p-3 rounded-xl bg-[#131519] border border-[#262A31] text-xs font-mono">
-          <div className="flex items-center gap-2">
-            <span
-              className={`w-2.5 h-2.5 rounded-full ${tier === "pro" ? "bg-emerald-400 animate-pulse" : "bg-amber-400"}`}
-            />
-            <span className="text-slate-300">
-              Estado de Cuenta:{" "}
-              <strong
-                className={
-                  tier === "pro" ? "text-emerald-400 font-bold" : "text-amber-400 font-bold"
-                }
-              >
-                {tier === "pro"
-                  ? `🌟 Suscriptor Pro (${user?.email})`
-                  : isAuthenticated
-                    ? "FREE (Vacantes >48h Gratuitas / 0-48h Bloqueadas)"
-                    : "Explorando sin cuenta (Vacantes >48h Gratuitas)"}
-              </strong>
-            </span>
-          </div>
+        {PAYWALL_ENABLED && (
+          <div className="flex items-center justify-between gap-4 mb-6 p-3 rounded-xl bg-[#ffffff] border border-[#e6e8e4] text-xs font-mono">
+            <div className="flex items-center gap-2">
+              <span
+                className={`w-2.5 h-2.5 rounded-full ${tier === "pro" ? "bg-primary animate-pulse" : "bg-accent"}`}
+              />
+              <span className="text-foreground">
+                Estado de Cuenta:{" "}
+                <strong className={tier === "pro" ? "text-primary font-bold" : "text-accent font-bold"}>
+                  {tier === "pro"
+                    ? `🌟 Suscriptor Pro (${user?.email})`
+                    : isAuthenticated
+                      ? "FREE (Vacantes >48h Gratuitas / 0-48h Bloqueadas)"
+                      : "Explorando sin cuenta (Vacantes >48h Gratuitas)"}
+                </strong>
+              </span>
+            </div>
 
-          {tier === "free" && (
-            <button
-              onClick={() => navigate("/pricing")}
-              className="px-3 py-1 rounded bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold font-sans text-xs transition-all shadow"
-            >
-              🔓 Desbloquear Pro por {formatCOP(PRO_MONTHLY_PRICE_COP)} COP
-            </button>
-          )}
+            {tier === "free" && (
+              <button
+                onClick={() => navigate("/pricing")}
+                className="px-3 py-1 rounded bg-accent hover:bg-accent text-primary-foreground font-bold font-sans text-xs transition-all shadow"
+              >
+                🔓 Desbloquear Pro por {formatCOP(PRO_MONTHLY_PRICE_COP)} COP
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Top search bar */}
+        <div className="mb-4">
+          <div className="relative">
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-ink-faint">🔍</span>
+            <input
+              type="text"
+              value={filters.search}
+              onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
+              placeholder="Título, empresa o palabra clave..."
+              className="w-full pl-11 pr-4 py-3 bg-[#ffffff] border border-[#e6e8e4] rounded-xl text-foreground placeholder-slate-500 text-sm focus:outline-none focus:border-primary/50"
+            />
+          </div>
         </div>
 
-        <div className="mt-4">
-          <StatsBar totalJobs={allJobs.length} filteredJobs={filteredJobs.length} />
+        <div className="flex flex-col lg:flex-row gap-6">
+          <FilterBar filters={filters} onFilterChange={setFilters} />
 
-          <FilterBar onFilterChange={handleFilterChange} />
+          <div className="flex-1 min-w-0">
+            <StatsBar totalJobs={total} filteredJobs={visibleJobs.length} />
 
-          {isLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="rounded-xl p-5 border border-[#262A31] bg-[#131519] animate-pulse space-y-3"
-                >
-                  <div className="h-3 w-24 rounded bg-[#1F232B]" />
-                  <div className="h-4 w-3/4 rounded bg-[#1F232B]" />
-                  <div className="h-3 w-1/2 rounded bg-[#1F232B]" />
-                  <div className="h-3 w-2/3 rounded bg-[#1F232B]" />
+            {isLoading ? (
+              <div className="space-y-3">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="rounded-xl p-5 border border-[#e6e8e4] bg-[#ffffff] animate-pulse space-y-3"
+                  >
+                    <div className="h-4 w-3/4 rounded bg-[#f1f2f0]" />
+                    <div className="h-3 w-1/2 rounded bg-[#f1f2f0]" />
+                    <div className="h-3 w-2/3 rounded bg-[#f1f2f0]" />
+                  </div>
+                ))}
+              </div>
+            ) : visibleJobs.length > 0 ? (
+              <>
+                <div className="space-y-3">
+                  {visibleJobs.map((job) =>
+                    job.isLocked ? (
+                      <PaywallCard
+                        key={job.jobId || job.url}
+                        job={job}
+                        onUnlockClick={() => navigate("/pricing")}
+                      />
+                    ) : (
+                      <JobCard
+                        key={job.jobId || job.url}
+                        job={{
+                          ...job,
+                          isSaved: savedJobIds.has(job.jobId),
+                          isApplied: appliedJobIds.has(job.jobId)
+                        }}
+                        onSaveToggle={handleSaveToggle}
+                        onAppliedToggle={handleAppliedToggle}
+                      />
+                    )
+                  )}
                 </div>
-              ))}
-            </div>
-          ) : filteredJobs.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {filteredJobs.map((job) =>
-                job.isLocked ? (
-                  <PaywallCard
-                    key={job.jobId || job.url}
-                    job={job}
-                    onUnlockClick={() => navigate("/pricing")}
-                  />
-                ) : (
-                  <JobCard
-                    key={job.jobId || job.url}
-                    job={{
-                      ...job,
-                      isSaved: savedJobIds.has(job.jobId),
-                      isApplied: appliedJobIds.has(job.jobId)
-                    }}
-                    onSaveToggle={handleSaveToggle}
-                    onAppliedToggle={handleAppliedToggle}
-                  />
-                )
-              )}
-            </div>
-          ) : (
-            <div className="text-center py-16 px-4 rounded-2xl border border-[#262A31] bg-[#131519] text-slate-400 font-mono">
-              <span className="text-3xl block mb-2">🔍</span>
-              No se encontraron vacantes con los filtros seleccionados.
-            </div>
-          )}
+
+                {!personalFilterActive && (
+                  <div ref={sentinelRef} className="h-10 flex items-center justify-center mt-4">
+                    {isLoadingMore && (
+                      <span className="w-5 h-5 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+                    )}
+                    {!hasMore && jobs.length > 0 && (
+                      <span className="text-xs font-mono text-ink-faint">
+                        Ya viste todas las vacantes que coinciden.
+                      </span>
+                    )}
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="text-center py-16 px-4 rounded-2xl border border-[#e6e8e4] bg-[#ffffff] text-muted-foreground font-mono">
+                <span className="text-3xl block mb-2">🔍</span>
+                No se encontraron vacantes con los filtros seleccionados.
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </section>

@@ -14,9 +14,9 @@ export default function RequireAuth({ children }: { children: JSX.Element }) {
     return (
       <div
         className="min-h-screen flex items-center justify-center"
-        style={{ backgroundColor: "#0A0B0D" }}
+        style={{ backgroundColor: "#fafafa" }}
       >
-        <div className="w-6 h-6 rounded-full border-2 border-emerald-500 border-t-transparent animate-spin" />
+        <div className="w-6 h-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
       </div>
     );
   }

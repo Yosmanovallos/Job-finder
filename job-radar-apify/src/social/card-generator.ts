@@ -34,7 +34,7 @@ export function generateCardSvg(digest: SocialDigest): string {
 
   <!-- Header Branding -->
   <circle cx="150" cy="210" r="12" fill="#34D399"/>
-  <text x="180" y="218" fill="#646B75" font-family="'JetBrains Mono', monospace" font-size="28" font-weight="600">job-radar / digest diario</text>
+  <text x="180" y="218" fill="#646B75" font-family="'JetBrains Mono', monospace" font-size="28" font-weight="600">buscotrabajo / digest diario</text>
 
   <!-- Live Status Chip -->
   <rect x="680" y="185" width="250" height="48" rx="24" fill="rgba(52,211,153,0.10)" stroke="rgba(52,211,153,0.30)" stroke-width="2"/>

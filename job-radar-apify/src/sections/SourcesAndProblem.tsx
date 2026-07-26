@@ -40,15 +40,15 @@ export default function SourcesAndProblem() {
       id="fuentes"
       className="bg-muted"
       style={{
-        borderTop: "1px solid #262A31",
-        borderBottom: "1px solid #262A31"
+        borderTop: "1px solid #e6e8e4",
+        borderBottom: "1px solid #e6e8e4"
       }}
     >
       {/* Sources Strip */}
       <div
         style={{
-          borderBottom: "1px solid #262A31",
-          background: "#131519"
+          borderBottom: "1px solid #e6e8e4",
+          background: "#ffffff"
         }}
       >
         <div className="mx-auto px-4 md:px-8 lg:px-16" style={{ maxWidth: "1200px" }}>
@@ -58,7 +58,7 @@ export default function SourcesAndProblem() {
               className="shrink-0 text-xs uppercase tracking-widest"
               style={{
                 fontFamily: "ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace",
-                color: "#646B75",
+                color: "#9a9d98",
                 letterSpacing: "0.12em"
               }}
             >
@@ -68,45 +68,40 @@ export default function SourcesAndProblem() {
             {/* Divider line — desktop only */}
             <div
               className="hidden sm:block shrink-0 w-px self-stretch"
-              style={{ background: "#262A31" }}
+              style={{ background: "#e6e8e4" }}
             />
 
-            {/* Chips row — horizontal scroll on mobile, no page overflow */}
-            <div className="relative flex-1 min-w-0">
+            {/* Chips row — continuously scrolling marquee, paused on hover
+                and frozen for prefers-reduced-motion via the .marquee-track
+                CSS rule (see index.css). The list is duplicated once so the
+                loop point is invisible. */}
+            <div className="relative flex-1 min-w-0 overflow-hidden">
               {/* Left gradient mask */}
               <div
                 className="pointer-events-none absolute left-0 top-0 bottom-0 w-6 z-10 hidden sm:block"
                 style={{
-                  background: "linear-gradient(to right, #131519, transparent)"
+                  background: "linear-gradient(to right, #ffffff, transparent)"
                 }}
               />
               {/* Right gradient mask */}
               <div
                 className="pointer-events-none absolute right-0 top-0 bottom-0 w-8 z-10"
                 style={{
-                  background: "linear-gradient(to left, #131519, transparent)"
+                  background: "linear-gradient(to left, #ffffff, transparent)"
                 }}
               />
 
-              <div
-                className="flex flex-row gap-2 overflow-x-auto"
-                style={{
-                  scrollbarWidth: "none",
-                  msOverflowStyle: "none",
-                  WebkitOverflowScrolling: "touch",
-                  paddingBottom: "2px"
-                }}
-              >
-                {sources.map((source) => (
+              <div className="marquee-track flex flex-row gap-2 w-max">
+                {[...sources, ...sources].map((source, i) => (
                   <span
-                    key={source}
+                    key={`${source}-${i}`}
                     className="shrink-0 inline-flex items-center px-3 py-1 text-xs whitespace-nowrap transition-colors duration-150"
                     style={{
                       fontFamily:
                         "ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace",
-                      color: "#9AA1AC",
-                      background: "#1B1E24",
-                      border: "1px solid #262A31",
+                      color: "#5b5f5c",
+                      background: "#f1f2f0",
+                      border: "1px solid #e6e8e4",
                       borderRadius: "999px",
                       fontSize: "0.8125rem"
                     }}
@@ -128,7 +123,7 @@ export default function SourcesAndProblem() {
             className="inline-block mb-4 text-xs uppercase tracking-widest"
             style={{
               fontFamily: "ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace",
-              color: "#646B75",
+              color: "#9a9d98",
               letterSpacing: "0.12em"
             }}
           >
@@ -139,7 +134,7 @@ export default function SourcesAndProblem() {
             style={{
               fontSize: "clamp(1.5rem, 3vw, 2.25rem)",
               letterSpacing: "-0.01em",
-              color: "#F4F5F7",
+              color: "#0e0f10",
               maxWidth: "640px"
             }}
           >
@@ -154,27 +149,27 @@ export default function SourcesAndProblem() {
               key={title}
               className="group relative flex flex-col gap-4 p-6 transition-all duration-150 cursor-default"
               style={{
-                background: "#131519",
-                border: "1px solid #262A31",
+                background: "#ffffff",
+                border: "1px solid #e6e8e4",
                 borderRadius: "12px"
               }}
               onMouseEnter={(e) => {
                 const el = e.currentTarget as HTMLDivElement;
-                el.style.background = "#1B1E24";
-                el.style.borderColor = "#3A404A";
+                el.style.background = "#f1f2f0";
+                el.style.borderColor = "#d3d6cf";
               }}
               onMouseLeave={(e) => {
                 const el = e.currentTarget as HTMLDivElement;
-                el.style.background = "#131519";
-                el.style.borderColor = "#262A31";
+                el.style.background = "#ffffff";
+                el.style.borderColor = "#e6e8e4";
               }}
             >
               {/* Grid line accent — top-left corner decoration */}
               <div
                 className="absolute top-0 left-0 w-6 h-6 pointer-events-none"
                 style={{
-                  borderTop: "1px solid #34D399",
-                  borderLeft: "1px solid #34D399",
+                  borderTop: "1px solid #0f6b4c",
+                  borderLeft: "1px solid #0f6b4c",
                   borderTopLeftRadius: "12px",
                   opacity: 0.35
                 }}
@@ -185,7 +180,7 @@ export default function SourcesAndProblem() {
                 className="text-xs"
                 style={{
                   fontFamily: "ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace",
-                  color: "#646B75",
+                  color: "#9a9d98",
                   fontSize: "0.8125rem"
                 }}
               >
@@ -196,11 +191,11 @@ export default function SourcesAndProblem() {
               <div
                 className="flex items-center justify-center w-10 h-10 rounded-lg"
                 style={{
-                  background: "rgba(52,211,153,0.10)",
-                  border: "1px solid rgba(52,211,153,0.20)"
+                  background: "rgba(15,107,76,0.10)",
+                  border: "1px solid rgba(15,107,76,0.20)"
                 }}
               >
-                <Icon weight="duotone" size={20} style={{ color: "#34D399" }} />
+                <Icon weight="duotone" size={20} style={{ color: "#0f6b4c" }} />
               </div>
 
               {/* Text */}
@@ -209,7 +204,7 @@ export default function SourcesAndProblem() {
                   className="font-heading font-semibold leading-snug"
                   style={{
                     fontSize: "1.125rem",
-                    color: "#F4F5F7"
+                    color: "#0e0f10"
                   }}
                 >
                   {title}
@@ -218,7 +213,7 @@ export default function SourcesAndProblem() {
                   className="leading-relaxed"
                   style={{
                     fontSize: "0.9375rem",
-                    color: "#9AA1AC",
+                    color: "#5b5f5c",
                     lineHeight: "1.65"
                   }}
                 >

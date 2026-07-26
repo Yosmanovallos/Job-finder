@@ -106,20 +106,20 @@ export default function Login() {
   const subtitle =
     mode === "forgot"
       ? "Te enviamos un enlace para elegir una nueva contraseña."
-      : "Accede a Job Radar para lanzar escaneos y desbloquear el plan Pro.";
+      : "Accede a BuscoTrabajo para lanzar escaneos y desbloquear el plan Pro.";
 
   return (
     <section
       className="min-h-screen flex items-center justify-center px-4"
-      style={{ backgroundColor: "#0A0B0D" }}
+      style={{ backgroundColor: "#fafafa" }}
     >
-      <div className="w-full max-w-sm p-6 rounded-2xl border border-[#262A31] bg-[#131519]">
-        <h1 className="text-xl font-bold text-slate-100 mb-1 font-heading">{title}</h1>
-        <p className="text-xs text-slate-400 mb-6 font-mono">{subtitle}</p>
+      <div className="w-full max-w-sm p-6 rounded-2xl border border-[#e6e8e4] bg-[#ffffff]">
+        <h1 className="text-xl font-bold text-foreground mb-1 font-heading">{title}</h1>
+        <p className="text-xs text-muted-foreground mb-6 font-mono">{subtitle}</p>
 
         {configError && (
-          <div className="mb-4 px-3 py-2.5 rounded-lg border border-red-500/30 bg-red-500/10">
-            <p className="text-xs text-red-400 font-mono">
+          <div className="mb-4 px-3 py-2.5 rounded-lg border border-destructive/30 bg-destructive/10">
+            <p className="text-xs text-destructive font-mono">
               El servicio de acceso está teniendo un problema de configuración en el servidor. No es
               algo que puedas arreglar desde aquí — ya quedó registrado, intenta de nuevo en unos
               minutos.
@@ -131,28 +131,28 @@ export default function Login() {
           <>
             <button
               onClick={handleGoogle}
-              className="w-full mb-4 px-4 py-3 rounded-lg border border-[#262A31] bg-[#0A0B0D] text-slate-100 text-sm font-semibold hover:bg-[#1B1E24] transition-all"
+              className="w-full mb-4 px-4 py-3 rounded-lg border border-[#e6e8e4] bg-[#fafafa] text-foreground text-sm font-semibold hover:bg-[#f1f2f0] transition-all"
             >
               Continuar con Google
             </button>
 
             <div className="flex items-center gap-2 mb-4">
-              <div className="flex-1 h-px bg-[#262A31]" />
-              <span className="text-[11px] text-slate-500 font-mono">o con tu correo</span>
-              <div className="flex-1 h-px bg-[#262A31]" />
+              <div className="flex-1 h-px bg-[#e6e8e4]" />
+              <span className="text-[11px] text-ink-faint font-mono">o con tu correo</span>
+              <div className="flex-1 h-px bg-[#e6e8e4]" />
             </div>
           </>
         )}
 
         {mode === "signup" && signupSent ? (
           <div className="space-y-3">
-            <p className="text-sm text-emerald-400 font-mono">
+            <p className="text-sm text-primary font-mono">
               Revisa tu correo para confirmar la cuenta antes de iniciar sesión.
             </p>
             <button
               onClick={handleResend}
               disabled={resendCooldown > 0}
-              className="text-xs text-slate-400 hover:text-slate-200 font-mono disabled:opacity-50"
+              className="text-xs text-muted-foreground hover:text-foreground font-mono disabled:opacity-50"
             >
               {resendCooldown > 0
                 ? `Reenviar correo (${resendCooldown}s)`
@@ -160,7 +160,7 @@ export default function Login() {
             </button>
           </div>
         ) : mode === "forgot" && resetSent ? (
-          <p className="text-sm text-emerald-400 font-mono">
+          <p className="text-sm text-primary font-mono">
             Si ese correo tiene una cuenta, te llegó un enlace para elegir una nueva contraseña.
             Revisa tu bandeja (y spam).
           </p>
@@ -172,7 +172,7 @@ export default function Login() {
               placeholder="tucorreo@ejemplo.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-3 py-2.5 rounded-lg bg-[#0A0B0D] border border-[#262A31] text-slate-100 text-sm placeholder-slate-500 focus:outline-none"
+              className="w-full px-3 py-2.5 rounded-lg bg-[#fafafa] border border-[#e6e8e4] text-foreground text-sm placeholder-slate-500 focus:outline-none"
             />
             {mode !== "forgot" && (
               <input
@@ -182,7 +182,7 @@ export default function Login() {
                 placeholder="Contraseña"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-lg bg-[#0A0B0D] border border-[#262A31] text-slate-100 text-sm placeholder-slate-500 focus:outline-none"
+                className="w-full px-3 py-2.5 rounded-lg bg-[#fafafa] border border-[#e6e8e4] text-foreground text-sm placeholder-slate-500 focus:outline-none"
               />
             )}
 
@@ -190,18 +190,18 @@ export default function Login() {
               <button
                 type="button"
                 onClick={() => switchMode("forgot")}
-                className="text-xs text-slate-400 hover:text-slate-200 font-mono"
+                className="text-xs text-muted-foreground hover:text-foreground font-mono"
               >
                 ¿Olvidaste tu contraseña?
               </button>
             )}
 
-            {error && <p className="text-xs text-red-400 font-mono">{error}</p>}
+            {error && <p className="text-xs text-destructive font-mono">{error}</p>}
 
             <button
               type="submit"
               disabled={busy}
-              className="w-full px-4 py-3 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm transition-all disabled:opacity-50"
+              className="w-full px-4 py-3 rounded-lg bg-primary hover:bg-primary text-primary-foreground font-bold text-sm transition-all disabled:opacity-50"
             >
               {busy
                 ? "Procesando..."
@@ -217,14 +217,14 @@ export default function Login() {
         {mode === "forgot" ? (
           <button
             onClick={() => switchMode("login")}
-            className="w-full mt-4 text-xs text-slate-400 hover:text-slate-200 font-mono"
+            className="w-full mt-4 text-xs text-muted-foreground hover:text-foreground font-mono"
           >
             ¿Ya la recordaste? Inicia sesión
           </button>
         ) : (
           <button
             onClick={() => switchMode(mode === "login" ? "signup" : "login")}
-            className="w-full mt-4 text-xs text-slate-400 hover:text-slate-200 font-mono"
+            className="w-full mt-4 text-xs text-muted-foreground hover:text-foreground font-mono"
           >
             {mode === "login"
               ? "¿No tienes cuenta? Regístrate"

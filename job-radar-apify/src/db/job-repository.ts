@@ -4,6 +4,7 @@ import { pool } from "./client.js";
 import { Job, normalizeJobUrl } from "../sources/types.js";
 import { saveRunToCache, getAllCachedRuns } from "../cache-manager.js";
 import { validateJobs } from "./job-validator.js";
+import { PAYWALL_ENABLED } from "../config.js";
 
 dotenv.config();
 
@@ -197,6 +198,42 @@ export async function getJobs(
   });
 }
 
+// getJobs()'s DISTINCT ON query has no index backing the lower(trim(...))
+// expressions it groups/sorts by, so Postgres does a full scan + sort of the
+// whole `jobs` table on every call — measured at 500ms-2s against the real
+// corpus. GET /api/jobs used to call getJobs() once per dashboard load; once
+// pagination made it call this on every scroll/filter change too, that cost
+// started showing up as a visible loading spinner on every page. Caching the
+// unfiltered corpus for a short TTL turns the expensive query into "at most
+// once every 30s across all requests" — everything after that (pagination,
+// filtering) is a plain in-memory array operation, effectively free at this
+// corpus size. A proper fix is a matching functional index in Postgres; this
+// is the immediate, zero-schema-risk mitigation.
+let jobsCache: { data: any[]; expiresAt: number } | null = null;
+let jobsCachePending: Promise<any[]> | null = null;
+// Scraping runs on an hours-long per-role cadence, so a couple of minutes of
+// staleness here is invisible in practice — chosen to make the still-slow
+// cold query (see below) rare rather than just occasional.
+const JOBS_CACHE_TTL_MS = 120_000;
+
+export async function getJobsCached(limit: number = DEFAULT_JOBS_LIMIT): Promise<any[]> {
+  const now = Date.now();
+  if (jobsCache && jobsCache.expiresAt > now) return jobsCache.data;
+  if (jobsCachePending) return jobsCachePending;
+
+  jobsCachePending = getJobs(limit)
+    .then((data) => {
+      jobsCache = { data, expiresAt: Date.now() + JOBS_CACHE_TTL_MS };
+      jobsCachePending = null;
+      return data;
+    })
+    .catch((err) => {
+      jobsCachePending = null;
+      throw err;
+    });
+  return jobsCachePending;
+}
+
 /**
  * Applies the 48h freshness paywall to a jobs array for the public API response.
  * Pro sessions pass through unchanged; free/anonymous callers get sensitive
@@ -204,7 +241,9 @@ export async function getJobs(
  * the frontend can render a truthful (not invented) teaser.
  */
 export function maskLockedFields(jobs: any[], tier: SubscriptionTier): any[] {
-  if (tier === "pro") return jobs.map((job) => ({ ...job, isLocked: false }));
+  if (!PAYWALL_ENABLED || tier === "pro") {
+    return jobs.map((job) => ({ ...job, isLocked: false }));
+  }
   return jobs.map((job) => {
     if (!job.isLocked) return job;
     return { ...job, company: null, location: null, url: null, dateText: null };
@@ -243,6 +282,7 @@ export interface AppUser {
   name: string | null;
   subscriptionTier: SubscriptionTier;
   subscriptionEnd: string | null;
+  preferredRoles: string[] | null;
 }
 
 function effectiveTier(row: {
@@ -266,7 +306,7 @@ export async function getOrCreateUser(
     `INSERT INTO users (id, email, name)
      VALUES ($1, $2, $3)
      ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email
-     RETURNING id, email, name, subscription_tier, subscription_end`,
+     RETURNING id, email, name, subscription_tier, subscription_end, preferred_roles`,
     [authUid, email, name ?? null]
   );
   const row = result.rows[0];
@@ -275,7 +315,8 @@ export async function getOrCreateUser(
     email: row.email,
     name: row.name,
     subscriptionTier: effectiveTier(row),
-    subscriptionEnd: row.subscription_end
+    subscriptionEnd: row.subscription_end,
+    preferredRoles: row.preferred_roles
   };
 }
 
@@ -287,7 +328,7 @@ export async function getOrCreateUser(
 export async function updateUserName(authUid: string, name: string): Promise<AppUser> {
   const result = await pool.query(
     `UPDATE users SET name = $2 WHERE id = $1
-     RETURNING id, email, name, subscription_tier, subscription_end`,
+     RETURNING id, email, name, subscription_tier, subscription_end, preferred_roles`,
     [authUid, name]
   );
   const row = result.rows[0];
@@ -296,7 +337,31 @@ export async function updateUserName(authUid: string, name: string): Promise<App
     email: row.email,
     name: row.name,
     subscriptionTier: effectiveTier(row),
-    subscriptionEnd: row.subscription_end
+    subscriptionEnd: row.subscription_end,
+    preferredRoles: row.preferred_roles
+  };
+}
+
+/**
+ * Persists the roles a user picked in the post-signup onboarding step.
+ * `roles` may be an empty array (user explicitly chose none) — that still
+ * counts as "onboarding completed", distinct from the NULL default that
+ * means the step hasn't been seen yet.
+ */
+export async function updateUserPreferredRoles(authUid: string, roles: string[]): Promise<AppUser> {
+  const result = await pool.query(
+    `UPDATE users SET preferred_roles = $2::jsonb WHERE id = $1
+     RETURNING id, email, name, subscription_tier, subscription_end, preferred_roles`,
+    [authUid, JSON.stringify(roles)]
+  );
+  const row = result.rows[0];
+  return {
+    id: row.id,
+    email: row.email,
+    name: row.name,
+    subscriptionTier: effectiveTier(row),
+    subscriptionEnd: row.subscription_end,
+    preferredRoles: row.preferred_roles
   };
 }
 

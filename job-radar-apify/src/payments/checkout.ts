@@ -44,7 +44,7 @@ function buildIntegritySignature(
 }
 
 /**
- * Starts a Wompi Web Checkout session for the Job Radar Pro monthly plan.
+ * Starts a Wompi Web Checkout session for the BuscoTrabajo Pro monthly plan.
  * Persists a 'pending' transaction row keyed by the reference so the webhook
  * can later confirm it idempotently.
  */

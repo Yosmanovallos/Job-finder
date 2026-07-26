@@ -72,30 +72,30 @@ export default function Pricing() {
   };
 
   return (
-    <section className="min-h-screen px-4 py-16" style={{ backgroundColor: "#0A0B0D" }}>
+    <section className="min-h-screen px-4 py-16" style={{ backgroundColor: "#fafafa" }}>
       <div className="max-w-3xl mx-auto">
         <div className="text-center mb-10">
-          <h1 className="text-3xl font-bold mb-2 font-heading" style={{ color: "#F4F5F7" }}>
+          <h1 className="text-3xl font-bold mb-2 font-heading" style={{ color: "#0e0f10" }}>
             Elige tu plan
           </h1>
-          <p className="text-sm text-slate-400">
+          <p className="text-sm text-muted-foreground">
             Sin permanencia — activa Pro cuando lo necesites, cancela cuando quieras.
           </p>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
           {/* Free plan card */}
-          <div className="rounded-2xl border border-[#262A31] bg-[#131519] p-6 flex flex-col">
-            <span className="text-xs font-mono uppercase tracking-widest text-slate-500 mb-2">
+          <div className="rounded-2xl border border-[#e6e8e4] bg-[#ffffff] p-6 flex flex-col">
+            <span className="text-xs font-mono uppercase tracking-widest text-ink-faint mb-2">
               {freePlan.name}
             </span>
-            <p className="text-3xl font-bold mb-4" style={{ color: "#F4F5F7" }}>
+            <p className="text-3xl font-bold mb-4" style={{ color: "#0e0f10" }}>
               {freePlan.price}
             </p>
             <ul className="space-y-2.5 mb-6 flex-1">
               {freePlan.features.map((f) => (
-                <li key={f} className="flex items-start gap-2 text-sm text-slate-400">
-                  <span className="text-emerald-400 mt-0.5">✓</span>
+                <li key={f} className="flex items-start gap-2 text-sm text-muted-foreground">
+                  <span className="text-primary mt-0.5">✓</span>
                   {f}
                 </li>
               ))}
@@ -103,14 +103,14 @@ export default function Pricing() {
             {isAuthenticated ? (
               <Link
                 to="/dashboard"
-                className="text-center px-4 py-3 rounded-lg border border-[#3A404A] text-slate-100 text-sm font-semibold hover:bg-[#1B1E24] transition-all"
+                className="text-center px-4 py-3 rounded-lg border border-[#d3d6cf] text-foreground text-sm font-semibold hover:bg-[#f1f2f0] transition-all"
               >
                 Ir al dashboard
               </Link>
             ) : (
               <Link
                 to="/dashboard"
-                className="text-center px-4 py-3 rounded-lg border border-[#3A404A] text-slate-100 text-sm font-semibold hover:bg-[#1B1E24] transition-all"
+                className="text-center px-4 py-3 rounded-lg border border-[#d3d6cf] text-foreground text-sm font-semibold hover:bg-[#f1f2f0] transition-all"
               >
                 {freePlan.cta}
               </Link>
@@ -118,39 +118,39 @@ export default function Pricing() {
           </div>
 
           {/* Pro plan card */}
-          <div className="relative rounded-2xl border-2 border-emerald-500 bg-[#131519] p-6 flex flex-col">
-            <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-xs font-mono font-semibold bg-emerald-500 text-slate-950">
+          <div className="relative rounded-2xl border-2 border-primary bg-[#ffffff] p-6 flex flex-col">
+            <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-xs font-mono font-semibold bg-primary text-primary-foreground">
               Más popular
             </span>
-            <span className="text-xs font-mono uppercase tracking-widest text-emerald-400 mb-2">
+            <span className="text-xs font-mono uppercase tracking-widest text-primary mb-2">
               {proPlan.name}
             </span>
-            <p className="text-3xl font-bold mb-4" style={{ color: "#F4F5F7" }}>
+            <p className="text-3xl font-bold mb-4" style={{ color: "#0e0f10" }}>
               {proPlan.price}{" "}
-              <span className="text-sm font-normal text-slate-400">{proPlan.period}</span>
+              <span className="text-sm font-normal text-muted-foreground">{proPlan.period}</span>
             </p>
             <ul className="space-y-2.5 mb-6 flex-1">
               {proPlan.features.map((f) => (
-                <li key={f} className="flex items-start gap-2 text-sm text-slate-400">
-                  <span className="text-emerald-400 mt-0.5">✓</span>
+                <li key={f} className="flex items-start gap-2 text-sm text-muted-foreground">
+                  <span className="text-primary mt-0.5">✓</span>
                   {f}
                 </li>
               ))}
             </ul>
 
             {tier === "pro" && (
-              <p className="text-center text-sm text-emerald-400 font-mono py-3">
+              <p className="text-center text-sm text-primary font-mono py-3">
                 🎉 Ya eres suscriptor Pro
               </p>
             )}
             <button
               onClick={handleSubscribe}
               disabled={busy}
-              className="px-4 py-3 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+              className="px-4 py-3 rounded-lg bg-primary hover:bg-primary text-primary-foreground font-bold text-sm transition-all disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {busy ? (
                 <>
-                  <span className="w-3.5 h-3.5 rounded-full border-2 border-slate-950 border-t-transparent animate-spin" />
+                  <span className="w-3.5 h-3.5 rounded-full border-2 border-primary-foreground border-t-transparent animate-spin" />
                   Redirigiendo a Wompi...
                 </>
               ) : tier === "pro" ? (
@@ -159,15 +159,15 @@ export default function Pricing() {
                 proPlan.cta
               )}
             </button>
-            {error && <p className="text-xs text-red-400 font-mono mt-3 text-center">{error}</p>}
+            {error && <p className="text-xs text-destructive font-mono mt-3 text-center">{error}</p>}
           </div>
         </div>
 
         {/* Trust row */}
-        <div className="flex items-center justify-center gap-2 mt-8 text-xs font-mono text-slate-500">
+        <div className="flex items-center justify-center gap-2 mt-8 text-xs font-mono text-ink-faint">
           <span>🔒</span>
           <span>Pago procesado de forma segura por Wompi</span>
-          <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/30">
+          <span className="px-2 py-0.5 rounded-full bg-accent/10 text-accent border border-accent/30">
             Sandbox
           </span>
         </div>
@@ -177,7 +177,7 @@ export default function Pricing() {
             refreshTier();
             navigate("/dashboard");
           }}
-          className="w-full mt-6 text-xs text-slate-400 hover:text-slate-200 font-mono text-center"
+          className="w-full mt-6 text-xs text-muted-foreground hover:text-foreground font-mono text-center"
         >
           ← Volver al Dashboard
         </button>

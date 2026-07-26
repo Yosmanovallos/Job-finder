@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../auth/auth-provider.js";
-import { PRO_MONTHLY_PRICE_COP, formatCOP } from "../config.js";
+import { PRO_MONTHLY_PRICE_COP, formatCOP, PAYWALL_ENABLED } from "../config.js";
 
 interface TransactionRecord {
   id: string;
@@ -13,10 +13,10 @@ interface TransactionRecord {
 }
 
 const STATUS_LABEL: Record<string, { label: string; className: string }> = {
-  approved: { label: "Aprobado", className: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" },
-  pending: { label: "Pendiente", className: "bg-amber-500/10 text-amber-400 border-amber-500/30" },
-  declined: { label: "Rechazado", className: "bg-red-500/10 text-red-400 border-red-500/30" },
-  error: { label: "Error", className: "bg-red-500/10 text-red-400 border-red-500/30" }
+  approved: { label: "Aprobado", className: "bg-primary/10 text-primary border-primary/30" },
+  pending: { label: "Pendiente", className: "bg-accent/10 text-accent border-accent/30" },
+  declined: { label: "Rechazado", className: "bg-destructive/10 text-destructive border-destructive/30" },
+  error: { label: "Error", className: "bg-destructive/10 text-destructive border-destructive/30" }
 };
 
 // RequireAuth (see App.tsx) already guarantees a resolved, authenticated
@@ -79,15 +79,15 @@ export default function Account() {
   };
 
   return (
-    <section className="min-h-screen px-4 py-16" style={{ backgroundColor: "#0A0B0D" }}>
+    <section className="min-h-screen px-4 py-16" style={{ backgroundColor: "#fafafa" }}>
       <div className="max-w-lg mx-auto">
-        <h1 className="text-2xl font-bold mb-8 font-heading" style={{ color: "#F4F5F7" }}>
+        <h1 className="text-2xl font-bold mb-8 font-heading" style={{ color: "#0e0f10" }}>
           Mi cuenta
         </h1>
 
-        <div className="rounded-2xl border border-[#262A31] bg-[#131519] p-6 space-y-5">
+        <div className="rounded-2xl border border-[#e6e8e4] bg-[#ffffff] p-6 space-y-5">
           <div>
-            <p className="text-xs font-mono text-slate-500 mb-1">Nombre</p>
+            <p className="text-xs font-mono text-ink-faint mb-1">Nombre</p>
             {editingName ? (
               <div className="space-y-2">
                 <input
@@ -95,21 +95,21 @@ export default function Account() {
                   value={nameInput}
                   onChange={(e) => setNameInput(e.target.value)}
                   maxLength={255}
-                  className="w-full px-3 py-2 rounded-lg bg-[#0A0B0D] border border-[#262A31] text-slate-100 text-sm focus:outline-none"
+                  className="w-full px-3 py-2 rounded-lg bg-[#fafafa] border border-[#e6e8e4] text-foreground text-sm focus:outline-none"
                 />
-                {nameError && <p className="text-xs text-red-400 font-mono">{nameError}</p>}
+                {nameError && <p className="text-xs text-destructive font-mono">{nameError}</p>}
                 <div className="flex gap-2">
                   <button
                     onClick={handleSaveName}
                     disabled={savingName}
-                    className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition-all disabled:opacity-50"
+                    className="px-3 py-1.5 rounded-lg bg-primary hover:bg-primary text-primary-foreground font-bold text-xs transition-all disabled:opacity-50"
                   >
                     {savingName ? "Guardando..." : "Guardar"}
                   </button>
                   <button
                     onClick={() => setEditingName(false)}
                     disabled={savingName}
-                    className="px-3 py-1.5 rounded-lg border border-[#262A31] text-slate-300 text-xs font-semibold hover:bg-[#1B1E24] transition-all"
+                    className="px-3 py-1.5 rounded-lg border border-[#e6e8e4] text-foreground text-xs font-semibold hover:bg-[#f1f2f0] transition-all"
                   >
                     Cancelar
                   </button>
@@ -117,10 +117,10 @@ export default function Account() {
               </div>
             ) : (
               <div className="flex items-center justify-between">
-                <p className="text-sm text-slate-100">{user?.name}</p>
+                <p className="text-sm text-foreground">{user?.name}</p>
                 <button
                   onClick={startEditingName}
-                  className="text-xs text-emerald-400 hover:text-emerald-300 font-mono"
+                  className="text-xs text-primary hover:text-primary font-mono"
                 >
                   Editar
                 </button>
@@ -128,23 +128,23 @@ export default function Account() {
             )}
           </div>
 
-          <div className="h-px bg-[#262A31]" />
+          <div className="h-px bg-[#e6e8e4]" />
 
           <div>
-            <p className="text-xs font-mono text-slate-500 mb-1">Correo</p>
-            <p className="text-sm text-slate-100">{user?.email}</p>
+            <p className="text-xs font-mono text-ink-faint mb-1">Correo</p>
+            <p className="text-sm text-foreground">{user?.email}</p>
           </div>
 
-          <div className="h-px bg-[#262A31]" />
+          <div className="h-px bg-[#e6e8e4]" />
 
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs font-mono text-slate-500 mb-1">Plan actual</p>
+              <p className="text-xs font-mono text-ink-faint mb-1">Plan actual</p>
               <span
                 className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-semibold ${
                   tier === "pro"
-                    ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
-                    : "bg-amber-500/10 text-amber-400 border border-amber-500/30"
+                    ? "bg-primary/10 text-primary border border-primary/30"
+                    : "bg-accent/10 text-accent border border-accent/30"
                 }`}
               >
                 {tier === "pro" ? "🌟 Pro" : "FREE"}
@@ -153,8 +153,8 @@ export default function Account() {
 
             {tier === "pro" && user?.subscriptionEnd && (
               <div className="text-right">
-                <p className="text-xs font-mono text-slate-500 mb-1">Renueva</p>
-                <p className="text-sm text-slate-300 font-mono">
+                <p className="text-xs font-mono text-ink-faint mb-1">Renueva</p>
+                <p className="text-sm text-foreground font-mono">
                   {new Date(user.subscriptionEnd).toLocaleDateString("es-CO", {
                     day: "2-digit",
                     month: "short",
@@ -165,16 +165,16 @@ export default function Account() {
             )}
           </div>
 
-          {tier === "free" && (
+          {PAYWALL_ENABLED && tier === "free" && (
             <>
-              <div className="h-px bg-[#262A31]" />
+              <div className="h-px bg-[#e6e8e4]" />
               <div className="flex items-center justify-between gap-3 flex-wrap">
-                <p className="text-sm text-slate-400">
+                <p className="text-sm text-muted-foreground">
                   Desbloquea acceso inmediato por {formatCOP(PRO_MONTHLY_PRICE_COP)} COP/mes.
                 </p>
                 <Link
                   to="/pricing"
-                  className="px-4 py-2 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs transition-all whitespace-nowrap"
+                  className="px-4 py-2 rounded-lg bg-accent hover:bg-accent text-primary-foreground font-bold text-xs transition-all whitespace-nowrap"
                 >
                   Ver plan Pro
                 </Link>
@@ -182,20 +182,20 @@ export default function Account() {
             </>
           )}
 
-          {tier === "pro" && (
+          {PAYWALL_ENABLED && tier === "pro" && (
             <>
-              <div className="h-px bg-[#262A31]" />
+              <div className="h-px bg-[#e6e8e4]" />
               <div className="flex items-center justify-between gap-3 flex-wrap">
-                <p className="text-xs text-slate-500 font-mono">
+                <p className="text-xs text-ink-faint font-mono">
                   Para cancelar tu suscripción, escríbenos a{" "}
-                  <a href="mailto:buscotrabajocolombia123@gmail.com" className="text-emerald-400">
+                  <a href="mailto:buscotrabajocolombia123@gmail.com" className="text-primary">
                     buscotrabajocolombia123@gmail.com
                   </a>
                   . Aún no hay cancelación automática desde aquí.
                 </p>
                 <Link
                   to="/pricing"
-                  className="px-4 py-2 rounded-lg border border-emerald-500/30 text-emerald-400 text-xs font-bold hover:bg-emerald-500/10 transition-all whitespace-nowrap"
+                  className="px-4 py-2 rounded-lg border border-primary/30 text-primary text-xs font-bold hover:bg-primary/10 transition-all whitespace-nowrap"
                 >
                   Renovar ahora
                 </Link>
@@ -204,31 +204,31 @@ export default function Account() {
           )}
         </div>
 
-        <div className="rounded-2xl border border-[#262A31] bg-[#131519] p-6 mt-6">
-          <h2 className="text-sm font-bold mb-4 font-heading" style={{ color: "#F4F5F7" }}>
+        <div className="rounded-2xl border border-[#e6e8e4] bg-[#ffffff] p-6 mt-6">
+          <h2 className="text-sm font-bold mb-4 font-heading" style={{ color: "#0e0f10" }}>
             Historial de pagos
           </h2>
           {loadingTransactions ? (
-            <p className="text-xs text-slate-500 font-mono">Cargando...</p>
+            <p className="text-xs text-ink-faint font-mono">Cargando...</p>
           ) : transactions.length === 0 ? (
-            <p className="text-xs text-slate-500 font-mono">Todavía no tienes pagos registrados.</p>
+            <p className="text-xs text-ink-faint font-mono">Todavía no tienes pagos registrados.</p>
           ) : (
             <ul className="space-y-3">
               {transactions.map((t) => {
                 const status = STATUS_LABEL[t.status] || {
                   label: t.status,
-                  className: "bg-slate-500/10 text-slate-400 border-slate-500/30"
+                  className: "bg-ink-faint/10 text-muted-foreground border-ink-faint/30"
                 };
                 return (
                   <li
                     key={t.id}
-                    className="flex items-center justify-between gap-3 pb-3 border-b border-[#262A31] last:border-0 last:pb-0"
+                    className="flex items-center justify-between gap-3 pb-3 border-b border-[#e6e8e4] last:border-0 last:pb-0"
                   >
                     <div>
-                      <p className="text-sm text-slate-100">
+                      <p className="text-sm text-foreground">
                         {formatCOP(Math.round(t.amountInCents / 100))} {t.currency}
                       </p>
-                      <p className="text-xs text-slate-500 font-mono">
+                      <p className="text-xs text-ink-faint font-mono">
                         {new Date(t.createdAt).toLocaleDateString("es-CO", {
                           day: "2-digit",
                           month: "short",
@@ -250,7 +250,7 @@ export default function Account() {
 
         <button
           onClick={handleLogout}
-          className="w-full mt-6 px-4 py-3 rounded-lg border border-[#262A31] text-slate-300 text-sm font-semibold hover:bg-[#1B1E24] hover:border-[#3A404A] transition-all"
+          className="w-full mt-6 px-4 py-3 rounded-lg border border-[#e6e8e4] text-foreground text-sm font-semibold hover:bg-[#f1f2f0] hover:border-[#d3d6cf] transition-all"
         >
           Cerrar sesión
         </button>

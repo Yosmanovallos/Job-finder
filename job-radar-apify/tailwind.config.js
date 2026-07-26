@@ -36,6 +36,16 @@ module.exports = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        "ink-faint": "hsl(var(--ink-faint))",
+        "border-strong": "hsl(var(--border-strong))",
+        gold: {
+          1: "hsl(var(--gold-1))",
+          2: "hsl(var(--gold-2))",
+          3: "hsl(var(--gold-3))",
+          ink: "hsl(var(--gold-ink))",
+        },
+        "green-deep": "hsl(var(--green-deep))",
+        "green-soft": "hsl(var(--green-soft))",
       },
       borderRadius: {
         lg: "var(--radius)",

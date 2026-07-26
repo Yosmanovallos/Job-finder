@@ -4,26 +4,39 @@
 
 @layer base {
   :root {
-    --background: 220 13% 5%;
-    --foreground: 220 16% 96%;
-    --card: 220 14% 9%;
-    --card-foreground: 220 16% 96%;
-    --popover: 220 14% 9%;
-    --popover-foreground: 220 16% 96%;
-    --primary: 158 64% 52%;
-    --primary-foreground: 220 13% 5%;
-    --secondary: 220 13% 5%;
-    --secondary-foreground: 220 16% 96%;
-    --muted: 220 13% 5%;
-    --muted-foreground: 217 10% 64%;
-    --accent: 37 91% 55%;
-    --accent-foreground: 220 13% 5%;
-    --destructive: 0 91% 71%;
-    --destructive-foreground: 220 13% 5%;
-    --border: 218 13% 17%;
-    --input: 218 13% 17%;
-    --ring: 158 64% 52%;
+    /* Light/gold/professional-green system — approved design direction
+       (2026-07-26): white backgrounds (60%), near-black text (20%), gold
+       as the identity/Pro accent (10%), deep green for actions/trust (10%). */
+    --background: 0 0% 98%;
+    --foreground: 210 7% 6%;
+    --card: 0 0% 100%;
+    --card-foreground: 210 7% 6%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 210 7% 6%;
+    --primary: 160 75% 24%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 90 7% 95%;
+    --secondary-foreground: 210 7% 6%;
+    --muted: 90 7% 95%;
+    --muted-foreground: 135 2% 36%;
+    --accent: 43 64% 53%;
+    --accent-foreground: 44 66% 17%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 90 8% 90%;
+    --input: 90 8% 90%;
+    --ring: 43 64% 53%;
     --radius: 0.5rem;
+
+    /* Extra tokens the ticket-card design needs beyond shadcn's defaults */
+    --ink-faint: 100 3% 63%;
+    --border-strong: 86 8% 83%;
+    --gold-1: 45 82% 80%;
+    --gold-2: 43 64% 53%;
+    --gold-3: 42 71% 36%;
+    --gold-ink: 38 62% 18%;
+    --green-deep: 163 82% 16%;
+    --green-soft: 152 45% 92%;
 
     --font-heading: 'Space Grotesk', sans-serif;
     --font-body: 'JetBrains Mono', sans-serif;
@@ -46,5 +59,108 @@
   h6 {
     font-family: var(--font-heading);
     font-weight: 600;
+  }
+}
+
+/* ---- Ticket card design (approved 2026-07-26): rail + stitched seam +
+   gold/green CTA + HUD corner marks — shared so JobCard/PaywallCard don't
+   each redefine the same look. ---- */
+@layer components {
+  .ticket-seam {
+    position: relative;
+    border-top: 1px dashed hsl(var(--border-strong));
+    margin-left: -1.25rem;
+    margin-right: -1.25rem;
+  }
+  .ticket-seam::before,
+  .ticket-seam::after {
+    content: "";
+    position: absolute;
+    top: -7px;
+    width: 14px;
+    height: 14px;
+    background: hsl(var(--background));
+    border-radius: 50%;
+  }
+  .ticket-seam::before {
+    left: -7px;
+  }
+  .ticket-seam::after {
+    right: -7px;
+  }
+
+  .hud-corners {
+    position: relative;
+  }
+  .hud-corners::before,
+  .hud-corners::after {
+    content: "";
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    pointer-events: none;
+  }
+  .hud-corners::before {
+    top: -1px;
+    left: -1px;
+    border-top: 2px solid hsl(var(--gold-2));
+    border-left: 2px solid hsl(var(--gold-2));
+    border-radius: 3px 0 0 0;
+  }
+  .hud-corners::after {
+    bottom: -1px;
+    right: -1px;
+    border-bottom: 2px solid hsl(var(--gold-2));
+    border-right: 2px solid hsl(var(--gold-2));
+    border-radius: 0 0 3px 0;
+  }
+
+  .btn-gold-shine {
+    position: relative;
+    overflow: hidden;
+  }
+  .btn-gold-shine::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      115deg,
+      transparent 30%,
+      rgba(255, 255, 255, 0.55) 50%,
+      transparent 70%
+    );
+    transform: translateX(-120%);
+    transition: transform 0.6s ease;
+  }
+  .btn-gold-shine:hover::after {
+    transform: translateX(120%);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .btn-gold-shine::after {
+      transition: none;
+    }
+  }
+
+  /* Continuously scrolling "Conectado a" source chips — the track holds two
+     copies of the list back to back, so translating exactly -50% loops
+     seamlessly. */
+  .marquee-track {
+    animation: marquee-scroll 22s linear infinite;
+  }
+  .marquee-track:hover {
+    animation-play-state: paused;
+  }
+  @keyframes marquee-scroll {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-50%);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .marquee-track {
+      animation: none;
+    }
   }
 }

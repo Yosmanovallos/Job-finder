@@ -1,16 +1,27 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState } from "react";
 import { DEFAULT_ROLES_200 } from "../queue/scheduler.js";
 
 export interface FilterState {
   search: string;
-  source: string;
+  sources: string[];
   modality: string;
   freshness: string;
   savedOnly: boolean;
   appliedOnly: boolean;
   selectedRoles: string[];
-  city: string;
+  cities: string[];
 }
+
+export const EMPTY_FILTERS: FilterState = {
+  search: "",
+  sources: [],
+  modality: "all",
+  freshness: "all",
+  savedOnly: false,
+  appliedOnly: false,
+  selectedRoles: [],
+  cities: []
+};
 
 // Raw `location` values are messy free text (hundreds of variants like
 // "Bogotá, D.C., Capital District, Colombia" vs plain "Bogotá"), so this is a
@@ -28,266 +39,239 @@ export const CITY_OPTIONS = [
   "Remoto"
 ];
 
+export const SOURCE_OPTIONS = [
+  "LinkedIn",
+  "Computrabajo",
+  "Elempleo",
+  "Torre",
+  "Magneto",
+  "Workana",
+  "WeRemoto",
+  "GetOnBoard",
+  "RemoteOK",
+  "Remotive",
+  "Indeed",
+  "Glassdoor",
+  "Jooble"
+];
+
 export interface FilterBarProps {
+  filters: FilterState;
   onFilterChange: (filters: FilterState) => void;
-  availableSources?: string[];
 }
 
-export const FilterBar: React.FC<FilterBarProps> = ({ onFilterChange, availableSources = [] }) => {
-  const [search, setSearch] = useState("");
-  const [source, setSource] = useState("all");
-  const [modality, setModality] = useState("all");
-  const [freshness, setFreshness] = useState("all");
-  const [savedOnly, setSavedOnly] = useState(false);
-  const [appliedOnly, setAppliedOnly] = useState(false);
-  const [city, setCity] = useState("all");
-  const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
-  const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
+// A single collapsible sidebar section — sections default open (matching the
+// reference layout) but can be tucked away once a user has picked a value.
+const FilterSection: React.FC<{ title: string; children: React.ReactNode }> = ({
+  title,
+  children
+}) => {
+  const [open, setOpen] = useState(true);
+  return (
+    <div className="border-b border-[#e6e8e4] py-4 last:border-b-0">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between text-left"
+      >
+        <span className="text-xs font-mono font-semibold uppercase tracking-wide text-foreground">
+          {title}
+        </span>
+        <span className="text-ink-faint text-xs">{open ? "▲" : "▼"}</span>
+      </button>
+      {open && <div className="mt-3 space-y-2">{children}</div>}
+    </div>
+  );
+};
+
+const RadioRow: React.FC<{
+  name: string;
+  label: string;
+  checked: boolean;
+  onChange: () => void;
+}> = ({ name, label, checked, onChange }) => (
+  <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer hover:text-foreground transition-colors">
+    <input
+      type="radio"
+      name={name}
+      checked={checked}
+      onChange={onChange}
+      className="accent-primary"
+    />
+    {label}
+  </label>
+);
+
+const CheckRow: React.FC<{
+  label: string;
+  checked: boolean;
+  onChange: () => void;
+}> = ({ label, checked, onChange }) => (
+  <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer hover:text-foreground transition-colors">
+    <input type="checkbox" checked={checked} onChange={onChange} className="accent-primary" />
+    <span className="truncate">{label}</span>
+  </label>
+);
+
+export const FilterBar: React.FC<FilterBarProps> = ({ filters, onFilterChange }) => {
   const [roleSearch, setRoleSearch] = useState("");
-  const roleDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Close the role dropdown on an outside click, same UX pattern as any
-  // standard multi-select popover.
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (roleDropdownRef.current && !roleDropdownRef.current.contains(e.target as Node)) {
-        setRoleDropdownOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  const update = (partial: Partial<FilterState>) => onFilterChange({ ...filters, ...partial });
 
-  const updateFilters = (newPartial: Partial<FilterState>) => {
-    const updated: FilterState = {
-      search: newPartial.search !== undefined ? newPartial.search : search,
-      source: newPartial.source !== undefined ? newPartial.source : source,
-      modality: newPartial.modality !== undefined ? newPartial.modality : modality,
-      freshness: newPartial.freshness !== undefined ? newPartial.freshness : freshness,
-      savedOnly: newPartial.savedOnly !== undefined ? newPartial.savedOnly : savedOnly,
-      appliedOnly: newPartial.appliedOnly !== undefined ? newPartial.appliedOnly : appliedOnly,
-      selectedRoles: newPartial.selectedRoles !== undefined ? newPartial.selectedRoles : selectedRoles,
-      city: newPartial.city !== undefined ? newPartial.city : city
-    };
-
-    if (newPartial.search !== undefined) setSearch(newPartial.search);
-    if (newPartial.source !== undefined) setSource(newPartial.source);
-    if (newPartial.modality !== undefined) setModality(newPartial.modality);
-    if (newPartial.freshness !== undefined) setFreshness(newPartial.freshness);
-    if (newPartial.savedOnly !== undefined) setSavedOnly(newPartial.savedOnly);
-    if (newPartial.appliedOnly !== undefined) setAppliedOnly(newPartial.appliedOnly);
-    if (newPartial.selectedRoles !== undefined) setSelectedRoles(newPartial.selectedRoles);
-    if (newPartial.city !== undefined) setCity(newPartial.city);
-
-    onFilterChange(updated);
-  };
-
-  const toggleRole = (role: string) => {
-    const next = selectedRoles.includes(role)
-      ? selectedRoles.filter((r) => r !== role)
-      : [...selectedRoles, role];
-    updateFilters({ selectedRoles: next });
+  const toggleInArray = (key: "sources" | "cities" | "selectedRoles", value: string) => {
+    const current = filters[key];
+    const next = current.includes(value)
+      ? current.filter((v) => v !== value)
+      : [...current, value];
+    update({ [key]: next } as Partial<FilterState>);
   };
 
   const filteredRoleOptions = DEFAULT_ROLES_200.filter((r) =>
     r.toLowerCase().includes(roleSearch.toLowerCase())
   );
 
-  const sourcesList = [
-    "all",
-    ...Array.from(
-      new Set([
-        "LinkedIn",
-        "Computrabajo",
-        "Elempleo",
-        "Torre",
-        "Magneto",
-        "Workana",
-        "WeRemoto",
-        "GetOnBoard",
-        "RemoteOK",
-        "Indeed",
-        "Glassdoor",
-        ...availableSources
-      ])
-    )
-  ];
+  const hasActiveFilters =
+    filters.sources.length > 0 ||
+    filters.cities.length > 0 ||
+    filters.modality !== "all" ||
+    filters.freshness !== "all" ||
+    filters.selectedRoles.length > 0 ||
+    filters.savedOnly ||
+    filters.appliedOnly;
 
   return (
-    <div className="rounded-xl border border-[#262A31] bg-[#131519] p-4 mb-6 space-y-3 font-sans">
-      {/* Top Search Row */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative flex-1 min-w-[240px]">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-mono">
-            🔍
-          </span>
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => updateFilters({ search: e.target.value })}
-            placeholder="Filtrar por título, empresa o palabra clave..."
-            className="w-full pl-9 pr-4 py-2 bg-[#0A0B0D] border border-[#262A31] rounded-lg text-slate-100 placeholder-slate-500 text-sm focus:outline-none focus:border-emerald-500/50 font-sans"
-          />
-        </div>
-
-        {/* Saved Toggle Button */}
-        <button
-          onClick={() => updateFilters({ savedOnly: !savedOnly })}
-          className={`px-4 py-2 rounded-lg border text-xs font-mono transition-colors ${
-            savedOnly
-              ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-300 font-semibold"
-              : "border-[#262A31] bg-[#0A0B0D] text-slate-400 hover:text-slate-200"
-          }`}
-        >
-          {savedOnly ? "★ Mis Guardadas" : "☆ Ver Guardadas"}
-        </button>
-
-        {/* Applied Toggle Button */}
-        <button
-          onClick={() => updateFilters({ appliedOnly: !appliedOnly })}
-          className={`px-4 py-2 rounded-lg border text-xs font-mono transition-colors ${
-            appliedOnly
-              ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-300 font-semibold"
-              : "border-[#262A31] bg-[#0A0B0D] text-slate-400 hover:text-slate-200"
-          }`}
-        >
-          {appliedOnly ? "✅ Mis Aplicadas" : "☐ Ver Aplicadas"}
-        </button>
-      </div>
-
-      {/* Select Filters Row */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 text-xs font-mono">
-        {/* Source Selector */}
-        <div>
-          <label className="block text-slate-500 mb-1">Fuente / Portal:</label>
-          <select
-            value={source}
-            onChange={(e) => updateFilters({ source: e.target.value })}
-            className="w-full px-3 py-1.5 bg-[#0A0B0D] border border-[#262A31] rounded-lg text-slate-200 focus:outline-none focus:border-emerald-500/50"
-          >
-            {sourcesList.map((s) => (
-              <option key={s} value={s}>
-                {s === "all" ? "🌐 Todas las Fuentes" : s}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* City Selector */}
-        <div>
-          <label className="block text-slate-500 mb-1">Ciudad:</label>
-          <select
-            value={city}
-            onChange={(e) => updateFilters({ city: e.target.value })}
-            className="w-full px-3 py-1.5 bg-[#0A0B0D] border border-[#262A31] rounded-lg text-slate-200 focus:outline-none focus:border-emerald-500/50"
-          >
-            <option value="all">📍 Todas las Ciudades</option>
-            {CITY_OPTIONS.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Modality Selector */}
-        <div>
-          <label className="block text-slate-500 mb-1">Modalidad:</label>
-          <select
-            value={modality}
-            onChange={(e) => updateFilters({ modality: e.target.value })}
-            className="w-full px-3 py-1.5 bg-[#0A0B0D] border border-[#262A31] rounded-lg text-slate-200 focus:outline-none focus:border-emerald-500/50"
-          >
-            <option value="all">🏠 Todas las Modalidades</option>
-            <option value="remoto">💻 100% Remoto</option>
-            <option value="hibrido">🏢 Híbrido</option>
-            <option value="presencial">📍 Presencial</option>
-          </select>
-        </div>
-
-        {/* Freshness Selector */}
-        <div>
-          <label className="block text-slate-500 mb-1">Frescura / Publicación:</label>
-          <select
-            value={freshness}
-            onChange={(e) => updateFilters({ freshness: e.target.value })}
-            className="w-full px-3 py-1.5 bg-[#0A0B0D] border border-[#262A31] rounded-lg text-slate-200 focus:outline-none focus:border-emerald-500/50"
-          >
-            <option value="all">⏱️ Cualquier Fecha</option>
-            <option value="24h">🔥 Últimas 24 Horas</option>
-            <option value="48h">⚡ Últimas 48 Horas</option>
-            <option value="7d">📅 Última Semana (7d)</option>
-          </select>
-        </div>
-
-        {/* Role Multi-Select Dropdown */}
-        <div className="relative" ref={roleDropdownRef}>
-          <label className="block text-slate-500 mb-1">Rol buscado:</label>
-          <button
-            type="button"
-            onClick={() => setRoleDropdownOpen((v) => !v)}
-            className="w-full px-3 py-1.5 bg-[#0A0B0D] border border-[#262A31] rounded-lg text-slate-200 text-left focus:outline-none focus:border-emerald-500/50 flex items-center justify-between gap-2"
-          >
-            <span className="truncate">
-              {selectedRoles.length === 0
-                ? "🧑‍💼 Todos los Roles"
-                : `🧑‍💼 ${selectedRoles.length} rol${selectedRoles.length > 1 ? "es" : ""}`}
-            </span>
-            <span className="text-slate-500 shrink-0">{roleDropdownOpen ? "▲" : "▼"}</span>
-          </button>
-
-          {roleDropdownOpen && (
-            <div className="absolute z-20 mt-1 w-full min-w-[240px] bg-[#0A0B0D] border border-[#262A31] rounded-lg shadow-xl p-2">
-              <input
-                type="text"
-                value={roleSearch}
-                onChange={(e) => setRoleSearch(e.target.value)}
-                placeholder="Buscar rol..."
-                autoFocus
-                className="w-full px-2 py-1.5 mb-2 bg-[#131519] border border-[#262A31] rounded text-slate-200 text-xs focus:outline-none focus:border-emerald-500/50"
-              />
-
-              <div className="flex items-center justify-between mb-2 text-[11px] text-slate-400">
-                <button
-                  type="button"
-                  onClick={() => updateFilters({ selectedRoles: [...DEFAULT_ROLES_200] })}
-                  className="hover:text-emerald-400"
-                >
-                  Seleccionar todos
-                </button>
-                <button
-                  type="button"
-                  onClick={() => updateFilters({ selectedRoles: [] })}
-                  className="hover:text-emerald-400"
-                >
-                  Limpiar
-                </button>
-              </div>
-
-              <div className="max-h-56 overflow-y-auto space-y-0.5">
-                {filteredRoleOptions.length === 0 ? (
-                  <p className="text-slate-500 text-[11px] px-1 py-2">Sin coincidencias.</p>
-                ) : (
-                  filteredRoleOptions.map((role) => (
-                    <label
-                      key={role}
-                      className="flex items-center gap-2 px-1.5 py-1 rounded hover:bg-[#1F232B] cursor-pointer text-slate-200 text-[11px]"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedRoles.includes(role)}
-                        onChange={() => toggleRole(role)}
-                        className="accent-emerald-500 shrink-0"
-                      />
-                      <span className="truncate">{role}</span>
-                    </label>
-                  ))
-                )}
-              </div>
-            </div>
+    <aside className="w-full lg:w-72 shrink-0">
+      <div className="rounded-xl border border-[#e6e8e4] bg-[#ffffff] p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="font-heading font-semibold text-sm text-foreground">Filtros</h2>
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={() => onFilterChange({ ...EMPTY_FILTERS, search: filters.search })}
+              className="text-[11px] font-mono text-ink-faint hover:text-primary transition-colors"
+            >
+              Limpiar todo
+            </button>
           )}
         </div>
+
+        <FilterSection title="Mis vacantes">
+          <CheckRow
+            label="★ Guardadas"
+            checked={filters.savedOnly}
+            onChange={() => update({ savedOnly: !filters.savedOnly })}
+          />
+          <CheckRow
+            label="✓ Aplicadas"
+            checked={filters.appliedOnly}
+            onChange={() => update({ appliedOnly: !filters.appliedOnly })}
+          />
+        </FilterSection>
+
+        <FilterSection title="Fecha de publicación">
+          <RadioRow
+            name="freshness"
+            label="Todas"
+            checked={filters.freshness === "all"}
+            onChange={() => update({ freshness: "all" })}
+          />
+          <RadioRow
+            name="freshness"
+            label="Últimas 24 horas"
+            checked={filters.freshness === "24h"}
+            onChange={() => update({ freshness: "24h" })}
+          />
+          <RadioRow
+            name="freshness"
+            label="Últimas 48 horas"
+            checked={filters.freshness === "48h"}
+            onChange={() => update({ freshness: "48h" })}
+          />
+          <RadioRow
+            name="freshness"
+            label="Última semana"
+            checked={filters.freshness === "7d"}
+            onChange={() => update({ freshness: "7d" })}
+          />
+        </FilterSection>
+
+        <FilterSection title="Modalidad">
+          <RadioRow
+            name="modality"
+            label="Cualquiera"
+            checked={filters.modality === "all"}
+            onChange={() => update({ modality: "all" })}
+          />
+          <RadioRow
+            name="modality"
+            label="100% remoto"
+            checked={filters.modality === "remoto"}
+            onChange={() => update({ modality: "remoto" })}
+          />
+          <RadioRow
+            name="modality"
+            label="Híbrido"
+            checked={filters.modality === "hibrido"}
+            onChange={() => update({ modality: "hibrido" })}
+          />
+          <RadioRow
+            name="modality"
+            label="Presencial"
+            checked={filters.modality === "presencial"}
+            onChange={() => update({ modality: "presencial" })}
+          />
+        </FilterSection>
+
+        <FilterSection title="Ciudad">
+          <div className="max-h-40 overflow-y-auto space-y-2 pr-1">
+            {CITY_OPTIONS.map((c) => (
+              <CheckRow
+                key={c}
+                label={c}
+                checked={filters.cities.includes(c)}
+                onChange={() => toggleInArray("cities", c)}
+              />
+            ))}
+          </div>
+        </FilterSection>
+
+        <FilterSection title="Fuente / Portal">
+          <div className="max-h-40 overflow-y-auto space-y-2 pr-1">
+            {SOURCE_OPTIONS.map((s) => (
+              <CheckRow
+                key={s}
+                label={s}
+                checked={filters.sources.includes(s)}
+                onChange={() => toggleInArray("sources", s)}
+              />
+            ))}
+          </div>
+        </FilterSection>
+
+        <FilterSection title="Rol buscado">
+          <input
+            type="text"
+            value={roleSearch}
+            onChange={(e) => setRoleSearch(e.target.value)}
+            placeholder="Buscar rol..."
+            className="w-full px-2.5 py-1.5 mb-2 bg-[#fafafa] border border-[#e6e8e4] rounded text-foreground text-xs focus:outline-none focus:border-primary/50"
+          />
+          <div className="max-h-48 overflow-y-auto space-y-2 pr-1">
+            {filteredRoleOptions.length === 0 ? (
+              <p className="text-ink-faint text-xs py-1">Sin coincidencias.</p>
+            ) : (
+              filteredRoleOptions.map((role) => (
+                <CheckRow
+                  key={role}
+                  label={role}
+                  checked={filters.selectedRoles.includes(role)}
+                  onChange={() => toggleInArray("selectedRoles", role)}
+                />
+              ))
+            )}
+          </div>
+        </FilterSection>
       </div>
-    </div>
+    </aside>
   );
 };

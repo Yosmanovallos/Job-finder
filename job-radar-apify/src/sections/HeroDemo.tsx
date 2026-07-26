@@ -1,80 +1,92 @@
-import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { JobCard } from "../components/JobCard.js";
-import { PaywallCard } from "../components/PaywallCard.js";
-import { useAuth } from "../auth/auth-provider.js";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 export default function HeroDemo() {
   const navigate = useNavigate();
-  const { accessToken } = useAuth();
-  const [previewJobs, setPreviewJobs] = useState<any[]>([]);
+  const [heroSearch, setHeroSearch] = useState("");
 
-  // Preview of the corpus: tier is resolved server-side from the session
-  // token, same as the dashboard — a logged-in Pro visitor sees their real
-  // unlocked preview here instead of the generic locked marketing teaser.
-  // No scrape is triggered by visiting the landing page either way.
-  useEffect(() => {
-    const headers: Record<string, string> = {};
-    if (accessToken) headers["Authorization"] = `Bearer ${accessToken}`;
-    fetch("/api/jobs", { headers })
-      .then((res) => (res.ok ? res.json() : { jobs: [] }))
-      .then((data) => setPreviewJobs(Array.isArray(data.jobs) ? data.jobs.slice(0, 4) : []))
-      .catch(() => {});
-  }, [accessToken]);
+  // The search box and chips below all lead into the real Dashboard — this
+  // is a visual redesign only, so it doesn't attempt to pre-filter results
+  // itself (that would mean wiring FilterBar's search state to a URL param,
+  // which is real logic, not design).
+  const goToDashboard = (e?: React.FormEvent) => {
+    e?.preventDefault();
+    navigate("/dashboard");
+  };
 
   return (
     <section
       id="hero-demo"
       className="relative w-full overflow-x-hidden"
-      style={{ backgroundColor: "#0A0B0D" }}
+      style={{ background: "linear-gradient(180deg, #fdf8ec 0%, #fafafa 60%)" }}
     >
+      {/* Ambient gold/green glow + faint dot grid, no boxed panel — the
+          headline and search sit directly on the page like the previous
+          production hero did. */}
       <div
         className="absolute inset-0 pointer-events-none"
         aria-hidden="true"
         style={{
           backgroundImage:
-            "linear-gradient(rgba(38,42,49,0.35) 1px, transparent 1px), linear-gradient(90deg, rgba(38,42,49,0.35) 1px, transparent 1px)",
-          backgroundSize: "64px 64px"
+            "radial-gradient(circle at 18% 10%, rgba(201,154,46,0.16), transparent 42%), " +
+            "radial-gradient(circle at 88% 6%, rgba(15,107,76,0.12), transparent 38%), " +
+            "radial-gradient(circle, rgba(14,15,16,0.05) 1px, transparent 1px)",
+          backgroundSize: "auto, auto, 26px 26px"
         }}
       />
 
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-20">
-        <h1
-          className="text-center text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-white mb-4"
-          style={{ fontFamily: "'Space Grotesk', sans-serif" }}
-        >
-          Encuentra todas las vacantes de Colombia{" "}
-          <span style={{ color: "#34D399" }}>en un solo lugar</span>
-        </h1>
-
-        <p className="text-center text-base sm:text-lg text-slate-400 max-w-2xl mx-auto mb-10">
-          Escaneamos 12 portales simultáneamente. Deduplicado automático por SHA256.
-        </p>
-
-        <div className="flex justify-center mb-12">
-          <Link
-            to="/dashboard"
-            className="px-8 py-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-base transition-all shadow-lg shadow-emerald-500/20"
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-16">
+        <div className="max-w-3xl mx-auto text-center">
+          <h1
+            className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-foreground mb-4"
+            style={{ fontFamily: "'Space Grotesk', sans-serif" }}
           >
-            Ver el Dashboard completo →
-          </Link>
-        </div>
+            Encuentra todas las vacantes de Colombia{" "}
+            <span style={{ color: "#0f6b4c" }}>en un solo lugar</span>
+          </h1>
 
-        {previewJobs.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {previewJobs.map((job) =>
-              job.isLocked ? (
-                <PaywallCard
-                  key={job.jobId || job.url}
-                  job={job}
-                  onUnlockClick={() => navigate("/pricing")}
-                />
-              ) : (
-                <JobCard key={job.jobId || job.url} job={job} />
-              )
-            )}
+          <p className="text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto mb-8">
+            Sin duplicados, sin pestañas de más. Un solo buscador para todas las vacantes de Colombia.
+          </p>
+
+          <form onSubmit={goToDashboard} className="relative max-w-lg mx-auto mb-5">
+            <input
+              type="text"
+              value={heroSearch}
+              onChange={(e) => setHeroSearch(e.target.value)}
+              placeholder="Ej: analista de datos, enfermería, developer..."
+              className="w-full font-heading text-base font-medium py-4 pl-6 pr-14 rounded-full border border-[#d3d6cf] bg-[#ffffff] text-foreground shadow-sm focus:outline-none focus:border-gold-2 focus:ring-4 focus:ring-gold-1/40 transition-all"
+            />
+            <button
+              type="submit"
+              aria-label="Buscar vacantes"
+              className="btn-gold-shine absolute right-1.5 top-1.5 bottom-1.5 w-11 rounded-full bg-gradient-to-br from-gold-1 to-gold-2 text-gold-ink flex items-center justify-center font-bold"
+            >
+              →
+            </button>
+          </form>
+
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <button
+              onClick={() => goToDashboard()}
+              className="text-xs font-mono px-3.5 py-1.5 rounded-full border border-primary/40 bg-green-soft text-green-deep"
+            >
+              Últimas 48h
+            </button>
+            <button
+              onClick={() => goToDashboard()}
+              className="text-xs font-mono px-3.5 py-1.5 rounded-full border border-[#d3d6cf] text-muted-foreground hover:border-primary/40 hover:text-green-deep transition-colors"
+            >
+              Remoto
+            </button>
+            <button
+              onClick={() => goToDashboard()}
+              className="text-xs font-mono px-3.5 py-1.5 rounded-full border border-[#d3d6cf] text-muted-foreground hover:border-primary/40 hover:text-green-deep transition-colors"
+            >
+              Bogotá
+            </button>
           </div>
-        )}
+        </div>
       </div>
     </section>
   );

@@ -2,11 +2,12 @@ import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { hoverStyle } from "../lib/hover-style.js";
 import { useAuth } from "../auth/auth-provider.js";
+import { PAYWALL_ENABLED } from "../config.js";
 
 const navLinks = [
   { label: "Cómo funciona", to: "/como-funciona" },
   { label: "Fuentes", to: "/fuentes" },
-  { label: "Precios", to: "/pricing" },
+  ...(PAYWALL_ENABLED ? [{ label: "Precios", to: "/pricing" }] : []),
   { label: "Preguntas", to: "/preguntas" }
 ];
 
@@ -43,10 +44,10 @@ export default function Header() {
       id="header"
       className="sticky top-0 z-50 w-full"
       style={{
-        backgroundColor: "rgba(10, 11, 13, 0.85)",
+        backgroundColor: "rgba(250,250,250, 0.85)",
         backdropFilter: "blur(12px)",
         WebkitBackdropFilter: "blur(12px)",
-        borderBottom: "1px solid #262A31"
+        borderBottom: "1px solid #e6e8e4"
       }}
     >
       {/* Main nav bar */}
@@ -59,11 +60,11 @@ export default function Header() {
           to="/"
           className="flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 rounded-sm"
           style={{
-            color: "#F4F5F7",
-            ringColor: "#34D399",
-            ringOffsetColor: "#0A0B0D"
+            color: "#0e0f10",
+            ringColor: "#0f6b4c",
+            ringOffsetColor: "#fafafa"
           }}
-          aria-label="Job Radar — inicio"
+          aria-label="BuscoTrabajo — inicio"
         >
           {/* Radar SVG icon */}
           <svg
@@ -71,13 +72,13 @@ export default function Header() {
             height="24"
             viewBox="0 0 24 24"
             fill="none"
-            stroke="#34D399"
+            stroke="#0f6b4c"
             strokeWidth="1.5"
             strokeLinecap="round"
             strokeLinejoin="round"
             aria-hidden="true"
           >
-            <circle cx="12" cy="12" r="2" fill="#34D399" stroke="none" />
+            <circle cx="12" cy="12" r="2" fill="#0f6b4c" stroke="none" />
             <circle cx="12" cy="12" r="5.5" />
             <circle cx="12" cy="12" r="9.5" />
             <line x1="12" y1="12" x2="19" y2="5" strokeWidth="1.5" />
@@ -88,11 +89,11 @@ export default function Header() {
               fontFamily:
                 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
               fontSize: "1rem",
-              color: "#F4F5F7",
+              color: "#0e0f10",
               letterSpacing: "-0.01em"
             }}
           >
-            Job Radar
+            BuscoTrabajo<span style={{ color: "#c99a2e" }}>.co</span>
           </span>
           {/* Mono micro-label — desktop only */}
           <span
@@ -100,7 +101,7 @@ export default function Header() {
             style={{
               fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
               fontSize: "0.6875rem",
-              color: "#646B75",
+              color: "#9a9d98",
               letterSpacing: "0.08em",
               textTransform: "uppercase",
               marginLeft: "4px",
@@ -122,13 +123,13 @@ export default function Header() {
                 fontFamily:
                   'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
                 fontSize: "0.9375rem",
-                color: "#9AA1AC",
+                color: "#5b5f5c",
                 textDecoration: "none",
                 minHeight: "44px",
                 display: "flex",
                 alignItems: "center"
               }}
-              {...hoverStyle<HTMLAnchorElement>({ color: "#F4F5F7" }, { color: "#9AA1AC" })}
+              {...hoverStyle<HTMLAnchorElement>({ color: "#0e0f10" }, { color: "#5b5f5c" })}
             >
               {link.label}
             </Link>
@@ -146,8 +147,8 @@ export default function Header() {
               to="/cuenta"
               className="px-4 py-2 rounded-sm transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 font-mono text-xs"
               style={{
-                color: "#F4F5F7",
-                border: "1px solid #262A31",
+                color: "#0e0f10",
+                border: "1px solid #e6e8e4",
                 borderRadius: "8px",
                 minHeight: "44px",
                 display: "flex",
@@ -156,8 +157,8 @@ export default function Header() {
                 backgroundColor: "transparent"
               }}
               {...hoverStyle<HTMLAnchorElement>(
-                { borderColor: "#3A404A", backgroundColor: "#131519" },
-                { borderColor: "#262A31", backgroundColor: "transparent" }
+                { borderColor: "#d3d6cf", backgroundColor: "#ffffff" },
+                { borderColor: "#e6e8e4", backgroundColor: "transparent" }
               )}
             >
               {accountLabel}
@@ -171,8 +172,8 @@ export default function Header() {
                   fontFamily:
                     'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
                   fontSize: "0.9375rem",
-                  color: "#9AA1AC",
-                  border: "1px solid #262A31",
+                  color: "#5b5f5c",
+                  border: "1px solid #e6e8e4",
                   borderRadius: "8px",
                   minHeight: "44px",
                   display: "flex",
@@ -181,8 +182,8 @@ export default function Header() {
                   backgroundColor: "transparent"
                 }}
                 {...hoverStyle<HTMLAnchorElement>(
-                  { color: "#F4F5F7", borderColor: "#3A404A", backgroundColor: "#131519" },
-                  { color: "#9AA1AC", borderColor: "#262A31", backgroundColor: "transparent" }
+                  { color: "#0e0f10", borderColor: "#d3d6cf", backgroundColor: "#ffffff" },
+                  { color: "#5b5f5c", borderColor: "#e6e8e4", backgroundColor: "transparent" }
                 )}
               >
                 Iniciar sesión
@@ -194,8 +195,8 @@ export default function Header() {
                   fontFamily:
                     'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
                   fontSize: "0.9375rem",
-                  color: "#0A0B0D",
-                  backgroundColor: "#34D399",
+                  color: "#fafafa",
+                  backgroundColor: "#0f6b4c",
                   borderRadius: "8px",
                   minHeight: "44px",
                   display: "flex",
@@ -204,8 +205,8 @@ export default function Header() {
                   fontWeight: 600
                 }}
                 {...hoverStyle<HTMLAnchorElement>(
-                  { backgroundColor: "#6EE7B7" },
-                  { backgroundColor: "#34D399" }
+                  { backgroundColor: "#14805a" },
+                  { backgroundColor: "#0f6b4c" }
                 )}
               >
                 Probar gratis
@@ -220,17 +221,17 @@ export default function Header() {
           style={{
             width: "44px",
             height: "44px",
-            color: "#9AA1AC",
+            color: "#5b5f5c",
             backgroundColor: "transparent",
-            border: "1px solid #262A31",
+            border: "1px solid #e6e8e4",
             borderRadius: "8px"
           }}
           aria-expanded={mobileNavOpen}
           aria-label={mobileNavOpen ? "Cerrar menú" : "Abrir menú"}
           onClick={() => setMobileNavOpen((prev) => !prev)}
           {...hoverStyle<HTMLButtonElement>(
-            { color: "#F4F5F7", borderColor: "#3A404A" },
-            { color: "#9AA1AC", borderColor: "#262A31" }
+            { color: "#0e0f10", borderColor: "#d3d6cf" },
+            { color: "#5b5f5c", borderColor: "#e6e8e4" }
           )}
         >
           {mobileNavOpen ? (
@@ -273,9 +274,9 @@ export default function Header() {
         <div
           className="lg:hidden w-full"
           style={{
-            backgroundColor: "#131519",
-            borderTop: "1px solid #262A31",
-            borderBottom: "1px solid #262A31"
+            backgroundColor: "#ffffff",
+            borderTop: "1px solid #e6e8e4",
+            borderBottom: "1px solid #e6e8e4"
           }}
           role="dialog"
           aria-modal="true"
@@ -287,10 +288,10 @@ export default function Header() {
             style={{
               fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
               fontSize: "0.6875rem",
-              color: "#646B75",
+              color: "#9a9d98",
               letterSpacing: "0.1em",
               textTransform: "uppercase",
-              borderBottom: "1px solid #262A31"
+              borderBottom: "1px solid #e6e8e4"
             }}
           >
             — navegación
@@ -307,14 +308,14 @@ export default function Header() {
                   fontFamily:
                     'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
                   fontSize: "1rem",
-                  color: "#9AA1AC",
+                  color: "#5b5f5c",
                   textDecoration: "none",
                   minHeight: "48px",
                   padding: "0 8px"
                 }}
                 {...hoverStyle<HTMLAnchorElement>(
-                  { color: "#F4F5F7", backgroundColor: "#1B1E24" },
-                  { color: "#9AA1AC", backgroundColor: "transparent" }
+                  { color: "#0e0f10", backgroundColor: "#f1f2f0" },
+                  { color: "#5b5f5c", backgroundColor: "transparent" }
                 )}
               >
                 {link.label}
@@ -323,7 +324,7 @@ export default function Header() {
           </nav>
 
           {/* Divider */}
-          <div style={{ borderTop: "1px solid #262A31", margin: "0 16px" }} />
+          <div style={{ borderTop: "1px solid #e6e8e4", margin: "0 16px" }} />
 
           {/* Mobile actions */}
           <div className="flex flex-col gap-3 px-4 py-4">
@@ -333,16 +334,16 @@ export default function Header() {
                 onClick={handleNavClick}
                 className="flex items-center justify-center rounded-sm transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 font-mono text-sm"
                 style={{
-                  color: "#F4F5F7",
-                  border: "1px solid #262A31",
+                  color: "#0e0f10",
+                  border: "1px solid #e6e8e4",
                   borderRadius: "8px",
                   minHeight: "48px",
                   textDecoration: "none",
                   backgroundColor: "transparent"
                 }}
                 {...hoverStyle<HTMLAnchorElement>(
-                  { borderColor: "#3A404A", backgroundColor: "#1B1E24" },
-                  { borderColor: "#262A31", backgroundColor: "transparent" }
+                  { borderColor: "#d3d6cf", backgroundColor: "#f1f2f0" },
+                  { borderColor: "#e6e8e4", backgroundColor: "transparent" }
                 )}
               >
                 {accountLabel}
@@ -357,16 +358,16 @@ export default function Header() {
                     fontFamily:
                       'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
                     fontSize: "1rem",
-                    color: "#9AA1AC",
-                    border: "1px solid #262A31",
+                    color: "#5b5f5c",
+                    border: "1px solid #e6e8e4",
                     borderRadius: "8px",
                     minHeight: "48px",
                     textDecoration: "none",
                     backgroundColor: "transparent"
                   }}
                   {...hoverStyle<HTMLAnchorElement>(
-                    { color: "#F4F5F7", borderColor: "#3A404A", backgroundColor: "#1B1E24" },
-                    { color: "#9AA1AC", borderColor: "#262A31", backgroundColor: "transparent" }
+                    { color: "#0e0f10", borderColor: "#d3d6cf", backgroundColor: "#f1f2f0" },
+                    { color: "#5b5f5c", borderColor: "#e6e8e4", backgroundColor: "transparent" }
                   )}
                 >
                   Iniciar sesión
@@ -379,16 +380,16 @@ export default function Header() {
                     fontFamily:
                       'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
                     fontSize: "1rem",
-                    color: "#0A0B0D",
-                    backgroundColor: "#34D399",
+                    color: "#fafafa",
+                    backgroundColor: "#0f6b4c",
                     borderRadius: "8px",
                     minHeight: "48px",
                     textDecoration: "none",
                     fontWeight: 600
                   }}
                   {...hoverStyle<HTMLAnchorElement>(
-                    { backgroundColor: "#6EE7B7" },
-                    { backgroundColor: "#34D399" }
+                    { backgroundColor: "#14805a" },
+                    { backgroundColor: "#0f6b4c" }
                   )}
                 >
                   Probar gratis
@@ -403,12 +404,12 @@ export default function Header() {
             style={{
               fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
               fontSize: "0.6875rem",
-              color: "#646B75",
+              color: "#9a9d98",
               letterSpacing: "0.08em",
-              borderTop: "1px solid #262A31"
+              borderTop: "1px solid #e6e8e4"
             }}
           >
-            sys://job-radar/nav · v1.0
+            sys://buscotrabajo/nav · v1.0
           </div>
         </div>
       )}

@@ -56,6 +56,14 @@ CREATE TABLE IF NOT EXISTS users (
     created_at        TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Roles de interés recolectados en el paso de onboarding post-registro
+-- (ver ¿Qué puestos estás buscando?). NULL = onboarding aún no completado;
+-- un array (incluso vacío) = el usuario ya pasó por ese paso. ADD COLUMN IF
+-- NOT EXISTS es idempotente, así que es seguro añadirlo aquí en vez de un
+-- script de migración aparte.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS preferred_roles JSONB DEFAULT NULL;
+ALTER TABLE users ALTER COLUMN preferred_roles SET DEFAULT NULL;
+
 -- 4. Tabla `social_posts`: Historial y estado de publicaciones en redes sociales
 CREATE TABLE IF NOT EXISTS social_posts (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),

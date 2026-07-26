@@ -4,13 +4,15 @@ import path from "path";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 import {
-  getJobs,
+  getJobsCached,
   getRuns,
   maskLockedFields,
   updateUserName,
+  updateUserPreferredRoles,
   getTransactionsForUser
 } from "./db/job-repository.js";
 import { markRoleForImmediateRescan } from "./db/scheduler-repository.js";
+import { applyJobFilters, JobFilterParams } from "./lib/job-filters.js";
 import { verifySession } from "./auth/verify-session.js";
 import { startPaymentCheckout } from "./payments/checkout.js";
 import { handleWompiWebhook } from "./payments/webhook.js";
@@ -52,13 +54,43 @@ const server = http.createServer(async (req, res) => {
 
   // 4. GET /api/jobs — tier is always resolved server-side from a verified
   //    session; free/anonymous callers get the 48h freshness paywall masking.
+  //    Filters + pagination happen here, in Node, against the full active
+  //    corpus (never in the browser) — as the corpus grows past a few
+  //    thousand rows, shipping everything to the client on every visit stops
+  //    being viable, so only the requested page is ever serialized out.
   if (pathname === "/api/jobs" && method === "GET") {
     const session = await verifySession(req);
     const tier = session?.tier || "free";
-    const jobs = await getJobs();
+    // 50k comfortably covers the corpus for years of growth at current
+    // scraping cadence — this is a fetch-into-Node cap, not a limit on what
+    // reaches the browser (that's the separate limit/offset pagination below).
+    const jobs = await getJobsCached(50000);
     const visibleJobs = maskLockedFields(jobs, tier);
+
+    const params = parsedUrl.searchParams;
+    const filters: JobFilterParams = {
+      search: params.get("search") || undefined,
+      sources: params.getAll("sources").length ? params.getAll("sources") : undefined,
+      cities: params.getAll("cities").length ? params.getAll("cities") : undefined,
+      modality: params.get("modality") || undefined,
+      freshness: params.get("freshness") || undefined,
+      roles: params.getAll("roles").length ? params.getAll("roles") : undefined
+    };
+    const filtered = applyJobFilters(visibleJobs, filters);
+
+    const limit = Math.min(Math.max(parseInt(params.get("limit") || "24", 10) || 24, 1), 100);
+    const offset = Math.max(parseInt(params.get("offset") || "0", 10) || 0, 0);
+    const page = filtered.slice(offset, offset + limit);
+
     res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ jobs: visibleJobs, count: visibleJobs.length }));
+    res.end(
+      JSON.stringify({
+        jobs: page,
+        count: page.length,
+        total: filtered.length,
+        hasMore: offset + limit < filtered.length
+      })
+    );
     return;
   }
 
@@ -77,7 +109,8 @@ const server = http.createServer(async (req, res) => {
         email: session.email,
         name: session.name,
         tier: session.tier,
-        subscriptionEnd: session.subscriptionEnd
+        subscriptionEnd: session.subscriptionEnd,
+        preferredRoles: session.preferredRoles
       })
     );
     return;
@@ -117,6 +150,58 @@ const server = http.createServer(async (req, res) => {
             name: updated.name,
             tier: updated.subscriptionTier,
             subscriptionEnd: updated.subscriptionEnd
+          })
+        );
+      } catch (e: any) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: e?.message || "Solicitud inválida" }));
+      }
+    });
+    return;
+  }
+
+  // 4c-bis. PATCH /api/me/roles — saves the roles picked in the post-signup
+  // onboarding step. Same id-from-session rule as PATCH /api/me: never a
+  // client-supplied id. An empty array is a valid, deliberate choice.
+  if (pathname === "/api/me/roles" && method === "PATCH") {
+    const session = await verifySession(req);
+    if (!session) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "No autenticado" }));
+      return;
+    }
+
+    let bodyText = "";
+    req.on("data", (chunk) => {
+      bodyText += chunk.toString();
+    });
+    req.on("end", async () => {
+      try {
+        const parsed = JSON.parse(bodyText || "{}");
+        if (!Array.isArray(parsed.roles)) {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "roles debe ser un arreglo" }));
+          return;
+        }
+        const roles = Array.from(
+          new Set(
+            parsed.roles
+              .filter((r: unknown) => typeof r === "string")
+              .map((r: string) => r.trim())
+              .filter((r: string) => r.length > 0 && r.length <= 100)
+          )
+        ).slice(0, 10);
+
+        const updated = await updateUserPreferredRoles(session.id, roles);
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(
+          JSON.stringify({
+            id: updated.id,
+            email: updated.email,
+            name: updated.name,
+            tier: updated.subscriptionTier,
+            subscriptionEnd: updated.subscriptionEnd,
+            preferredRoles: updated.preferredRoles
           })
         );
       } catch (e: any) {

@@ -22,6 +22,7 @@ export interface VerifiedSession {
   name: string | null;
   tier: 'free' | 'pro';
   subscriptionEnd: string | null;
+  preferredRoles: string[] | null;
 }
 
 function extractBearerToken(req: IncomingMessage): string | null {
@@ -49,6 +50,7 @@ export async function verifySession(req: IncomingMessage): Promise<VerifiedSessi
     email: appUser.email,
     name: appUser.name,
     tier: appUser.subscriptionTier,
-    subscriptionEnd: appUser.subscriptionEnd
+    subscriptionEnd: appUser.subscriptionEnd,
+    preferredRoles: appUser.preferredRoles
   };
 }

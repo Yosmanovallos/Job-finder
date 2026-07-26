@@ -40,47 +40,47 @@ export default function ResetPassword() {
     return (
       <section
         className="min-h-screen flex items-center justify-center"
-        style={{ backgroundColor: "#0A0B0D" }}
+        style={{ backgroundColor: "#fafafa" }}
       >
-        <div className="w-6 h-6 rounded-full border-2 border-emerald-500 border-t-transparent animate-spin" />
+        <div className="w-6 h-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
       </section>
     );
   }
 
   return (
-    <section className="min-h-screen flex items-center justify-center px-4" style={{ backgroundColor: "#0A0B0D" }}>
-      <div className="w-full max-w-sm p-6 rounded-2xl border border-[#262A31] bg-[#131519]">
+    <section className="min-h-screen flex items-center justify-center px-4" style={{ backgroundColor: "#fafafa" }}>
+      <div className="w-full max-w-sm p-6 rounded-2xl border border-[#e6e8e4] bg-[#ffffff]">
         {done ? (
           <>
-            <h1 className="text-xl font-bold text-slate-100 mb-1 font-heading">Contraseña actualizada</h1>
-            <p className="text-xs text-slate-400 mb-6 font-mono">
+            <h1 className="text-xl font-bold text-foreground mb-1 font-heading">Contraseña actualizada</h1>
+            <p className="text-xs text-muted-foreground mb-6 font-mono">
               Ya puedes usar tu nueva contraseña la próxima vez que inicies sesión.
             </p>
             <button
               onClick={() => navigate('/dashboard')}
-              className="w-full px-4 py-3 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm transition-all"
+              className="w-full px-4 py-3 rounded-lg bg-primary hover:bg-primary text-primary-foreground font-bold text-sm transition-all"
             >
               Ir al dashboard
             </button>
           </>
         ) : !passwordRecovery ? (
           <>
-            <h1 className="text-xl font-bold text-slate-100 mb-1 font-heading">Enlace no válido</h1>
-            <p className="text-xs text-slate-400 mb-6 font-mono">
+            <h1 className="text-xl font-bold text-foreground mb-1 font-heading">Enlace no válido</h1>
+            <p className="text-xs text-muted-foreground mb-6 font-mono">
               Este enlace de recuperación no es válido o ya expiró. Solicita uno nuevo desde
               la pantalla de inicio de sesión.
             </p>
             <Link
               to="/login"
-              className="block w-full text-center px-4 py-3 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm transition-all"
+              className="block w-full text-center px-4 py-3 rounded-lg bg-primary hover:bg-primary text-primary-foreground font-bold text-sm transition-all"
             >
               Volver a iniciar sesión
             </Link>
           </>
         ) : (
           <>
-            <h1 className="text-xl font-bold text-slate-100 mb-1 font-heading">Elige una nueva contraseña</h1>
-            <p className="text-xs text-slate-400 mb-6 font-mono">
+            <h1 className="text-xl font-bold text-foreground mb-1 font-heading">Elige una nueva contraseña</h1>
+            <p className="text-xs text-muted-foreground mb-6 font-mono">
               Escríbela dos veces para confirmar que no hay errores de tipeo.
             </p>
             <form onSubmit={handleSubmit} className="space-y-3">
@@ -91,7 +91,7 @@ export default function ResetPassword() {
                 placeholder="Nueva contraseña"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-lg bg-[#0A0B0D] border border-[#262A31] text-slate-100 text-sm placeholder-slate-500 focus:outline-none"
+                className="w-full px-3 py-2.5 rounded-lg bg-[#fafafa] border border-[#e6e8e4] text-foreground text-sm placeholder-slate-500 focus:outline-none"
               />
               <input
                 type="password"
@@ -100,15 +100,15 @@ export default function ResetPassword() {
                 placeholder="Confirma la nueva contraseña"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-lg bg-[#0A0B0D] border border-[#262A31] text-slate-100 text-sm placeholder-slate-500 focus:outline-none"
+                className="w-full px-3 py-2.5 rounded-lg bg-[#fafafa] border border-[#e6e8e4] text-foreground text-sm placeholder-slate-500 focus:outline-none"
               />
 
-              {error && <p className="text-xs text-red-400 font-mono">{error}</p>}
+              {error && <p className="text-xs text-destructive font-mono">{error}</p>}
 
               <button
                 type="submit"
                 disabled={busy}
-                className="w-full px-4 py-3 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm transition-all disabled:opacity-50"
+                className="w-full px-4 py-3 rounded-lg bg-primary hover:bg-primary text-primary-foreground font-bold text-sm transition-all disabled:opacity-50"
               >
                 {busy ? 'Guardando...' : 'Guardar nueva contraseña'}
               </button>
