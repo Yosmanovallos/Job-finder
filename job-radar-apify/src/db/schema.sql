@@ -28,8 +28,13 @@ CREATE INDEX IF NOT EXISTS idx_jobs_published_at ON jobs (published_at DESC);
 CREATE INDEX IF NOT EXISTS idx_jobs_url_hash ON jobs (url_hash);
 CREATE INDEX IF NOT EXISTS idx_jobs_sources ON jobs USING GIN (sources);
 CREATE INDEX IF NOT EXISTS idx_jobs_created_at ON jobs (created_at DESC);
+-- Predicate must match the index created by scripts/migrate-dedupe.ts
+-- (also scoped to is_active = TRUE) — otherwise a deactivated row still
+-- occupies the index and a later re-scrape of the same posting (new
+-- url_hash, same fingerprint) hits an unhandled unique violation instead
+-- of the intended ON CONFLICT (url_hash) merge path.
 CREATE UNIQUE INDEX IF NOT EXISTS idx_jobs_content_fingerprint
-  ON jobs (content_fingerprint) WHERE content_fingerprint IS NOT NULL;
+  ON jobs (content_fingerprint) WHERE content_fingerprint IS NOT NULL AND is_active = TRUE;
 
 -- 2. Tabla `search_roles`: Monitoreo de 200+ roles y sinónimos
 CREATE TABLE IF NOT EXISTS search_roles (

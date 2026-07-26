@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import dotenv from "dotenv";
 import { pool } from "./client.js";
-import { Job } from "../sources/types.js";
+import { Job, normalizeJobUrl } from "../sources/types.js";
 import { saveRunToCache, getAllCachedRuns } from "../cache-manager.js";
 import { validateJobs } from "./job-validator.js";
 
@@ -9,37 +9,14 @@ dotenv.config();
 
 export type SubscriptionTier = "free" | "pro";
 
-// SHA256 helper for url_hash — now unwraps Google Translate proxy URLs and
-// strips tracking/session params so the same underlying posting always
-// produces the same hash regardless of which keyword search found it.
+// SHA256 helper for url_hash. Delegates URL normalization to
+// normalizeJobUrl (sources/types.ts) so the DB-level hash and the
+// in-memory per-adapter dedup (deduplicateJobs) always agree on what
+// counts as "the same URL" — they used to have separate, drifting
+// implementations, which is how a job id living in the query string
+// (e.g. Indeed's `?jk=`) went unnoticed on one side.
 export function computeUrlHash(url: string): string {
-  let cleaned = url.trim();
-
-  // Unwrap Google redirect wrapper (used by Computrabajo proxy)
-  const googleRedirectMatch = cleaned.match(/google\.com\/url\?q=([^&]+)/);
-  if (googleRedirectMatch) {
-    cleaned = decodeURIComponent(googleRedirectMatch[1]);
-  }
-
-  // Unwrap Google Translate proxy domains → original host
-  cleaned = cleaned.replace(
-    /https?:\/\/[\w.-]*\.translate\.goog\//,
-    "https://translated.host/"
-  );
-
-  const normalized = cleaned
-    .toLowerCase()
-    .trim()
-    .replace(/^https?:\/\//, "")
-    .replace(/\/$/, "")
-    // Strip Google Translate params
-    .replace(/[?&]_x_tr_[^&]*/g, "")
-    // Strip common tracking/session params
-    .replace(/[?&](utm_\w+|ref|fbclid|gclid)=[^&]*/g, "")
-    // Clean trailing ? or & left after param stripping
-    .replace(/[?&]$/, "");
-
-  return crypto.createHash("sha256").update(normalized).digest("hex");
+  return crypto.createHash("sha256").update(normalizeJobUrl(url)).digest("hex");
 }
 
 /**
@@ -98,10 +75,10 @@ export async function saveJobs(
       const existing = existingByFingerprint.rows[0];
       const sources: string[] = Array.isArray(existing.sources) ? existing.sources : [];
       if (!sources.includes(job.source)) {
-        await pool.query(
-          `UPDATE jobs SET sources = sources || to_jsonb($2::text) WHERE id = $1`,
-          [existing.id, job.source]
-        );
+        await pool.query(`UPDATE jobs SET sources = sources || to_jsonb($2::text) WHERE id = $1`, [
+          existing.id,
+          job.source
+        ]);
       }
       duplicateCount++;
       continue;
@@ -194,7 +171,7 @@ export async function getJobs(
        WHERE is_active = TRUE
        ORDER BY lower(trim(title)), lower(trim(COALESCE(company, 'confidencial'))), lower(trim(COALESCE(location, 'colombia'))), published_at DESC
      ) deduped
-     ORDER BY published_at DESC
+     ORDER BY published_at DESC, id DESC
      LIMIT $1 OFFSET $2`,
     [limit, offset]
   );
