@@ -188,8 +188,8 @@ export default function Account() {
               <div className="flex items-center justify-between gap-3 flex-wrap">
                 <p className="text-xs text-slate-500 font-mono">
                   Para cancelar tu suscripción, escríbenos a{" "}
-                  <a href="mailto:hola@buscotrabajo.co" className="text-emerald-400">
-                    hola@buscotrabajo.co
+                  <a href="mailto:buscotrabajocolombia123@gmail.com" className="text-emerald-400">
+                    buscotrabajocolombia123@gmail.com
                   </a>
                   . Aún no hay cancelación automática desde aquí.
                 </p>

@@ -55,7 +55,7 @@ const content: Record<LegalPageType, { title: string; sections: LegalSection[] }
       {
         title: "Tus derechos",
         paragraphs: [
-          "Puedes solicitar acceso, corrección o eliminación de tus datos escribiendo a hola@buscotrabajo.co.",
+          "Puedes solicitar acceso, corrección o eliminación de tus datos escribiendo a buscotrabajocolombia123@gmail.com.",
         ],
       },
     ],
@@ -145,7 +145,7 @@ export default function Legal({ type }: { type: LegalPageType }) {
         </div>
 
         <p className="mt-10 text-xs font-mono" style={{ color: "#646B75" }}>
-          Última actualización: julio de 2026. Preguntas: hola@buscotrabajo.co
+          Última actualización: julio de 2026. Preguntas: buscotrabajocolombia123@gmail.com
         </p>
       </div>
     </section>

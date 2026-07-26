@@ -31,7 +31,7 @@ const legalLinks = [
   { label: "Cookies", href: "/legal/cookies" }
 ];
 
-const contactLinks = [{ label: "hola@buscotrabajo.co", href: "mailto:hola@buscotrabajo.co" }];
+const contactLinks = [{ label: "buscotrabajocolombia123@gmail.com", href: "mailto:buscotrabajocolombia123@gmail.com" }];
 
 export default function Footer() {
   return (
