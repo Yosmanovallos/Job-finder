@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /login
+Disallow: /reset-password
+Disallow: /auth/callback
+Disallow: /cuenta
+Disallow: /api/
+
+Sitemap: https://buscotrabajo.co/sitemap.xml
