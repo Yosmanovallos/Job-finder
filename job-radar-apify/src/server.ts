@@ -336,7 +336,12 @@ const server = http.createServer(async (req, res) => {
     ".js": "application/javascript",
     ".json": "application/json",
     ".png": "image/png",
-    ".svg": "image/svg+xml"
+    ".svg": "image/svg+xml",
+    // sitemap.xml was falling back to text/plain (the default below), which
+    // is exactly the kind of thing Search Console's sitemap validator
+    // rejects as "invalid" — robots.txt is correctly text/plain already.
+    ".xml": "application/xml",
+    ".txt": "text/plain"
   };
 
   const contentType = mimeTypes[ext] || "text/plain";
