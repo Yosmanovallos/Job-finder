@@ -131,11 +131,6 @@ export default function Legal({ type }: { type: LegalPageType }) {
           ← Volver al inicio
         </Link>
 
-        <div className="mb-8 p-4 rounded-lg border border-accent/30 bg-accent/10 text-accent text-xs font-mono leading-relaxed">
-          ⚠️ Documento borrador — pendiente de revisión legal profesional antes
-          de producción. No constituye asesoría legal.
-        </div>
-
         <h1 className="text-3xl font-bold mb-8 font-heading" style={{ color: "#0e0f10" }}>
           {page.title}
         </h1>
