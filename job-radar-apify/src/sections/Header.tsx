@@ -69,7 +69,7 @@ export default function Header() {
           <img
             src="/BT.png"
             alt="BuscoTrabajo.co"
-            style={{ display: "block", height: "38px", width: "auto" }}
+            style={{ display: "block", height: "28px", width: "auto" }}
           />
         </Link>
 
