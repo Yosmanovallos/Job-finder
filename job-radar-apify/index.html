@@ -14,6 +14,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="icon" type="image/png" sizes="64x64" href="/favicon.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="canonical" href="https://buscotrabajo.co/" />
 
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-QV1E0K4KZF"></script>
@@ -45,6 +46,29 @@
       name="twitter:description"
       content="Escaneamos varios portales de empleo en Colombia y LatAm en paralelo, deduplicamos y verificamos cada vacante."
     />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "name": "BuscoTrabajo",
+        "url": "https://buscotrabajo.co/",
+        "logo": "https://buscotrabajo.co/apple-touch-icon.png"
+      }
+    </script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "BuscoTrabajo",
+        "url": "https://buscotrabajo.co/",
+        "potentialAction": {
+          "@type": "SearchAction",
+          "target": "https://buscotrabajo.co/dashboard?search={search_term}",
+          "query-input": "required name=search_term"
+        }
+      }
+    </script>
   </head>
   <body>
     <div id="app"></div>

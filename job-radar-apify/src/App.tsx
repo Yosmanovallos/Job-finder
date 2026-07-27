@@ -7,6 +7,8 @@ import ComparisonAndProcess from "./sections/ComparisonAndProcess.js";
 import ProductFeaturesPricingFaq from "./sections/ProductFeaturesPricingFaq.js";
 import Faq from "./sections/Faq.js";
 import Footer from "./sections/Footer.js";
+import ScrollToTop from "./components/ScrollToTop.js";
+import { usePageMeta, PageMeta } from "./lib/use-page-meta.js";
 import { AuthProvider } from "./auth/auth-provider.js";
 import RequireAuth from "./auth/require-auth.js";
 
@@ -21,6 +23,12 @@ const Legal = lazy(() => import("./sections/Legal.js"));
 const Account = lazy(() => import("./sections/Account.js"));
 
 function Landing() {
+  usePageMeta({
+    title: "BuscoTrabajo — Vacantes de Empleo en Colombia, Todas en un Solo Lugar",
+    description:
+      "Encuentra vacantes de empleo en Colombia de LinkedIn, Computrabajo, Elempleo, Magneto, Torre y otros portales, deduplicadas y verificadas en un solo dashboard. Gratis para vacantes con más de 48h publicadas."
+  });
+
   return (
     <>
       <HeroDemo />
@@ -46,6 +54,7 @@ export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
+        <ScrollToTop />
         <div className="min-h-screen bg-background text-foreground overflow-x-hidden font-sans">
           <Header />
           <main>
@@ -69,9 +78,42 @@ export default function App() {
                     </RequireAuth>
                   }
                 />
-                <Route path="/como-funciona" element={<ComparisonAndProcess />} />
-                <Route path="/fuentes" element={<SourcesAndProblem />} />
-                <Route path="/preguntas" element={<Faq />} />
+                <Route
+                  path="/como-funciona"
+                  element={
+                    <>
+                      <PageMeta
+                        title="Cómo funciona BuscoTrabajo — Deduplicación y verificación de vacantes"
+                        description="BuscoTrabajo escanea varios portales de empleo en paralelo, elimina duplicados y verifica que cada vacante siga vigente antes de mostrarla."
+                      />
+                      <ComparisonAndProcess />
+                    </>
+                  }
+                />
+                <Route
+                  path="/fuentes"
+                  element={
+                    <>
+                      <PageMeta
+                        title="Fuentes de empleo que rastreamos — BuscoTrabajo"
+                        description="Vacantes agregadas de LinkedIn, Computrabajo, Elempleo, Magneto, Torre y otros portales de empleo en Colombia y LatAm, en un solo lugar."
+                      />
+                      <SourcesAndProblem />
+                    </>
+                  }
+                />
+                <Route
+                  path="/preguntas"
+                  element={
+                    <>
+                      <PageMeta
+                        title="Preguntas frecuentes — BuscoTrabajo"
+                        description="Resolvemos las dudas más comunes sobre fuentes, actualidad de las vacantes, el plan Pro y cómo funciona la deduplicación."
+                      />
+                      <Faq />
+                    </>
+                  }
+                />
               </Routes>
             </Suspense>
           </main>

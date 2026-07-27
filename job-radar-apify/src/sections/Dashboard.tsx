@@ -6,6 +6,7 @@ import { PaywallCard } from "../components/PaywallCard.js";
 import { FilterBar, FilterState, EMPTY_FILTERS } from "../components/FilterBar.js";
 import { StatsBar } from "../components/StatsBar.js";
 import { useAuth } from "../auth/auth-provider.js";
+import { usePageMeta } from "../lib/use-page-meta.js";
 
 type CheckoutBannerState = "confirming" | "success" | "pending" | null;
 
@@ -16,6 +17,12 @@ const PAGE_SIZE = 24;
 const SEARCH_DEBOUNCE_MS = 350;
 
 export default function Dashboard() {
+  usePageMeta({
+    title: "Vacantes de Empleo en Colombia | BuscoTrabajo",
+    description:
+      "Explora vacantes actualizadas de LinkedIn, Computrabajo, Elempleo y más, filtradas y sin duplicados. Gratis para vacantes con más de 48h publicadas."
+  });
+
   const { tier, isAuthenticated, accessToken, user, refreshTier } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();

@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { PRO_MONTHLY_PRICE_COP, formatCOP } from "../config.js";
+import { usePageMeta } from "../lib/use-page-meta.js";
 
 export type LegalPageType = "terminos" | "privacidad" | "uso-aceptable" | "cookies";
 
@@ -7,6 +8,13 @@ interface LegalSection {
   title: string;
   paragraphs: string[];
 }
+
+const metaDescriptions: Record<LegalPageType, string> = {
+  terminos: "Términos de uso de BuscoTrabajo: qué es el servicio, planes y pago, y disponibilidad de los datos de vacantes.",
+  privacidad: "Política de privacidad de BuscoTrabajo: qué datos recolectamos, qué no recolectamos y tus derechos sobre tu información.",
+  "uso-aceptable": "Uso aceptable de BuscoTrabajo: qué está permitido y qué no al usar el servicio de búsqueda de empleo.",
+  cookies: "Política de cookies de BuscoTrabajo: qué cookies usamos y cómo controlarlas desde tu navegador."
+};
 
 const content: Record<LegalPageType, { title: string; sections: LegalSection[] }> = {
   terminos: {
@@ -107,6 +115,11 @@ const content: Record<LegalPageType, { title: string; sections: LegalSection[] }
 
 export default function Legal({ type }: { type: LegalPageType }) {
   const page = content[type];
+
+  usePageMeta({
+    title: `${page.title} — BuscoTrabajo`,
+    description: metaDescriptions[type]
+  });
 
   return (
     <section className="min-h-screen px-4 py-16" style={{ backgroundColor: "#fafafa" }}>

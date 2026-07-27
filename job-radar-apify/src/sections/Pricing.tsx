@@ -2,10 +2,17 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../auth/auth-provider.js";
 import { pricingPlans } from "../lib/pricing-plans.js";
+import { usePageMeta } from "../lib/use-page-meta.js";
 
 const WOMPI_CHECKOUT_URL = "https://checkout.wompi.co/p/";
 
 export default function Pricing() {
+  usePageMeta({
+    title: "Planes y precios — BuscoTrabajo",
+    description:
+      "Plan Gratis con acceso ilimitado a vacantes con más de 48h publicadas, o Pro para ver resultados desde el momento en que se publican."
+  });
+
   const { isAuthenticated, tier, accessToken, user, refreshTier } = useAuth();
   const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
