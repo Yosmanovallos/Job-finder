@@ -66,23 +66,15 @@ export default function Header() {
           }}
           aria-label="BuscoTrabajo — inicio"
         >
-          {/* Radar SVG icon */}
-          <svg
+          {/* BT icon */}
+          <img
+            src="/BT.png"
             width="24"
             height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="#0f6b4c"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+            alt="BuscoTrabajo.co Logo"
             aria-hidden="true"
-          >
-            <circle cx="12" cy="12" r="2" fill="#0f6b4c" stroke="none" />
-            <circle cx="12" cy="12" r="5.5" />
-            <circle cx="12" cy="12" r="9.5" />
-            <line x1="12" y1="12" x2="19" y2="5" strokeWidth="1.5" />
-          </svg>
+            style={{ display: "block" }}
+          />
           <span
             className="font-semibold tracking-tight"
             style={{
