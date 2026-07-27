@@ -5,13 +5,14 @@ export default function HeroDemo() {
   const navigate = useNavigate();
   const [heroSearch, setHeroSearch] = useState("");
 
-  // The search box and chips below all lead into the real Dashboard — this
-  // is a visual redesign only, so it doesn't attempt to pre-filter results
-  // itself (that would mean wiring FilterBar's search state to a URL param,
-  // which is real logic, not design).
-  const goToDashboard = (e?: React.FormEvent) => {
+  // The search box and chips below all lead into the real Dashboard, and
+  // whatever the user typed/picked here has to actually carry over — an
+  // earlier version dropped the typed search text entirely, so submitting
+  // it here silently showed unrelated results on the other end.
+  const goToDashboard = (e?: React.FormEvent, params?: Record<string, string>) => {
     e?.preventDefault();
-    navigate("/dashboard");
+    const query = new URLSearchParams(params).toString();
+    navigate(query ? `/dashboard?${query}` : "/dashboard");
   };
 
   return (
@@ -49,7 +50,10 @@ export default function HeroDemo() {
             Sin duplicados, sin pestañas de más. Un solo buscador para todas las vacantes de Colombia.
           </p>
 
-          <form onSubmit={goToDashboard} className="relative max-w-lg mx-auto mb-5">
+          <form
+            onSubmit={(e) => goToDashboard(e, heroSearch.trim() ? { search: heroSearch.trim() } : {})}
+            className="relative max-w-lg mx-auto mb-5"
+          >
             <input
               type="text"
               value={heroSearch}
@@ -68,19 +72,19 @@ export default function HeroDemo() {
 
           <div className="flex flex-wrap items-center justify-center gap-2">
             <button
-              onClick={() => goToDashboard()}
+              onClick={() => goToDashboard(undefined, { freshness: "48h" })}
               className="text-xs font-mono px-3.5 py-1.5 rounded-full border border-primary/40 bg-green-soft text-green-deep"
             >
               Últimas 48h
             </button>
             <button
-              onClick={() => goToDashboard()}
+              onClick={() => goToDashboard(undefined, { modality: "remoto" })}
               className="text-xs font-mono px-3.5 py-1.5 rounded-full border border-[#d3d6cf] text-muted-foreground hover:border-primary/40 hover:text-green-deep transition-colors"
             >
               Remoto
             </button>
             <button
-              onClick={() => goToDashboard()}
+              onClick={() => goToDashboard(undefined, { cities: "Bogotá" })}
               className="text-xs font-mono px-3.5 py-1.5 rounded-full border border-[#d3d6cf] text-muted-foreground hover:border-primary/40 hover:text-green-deep transition-colors"
             >
               Bogotá

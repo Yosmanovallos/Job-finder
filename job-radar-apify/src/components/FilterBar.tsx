@@ -140,7 +140,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({ filters, onFilterChange })
     filters.appliedOnly;
 
   return (
-    <aside className="w-full lg:w-72 shrink-0">
+    <aside className="w-full lg:w-72 shrink-0 lg:sticky lg:top-32 lg:max-h-[calc(100vh-8.5rem)] lg:overflow-y-auto">
       <div className="rounded-xl border border-[#e6e8e4] bg-[#ffffff] p-4">
         <div className="flex items-center justify-between mb-3">
           <h2 className="font-heading font-semibold text-sm text-foreground">Filtros</h2>

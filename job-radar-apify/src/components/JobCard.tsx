@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { Job } from '../sources/types.js';
 import { getSourceColor } from '../lib/source-colors.js';
+import { getModalityLabel } from '../lib/job-filters.js';
 
 export interface JobCardProps {
   job: Job & {
     alsoIn?: string[];
     isSaved?: boolean;
     isApplied?: boolean;
+    salary?: string;
   };
   onSaveToggle?: (jobId: string) => void;
   onAppliedToggle?: (jobId: string) => void;
@@ -23,6 +25,12 @@ function isFresh(job: JobCardProps["job"]): boolean {
   return ageHours <= 48;
 }
 
+const MODALITY_STYLE: Record<string, string> = {
+  Remoto: "bg-green-soft text-green-deep",
+  Híbrido: "bg-gold-1/40 text-gold-ink",
+  Presencial: "bg-[#f1f2f0] text-muted-foreground"
+};
+
 export const JobCard: React.FC<JobCardProps> = ({ job, onSaveToggle, onAppliedToggle }) => {
   const [saved, setSaved] = useState(job.isSaved || false);
   const [applied, setApplied] = useState(job.isApplied || false);
@@ -38,6 +46,8 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onSaveToggle, onAppliedTo
   };
 
   const otherSources = job.alsoIn || (Array.isArray(job.sources) ? job.sources.filter(s => s !== job.source) : []);
+  const modality = getModalityLabel(job.location);
+  const sourceColor = getSourceColor(job.source);
 
   return (
     <div
@@ -51,38 +61,48 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onSaveToggle, onAppliedTo
           {initialFor(job)}
         </div>
 
-        {/* Body */}
+        {/* Body — title, company, location first (the scan path), tags and
+            timestamp last and quietest. */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-start gap-2 mb-1">
-            <h3 className="font-heading font-semibold text-base text-foreground leading-snug">
-              {job.title}
-            </h3>
+          <h3 className="font-heading font-semibold text-base text-foreground leading-snug mb-1">
+            {job.title}
+          </h3>
+
+          <p className="text-sm text-foreground/80 mb-2">
+            {job.company || 'Confidencial'}
+            <span className="text-muted-foreground"> · {job.location || 'Colombia'}</span>
+          </p>
+
+          <div className="flex flex-wrap items-center gap-1.5 mb-2">
+            {modality && (
+              <span
+                className={`px-2 py-0.5 rounded-full text-[11px] font-mono font-medium ${MODALITY_STYLE[modality]}`}
+              >
+                {modality}
+              </span>
+            )}
+            {job.salary && (
+              <span className="px-2 py-0.5 rounded-full text-[11px] font-mono font-medium bg-[#f1f2f0] text-foreground">
+                {job.salary}
+              </span>
+            )}
             {isFresh(job) && (
-              <span className="shrink-0 mt-1 inline-flex items-center gap-1 text-[10px] font-mono uppercase tracking-wide text-primary">
-                <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+              <span className="px-2 py-0.5 rounded-full text-[11px] font-mono font-medium bg-primary/10 text-primary">
                 Nueva
               </span>
             )}
-          </div>
-
-          <p className="text-xs text-muted-foreground mb-2">
-            🏢 {job.company || 'Confidencial'} · 📍 {job.location || 'Colombia'}
-          </p>
-
-          <div className="flex flex-wrap items-center gap-2 text-[11px] font-mono text-ink-faint">
             <span
-              className="px-2 py-0.5 rounded-full font-medium"
-              style={{ background: getSourceColor(job.source).bg, color: getSourceColor(job.source).text }}
+              className="px-2 py-0.5 rounded-full text-[11px] font-mono font-medium"
+              style={{ background: sourceColor.bg, color: sourceColor.text }}
             >
               {job.source}
             </span>
-            {otherSources.length > 0 && (
-              <span>
-                también en: <span className="text-foreground">{otherSources.join(', ')}</span>
-              </span>
-            )}
-            <span>{job.dateText || job.publishedAt || 'Reciente'}</span>
           </div>
+
+          <p className="text-[11px] font-mono text-ink-faint">
+            {otherSources.length > 0 && <>también en: {otherSources.join(', ')} · </>}
+            {job.dateText || job.publishedAt || 'Reciente'}
+          </p>
         </div>
       </div>
 

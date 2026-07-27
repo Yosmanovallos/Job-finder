@@ -20,8 +20,18 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const [filters, setFilters] = useState<FilterState>(EMPTY_FILTERS);
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  // The landing hero's search box and quick chips ("Últimas 48h", "Remoto",
+  // "Bogotá") link here with query params — read once on mount so following
+  // that link actually lands on the matching results instead of the
+  // unfiltered dashboard.
+  const [filters, setFilters] = useState<FilterState>(() => ({
+    ...EMPTY_FILTERS,
+    search: searchParams.get("search") || "",
+    modality: searchParams.get("modality") || "all",
+    freshness: searchParams.get("freshness") || "all",
+    cities: searchParams.get("cities") ? [searchParams.get("cities") as string] : []
+  }));
+  const [debouncedSearch, setDebouncedSearch] = useState(() => searchParams.get("search") || "");
   const [jobs, setJobs] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
   const [hasMore, setHasMore] = useState(false);
@@ -223,7 +233,7 @@ export default function Dashboard() {
 
   return (
     <section
-      className="relative w-full overflow-x-hidden min-h-screen"
+      className="relative w-full min-h-screen"
       style={{ backgroundColor: "#fafafa" }}
     >
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-20">
@@ -284,30 +294,39 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Top search bar + mobile filters trigger */}
-        <div className="mb-4 flex gap-2">
-          <div className="relative flex-1">
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-ink-faint">🔍</span>
-            <input
-              type="text"
-              value={filters.search}
-              onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
-              placeholder="Título, empresa o palabra clave..."
-              className="w-full pl-11 pr-4 py-3 bg-[#ffffff] border border-[#e6e8e4] rounded-xl text-foreground placeholder-slate-500 text-sm focus:outline-none focus:border-primary/50"
-            />
+        {/* Top search bar + filters trigger — sticky so the user can always
+            get to search/filters without scrolling back up, on mobile
+            (where this doubles as the filters entry point) and desktop
+            alike. Same rounded-full/gold-focus treatment as the landing
+            hero's search input, for a consistent feel. Solid background so
+            content scrolling underneath doesn't show through, and its own
+            padding (not a negative-margin bleed trick) so nothing below it
+            can end up visually clipped. */}
+        <div className="sticky top-16 z-40 bg-[#fafafa] pt-3 pb-4">
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <span className="absolute left-5 top-1/2 -translate-y-1/2 text-ink-faint">🔍</span>
+              <input
+                type="text"
+                value={filters.search}
+                onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
+                placeholder="Título, empresa o palabra clave..."
+                className="w-full pl-11 pr-4 py-3 bg-[#ffffff] border border-[#d3d6cf] rounded-full text-foreground placeholder-slate-500 text-sm shadow-sm focus:outline-none focus:border-gold-2 focus:ring-4 focus:ring-gold-1/40 transition-all"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => setMobileFiltersOpen(true)}
+              className="lg:hidden shrink-0 relative px-5 py-3 rounded-full border border-[#d3d6cf] bg-[#ffffff] text-sm font-medium text-foreground shadow-sm"
+            >
+              Filtros
+              {activeFilterCount > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-primary text-primary-foreground text-[10px] font-mono font-bold flex items-center justify-center">
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => setMobileFiltersOpen(true)}
-            className="lg:hidden shrink-0 relative px-4 py-3 rounded-xl border border-[#e6e8e4] bg-[#ffffff] text-sm font-medium text-foreground"
-          >
-            🔧 Filtros
-            {activeFilterCount > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-primary text-primary-foreground text-[10px] font-mono font-bold flex items-center justify-center">
-                {activeFilterCount}
-              </span>
-            )}
-          </button>
         </div>
 
         <div className="flex flex-col lg:flex-row gap-6">
@@ -319,7 +338,7 @@ export default function Dashboard() {
               block, so the job list is never pushed below a wall of
               accordions on small screens. */}
           {mobileFiltersOpen && (
-            <div className="lg:hidden fixed inset-0 z-50 bg-[#fafafa] flex flex-col">
+            <div className="lg:hidden fixed inset-0 z-[60] bg-[#fafafa] flex flex-col">
               <div className="flex items-center justify-between px-4 py-3 border-b border-[#e6e8e4] bg-[#ffffff] shrink-0">
                 <h2 className="font-heading font-semibold text-base text-foreground">Filtros</h2>
                 <button

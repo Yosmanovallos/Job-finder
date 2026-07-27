@@ -65,6 +65,18 @@ export function jobMatchesRole(role: string, job: any): boolean {
   return words.every((w) => title.includes(w));
 }
 
+// Same detection the modality filter uses, exposed separately so the job
+// card can show a "Remoto/Híbrido/Presencial" tag consistent with what
+// filtering that same job would match — derived from the real `location`
+// text, never a separate/inventable field.
+export function getModalityLabel(location: string | undefined | null): string | null {
+  const loc = (location || "").toLowerCase();
+  if (!loc) return null;
+  if (loc.includes("remoto") || loc.includes("remote")) return "Remoto";
+  if (loc.includes("híbrido") || loc.includes("hibrido")) return "Híbrido";
+  return "Presencial";
+}
+
 export interface JobFilterParams {
   search?: string;
   sources?: string[];
@@ -90,13 +102,23 @@ const normalizeText = (s: string) =>
 export function applyJobFilters(jobs: Job[], filters: JobFilterParams): Job[] {
   let result = jobs;
 
-  const search = filters.search?.trim().toLowerCase();
-  if (search) {
+  const rawSearch = filters.search?.trim();
+  const search = rawSearch?.toLowerCase();
+  if (search && rawSearch) {
+    // Plain substring match (title/company/location) PLUS the same
+    // synonym-aware role matching the role checkboxes use (jobMatchesRole)
+    // — otherwise typing "QA" in the search box misses "Quality Assurance"/
+    // "Ingeniero de Calidad" postings that the checkbox filter for "QA
+    // Engineer" already finds, which is exactly the inconsistency between
+    // the two filters that must not exist: the search box is the primary
+    // way people use this app, so it needs at least the same recall as the
+    // checkbox filter, not less.
     result = result.filter(
       (j: any) =>
         (j.title && j.title.toLowerCase().includes(search)) ||
         (j.company && j.company.toLowerCase().includes(search)) ||
-        (j.location && j.location.toLowerCase().includes(search))
+        (j.location && j.location.toLowerCase().includes(search)) ||
+        jobMatchesRole(rawSearch, j)
     );
   }
 
