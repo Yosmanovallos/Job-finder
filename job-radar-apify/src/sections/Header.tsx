@@ -66,42 +66,11 @@ export default function Header() {
           }}
           aria-label="BuscoTrabajo — inicio"
         >
-          {/* BT icon */}
           <img
             src="/BT.png"
-            width="24"
-            height="24"
-            alt="BuscoTrabajo.co Logo"
-            aria-hidden="true"
-            style={{ display: "block" }}
+            alt="BuscoTrabajo.co"
+            style={{ display: "block", height: "32px", width: "auto" }}
           />
-          <span
-            className="font-semibold tracking-tight"
-            style={{
-              fontFamily:
-                'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-              fontSize: "1rem",
-              color: "#0e0f10",
-              letterSpacing: "-0.01em"
-            }}
-          >
-            BuscoTrabajo<span style={{ color: "#c99a2e" }}>.co</span>
-          </span>
-          {/* Mono micro-label — desktop only */}
-          <span
-            className="hidden lg:inline-block"
-            style={{
-              fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
-              fontSize: "0.6875rem",
-              color: "#9a9d98",
-              letterSpacing: "0.08em",
-              textTransform: "uppercase",
-              marginLeft: "4px",
-              paddingTop: "2px"
-            }}
-          >
-            v1.0
-          </span>
         </Link>
 
         {/* Desktop center nav */}
