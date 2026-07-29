@@ -47,6 +47,16 @@
   * {
     @apply border-border;
   }
+  /* Clips horizontal bleed (e.g. the SourcesAndProblem marquee, or the
+     header nav at in-between viewport widths) at the root instead of on an
+     App-level wrapper div. overflow-x on the root element propagates to
+     the viewport itself per the CSS spec, rather than turning some div
+     into a nested scroll container — so it doesn't trigger the
+     overflow-x/overflow-y "visible pairing" quirk that broke
+     `position: sticky` everywhere below it (see App.tsx). */
+  html {
+    overflow-x: hidden;
+  }
   body {
     @apply bg-background text-foreground;
     font-family: var(--font-body);

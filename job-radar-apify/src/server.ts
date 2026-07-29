@@ -100,6 +100,27 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // 4a. GET /api/jobs/:id — used by the apply-gate flow to re-fetch one
+  //     specific job by id after login, independent of whatever page of the
+  //     paginated list the browser last had loaded (that job may not even
+  //     be on the first page once preference-sorted).
+  if (pathname.startsWith("/api/jobs/") && method === "GET") {
+    const id = pathname.slice("/api/jobs/".length);
+    const session = await verifySession(req);
+    const tier = session?.tier || "free";
+    const jobs = await getJobsCached(50000);
+    const job = jobs.find((j: any) => j.jobId === id);
+    if (!job) {
+      res.writeHead(404, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Vacante no encontrada" }));
+      return;
+    }
+    const [visible] = maskLockedFields([job], tier);
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ job: visible }));
+    return;
+  }
+
   // 4b. GET /api/me — returns the caller's verified profile/tier (never trusts the client)
   if (pathname === "/api/me" && method === "GET") {
     const session = await verifySession(req);

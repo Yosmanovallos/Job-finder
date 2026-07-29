@@ -3,13 +3,16 @@ import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { PRO_MONTHLY_PRICE_COP, formatCOP, PAYWALL_ENABLED } from "../config.js";
 import { JobCard } from "../components/JobCard.js";
 import { PaywallCard } from "../components/PaywallCard.js";
-import { FilterBar, FilterState, EMPTY_FILTERS } from "../components/FilterBar.js";
+import { ApplyGateModal } from "../components/ApplyGateModal.js";
+import { JobListItem } from "../components/JobListItem.js";
+import { JobDetailPanel } from "../components/JobDetailPanel.js";
+import { FilterBar, FilterState, EMPTY_FILTERS, CITY_OPTIONS } from "../components/FilterBar.js";
 import { StatsBar } from "../components/StatsBar.js";
 import { useAuth } from "../auth/auth-provider.js";
 import { usePageMeta } from "../lib/use-page-meta.js";
 import { Input } from "../components/ui/input.js";
 import { Button } from "../components/ui/button.js";
-import { Search, SlidersHorizontal, Unlock } from "lucide-react";
+import { Search, SlidersHorizontal, Unlock, ArrowUpRight, X } from "lucide-react";
 
 type CheckoutBannerState = "confirming" | "success" | "pending" | null;
 
@@ -50,10 +53,34 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [checkoutBanner, setCheckoutBanner] = useState<CheckoutBannerState>(null);
-  // Filters render inline as a sidebar on desktop, but on mobile they used to
-  // stack above the job list — pushing every result below the fold behind a
-  // wall of accordions. Below lg they now live behind this toggle instead.
+  // Job the apply-gate modal is currently open for (null = closed). Shared
+  // between the mobile JobCard list and the desktop detail panel so both
+  // trigger the exact same modal instead of each owning a copy.
+  const [applyGateJob, setApplyGateJob] = useState<any | null>(null);
+  // Set once the apply_job=<id> effect (below) resolves — renders a banner
+  // with a real, user-clicked link to the job the visitor registered to
+  // apply for, since auto-opening it isn't reliable (see that effect).
+  const [applyContinueJob, setApplyContinueJob] = useState<any | null>(null);
+  // Filters live behind this "Filtros" sheet at every breakpoint now (see
+  // the top bar below) — a persistent sidebar column would put filters,
+  // list and detail side by side as three separate columns, which is what
+  // we're moving away from.
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  // Desktop split-pane (list + sticky detail panel) vs. the mobile stacked
+  // JobCard list are genuinely different DOM trees, not just different CSS
+  // — rendering both simultaneously (one hidden via Tailwind's
+  // `hidden`/`lg:hidden`) doubles the mounted components (and their hooks)
+  // per job, which gets slower the further an infinite-scrolled list grows.
+  // This mirrors the `lg` breakpoint (1024px) so only one tree ever mounts.
+  const [isDesktop, setIsDesktop] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches
+  );
+  useEffect(() => {
+    const mql = window.matchMedia("(min-width: 1024px)");
+    const onChange = () => setIsDesktop(mql.matches);
+    mql.addEventListener("change", onChange);
+    return () => mql.removeEventListener("change", onChange);
+  }, []);
 
   const sentinelRef = useRef<HTMLDivElement>(null);
   // Guards the fetch effect against a stale response landing after a newer
@@ -141,20 +168,40 @@ export default function Dashboard() {
       .finally(() => setIsLoadingMore(false));
   }, [accessToken, buildQuery, jobs.length, hasMore, isLoadingMore, personalFilterActive]);
 
-  // Infinite scroll: fetch the next page once the sentinel at the bottom of
-  // the list enters the viewport.
+  // loadMore's identity changes on every jobs-length/hasMore update (it's a
+  // useCallback closing over both). The observer effects below must NOT
+  // depend on it directly — recreating an IntersectionObserver re-checks
+  // the sentinel's current position immediately, and while a fresh batch
+  // of cards is still settling into the DOM that recheck can read stale
+  // (pre-layout) geometry and report "still intersecting" one more time —
+  // cascading into a runaway loop of loads. A ref keeps the observer itself
+  // stable across the whole mount while still always calling the latest
+  // loadMore.
+  const loadMoreRef = useRef(loadMore);
+  useEffect(() => {
+    loadMoreRef.current = loadMore;
+  }, [loadMore]);
+
+  // Infinite scroll, shared by both the mobile stacked list and the desktop
+  // split-pane (both use normal page flow, no inner scroll container): fetch
+  // the next page once the bottom-of-page sentinel enters the viewport. It
+  // only exists in the DOM once the first page has loaded (inside the
+  // `visibleJobs.length > 0` branch, which is cleared during every refetch)
+  // — re-run on `isLoading` flipping false so the observer re-attaches to
+  // the fresh DOM node each time, instead of depending on `loadMore` itself
+  // (see loadMoreRef comment above).
   useEffect(() => {
     const el = sentinelRef.current;
     if (!el) return;
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting) loadMore();
+        if (entries[0].isIntersecting) loadMoreRef.current();
       },
       { rootMargin: "400px" }
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [loadMore]);
+  }, [isLoading]);
 
   // Wompi redirects back here with ?checkout=return after the sandbox
   // payment. The webhook that actually flips the tier to 'pro' can take a
@@ -205,6 +252,44 @@ export default function Dashboard() {
     }
   }, [checkoutBanner]);
 
+  // A user who registered from the apply-gate modal comes back here with
+  // ?apply_job=<id> — re-fetch that one job directly (not from the
+  // paginated `jobs` list, which may not even include it once loaded).
+  // Deliberately does NOT call window.open() here: this fires after an
+  // OAuth redirect + an async fetch, both of which strip the browser's
+  // "user activation" flag, so an auto-opened tab would be silently
+  // popup-blocked in every major browser — worse than doing nothing, since
+  // the user would have no idea it failed. A real button the user clicks
+  // themselves always carries a fresh user gesture, so target="_blank"
+  // works reliably there instead.
+  const appliedAutoOpenRef = useRef(false);
+  useEffect(() => {
+    const applyJobId = searchParams.get("apply_job");
+    if (!applyJobId || appliedAutoOpenRef.current) return;
+    appliedAutoOpenRef.current = true;
+
+    const headers: Record<string, string> = {};
+    if (accessToken) headers["Authorization"] = `Bearer ${accessToken}`;
+
+    fetch(`/api/jobs/${encodeURIComponent(applyJobId)}`, { headers })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.job?.url) setApplyContinueJob(data.job);
+      })
+      .catch(() => {})
+      .finally(() => {
+        setSearchParams(
+          (prev) => {
+            const next = new URLSearchParams(prev);
+            next.delete("apply_job");
+            return next;
+          },
+          { replace: true }
+        );
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accessToken]);
+
   const handleSaveToggle = (jobId: string) => {
     const next = new Set(savedJobIds);
     if (next.has(jobId)) next.delete(jobId);
@@ -225,6 +310,22 @@ export default function Dashboard() {
     return true;
   });
 
+  // Desktop split-pane: which job the right-hand detail panel shows. Only
+  // meaningful at lg+ (mobile keeps the old stacked JobCard list, no
+  // detail pane) but tracked unconditionally since it's cheap either way.
+  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  useEffect(() => {
+    if (visibleJobs.length === 0) {
+      setSelectedJobId(null);
+      return;
+    }
+    if (selectedJobId && visibleJobs.some((j) => j.jobId === selectedJobId)) return;
+    const firstUnlocked = visibleJobs.find((j) => !j.isLocked) || visibleJobs[0];
+    setSelectedJobId(firstUnlocked.jobId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleJobs]);
+  const selectedJob = visibleJobs.find((j) => j.jobId === selectedJobId) || null;
+
   const activeFilterCount =
     filters.sources.length +
     filters.cities.length +
@@ -242,10 +343,7 @@ export default function Dashboard() {
   }, [mobileFiltersOpen]);
 
   return (
-    <section
-      className="relative w-full min-h-screen"
-      style={{ backgroundColor: "#fafafa" }}
-    >
+    <section className="relative w-full min-h-screen" style={{ backgroundColor: "#fafafa" }}>
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-20">
         {checkoutBanner && (
           <div
@@ -275,6 +373,35 @@ export default function Dashboard() {
           </div>
         )}
 
+        {applyContinueJob && (
+          <div className="flex items-center justify-between gap-4 mb-4 p-3 rounded-xl bg-primary/10 border border-primary/30 text-xs font-mono">
+            <span className="text-foreground">
+              ¡Cuenta lista! Continúa a{" "}
+              <strong className="text-primary">{applyContinueJob.title}</strong>.
+            </span>
+            <div className="flex items-center gap-2 shrink-0">
+              <Button asChild size="sm">
+                <a
+                  href={applyContinueJob.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => setApplyContinueJob(null)}
+                >
+                  Continuar a la vacante <ArrowUpRight className="h-3.5 w-3.5" />
+                </a>
+              </Button>
+              <button
+                type="button"
+                onClick={() => setApplyContinueJob(null)}
+                aria-label="Cerrar"
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
         {PAYWALL_ENABLED && (
           <div className="flex items-center justify-between gap-4 mb-6 p-3 rounded-xl bg-[#ffffff] border border-[#e6e8e4] text-xs font-mono">
             <div className="flex items-center gap-2">
@@ -283,7 +410,9 @@ export default function Dashboard() {
               />
               <span className="text-foreground">
                 Estado de Cuenta:{" "}
-                <strong className={tier === "pro" ? "text-primary font-bold" : "text-accent font-bold"}>
+                <strong
+                  className={tier === "pro" ? "text-primary font-bold" : "text-accent font-bold"}
+                >
                   {tier === "pro"
                     ? `🌟 Suscriptor Pro (${user?.email})`
                     : isAuthenticated
@@ -322,61 +451,118 @@ export default function Dashboard() {
                 className="h-12 pl-11 rounded-full bg-card border-border-strong shadow-sm focus-visible:border-gold-2 focus-visible:ring-4 focus-visible:ring-gold-1/40"
               />
             </div>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setMobileFiltersOpen(true)}
-              className="lg:hidden shrink-0 relative h-12 rounded-full px-5 shadow-sm"
+
+            {/* lg+: a few quick filters live inline right next to search —
+                everything else (fuente/portal, rol buscado, mis vacantes)
+                stays behind the "Filtros" sheet below, since a 200-role
+                checkbox list has no reasonable inline form. */}
+            <select
+              value={filters.freshness}
+              onChange={(e) => setFilters((f) => ({ ...f, freshness: e.target.value }))}
+              className="hidden lg:block h-12 rounded-full border border-border-strong bg-card px-4 text-sm shadow-sm"
+              aria-label="Fecha de publicación"
             >
-              <SlidersHorizontal className="h-4 w-4" />
-              Filtros
-              {activeFilterCount > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-primary text-primary-foreground text-[10px] font-mono font-bold flex items-center justify-center">
-                  {activeFilterCount}
-                </span>
+              <option value="all">Cualquier fecha</option>
+              <option value="24h">Últimas 24 horas</option>
+              <option value="48h">Últimas 48 horas</option>
+              <option value="7d">Última semana</option>
+            </select>
+            <select
+              value={filters.modality}
+              onChange={(e) => setFilters((f) => ({ ...f, modality: e.target.value }))}
+              className="hidden lg:block h-12 rounded-full border border-border-strong bg-card px-4 text-sm shadow-sm"
+              aria-label="Modalidad"
+            >
+              <option value="all">Cualquier modalidad</option>
+              <option value="remoto">100% remoto</option>
+              <option value="hibrido">Híbrido</option>
+              <option value="presencial">Presencial</option>
+            </select>
+            <select
+              value={filters.cities[0] || "all"}
+              onChange={(e) =>
+                setFilters((f) => ({ ...f, cities: e.target.value === "all" ? [] : [e.target.value] }))
+              }
+              className="hidden lg:block h-12 rounded-full border border-border-strong bg-card px-4 text-sm shadow-sm"
+              aria-label="Ciudad"
+            >
+              <option value="all">Cualquier ciudad</option>
+              {CITY_OPTIONS.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+
+            <div className="relative shrink-0">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setMobileFiltersOpen((v) => !v)}
+                className="relative h-12 rounded-full px-5 shadow-sm"
+              >
+                <SlidersHorizontal className="h-4 w-4" />
+                Filtros
+                {activeFilterCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-primary text-primary-foreground text-[10px] font-mono font-bold flex items-center justify-center">
+                    {activeFilterCount}
+                  </span>
+                )}
+              </Button>
+
+              {/* lg+: an anchored dropdown right under the button — keeps
+                  the list/detail visible behind it instead of replacing the
+                  whole screen. Below lg there's no room for a floating
+                  panel that size, so mobile keeps the full-screen sheet
+                  (rendered separately below). */}
+              {mobileFiltersOpen && isDesktop && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setMobileFiltersOpen(false)} />
+                  {/* FilterBar already renders its own card (border, title,
+                      "Limpiar todo") — this wrapper only positions/sizes/
+                      scrolls it, no second header on top of that one. */}
+                  <div className="absolute right-0 top-full mt-2 w-[26rem] max-h-[70vh] overflow-y-auto rounded-xl shadow-xl z-20">
+                    <FilterBar filters={filters} onFilterChange={setFilters} />
+                  </div>
+                </>
               )}
-            </Button>
+            </div>
           </div>
         </div>
 
-        <div className="flex flex-col lg:flex-row gap-6">
-          <div className="hidden lg:block">
-            <FilterBar filters={filters} onFilterChange={setFilters} />
-          </div>
-
-          {/* Mobile filter sheet — full-screen overlay instead of an inline
-              block, so the job list is never pushed below a wall of
-              accordions on small screens. */}
-          {mobileFiltersOpen && (
-            <div className="lg:hidden fixed inset-0 z-[60] bg-[#fafafa] flex flex-col">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-[#e6e8e4] bg-[#ffffff] shrink-0">
-                <h2 className="font-heading font-semibold text-base text-foreground">Filtros</h2>
-                <button
-                  type="button"
-                  onClick={() => setMobileFiltersOpen(false)}
-                  aria-label="Cerrar filtros"
-                  className="w-9 h-9 rounded-lg border border-[#e6e8e4] flex items-center justify-center text-lg"
-                >
-                  ×
-                </button>
-              </div>
-              <div className="flex-1 overflow-y-auto p-4">
-                <FilterBar filters={filters} onFilterChange={setFilters} />
-              </div>
-              <div className="shrink-0 p-4 border-t border-[#e6e8e4] bg-[#ffffff]">
-                <button
-                  type="button"
-                  onClick={() => setMobileFiltersOpen(false)}
-                  className="w-full py-3 rounded-lg bg-primary text-primary-foreground font-semibold text-sm"
-                >
-                  Ver {total} resultado{total === 1 ? "" : "s"}
-                </button>
-              </div>
+        {/* Below lg: full-screen filter sheet (there's no room for a
+            floating popover at that width). */}
+        {mobileFiltersOpen && !isDesktop && (
+          <div className="fixed inset-0 z-[60] bg-[#fafafa] flex flex-col">
+            {/* Just the close affordance — FilterBar's own card already has
+                the "Filtros" heading and "Limpiar todo", right below. */}
+            <div className="flex items-center justify-end px-4 py-3 border-b border-[#e6e8e4] bg-[#ffffff] shrink-0">
+              <button
+                type="button"
+                onClick={() => setMobileFiltersOpen(false)}
+                aria-label="Cerrar filtros"
+                className="w-9 h-9 rounded-lg border border-[#e6e8e4] flex items-center justify-center text-lg"
+              >
+                ×
+              </button>
             </div>
-          )}
+            <div className="flex-1 overflow-y-auto p-4 max-w-xl w-full mx-auto">
+              <FilterBar filters={filters} onFilterChange={setFilters} />
+            </div>
+            <div className="shrink-0 p-4 border-t border-[#e6e8e4] bg-[#ffffff]">
+              <button
+                type="button"
+                onClick={() => setMobileFiltersOpen(false)}
+                className="w-full py-3 rounded-lg bg-primary text-primary-foreground font-semibold text-sm"
+              >
+                Ver {total} resultado{total === 1 ? "" : "s"}
+              </button>
+            </div>
+          </div>
+        )}
 
-          <div className="flex-1 min-w-0">
-            <StatsBar totalJobs={total} filteredJobs={visibleJobs.length} />
+        <div>
+          <StatsBar totalJobs={total} filteredJobs={visibleJobs.length} />
 
             {isLoading ? (
               <div className="space-y-3">
@@ -393,28 +579,97 @@ export default function Dashboard() {
               </div>
             ) : visibleJobs.length > 0 ? (
               <>
-                <div className="space-y-3">
-                  {visibleJobs.map((job) =>
-                    job.isLocked ? (
-                      <PaywallCard
-                        key={job.jobId || job.url}
-                        job={job}
-                        onUnlockClick={() => navigate("/pricing")}
-                      />
-                    ) : (
-                      <JobCard
-                        key={job.jobId || job.url}
-                        job={{
-                          ...job,
-                          isSaved: savedJobIds.has(job.jobId),
-                          isApplied: appliedJobIds.has(job.jobId)
-                        }}
-                        onSaveToggle={handleSaveToggle}
-                        onAppliedToggle={handleAppliedToggle}
-                      />
-                    )
-                  )}
-                </div>
+                {isDesktop ? (
+                  /* Desktop split-pane: compact clickable list on the left,
+                     sticky detail panel on the right — same master-detail
+                     pattern JobLeads/LinkedIn Jobs use. Both columns follow
+                     normal page flow (no inner overflow-y-auto column) so
+                     there's a single native scrollbar for the whole page —
+                     same as the plain stacked list always had. */
+                  <div className="grid grid-cols-[380px_1fr] gap-4 items-start">
+                    <div className="space-y-3">
+                      {visibleJobs.map((job) =>
+                        job.isLocked ? (
+                          <PaywallCard
+                            key={job.jobId || job.url}
+                            job={job}
+                            onUnlockClick={() => navigate("/pricing")}
+                          />
+                        ) : (
+                          <JobListItem
+                            key={job.jobId || job.url}
+                            job={job}
+                            selected={job.jobId === selectedJobId}
+                            onClick={() => setSelectedJobId(job.jobId)}
+                          />
+                        )
+                      )}
+                    </div>
+
+                    {/* top-40 (160px), not top-32 (128px): the sticky
+                        search bar above sits at top-16 (64px) and is
+                        76px tall, so its own bottom edge lands at 140px.
+                        Anything less than that here and the search bar's
+                        opaque z-40 background paints over the top of this
+                        card while scrolled, wiping out its color strip —
+                        this leaves a clean 20px gap below it instead. */}
+                    <div className="sticky top-40">
+                      {selectedJob?.isLocked ? (
+                        <div className="rounded-lg border border-border bg-card p-8 text-center">
+                          <p className="text-sm text-muted-foreground mb-4">
+                            Esta vacante es reciente y está reservada para suscriptores Pro.
+                          </p>
+                          <Button variant="gold" onClick={() => navigate("/pricing")}>
+                            <Unlock className="h-3.5 w-3.5" />
+                            Desbloquear Pro
+                          </Button>
+                        </div>
+                      ) : (
+                        <JobDetailPanel
+                          job={
+                            selectedJob
+                              ? {
+                                  ...selectedJob,
+                                  isSaved: savedJobIds.has(selectedJob.jobId),
+                                  isApplied: appliedJobIds.has(selectedJob.jobId)
+                                }
+                              : null
+                          }
+                          onSaveToggle={handleSaveToggle}
+                          onAppliedToggle={handleAppliedToggle}
+                          onApplyClick={setApplyGateJob}
+                        />
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  /* Mobile / below-lg: stacked full-card list — there's no
+                     room for a second pane, so each card carries its own
+                     actions (as it always has). */
+                  <div className="space-y-3">
+                    {visibleJobs.map((job) =>
+                      job.isLocked ? (
+                        <PaywallCard
+                          key={job.jobId || job.url}
+                          job={job}
+                          onUnlockClick={() => navigate("/pricing")}
+                        />
+                      ) : (
+                        <JobCard
+                          key={job.jobId || job.url}
+                          job={{
+                            ...job,
+                            isSaved: savedJobIds.has(job.jobId),
+                            isApplied: appliedJobIds.has(job.jobId)
+                          }}
+                          onSaveToggle={handleSaveToggle}
+                          onAppliedToggle={handleAppliedToggle}
+                          onApplyClick={setApplyGateJob}
+                        />
+                      )
+                    )}
+                  </div>
+                )}
 
                 {!personalFilterActive && (
                   <div ref={sentinelRef} className="h-10 flex items-center justify-center mt-4">
@@ -437,7 +692,10 @@ export default function Dashboard() {
             )}
           </div>
         </div>
-      </div>
+
+      {applyGateJob && (
+        <ApplyGateModal job={applyGateJob} onClose={() => setApplyGateJob(null)} />
+      )}
     </section>
   );
 }

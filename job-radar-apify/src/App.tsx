@@ -55,7 +55,21 @@ export default function App() {
     <AuthProvider>
       <BrowserRouter>
         <ScrollToTop />
-        <div className="min-h-screen bg-background text-foreground overflow-x-hidden font-sans">
+        {/* No overflow-x-hidden here: setting overflow-x alone forces the
+            browser to silently promote overflow-y from its default
+            `visible` to `auto` too (a CSS quirk — the two axes can't be
+            visible/non-visible at the same time), which turns this div into
+            the page's real scroll container instead of the window. That
+            breaks every `position: sticky` element anywhere below it (the
+            dashboard's search bar and its split-pane detail panel included)
+            — sticky positioning is computed against the nearest ancestor
+            with non-visible overflow, and this one never actually needs to
+            scroll internally (it has no height cap), so it just silently
+            eats the stickiness. Sections that render wide decorative
+            elements (HeroDemo, ComparisonAndProcess,
+            ProductFeaturesPricingFaq) already scope their own
+            overflow-x-hidden locally instead. */}
+        <div className="min-h-screen bg-background text-foreground font-sans">
           <Header />
           <main>
             <Suspense fallback={<RouteFallback />}>

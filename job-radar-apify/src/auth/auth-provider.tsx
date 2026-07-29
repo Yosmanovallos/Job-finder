@@ -25,7 +25,11 @@ export interface AuthContextType {
   profileLoaded: boolean;
   loginWithGoogle: (returnTo?: string) => Promise<void>;
   loginWithEmail: (email: string, password: string) => Promise<{ error?: string }>;
-  signUpWithEmail: (email: string, password: string) => Promise<{ error?: string }>;
+  signUpWithEmail: (
+    email: string,
+    password: string,
+    returnTo?: string
+  ) => Promise<{ error?: string }>;
   logout: () => Promise<void>;
   refreshTier: () => Promise<void>;
   updateProfileName: (name: string) => Promise<{ error?: string }>;
@@ -141,15 +145,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { error: error?.message };
   };
 
-  const signUpWithEmail = async (email: string, password: string) => {
+  const signUpWithEmail = async (email: string, password: string, returnTo?: string) => {
     // Without emailRedirectTo, Supabase falls back to the project's "Site
     // URL" for the confirmation link — which is easy to leave pointed at
     // localhost (a real-world case we hit: see docs/BACKLOG.md). Pin it to
     // this deployment's own origin so it never depends on that setting.
+    // Carries return_to the same way loginWithGoogle does, so a signup
+    // started from the apply-gate modal still lands back on the job the
+    // user wanted after they click the confirmation link in their email.
+    const callbackUrl = new URL("/auth/callback", window.location.origin);
+    if (returnTo) callbackUrl.searchParams.set("return_to", returnTo);
     const { error } = await supabase.auth.signUp({
       email,
       password,
-      options: { emailRedirectTo: `${window.location.origin}/auth/callback` }
+      options: { emailRedirectTo: callbackUrl.toString() }
     });
     if (error && isSupabaseConfigError(error.message)) {
       setConfigError(true);
@@ -258,7 +267,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Our own DB row (editable via updateProfileName) wins once set;
         // falls back to whatever Google OAuth gave us, then the email.
         name:
-          dbName || session.user.user_metadata?.full_name || session.user.email?.split("@")[0] || "Usuario",
+          dbName ||
+          session.user.user_metadata?.full_name ||
+          session.user.email?.split("@")[0] ||
+          "Usuario",
         subscriptionTier: tier,
         subscriptionEnd
       }

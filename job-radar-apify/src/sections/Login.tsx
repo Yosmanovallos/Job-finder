@@ -4,31 +4,9 @@ import { useAuth } from "../auth/auth-provider.js";
 import { translateAuthError } from "../lib/auth-error-messages.js";
 import { Button } from "../components/ui/button.js";
 import { Input } from "../components/ui/input.js";
+import { GoogleIcon } from "../components/ui/google-icon.js";
 
 const RESEND_COOLDOWN_S = 30;
-
-function GoogleIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 18 18" aria-hidden="true">
-      <path
-        fill="#4285F4"
-        d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.71v2.26h2.9c1.7-1.57 2.7-3.87 2.7-6.61z"
-      />
-      <path
-        fill="#34A853"
-        d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.9-2.26c-.8.54-1.84.86-3.06.86-2.35 0-4.34-1.59-5.05-3.72H.96v2.33A9 9 0 0 0 9 18z"
-      />
-      <path
-        fill="#FBBC05"
-        d="M3.95 10.7A5.4 5.4 0 0 1 3.67 9c0-.59.1-1.17.28-1.7V4.97H.96A9 9 0 0 0 0 9c0 1.45.35 2.83.96 4.03l2.99-2.33z"
-      />
-      <path
-        fill="#EA4335"
-        d="M9 3.58c1.32 0 2.51.46 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0A9 9 0 0 0 .96 4.97l2.99 2.33C4.66 5.17 6.65 3.58 9 3.58z"
-      />
-    </svg>
-  );
-}
 
 export default function Login() {
   const {
@@ -92,7 +70,7 @@ export default function Login() {
       const result =
         mode === "login"
           ? await loginWithEmail(email, password)
-          : await signUpWithEmail(email, password);
+          : await signUpWithEmail(email, password, returnTo);
 
       if (result.error) {
         setError(translateAuthError(result.error));
@@ -141,7 +119,9 @@ export default function Login() {
         <div className="h-1.5 bg-gradient-to-r from-green-soft via-primary to-gold-2" />
         <div className="p-6">
           <img src="/BT.png" alt="BuscoTrabajo.co" className="h-6 w-auto mb-4" />
-          <h1 className={`text-xl font-bold text-foreground font-heading ${subtitle ? "mb-1" : "mb-6"}`}>
+          <h1
+            className={`text-xl font-bold text-foreground font-heading ${subtitle ? "mb-1" : "mb-6"}`}
+          >
             {title}
           </h1>
           {subtitle && <p className="text-xs text-muted-foreground mb-6 font-mono">{subtitle}</p>}

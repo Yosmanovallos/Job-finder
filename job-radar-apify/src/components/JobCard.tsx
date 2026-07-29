@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
-import { Star, Check, ArrowRight } from 'lucide-react';
-import { Job } from '../sources/types.js';
-import { getSourceColor } from '../lib/source-colors.js';
-import { getModalityLabel } from '../lib/job-filters.js';
-import { Button } from './ui/button.js';
-import { Badge } from './ui/badge.js';
-import { cn } from '../lib/utils.js';
+import React, { useState } from "react";
+import { Star, Check, ArrowRight } from "lucide-react";
+import { Job } from "../sources/types.js";
+import { getSourceColor } from "../lib/source-colors.js";
+import { getModalityLabel } from "../lib/job-filters.js";
+import { useAuth } from "../auth/auth-provider.js";
+import { Button } from "./ui/button.js";
+import { Badge } from "./ui/badge.js";
+import { cn } from "../lib/utils.js";
 
 export interface JobCardProps {
   job: Job & {
@@ -16,6 +17,10 @@ export interface JobCardProps {
   };
   onSaveToggle?: (jobId: string) => void;
   onAppliedToggle?: (jobId: string) => void;
+  // Anonymous visitors get intercepted here instead of navigating straight
+  // to the external posting — the caller (Dashboard) owns the gate modal's
+  // open/closed state so it can be shared with the split-pane detail panel.
+  onApplyClick?: (job: JobCardProps["job"]) => void;
 }
 
 function initialFor(job: JobCardProps["job"]): string {
@@ -35,7 +40,13 @@ const MODALITY_VARIANT: Record<string, "remote" | "hybrid" | "default"> = {
   Presencial: "default"
 };
 
-export const JobCard: React.FC<JobCardProps> = ({ job, onSaveToggle, onAppliedToggle }) => {
+export const JobCard: React.FC<JobCardProps> = ({
+  job,
+  onSaveToggle,
+  onAppliedToggle,
+  onApplyClick
+}) => {
+  const { isAuthenticated } = useAuth();
   const [saved, setSaved] = useState(job.isSaved || false);
   const [applied, setApplied] = useState(job.isApplied || false);
 
@@ -49,7 +60,15 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onSaveToggle, onAppliedTo
     if (onAppliedToggle) onAppliedToggle(job.jobId);
   };
 
-  const otherSources = job.alsoIn || (Array.isArray(job.sources) ? job.sources.filter(s => s !== job.source) : []);
+  const handleApplyLinkClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    if (!isAuthenticated && onApplyClick) {
+      e.preventDefault();
+      onApplyClick(job);
+    }
+  };
+
+  const otherSources =
+    job.alsoIn || (Array.isArray(job.sources) ? job.sources.filter((s) => s !== job.source) : []);
   const modality = getModalityLabel(job.location);
   const sourceColor = getSourceColor(job.source);
 
@@ -63,10 +82,18 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onSaveToggle, onAppliedTo
       // for locked/Pro, so the two states read as siblings, not opposites.
       className={cn(
         "hud-corners grid grid-cols-[4px_1fr] rounded-lg border overflow-hidden transition-colors",
-        applied ? "border-border bg-muted opacity-60" : "border-border bg-card hover:border-border-strong"
+        applied
+          ? "border-border bg-muted opacity-60"
+          : "border-border bg-card hover:border-border-strong"
       )}
     >
-      <div className={applied ? "bg-border-strong" : "bg-gradient-to-b from-green-soft via-primary to-green-deep"} />
+      <div
+        className={
+          applied
+            ? "bg-border-strong"
+            : "bg-gradient-to-b from-green-soft via-primary to-green-deep"
+        }
+      />
 
       <div className="flex flex-col sm:flex-row gap-4 p-4 sm:p-5 min-w-0">
         <div className="flex items-start gap-4 flex-1 min-w-0">
@@ -87,8 +114,8 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onSaveToggle, onAppliedTo
             </h3>
 
             <p className="text-sm text-foreground/80 mb-2">
-              {job.company || 'Confidencial'}
-              <span className="text-muted-foreground"> · {job.location || 'Colombia'}</span>
+              {job.company || "Confidencial"}
+              <span className="text-muted-foreground"> · {job.location || "Colombia"}</span>
             </p>
 
             <div className="flex flex-wrap items-center gap-1.5 mb-2">
@@ -101,8 +128,8 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onSaveToggle, onAppliedTo
             </div>
 
             <p className="text-[11px] font-mono text-ink-faint">
-              {otherSources.length > 0 && <>también en: {otherSources.join(', ')} · </>}
-              {job.dateText || job.publishedAt || 'Reciente'}
+              {otherSources.length > 0 && <>también en: {otherSources.join(", ")} · </>}
+              {job.dateText || job.publishedAt || "Reciente"}
             </p>
           </div>
         </div>
@@ -110,7 +137,12 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onSaveToggle, onAppliedTo
         {/* Actions */}
         <div className="shrink-0 flex flex-row sm:flex-col items-center sm:items-end justify-between sm:justify-start gap-2 w-full sm:w-auto">
           <Button asChild size="sm" className="order-2 sm:order-1 font-mono">
-            <a href={job.url} target="_blank" rel="noopener noreferrer">
+            <a
+              href={job.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={handleApplyLinkClick}
+            >
               Ver vacante <ArrowRight className="h-3.5 w-3.5" />
             </a>
           </Button>
@@ -120,7 +152,9 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onSaveToggle, onAppliedTo
               size="icon"
               onClick={handleSave}
               aria-label={saved ? "Quitar de guardados" : "Guardar"}
-              className={saved ? "bg-gold-1/40 border-gold-2/50 text-gold-ink hover:bg-gold-1/40" : undefined}
+              className={
+                saved ? "bg-gold-1/40 border-gold-2/50 text-gold-ink hover:bg-gold-1/40" : undefined
+              }
             >
               <Star className="h-4 w-4" fill={saved ? "currentColor" : "none"} />
             </Button>
@@ -129,7 +163,11 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onSaveToggle, onAppliedTo
               size="icon"
               onClick={handleApplied}
               aria-label={applied ? "Marcar como no aplicada" : "Marcar aplicada"}
-              className={applied ? "bg-primary/10 border-primary/40 text-primary hover:bg-primary/10" : undefined}
+              className={
+                applied
+                  ? "bg-primary/10 border-primary/40 text-primary hover:bg-primary/10"
+                  : undefined
+              }
             >
               <Check className="h-4 w-4" />
             </Button>
