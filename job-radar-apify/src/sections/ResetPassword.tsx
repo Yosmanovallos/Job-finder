@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/auth-provider.js";
 import { translateAuthError } from "../lib/auth-error-messages.js";
+import { Button } from "../components/ui/button.js";
+import { Input } from "../components/ui/input.js";
 
 export default function ResetPassword() {
   const { loading, passwordRecovery, updatePassword } = useAuth();
@@ -56,12 +58,9 @@ export default function ResetPassword() {
             <p className="text-xs text-muted-foreground mb-6 font-mono">
               Ya puedes usar tu nueva contraseña la próxima vez que inicies sesión.
             </p>
-            <button
-              onClick={() => navigate('/dashboard')}
-              className="w-full px-4 py-3 rounded-lg bg-primary hover:bg-primary text-primary-foreground font-bold text-sm transition-all"
-            >
+            <Button size="lg" className="w-full" onClick={() => navigate('/dashboard')}>
               Ir al dashboard
-            </button>
+            </Button>
           </>
         ) : !passwordRecovery ? (
           <>
@@ -70,12 +69,9 @@ export default function ResetPassword() {
               Este enlace de recuperación no es válido o ya expiró. Solicita uno nuevo desde
               la pantalla de inicio de sesión.
             </p>
-            <Link
-              to="/login"
-              className="block w-full text-center px-4 py-3 rounded-lg bg-primary hover:bg-primary text-primary-foreground font-bold text-sm transition-all"
-            >
-              Volver a iniciar sesión
-            </Link>
+            <Button size="lg" className="w-full" asChild>
+              <Link to="/login">Volver a iniciar sesión</Link>
+            </Button>
           </>
         ) : (
           <>
@@ -84,34 +80,28 @@ export default function ResetPassword() {
               Escríbela dos veces para confirmar que no hay errores de tipeo.
             </p>
             <form onSubmit={handleSubmit} className="space-y-3">
-              <input
+              <Input
                 type="password"
                 required
                 minLength={8}
                 placeholder="Nueva contraseña"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-lg bg-muted/50 border border-border text-foreground text-sm placeholder-slate-500 focus:outline-none"
               />
-              <input
+              <Input
                 type="password"
                 required
                 minLength={8}
                 placeholder="Confirma la nueva contraseña"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-lg bg-muted/50 border border-border text-foreground text-sm placeholder-slate-500 focus:outline-none"
               />
 
               {error && <p className="text-xs text-destructive font-mono">{error}</p>}
 
-              <button
-                type="submit"
-                disabled={busy}
-                className="w-full px-4 py-3 rounded-lg bg-primary hover:bg-primary text-primary-foreground font-bold text-sm transition-all disabled:opacity-50"
-              >
+              <Button type="submit" size="lg" className="w-full" disabled={busy}>
                 {busy ? 'Guardando...' : 'Guardar nueva contraseña'}
-              </button>
+              </Button>
             </form>
           </>
         )}

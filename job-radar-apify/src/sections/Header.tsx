@@ -3,6 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { hoverStyle } from "../lib/hover-style.js";
 import { useAuth } from "../auth/auth-provider.js";
 import { PAYWALL_ENABLED } from "../config.js";
+import { Button } from "../components/ui/button.js";
 
 const navLinks = [
   { label: "Cómo funciona", to: "/como-funciona" },
@@ -104,74 +105,17 @@ export default function Header() {
             // redirect hash) is still being resolved on first paint.
             <div className="w-24" style={{ height: "44px" }} />
           ) : isAuthenticated ? (
-            <Link
-              to="/cuenta"
-              className="px-4 py-2 rounded-sm transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 font-mono text-xs"
-              style={{
-                color: "#0e0f10",
-                border: "1px solid #e6e8e4",
-                borderRadius: "8px",
-                minHeight: "44px",
-                display: "flex",
-                alignItems: "center",
-                textDecoration: "none",
-                backgroundColor: "transparent"
-              }}
-              {...hoverStyle<HTMLAnchorElement>(
-                { borderColor: "#d3d6cf", backgroundColor: "#ffffff" },
-                { borderColor: "#e6e8e4", backgroundColor: "transparent" }
-              )}
-            >
-              {accountLabel}
-            </Link>
+            <Button variant="outline" size="lg" className="font-mono text-xs" asChild>
+              <Link to="/cuenta">{accountLabel}</Link>
+            </Button>
           ) : (
             <>
-              <Link
-                to={loginHref}
-                className="px-4 py-2 rounded-sm transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-                style={{
-                  fontFamily:
-                    'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-                  fontSize: "0.9375rem",
-                  color: "#5b5f5c",
-                  border: "1px solid #e6e8e4",
-                  borderRadius: "8px",
-                  minHeight: "44px",
-                  display: "flex",
-                  alignItems: "center",
-                  textDecoration: "none",
-                  backgroundColor: "transparent"
-                }}
-                {...hoverStyle<HTMLAnchorElement>(
-                  { color: "#0e0f10", borderColor: "#d3d6cf", backgroundColor: "#ffffff" },
-                  { color: "#5b5f5c", borderColor: "#e6e8e4", backgroundColor: "transparent" }
-                )}
-              >
-                Iniciar sesión
-              </Link>
-              <Link
-                to="/dashboard"
-                className="px-5 py-2 font-semibold rounded-sm transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-                style={{
-                  fontFamily:
-                    'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-                  fontSize: "0.9375rem",
-                  color: "#fafafa",
-                  backgroundColor: "#0f6b4c",
-                  borderRadius: "8px",
-                  minHeight: "44px",
-                  display: "flex",
-                  alignItems: "center",
-                  textDecoration: "none",
-                  fontWeight: 600
-                }}
-                {...hoverStyle<HTMLAnchorElement>(
-                  { backgroundColor: "#14805a" },
-                  { backgroundColor: "#0f6b4c" }
-                )}
-              >
-                Probar gratis
-              </Link>
+              <Button variant="outline" size="lg" asChild>
+                <Link to={loginHref}>Iniciar sesión</Link>
+              </Button>
+              <Button size="lg" asChild>
+                <Link to="/dashboard">Probar gratis</Link>
+              </Button>
             </>
           )}
         </div>
@@ -290,71 +234,23 @@ export default function Header() {
           {/* Mobile actions */}
           <div className="flex flex-col gap-3 px-4 py-4">
             {loading ? null : isAuthenticated ? (
-              <Link
-                to="/cuenta"
-                onClick={handleNavClick}
-                className="flex items-center justify-center rounded-sm transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 font-mono text-sm"
-                style={{
-                  color: "#0e0f10",
-                  border: "1px solid #e6e8e4",
-                  borderRadius: "8px",
-                  minHeight: "48px",
-                  textDecoration: "none",
-                  backgroundColor: "transparent"
-                }}
-                {...hoverStyle<HTMLAnchorElement>(
-                  { borderColor: "#d3d6cf", backgroundColor: "#f1f2f0" },
-                  { borderColor: "#e6e8e4", backgroundColor: "transparent" }
-                )}
-              >
-                {accountLabel}
-              </Link>
+              <Button variant="outline" size="lg" className="font-mono text-sm" asChild>
+                <Link to="/cuenta" onClick={handleNavClick}>
+                  {accountLabel}
+                </Link>
+              </Button>
             ) : (
               <>
-                <Link
-                  to={loginHref}
-                  onClick={handleNavClick}
-                  className="flex items-center justify-center rounded-sm transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-                  style={{
-                    fontFamily:
-                      'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-                    fontSize: "1rem",
-                    color: "#5b5f5c",
-                    border: "1px solid #e6e8e4",
-                    borderRadius: "8px",
-                    minHeight: "48px",
-                    textDecoration: "none",
-                    backgroundColor: "transparent"
-                  }}
-                  {...hoverStyle<HTMLAnchorElement>(
-                    { color: "#0e0f10", borderColor: "#d3d6cf", backgroundColor: "#f1f2f0" },
-                    { color: "#5b5f5c", borderColor: "#e6e8e4", backgroundColor: "transparent" }
-                  )}
-                >
-                  Iniciar sesión
-                </Link>
-                <Link
-                  to="/dashboard"
-                  onClick={handleNavClick}
-                  className="flex items-center justify-center font-semibold rounded-sm transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-                  style={{
-                    fontFamily:
-                      'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-                    fontSize: "1rem",
-                    color: "#fafafa",
-                    backgroundColor: "#0f6b4c",
-                    borderRadius: "8px",
-                    minHeight: "48px",
-                    textDecoration: "none",
-                    fontWeight: 600
-                  }}
-                  {...hoverStyle<HTMLAnchorElement>(
-                    { backgroundColor: "#14805a" },
-                    { backgroundColor: "#0f6b4c" }
-                  )}
-                >
-                  Probar gratis
-                </Link>
+                <Button variant="outline" size="lg" className="text-base" asChild>
+                  <Link to={loginHref} onClick={handleNavClick}>
+                    Iniciar sesión
+                  </Link>
+                </Button>
+                <Button size="lg" className="text-base" asChild>
+                  <Link to="/dashboard" onClick={handleNavClick}>
+                    Probar gratis
+                  </Link>
+                </Button>
               </>
             )}
           </div>

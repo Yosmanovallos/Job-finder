@@ -18,11 +18,12 @@ All paths below are relative to `job-radar-apify/`.
 No `apt-get install` needed — the driver downloads the missing shared
 libs itself (see Gotchas), no root required.
 
-`playwright` (the npm package) must be present in `node_modules` and a
-Chromium binary must be downloaded:
+`playwright` is a real `devDependency` (added after this skill's first
+use, when it turned out to be `extraneous` and got silently pruned by
+an unrelated `npm install`) — `npm install` at Setup below covers it.
+Just make sure the Chromium binary itself is downloaded:
 
 ```bash
-npm ls playwright || npm install --no-save playwright
 npx playwright install chromium
 ```
 
@@ -117,6 +118,13 @@ non-zero on failure.
 
 ## Gotchas
 
+- **`Cannot find package 'playwright'` even though it worked a minute ago**
+  — happened once: `playwright` was `npm install`ed without `--save`,
+  sat in `node_modules` as `extraneous` (present but undeclared), then a
+  *later, unrelated* `npm install <other-package>` pruned it since npm
+  doesn't keep undeclared packages around. Now a real `devDependency` (see
+  Prerequisites) so `npm install` always restores it — if this error comes
+  back, check `package.json` actually still lists it before re-installing.
 - **`chromium.launch()` fails with `error while loading shared libraries:
   libnspr4.so: cannot open shared object file`** — the playwright-downloaded
   Chromium (both `chrome-linux64/chrome` and

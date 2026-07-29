@@ -7,6 +7,9 @@ import { FilterBar, FilterState, EMPTY_FILTERS } from "../components/FilterBar.j
 import { StatsBar } from "../components/StatsBar.js";
 import { useAuth } from "../auth/auth-provider.js";
 import { usePageMeta } from "../lib/use-page-meta.js";
+import { Input } from "../components/ui/input.js";
+import { Button } from "../components/ui/button.js";
+import { Search, SlidersHorizontal, Unlock } from "lucide-react";
 
 type CheckoutBannerState = "confirming" | "success" | "pending" | null;
 
@@ -291,12 +294,10 @@ export default function Dashboard() {
             </div>
 
             {tier === "free" && (
-              <button
-                onClick={() => navigate("/pricing")}
-                className="px-3 py-1 rounded bg-accent hover:bg-accent text-primary-foreground font-bold font-sans text-xs transition-all shadow"
-              >
-                🔓 Desbloquear Pro por {formatCOP(PRO_MONTHLY_PRICE_COP)} COP
-              </button>
+              <Button variant="gold" size="sm" onClick={() => navigate("/pricing")}>
+                <Unlock className="h-3.5 w-3.5" />
+                Desbloquear Pro por {formatCOP(PRO_MONTHLY_PRICE_COP)} COP
+              </Button>
             )}
           </div>
         )}
@@ -309,30 +310,32 @@ export default function Dashboard() {
             content scrolling underneath doesn't show through, and its own
             padding (not a negative-margin bleed trick) so nothing below it
             can end up visually clipped. */}
-        <div className="sticky top-16 z-40 bg-[#fafafa] pt-3 pb-4">
+        <div className="sticky top-16 z-40 bg-background pt-3 pb-4">
           <div className="flex gap-2">
             <div className="relative flex-1">
-              <span className="absolute left-5 top-1/2 -translate-y-1/2 text-ink-faint">🔍</span>
-              <input
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-ink-faint pointer-events-none" />
+              <Input
                 type="text"
                 value={filters.search}
                 onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
                 placeholder="Título, empresa o palabra clave..."
-                className="w-full pl-11 pr-4 py-3 bg-[#ffffff] border border-[#d3d6cf] rounded-full text-foreground placeholder-slate-500 text-sm shadow-sm focus:outline-none focus:border-gold-2 focus:ring-4 focus:ring-gold-1/40 transition-all"
+                className="h-12 pl-11 rounded-full bg-card border-border-strong shadow-sm focus-visible:border-gold-2 focus-visible:ring-4 focus-visible:ring-gold-1/40"
               />
             </div>
-            <button
+            <Button
               type="button"
+              variant="outline"
               onClick={() => setMobileFiltersOpen(true)}
-              className="lg:hidden shrink-0 relative px-5 py-3 rounded-full border border-[#d3d6cf] bg-[#ffffff] text-sm font-medium text-foreground shadow-sm"
+              className="lg:hidden shrink-0 relative h-12 rounded-full px-5 shadow-sm"
             >
+              <SlidersHorizontal className="h-4 w-4" />
               Filtros
               {activeFilterCount > 0 && (
                 <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-primary text-primary-foreground text-[10px] font-mono font-bold flex items-center justify-center">
                   {activeFilterCount}
                 </span>
               )}
-            </button>
+            </Button>
           </div>
         </div>
 

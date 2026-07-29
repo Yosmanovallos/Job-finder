@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../auth/auth-provider.js";
 import { translateAuthError } from "../lib/auth-error-messages.js";
+import { Button } from "../components/ui/button.js";
+import { Input } from "../components/ui/input.js";
 
 const RESEND_COOLDOWN_S = 30;
 
@@ -133,12 +135,15 @@ export default function Login() {
 
         {mode !== "forgot" && (
           <>
-            <button
+            <Button
+              type="button"
+              variant="outline"
+              size="lg"
+              className="w-full"
               onClick={handleGoogle}
-              className="w-full mb-4 px-4 py-3 rounded-lg border border-border bg-muted/50 text-foreground text-sm font-semibold hover:bg-muted transition-all"
             >
               Continuar con Google
-            </button>
+            </Button>
 
             <div className="flex items-center gap-2 mb-4">
               <div className="flex-1 h-px bg-border" />
@@ -170,23 +175,21 @@ export default function Login() {
           </p>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-3">
-            <input
+            <Input
               type="email"
               required
               placeholder="tucorreo@ejemplo.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-3 py-2.5 rounded-lg bg-muted/50 border border-border text-foreground text-sm placeholder-slate-500 focus:outline-none"
             />
             {mode !== "forgot" && (
-              <input
+              <Input
                 type="password"
                 required
                 minLength={mode === "signup" ? 8 : undefined}
                 placeholder={mode === "signup" ? "Contraseña (mínimo 8 caracteres)" : "Contraseña"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-lg bg-muted/50 border border-border text-foreground text-sm placeholder-slate-500 focus:outline-none"
               />
             )}
 
@@ -202,11 +205,7 @@ export default function Login() {
 
             {error && <p className="text-xs text-destructive font-mono">{error}</p>}
 
-            <button
-              type="submit"
-              disabled={busy}
-              className="w-full px-4 py-3 rounded-lg bg-primary hover:bg-primary text-primary-foreground font-bold text-sm transition-all disabled:opacity-50"
-            >
+            <Button type="submit" size="lg" className="w-full" disabled={busy}>
               {busy
                 ? "Procesando..."
                 : mode === "login"
@@ -214,7 +213,7 @@ export default function Login() {
                   : mode === "signup"
                     ? "Crear cuenta"
                     : "Enviar enlace de recuperación"}
-            </button>
+            </Button>
           </form>
         )}
 
