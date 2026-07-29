@@ -39,7 +39,7 @@
     --green-soft: 152 45% 92%;
 
     --font-heading: 'Space Grotesk', sans-serif;
-    --font-body: 'JetBrains Mono', sans-serif;
+    --font-body: 'Inter', system-ui, sans-serif;
   }
 }
 

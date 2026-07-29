@@ -53,8 +53,15 @@ module.exports = {
         sm: "calc(var(--radius) - 4px)",
       },
       fontFamily: {
-        sans: ["'JetBrains Mono'", "system-ui", "sans-serif"],
+        sans: ["'Inter'", "system-ui", "sans-serif"],
         heading: ["'Space Grotesk'", "system-ui", "sans-serif"],
+        // Was previously undefined, so `font-mono` (used ~50+ times for
+        // tags/badges/timestamps) silently fell back to Tailwind's default
+        // system mono stack instead of the JetBrains Mono actually loaded
+        // in index.html — fixed as part of making body text Inter instead
+        // of JetBrains Mono, so `font-mono` now means what it always should
+        // have.
+        mono: ["'JetBrains Mono'", "ui-monospace", "monospace"],
       },
     },
     container: { center: true, padding: "2rem", screens: { "2xl": "1400px" } },
