@@ -335,12 +335,22 @@ export default function Dashboard() {
     (filters.savedOnly ? 1 : 0) +
     (filters.appliedOnly ? 1 : 0);
 
+  // Only the mobile full-screen sheet needs this (it opaquely covers
+  // everything, so a locked background isn't noticeable). The desktop
+  // dropdown is a small anchored popover with the list/detail still
+  // visible and interactive behind it — locking body scroll there did
+  // more than pause scrolling: setting a non-"visible" overflow on body
+  // is the same class of bug as the App.tsx one fixed earlier (see
+  // index.css's `html { overflow-x: hidden }` comment) and made every
+  // sticky element (search bar, detail panel) jump out of view the
+  // instant the dropdown opened while scrolled down.
   useEffect(() => {
-    document.body.style.overflow = mobileFiltersOpen ? "hidden" : "";
+    const shouldLock = mobileFiltersOpen && !isDesktop;
+    document.body.style.overflow = shouldLock ? "hidden" : "";
     return () => {
       document.body.style.overflow = "";
     };
-  }, [mobileFiltersOpen]);
+  }, [mobileFiltersOpen, isDesktop]);
 
   return (
     <section className="relative w-full min-h-screen" style={{ backgroundColor: "#fafafa" }}>
