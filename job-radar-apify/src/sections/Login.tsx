@@ -178,8 +178,8 @@ export default function Login() {
               <input
                 type="password"
                 required
-                minLength={6}
-                placeholder="Contraseña"
+                minLength={mode === "signup" ? 8 : undefined}
+                placeholder={mode === "signup" ? "Contraseña (mínimo 8 caracteres)" : "Contraseña"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-3 py-2.5 rounded-lg bg-[#fafafa] border border-[#e6e8e4] text-foreground text-sm placeholder-slate-500 focus:outline-none"

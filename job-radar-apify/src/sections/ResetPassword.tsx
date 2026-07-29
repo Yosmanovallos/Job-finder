@@ -87,7 +87,7 @@ export default function ResetPassword() {
               <input
                 type="password"
                 required
-                minLength={6}
+                minLength={8}
                 placeholder="Nueva contraseña"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -96,7 +96,7 @@ export default function ResetPassword() {
               <input
                 type="password"
                 required
-                minLength={6}
+                minLength={8}
                 placeholder="Confirma la nueva contraseña"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
