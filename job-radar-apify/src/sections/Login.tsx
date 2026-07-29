@@ -109,13 +109,17 @@ export default function Login() {
       : "Accede a BuscoTrabajo para lanzar escaneos y desbloquear el plan Pro.";
 
   return (
-    <section
-      className="min-h-screen flex items-center justify-center px-4"
-      style={{ backgroundColor: "#fafafa" }}
-    >
-      <div className="w-full max-w-sm p-6 rounded-2xl border border-[#e6e8e4] bg-[#ffffff]">
-        <h1 className="text-xl font-bold text-foreground mb-1 font-heading">{title}</h1>
-        <p className="text-xs text-muted-foreground mb-6 font-mono">{subtitle}</p>
+    <section className="min-h-screen flex items-center justify-center px-4 bg-background">
+      <div className="hud-corners w-full max-w-sm rounded-2xl border border-border bg-card overflow-hidden">
+        {/* Same top rail treatment as JobCard/PaywallCard, adapted to a
+            horizontal strip — the auth screen is most people's first
+            interaction with the product, so it should carry the same
+            identity as the rest of the app, not fall back to a bare form. */}
+        <div className="h-1.5 bg-gradient-to-r from-green-soft via-primary to-gold-2" />
+        <div className="p-6">
+          <img src="/BT.png" alt="BuscoTrabajo.co" className="h-6 w-auto mb-4" />
+          <h1 className="text-xl font-bold text-foreground mb-1 font-heading">{title}</h1>
+          <p className="text-xs text-muted-foreground mb-6 font-mono">{subtitle}</p>
 
         {configError && (
           <div className="mb-4 px-3 py-2.5 rounded-lg border border-destructive/30 bg-destructive/10">
@@ -131,15 +135,15 @@ export default function Login() {
           <>
             <button
               onClick={handleGoogle}
-              className="w-full mb-4 px-4 py-3 rounded-lg border border-[#e6e8e4] bg-[#fafafa] text-foreground text-sm font-semibold hover:bg-[#f1f2f0] transition-all"
+              className="w-full mb-4 px-4 py-3 rounded-lg border border-border bg-muted/50 text-foreground text-sm font-semibold hover:bg-muted transition-all"
             >
               Continuar con Google
             </button>
 
             <div className="flex items-center gap-2 mb-4">
-              <div className="flex-1 h-px bg-[#e6e8e4]" />
+              <div className="flex-1 h-px bg-border" />
               <span className="text-[11px] text-ink-faint font-mono">o con tu correo</span>
-              <div className="flex-1 h-px bg-[#e6e8e4]" />
+              <div className="flex-1 h-px bg-border" />
             </div>
           </>
         )}
@@ -172,7 +176,7 @@ export default function Login() {
               placeholder="tucorreo@ejemplo.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-3 py-2.5 rounded-lg bg-[#fafafa] border border-[#e6e8e4] text-foreground text-sm placeholder-slate-500 focus:outline-none"
+              className="w-full px-3 py-2.5 rounded-lg bg-muted/50 border border-border text-foreground text-sm placeholder-slate-500 focus:outline-none"
             />
             {mode !== "forgot" && (
               <input
@@ -182,7 +186,7 @@ export default function Login() {
                 placeholder={mode === "signup" ? "Contraseña (mínimo 8 caracteres)" : "Contraseña"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-lg bg-[#fafafa] border border-[#e6e8e4] text-foreground text-sm placeholder-slate-500 focus:outline-none"
+                className="w-full px-3 py-2.5 rounded-lg bg-muted/50 border border-border text-foreground text-sm placeholder-slate-500 focus:outline-none"
               />
             )}
 
@@ -231,6 +235,7 @@ export default function Login() {
               : "¿Ya tienes cuenta? Inicia sesión"}
           </button>
         )}
+        </div>
       </div>
     </section>
   );

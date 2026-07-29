@@ -38,18 +38,18 @@ export default function ResetPassword() {
 
   if (loading) {
     return (
-      <section
-        className="min-h-screen flex items-center justify-center"
-        style={{ backgroundColor: "#fafafa" }}
-      >
+      <section className="min-h-screen flex items-center justify-center bg-background">
         <div className="w-6 h-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
       </section>
     );
   }
 
   return (
-    <section className="min-h-screen flex items-center justify-center px-4" style={{ backgroundColor: "#fafafa" }}>
-      <div className="w-full max-w-sm p-6 rounded-2xl border border-[#e6e8e4] bg-[#ffffff]">
+    <section className="min-h-screen flex items-center justify-center px-4 bg-background">
+      <div className="hud-corners w-full max-w-sm rounded-2xl border border-border bg-card overflow-hidden">
+        <div className="h-1.5 bg-gradient-to-r from-green-soft via-primary to-gold-2" />
+        <div className="p-6">
+        <img src="/BT.png" alt="BuscoTrabajo.co" className="h-6 w-auto mb-4" />
         {done ? (
           <>
             <h1 className="text-xl font-bold text-foreground mb-1 font-heading">Contraseña actualizada</h1>
@@ -91,7 +91,7 @@ export default function ResetPassword() {
                 placeholder="Nueva contraseña"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-lg bg-[#fafafa] border border-[#e6e8e4] text-foreground text-sm placeholder-slate-500 focus:outline-none"
+                className="w-full px-3 py-2.5 rounded-lg bg-muted/50 border border-border text-foreground text-sm placeholder-slate-500 focus:outline-none"
               />
               <input
                 type="password"
@@ -100,7 +100,7 @@ export default function ResetPassword() {
                 placeholder="Confirma la nueva contraseña"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-lg bg-[#fafafa] border border-[#e6e8e4] text-foreground text-sm placeholder-slate-500 focus:outline-none"
+                className="w-full px-3 py-2.5 rounded-lg bg-muted/50 border border-border text-foreground text-sm placeholder-slate-500 focus:outline-none"
               />
 
               {error && <p className="text-xs text-destructive font-mono">{error}</p>}
@@ -115,6 +115,7 @@ export default function ResetPassword() {
             </form>
           </>
         )}
+        </div>
       </div>
     </section>
   );
