@@ -117,3 +117,24 @@ CREATE TABLE IF NOT EXISTS source_circuit_state (
     failures     INTEGER NOT NULL DEFAULT 0,
     open_until   TIMESTAMPTZ
 );
+
+-- =============================================================================
+-- ROW LEVEL SECURITY: every read/write from this app goes through the `pool`
+-- (direct `pg` connection as the `postgres` role, which has BYPASSRLS — see
+-- src/db/client.ts) or from GitHub Actions cron scripts using the same
+-- connection string. The frontend's supabase-js client (anon key, browser)
+-- is only ever used for supabase.auth.* (Supabase Auth/GoTrue), never to
+-- query these tables directly. No table here has an anon/authenticated
+-- PostgREST use case, so RLS is enabled with zero policies: PostgREST
+-- (anon/authenticated roles) is denied by default, `postgres` is unaffected.
+-- Without this, Supabase's PostgREST exposes every one of these tables —
+-- including `users` and `transactions` — to anyone with the project URL and
+-- the public anon key.
+-- =============================================================================
+ALTER TABLE jobs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE search_roles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE social_posts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE role_source_runs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE source_circuit_state ENABLE ROW LEVEL SECURITY;
