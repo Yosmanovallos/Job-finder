@@ -7,6 +7,29 @@ import { Input } from "../components/ui/input.js";
 
 const RESEND_COOLDOWN_S = 30;
 
+function GoogleIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 18 18" aria-hidden="true">
+      <path
+        fill="#4285F4"
+        d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.71v2.26h2.9c1.7-1.57 2.7-3.87 2.7-6.61z"
+      />
+      <path
+        fill="#34A853"
+        d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.9-2.26c-.8.54-1.84.86-3.06.86-2.35 0-4.34-1.59-5.05-3.72H.96v2.33A9 9 0 0 0 9 18z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M3.95 10.7A5.4 5.4 0 0 1 3.67 9c0-.59.1-1.17.28-1.7V4.97H.96A9 9 0 0 0 0 9c0 1.45.35 2.83.96 4.03l2.99-2.33z"
+      />
+      <path
+        fill="#EA4335"
+        d="M9 3.58c1.32 0 2.51.46 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0A9 9 0 0 0 .96 4.97l2.99 2.33C4.66 5.17 6.65 3.58 9 3.58z"
+      />
+    </svg>
+  );
+}
+
 export default function Login() {
   const {
     loginWithGoogle,
@@ -106,9 +129,7 @@ export default function Login() {
         ? "Crea tu cuenta"
         : "Recupera tu contraseña";
   const subtitle =
-    mode === "forgot"
-      ? "Te enviamos un enlace para elegir una nueva contraseña."
-      : "Accede a BuscoTrabajo para lanzar escaneos y desbloquear el plan Pro.";
+    mode === "forgot" ? "Te enviamos un enlace para elegir una nueva contraseña." : null;
 
   return (
     <section className="min-h-screen flex items-center justify-center px-4 bg-background">
@@ -120,120 +141,127 @@ export default function Login() {
         <div className="h-1.5 bg-gradient-to-r from-green-soft via-primary to-gold-2" />
         <div className="p-6">
           <img src="/BT.png" alt="BuscoTrabajo.co" className="h-6 w-auto mb-4" />
-          <h1 className="text-xl font-bold text-foreground mb-1 font-heading">{title}</h1>
-          <p className="text-xs text-muted-foreground mb-6 font-mono">{subtitle}</p>
+          <h1 className={`text-xl font-bold text-foreground font-heading ${subtitle ? "mb-1" : "mb-6"}`}>
+            {title}
+          </h1>
+          {subtitle && <p className="text-xs text-muted-foreground mb-6 font-mono">{subtitle}</p>}
 
-        {configError && (
-          <div className="mb-4 px-3 py-2.5 rounded-lg border border-destructive/30 bg-destructive/10">
-            <p className="text-xs text-destructive font-mono">
-              El servicio de acceso está teniendo un problema de configuración en el servidor. No es
-              algo que puedas arreglar desde aquí — ya quedó registrado, intenta de nuevo en unos
-              minutos.
-            </p>
-          </div>
-        )}
-
-        {mode !== "forgot" && (
-          <>
-            <Button
-              type="button"
-              variant="outline"
-              size="lg"
-              className="w-full"
-              onClick={handleGoogle}
-            >
-              Continuar con Google
-            </Button>
-
-            <div className="flex items-center gap-2 mb-4">
-              <div className="flex-1 h-px bg-border" />
-              <span className="text-[11px] text-ink-faint font-mono">o con tu correo</span>
-              <div className="flex-1 h-px bg-border" />
+          {configError && (
+            <div className="mb-4 px-3 py-2.5 rounded-lg border border-destructive/30 bg-destructive/10">
+              <p className="text-xs text-destructive font-mono">
+                El servicio de acceso está teniendo un problema de configuración en el servidor. No
+                es algo que puedas arreglar desde aquí — ya quedó registrado, intenta de nuevo en
+                unos minutos.
+              </p>
             </div>
-          </>
-        )}
+          )}
 
-        {mode === "signup" && signupSent ? (
-          <div className="space-y-3">
-            <p className="text-sm text-primary font-mono">
-              Revisa tu correo para confirmar la cuenta antes de iniciar sesión.
-            </p>
-            <button
-              onClick={handleResend}
-              disabled={resendCooldown > 0}
-              className="text-xs text-muted-foreground hover:text-foreground font-mono disabled:opacity-50"
-            >
-              {resendCooldown > 0
-                ? `Reenviar correo (${resendCooldown}s)`
-                : "¿No te llegó? Reenviar correo de confirmación"}
-            </button>
-          </div>
-        ) : mode === "forgot" && resetSent ? (
-          <p className="text-sm text-primary font-mono">
-            Si ese correo tiene una cuenta, te llegó un enlace para elegir una nueva contraseña.
-            Revisa tu bandeja (y spam).
-          </p>
-        ) : (
-          <form onSubmit={handleSubmit} className="space-y-3">
-            <Input
-              type="email"
-              required
-              placeholder="tucorreo@ejemplo.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-            {mode !== "forgot" && (
-              <Input
-                type="password"
-                required
-                minLength={mode === "signup" ? 8 : undefined}
-                placeholder={mode === "signup" ? "Contraseña (mínimo 8 caracteres)" : "Contraseña"}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            )}
-
-            {mode === "login" && (
-              <button
+          {mode !== "forgot" && (
+            <>
+              <Button
                 type="button"
-                onClick={() => switchMode("forgot")}
-                className="text-xs text-muted-foreground hover:text-foreground font-mono"
+                variant="google"
+                size="lg"
+                className="w-full"
+                onClick={handleGoogle}
               >
-                ¿Olvidaste tu contraseña?
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white">
+                  <GoogleIcon className="h-3.5 w-3.5" />
+                </span>
+                Continuar con Google
+              </Button>
+
+              <div className="flex items-center gap-2 mb-4">
+                <div className="flex-1 h-px bg-border" />
+                <span className="text-[11px] text-ink-faint font-mono">o con tu correo</span>
+                <div className="flex-1 h-px bg-border" />
+              </div>
+            </>
+          )}
+
+          {mode === "signup" && signupSent ? (
+            <div className="space-y-3">
+              <p className="text-sm text-primary font-mono">
+                Revisa tu correo para confirmar la cuenta antes de iniciar sesión.
+              </p>
+              <button
+                onClick={handleResend}
+                disabled={resendCooldown > 0}
+                className="text-xs text-muted-foreground hover:text-foreground font-mono disabled:opacity-50"
+              >
+                {resendCooldown > 0
+                  ? `Reenviar correo (${resendCooldown}s)`
+                  : "¿No te llegó? Reenviar correo de confirmación"}
               </button>
-            )}
+            </div>
+          ) : mode === "forgot" && resetSent ? (
+            <p className="text-sm text-primary font-mono">
+              Si ese correo tiene una cuenta, te llegó un enlace para elegir una nueva contraseña.
+              Revisa tu bandeja (y spam).
+            </p>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-3">
+              <Input
+                type="email"
+                required
+                placeholder="tucorreo@ejemplo.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+              {mode !== "forgot" && (
+                <Input
+                  type="password"
+                  required
+                  minLength={mode === "signup" ? 8 : undefined}
+                  placeholder={
+                    mode === "signup" ? "Contraseña (mínimo 8 caracteres)" : "Contraseña"
+                  }
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+              )}
 
-            {error && <p className="text-xs text-destructive font-mono">{error}</p>}
+              {mode === "login" && (
+                <button
+                  type="button"
+                  onClick={() => switchMode("forgot")}
+                  className="text-xs text-muted-foreground hover:text-foreground font-mono"
+                >
+                  ¿Olvidaste tu contraseña?
+                </button>
+              )}
 
-            <Button type="submit" size="lg" className="w-full" disabled={busy}>
-              {busy
-                ? "Procesando..."
-                : mode === "login"
-                  ? "Iniciar sesión"
-                  : mode === "signup"
-                    ? "Crear cuenta"
-                    : "Enviar enlace de recuperación"}
-            </Button>
-          </form>
-        )}
+              {error && <p className="text-xs text-destructive font-mono">{error}</p>}
 
-        {mode === "forgot" ? (
-          <button
-            onClick={() => switchMode("login")}
-            className="w-full mt-4 text-xs text-muted-foreground hover:text-foreground font-mono"
-          >
-            ¿Ya la recordaste? Inicia sesión
-          </button>
-        ) : (
-          <button
-            onClick={() => switchMode(mode === "login" ? "signup" : "login")}
-            className="w-full mt-4 text-xs text-muted-foreground hover:text-foreground font-mono"
-          >
-            {mode === "login"
-              ? "¿No tienes cuenta? Regístrate"
-              : "¿Ya tienes cuenta? Inicia sesión"}
-          </button>
-        )}
+              <Button type="submit" size="lg" className="w-full" disabled={busy}>
+                {busy
+                  ? "Procesando..."
+                  : mode === "login"
+                    ? "Iniciar sesión"
+                    : mode === "signup"
+                      ? "Crear cuenta"
+                      : "Enviar enlace de recuperación"}
+              </Button>
+            </form>
+          )}
+
+          {mode === "forgot" ? (
+            <button
+              onClick={() => switchMode("login")}
+              className="w-full mt-4 text-xs text-muted-foreground hover:text-foreground font-mono"
+            >
+              ¿Ya la recordaste? Inicia sesión
+            </button>
+          ) : (
+            <button
+              onClick={() => switchMode(mode === "login" ? "signup" : "login")}
+              className="w-full mt-4 text-xs text-muted-foreground hover:text-foreground font-mono"
+            >
+              {mode === "login"
+                ? "¿No tienes cuenta? Regístrate"
+                : "¿Ya tienes cuenta? Inicia sesión"}
+            </button>
+          )}
         </div>
       </div>
     </section>

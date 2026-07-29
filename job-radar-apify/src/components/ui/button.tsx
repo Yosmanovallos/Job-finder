@@ -13,7 +13,8 @@ const buttonVariants = cva(
         gold: "bg-gradient-to-br from-gold-1 via-gold-2 to-gold-3 text-gold-ink font-bold shadow-[0_8px_18px_-8px_rgba(156,122,30,0.55)]",
         outline: "border border-border bg-card text-foreground hover:bg-muted",
         ghost: "text-foreground hover:bg-muted",
-        icon: "border border-border text-muted-foreground hover:text-foreground hover:bg-muted"
+        icon: "border border-border text-muted-foreground hover:text-foreground hover:bg-muted",
+        google: "bg-[#4285F4] text-white hover:bg-[#3b78e0]"
       },
       size: {
         default: "h-10 px-4 py-2",
@@ -30,8 +31,7 @@ const buttonVariants = cva(
 );
 
 export interface ButtonProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
-    VariantProps<typeof buttonVariants> {
+  extends React.ButtonHTMLAttributes<HTMLButtonElement>, VariantProps<typeof buttonVariants> {
   asChild?: boolean;
 }
 
