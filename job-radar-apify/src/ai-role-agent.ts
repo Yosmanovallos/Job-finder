@@ -228,6 +228,15 @@ export function generateRoleKeywordsWithAI(requestedRoles: string[]): string[] {
       expanded.add("Ingeniero de Estructuras");
       expanded.add("Structural Engineer");
       expanded.add("Ingeniero Calculista");
+    } else if (lower.includes("ambiental") || lower.includes("environmental")) {
+      expanded.add("Ingeniero Ambiental");
+      expanded.add("Environmental Engineer");
+      expanded.add("Especialista Ambiental");
+      expanded.add("Especialista HSE");
+      expanded.add("Coordinador Ambiental");
+      expanded.add("Coordinador HSEQ");
+      expanded.add("Gestión Ambiental");
+      expanded.add("Ingeniero de Saneamiento Ambiental");
     } else if (lower.includes("business analyst") || lower.includes("analista de negocio")) {
       expanded.add("Business Analyst");
       expanded.add("Analista de Negocio");

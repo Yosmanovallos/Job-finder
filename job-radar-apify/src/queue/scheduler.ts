@@ -18,6 +18,8 @@ export const DEFAULT_ROLES_200: string[] = [
   "Desarrollador Backend",
   "Desarrollador Mobile",
   "Ingeniero DevOps",
+  "Ingeniero Civil",
+  "Ingeniero Ambiental",
   "Arquitecto de Software",
   "Scrum Master",
   "Product Owner",
