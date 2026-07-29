@@ -12,7 +12,7 @@ import {
   getTransactionsForUser
 } from "./db/job-repository.js";
 import { markRoleForImmediateRescan } from "./db/scheduler-repository.js";
-import { applyJobFilters, JobFilterParams } from "./lib/job-filters.js";
+import { applyJobFilters, sortByPreferredRoles, JobFilterParams } from "./lib/job-filters.js";
 import { verifySession } from "./auth/verify-session.js";
 import { startPaymentCheckout } from "./payments/checkout.js";
 import { handleWompiWebhook } from "./payments/webhook.js";
@@ -76,7 +76,13 @@ const server = http.createServer(async (req, res) => {
       freshness: params.get("freshness") || undefined,
       roles: params.getAll("roles").length ? params.getAll("roles") : undefined
     };
-    const filtered = applyJobFilters(visibleJobs, filters);
+    let filtered = applyJobFilters(visibleJobs, filters);
+    // A manual role filter (checked in FilterBar) is an explicit, stronger
+    // signal than the soft onboarding preference — only reorder by
+    // preference when the caller didn't already filter by role themselves.
+    if (!filters.roles && session?.preferredRoles) {
+      filtered = sortByPreferredRoles(filtered, session.preferredRoles);
+    }
 
     const limit = Math.min(Math.max(parseInt(params.get("limit") || "24", 10) || 24, 1), 100);
     const offset = Math.max(parseInt(params.get("offset") || "0", 10) || 0, 0);
@@ -268,7 +274,8 @@ const server = http.createServer(async (req, res) => {
       res.end(
         JSON.stringify({
           status: "ok",
-          message: "Marcado para el próximo ciclo programado (~15 min), no se ejecuta en este proceso."
+          message:
+            "Marcado para el próximo ciclo programado (~15 min), no se ejecuta en este proceso."
         })
       );
     });

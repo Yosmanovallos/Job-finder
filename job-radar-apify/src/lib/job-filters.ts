@@ -210,3 +210,28 @@ export function applyJobFilters(jobs: Job[], filters: JobFilterParams): Job[] {
 
   return result;
 }
+
+/**
+ * Stable-partitions an already-filtered/sorted job list so postings matching
+ * the caller's onboarding role preferences surface first, WITHOUT dropping
+ * anything else — the onboarding modal (RoleOnboardingModal.tsx) promises
+ * "te mostramos primero las vacantes que más te interesan", not "solo tus
+ * vacantes". Each partition keeps its incoming relative order (newest-first,
+ * from the caller's ORDER BY), so within "matches" and within "the rest" the
+ * newest scraped postings still show up first — this only ever reorders
+ * across the two groups, never within one.
+ *
+ * Only meaningful when the caller hasn't already filtered by roles
+ * explicitly (see GET /api/jobs) — a manual role filter is a stronger,
+ * intentional signal than a soft onboarding preference.
+ */
+export function sortByPreferredRoles(jobs: Job[], preferredRoles: string[] | null): Job[] {
+  if (!preferredRoles || preferredRoles.length === 0) return jobs;
+  const matches: Job[] = [];
+  const rest: Job[] = [];
+  for (const job of jobs) {
+    if (preferredRoles.some((role) => jobMatchesRole(role, job))) matches.push(job);
+    else rest.push(job);
+  }
+  return [...matches, ...rest];
+}
