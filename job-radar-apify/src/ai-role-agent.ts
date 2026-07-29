@@ -8,6 +8,12 @@ export const TRANSLATION_MAP: Record<string, string[]> = {
   // Professions / Titles
   ingeniero: ["engineer"],
   ingeniera: ["engineer"],
+  // "ingeniería"/"ingenieria" (the field, not the person) is how people
+  // naturally type this search ("ingeniería civil") — without this it
+  // doesn't match "Ingeniero Civil"-titled postings, since "ingeniería"
+  // isn't a substring of "ingeniero" (different ending).
+  ingeniería: ["ingeniero", "ingeniera", "engineer"],
+  ingenieria: ["ingeniero", "ingeniera", "engineer"],
   engineer: ["ingeniero", "ingeniera"],
   analista: ["analyst"],
   analyst: ["analista"],
@@ -91,6 +97,8 @@ export const TRANSLATION_MAP: Record<string, string[]> = {
   hr: ["recursos humanos", "rrhh", "gestion humana"],
   rrhh: ["hr", "recursos humanos", "talent"],
   civil: ["civil", "construction"],
+  ambiental: ["environmental"],
+  environmental: ["ambiental"],
   estructuras: ["structural", "structures"],
   obra: ["construction", "site"],
   construccion: ["construction"],

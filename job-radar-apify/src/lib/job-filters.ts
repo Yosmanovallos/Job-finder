@@ -86,11 +86,7 @@ export interface JobFilterParams {
   roles?: string[];
 }
 
-const normalizeText = (s: string) =>
-  s
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase();
+const normalizeText = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
 /**
  * Applies every corpus-wide filter (search/sources/cities/modality/
@@ -103,23 +99,67 @@ export function applyJobFilters(jobs: Job[], filters: JobFilterParams): Job[] {
   let result = jobs;
 
   const rawSearch = filters.search?.trim();
-  const search = rawSearch?.toLowerCase();
-  if (search && rawSearch) {
-    // Plain substring match (title/company/location) PLUS the same
-    // synonym-aware role matching the role checkboxes use (jobMatchesRole)
-    // — otherwise typing "QA" in the search box misses "Quality Assurance"/
-    // "Ingeniero de Calidad" postings that the checkbox filter for "QA
-    // Engineer" already finds, which is exactly the inconsistency between
-    // the two filters that must not exist: the search box is the primary
-    // way people use this app, so it needs at least the same recall as the
-    // checkbox filter, not less.
-    result = result.filter(
-      (j: any) =>
-        (j.title && j.title.toLowerCase().includes(search)) ||
-        (j.company && j.company.toLowerCase().includes(search)) ||
-        (j.location && j.location.toLowerCase().includes(search)) ||
-        jobMatchesRole(rawSearch, j)
-    );
+  if (rawSearch) {
+    const search = rawSearch.toLowerCase();
+    // Only drop genuine stopwords ("de", "la", ...) — NOT short words. A
+    // 1-2 char query ("r", "go") is a legitimate literal search and must
+    // still be required below; dropping it here would leave searchWords
+    // empty and match the entire corpus instead of nothing extra.
+    const searchWords = search.split(/\s+/).filter((w) => w.length > 0 && !ROLE_STOPWORDS.has(w));
+
+    if (searchWords.length <= 1) {
+      // Single word (or only stopwords): unchanged from before this fix —
+      // plain substring PLUS jobMatchesRole's synonym-aware OR. Left
+      // exactly as-is because jobMatchesRole's "distinctive word" gate is
+      // load-bearing here: a bare word like "desarrollador" expands (via
+      // TRANSLATION_MAP) to also include "engineer", which is shared by
+      // dozens of tracked roles (QA/Data/AI Engineer, ...) — the gate
+      // excludes it from matching alone specifically so a lone
+      // "desarrollador" search doesn't pull in every unrelated Engineer
+      // posting. That guard only makes sense with nothing else narrowing
+      // the query, which is exactly the single-word case.
+      result = result.filter(
+        (j: any) =>
+          (j.title && j.title.toLowerCase().includes(search)) ||
+          (j.company && j.company.toLowerCase().includes(search)) ||
+          (j.location && j.location.toLowerCase().includes(search)) ||
+          jobMatchesRole(rawSearch, j)
+      );
+    } else {
+      // 2+ words: require EACH word independently (AND across words), using
+      // the full synonym set per word (expandRoleWords, unfiltered by
+      // jobMatchesRole's frequency gate) for recall — e.g. "ingeniería" also
+      // matching "ingeniero"/"engineer". This is safe to be permissive on a
+      // single word's synonyms specifically because another word in the
+      // query still has to match too: "ingeniería civil" only matches
+      // "Civil Engineer" because "civil" independently confirms it, not
+      // because "ingeniería" alone decided it. The bug this replaces was
+      // passing the WHOLE multi-word phrase to jobMatchesRole, which ORs
+      // together words the 200 tracked role names don't share — "ingeniería"
+      // and "civil" both counted as "distinctive" (neither appears in any
+      // tracked role name, those are English, e.g. "QA Engineer") and got
+      // OR'd, so any "ingeniería" job matched regardless of "civil": the
+      // second word never actually narrowed anything.
+      result = result.filter((j: any) => {
+        const title = (j.title || "").toLowerCase();
+        const company = (j.company || "").toLowerCase();
+        const location = (j.location || "").toLowerCase();
+        return searchWords.every((word) => {
+          // expandRoleWords applies its own length/stopword filter, so it
+          // can return [] for a short word even though we already decided
+          // to require it — fall back to the literal word so it's still
+          // checked, just without synonym expansion.
+          const candidates = expandRoleWords(word);
+          const forms = candidates.length > 0 ? candidates : [word];
+          return forms.some(
+            (candidate) =>
+              title.includes(candidate) ||
+              company.includes(candidate) ||
+              location.includes(candidate)
+          );
+        });
+      });
+    }
   }
 
   if (filters.sources && filters.sources.length > 0) {
