@@ -57,11 +57,11 @@ Confirmado leyendo el código actual (`src/App.tsx`, `src/index.html`,
 Indeed, LinkedIn Jobs y los agregadores serios (Jooble, Trabajo.org) usan el
 mismo patrón de **3 capas**, confirmado por la investigación:
 
-| Capa | Qué es | Ejemplo | Función SEO |
-|---|---|---|---|
-| 1 | Página individual por vacante | `/jobs/view/analista-de-datos-...` | long-tail: "analista de datos pepsico bogotá" |
-| 2 | Página de categoría/ubicación | `/jobs/bogota`, `/jobs/remote` | volumen alto: "trabajo en bogotá", "empleo remoto" |
-| 3 | Buscador interactivo | `/dashboard` (lo que ya existe) | producto real, no pensado para rankear por sí solo |
+| Capa | Qué es                        | Ejemplo                            | Función SEO                                        |
+| ---- | ----------------------------- | ---------------------------------- | -------------------------------------------------- |
+| 1    | Página individual por vacante | `/jobs/view/analista-de-datos-...` | long-tail: "analista de datos pepsico bogotá"      |
+| 2    | Página de categoría/ubicación | `/jobs/bogota`, `/jobs/remote`     | volumen alto: "trabajo en bogotá", "empleo remoto" |
+| 3    | Buscador interactivo          | `/dashboard` (lo que ya existe)    | producto real, no pensado para rankear por sí solo |
 
 Puntos clave del research que cambian decisiones de diseño:
 
@@ -77,7 +77,7 @@ Puntos clave del research que cambian decisiones de diseño:
   duplicación en sí. Con miles de páginas casi idénticas (solo
   título/empresa/ubicación/fecha, sin descripción — este proyecto nunca
   inventa datos que no tiene, por diseño) Google puede empezar a tratarlas
-  como *doorway pages* de baja calidad. La mitigación estándar es enriquecer
+  como _doorway pages_ de baja calidad. La mitigación estándar es enriquecer
   cada página con contenido real y variable que sí tenemos sin inventar
   nada: cuántas otras vacantes tiene esa empresa activas, vacantes similares
   en la misma ciudad/rol, badges de fuente/frescura, breadcrumbs. Nunca texto
@@ -94,6 +94,7 @@ Esta es la parte que probablemente no es obvia: **nadie manda 10,000 URLs a
 mano.** Los mecanismos son:
 
 ### a) Sitemap (descubrimiento masivo)
+
 Un único archivo XML lista todas las URLs; Google lo lee una vez y descubre
 todo. Límite real: **50,000 URLs / 50MB por archivo** — con 10,000 vacantes
 todavía cabe en uno solo, pero se diseña de una vez como **sitemap index**
@@ -108,6 +109,7 @@ sitemap.xml              (índice)
 ```
 
 ### b) Google Indexing API — el mecanismo que sí aplica aquí
+
 Dato importante confirmado en la documentación oficial de Google (y
 reforzado por el enforcement que empezaron a aplicar en 2025): **la
 Indexing API de Google está restringida oficialmente a solo dos tipos de
@@ -117,37 +119,58 @@ En la práctica: cada vez que se publica o se da de baja una vacante, se
 notifica a Google vía API (`URL_UPDATED` / `URL_DELETED`) y entra en una
 cola de rastreo prioritaria — hablamos de horas, no de esperar el rastreo
 orgánico normal. Esto es automatizable por completo desde el pipeline de
-scraping que ya existe (hook en el punto donde una vacante se inserta o se
-marca `is_active = false`).
+scraping que ya existe.
+
+**Corrección tras investigar el código real (Fase 3):** la suposición
+original de que la baja de una vacante pasaba por `is_active = false` era
+incorrecta. `is_active` solo lo toca `scripts/migrate-dedupe.ts` (un
+script manual de limpieza de duplicados, no el flujo normal de ingestión).
+El mecanismo real de expiración es un **`DELETE` duro** —
+`purgeOldJobs()` en `scheduler-repository.ts`, invocado en cada tick de
+`scripts/run-scrape-tick.ts` (cron de GitHub Actions cada 15 min) — borra
+toda fila con `created_at` de hace más de 30 días. Los dos hooks reales
+de la Fase 3 son: `saveJobs()` (encola `URL_UPDATED` al insertar una
+vacante nueva) y `purgeOldJobs()` (encola `URL_DELETED` con la URL de
+cada fila justo antes de borrarla, vía `DELETE ... RETURNING` — la única
+forma de no perder esos datos, porque una vez borrada la fila no hay
+forma de reconstruir su URL).
 
 - Cuota por defecto ~200 solicitudes/día por proyecto de Google Cloud
-  (ampliable pidiéndolo). Con 10k vacantes existentes se hace un submit
-  inicial en lote paulatino; el volumen diario real después (vacantes
-  nuevas + expiradas) es mucho menor.
+  (ampliable pidiéndolo, hay un formulario de solicitud de aumento). Con
+  ~10,170 vacantes existentes, el backfill inicial a 200/día tarda **~51
+  días** en cubrirlas todas — esto es una cola que se drena sola en el
+  tiempo, no algo que haya que forzar. El volumen diario real después
+  (vacantes nuevas + expiradas) es mucho menor y esa parte sí se mantiene
+  al día porque se encola en tiempo real.
 - Requiere: proyecto en Google Cloud, cuenta de servicio, y verificar la
-  propiedad `buscotrabajo.co` como *owner* en Search Console (para dar
+  propiedad `buscotrabajo.co` como _owner_ en Search Console (para dar
   permiso a esa cuenta de servicio).
 
 ### c) Lo que NO aplica
+
 **IndexNow no lo soporta Google** (solo Bing/Yandex/Naver/Seznam/Yep,
 confirmado a 2026) — sirve para indexación rápida en Bing, no en Google.
 No vale la pena implementarlo para el objetivo específico que se busca aquí
 (aunque es trivial añadirlo después si se quiere tráfico de Bing gratis).
 
 ### d) Search Console (el paso manual que sí hace falta, una sola vez)
+
 Verificar la propiedad del dominio y enviar el sitemap ahí. Si nunca se hizo,
 es muy probable que Google ni siquiera esté rastreando el sitio de forma
 regular — esto se puede confirmar en 5 minutos mirando el reporte de
 cobertura ("Coverage") antes de construir nada más.
 
 ### e) Vencimiento — la parte que protege el resto del sitio
-Google explícitamente penaliza (reduce visibilidad de *todo* el sitio, no
+
+Google explícitamente penaliza (reduce visibilidad de _todo_ el sitio, no
 solo la vacante vieja) a boards con muchas vacantes vencidas todavía
 indexadas. Con 3 opciones válidas: `validThrough` en el pasado, eliminar la
 página (404/410 — 410 es preferible, señala "no vuelve"), o quitar el
-`JobPosting` de la página. Esto debe conectarse a la lógica de vigencia que
-ya existe (`is_active`, verificación de frescura) — no es trabajo nuevo,
-es un webhook sobre algo que el sistema ya calcula.
+`JobPosting` de la página. Esto debe conectarse al `DELETE` duro de
+`purgeOldJobs()` (ver corrección en la sección 3b) — hoy `/empleos/:id`
+de una vacante purgada ya cae en el 404 genérico porque simplemente no se
+encuentra en `getJobsCached()`; la Fase 5 es diferenciarlo de un id que
+nunca existió y devolver 410 en ese caso específico.
 
 ## 4. Arquitectura propuesta (mapeada a lo que ya existe en el repo)
 
@@ -155,17 +178,21 @@ Todo esto es **aditivo**: nada de lo que ya funciona (`/dashboard`, `/api/jobs`,
 el split-pane, los filtros) se toca. Rutas y queries nuevas, aisladas.
 
 ### 4.1 Esquema de URL
+
 ```
 /empleos/<slug-titulo>-<slug-ciudad>-<id-corto>
 ej: /empleos/analista-de-datos-bogota-8f3a1c
 ```
+
 Requiere una columna `slug` en `jobs` (migración simple, `ALTER TABLE ... ADD
 COLUMN IF NOT EXISTS`, mismo estilo que ya usa `schema.sql`). Se genera una
 vez al ingestar la vacante, no en cada visita.
 
 ### 4.2 Renderizado — SSR ligero, no una reescritura a Next.js
+
 No hace falta migrar el framework. `server.ts` ya sirve `/api/*` y el HTML
 estático; se le agrega una ruta `/empleos/:slug` que:
+
 1. Hace **una** consulta a Postgres por `id` (ya indexado, PK) — el mismo
    costo que ya paga `/api/jobs/:id`.
 2. Aplica el mismo `maskLockedFields` que ya usa la API — si el paywall
@@ -181,12 +208,14 @@ estático; se le agrega una ruta `/empleos/:slug` que:
    se hidrata igual para el resto de la interacción (guardar, aplicar, etc.)
 
 ### 4.3 Cache (para no afectar rendimiento)
+
 Las vacantes no cambian a cada segundo. Cache en memoria (LRU simple, sin
 necesidad de Redis a este volumen) con TTL corto, invalidado cuando el
 pipeline de ingesta actualiza esa fila. Evita pegarle a Postgres en cada
 visita de un crawler.
 
 ### 4.4 Páginas de categoría (capa 2)
+
 `/empleos/bogota`, `/empleos/remoto`, `/empleos/analista-de-datos` — se
 generan reutilizando la taxonomía que **ya existe** en
 `FilterBar.tsx` (`CITY_OPTIONS`, `DEFAULT_ROLES_200`), sin tabla nueva.
@@ -196,12 +225,14 @@ lo que compite por volumen ("trabajo en Bogotá"), no las páginas
 individuales.
 
 ### 4.5 Sitemap dinámico
+
 Job programado (mismo patrón que el cron ya existente vía `ENABLE_CRON`)
 que regenera `sitemap-jobs-N.xml` cada pocas horas a partir de `jobs WHERE
 is_active = TRUE`, y un `sitemap.xml` índice que los referencia junto al
 sitemap estático actual.
 
 ### 4.6 robots.txt
+
 Agregar `Allow: /empleos/` explícito (ya permitido por el `Allow: /`
 genérico, pero se documenta) y considerar bloquear parámetros de filtro
 del dashboard (`?search=`, `?modality=`, etc.) para no gastar crawl budget
@@ -209,14 +240,14 @@ en combinaciones infinitas de la misma data que ya vive en `/empleos/`.
 
 ## 5. Fases sugeridas (una por sesión, cada una con criterio de salida)
 
-| Fase | Qué entrega | Cómo se verifica | Estado |
-|---|---|---|---|
-| **0** | Auditoría: robots.txt/sitemap sanos, sin `noindex`, confirmar qué tiene Google indexado hoy | Ver sección 5.1 | ✅ Hecho |
-| **1** | Ruta `/empleos/:id/:slug` con SSR + JSON-LD `JobPosting` + meta tags, página cliente equivalente | `npm run test:seo` + `docs/QA-CHECKLIST-SEO.md` | ✅ Hecho |
-| **2** | Sitemap dinámico (índice + jobs) + robots.txt actualizado | `curl` al sitemap, validación XML, envío manual una vez en Search Console | ✅ Hecho |
-| **3** | Integración con Google Indexing API (cuenta de servicio + hook en ingesta/expiración) | Log de submits exitosos; una vacante nueva aparece en el reporte de cobertura en horas, no semanas | Pendiente |
-| **4** | Páginas de categoría (`/empleos/<ciudad>`, `/empleos/<rol>`) | Igual que fase 1, sobre una categoría | Pendiente |
-| **5** | Manejo de vencimiento (410 / `validThrough`) atado al ciclo de vida de `is_active` | Vacante desactivada devuelve 410; JSON-LD deja de emitirse | Pendiente |
+| Fase  | Qué entrega                                                                                                       | Cómo se verifica                                                                                   | Estado                                          |
+| ----- | ----------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| **0** | Auditoría: robots.txt/sitemap sanos, sin `noindex`, confirmar qué tiene Google indexado hoy                       | Ver sección 5.1                                                                                    | ✅ Hecho                                        |
+| **1** | Ruta `/empleos/:id/:slug` con SSR + JSON-LD `JobPosting` + meta tags, página cliente equivalente                  | `npm run test:seo` + `docs/QA-CHECKLIST-SEO.md`                                                    | ✅ Hecho                                        |
+| **2** | Sitemap dinámico (índice + jobs) + robots.txt actualizado                                                         | `curl` al sitemap, validación XML, envío manual una vez en Search Console                          | ✅ Hecho                                        |
+| **3** | Integración con Google Indexing API (cuenta de servicio + hook en `saveJobs()`/`purgeOldJobs()`, ver sección 5.5) | Log de submits exitosos; una vacante nueva aparece en el reporte de cobertura en horas, no semanas | 🟡 Código listo, falta setup de GCP del usuario |
+| **4** | Páginas de categoría (`/empleos/<ciudad>`, `/empleos/<rol>`)                                                      | Igual que fase 1, sobre una categoría                                                              | Pendiente                                       |
+| **5** | Manejo de vencimiento (410 / `validThrough`) atado al `DELETE` duro de `purgeOldJobs()`                           | Vacante purgada devuelve 410 en vez de 404 genérico; JSON-LD deja de emitirse                      | Pendiente                                       |
 
 ### 5.1 Resultado de la Fase 0 (corregido — ver nota abajo)
 
@@ -241,6 +272,7 @@ en combinaciones infinitas de la misma data que ya vive en `/empleos/`.
 solo tiene páginas estáticas — cero vacantes, porque `/empleos/:id/:slug`
 no existía hasta la Fase 1. Acción para la próxima vez que se entre a
 Search Console (ya verificado, sin pasos de DNS/Cloudflare pendientes):
+
 1. **Indexación → Páginas**: revisar cuántas páginas están indexadas hoy
    y por qué motivo las demás quedaron excluidas — este reporte es la
    fuente de verdad real, no `site:`.
@@ -267,8 +299,8 @@ cosmético, el matching es por `jobId`):
   visitante real después de que carga JS (reusa `JobDetailPanel`,
   `PaywallCard`, `ApplyGateModal` ya existentes).
 - `tests/validate-seo-job-pages.ts` (`npm run test:seo`) — funciones puras
-  + HTTP real contra un servidor de prueba, **de solo lectura** contra la
-  BD real (ver sección 0).
+  - HTTP real contra un servidor de prueba, **de solo lectura** contra la
+    BD real (ver sección 0).
 - `docs/QA-CHECKLIST-SEO.md` — checklist manual (Rich Results Test,
   revisión visual, casos que el automatizado no cubre).
 
@@ -320,7 +352,7 @@ habría quedado sin detectar:
 - Pero el HTML que Google capturó y tiene indexado para `/dashboard`
   (pestaña "Índice de Google" → "Ver página rastreada") termina en:
   `<strong>0</strong> de 0 vacantes` / `No se encontraron vacantes con
-  los filtros seleccionados`. **Google indexó el dashboard con cero
+los filtros seleccionados`. **Google indexó el dashboard con cero
   vacantes reales.**
 - Descartado que sea cold-start de Render (el proyecto corre en el plan
   Starter de $7, siempre activo) — confirmado en vivo: HTML de
@@ -404,14 +436,86 @@ presente y sea JSON válido con vacantes reales.
   costo real es de ~2 KB comprimidos y cero queries nuevas, no escala con
   el tamaño de la tabla `jobs`. `/api/jobs` en sí nunca se tocó.
 - **Vacantes vencidas indexadas** (penaliza todo el sitio): resuelto en
-  fase 5, conectado al `is_active` que ya existe.
+  fase 5, conectado al `DELETE` duro de `purgeOldJobs()` (no a `is_active`
+  — ver corrección en la sección 3b).
+- **Cuota de Indexing API agotada por un pico de scraping**: mitigado —
+  el presupuesto diario se calcula contra `indexing_queue` (filas `sent`
+  en las últimas 24h reales), no un contador en memoria que un cron de
+  15 min reiniciaría en cada corrida; ver `indexing-repository.ts`.
 
 ## 7. Próximo paso
 
-**Fase 3** (Google Indexing API): requiere una cuenta de servicio de
-Google Cloud con acceso a Search Console — la propiedad ya está
-verificada (sección 5.1), así que ese prerrequisito ya está cubierto.
-Sin esto, las 10,000+ vacantes dependen del rastreo orgánico normal de
-Google vía el sitemap de la Fase 2, que puede tardar semanas en cubrirlas
-todas; con la Indexing API, cada vacante nueva/vencida entra a una cola
-de rastreo prioritaria en horas.
+**Fase 3** (Google Indexing API) — código ya escrito, falta el setup de
+Google Cloud del usuario para poder probarlo de punta a punta.
+
+### 7.1 Qué se construyó
+
+- `src/lib/google-indexing.ts` — cliente hecho a mano (JWT RS256 firmado
+  con `crypto` de Node + intercambio OAuth), sin dependencia nueva
+  (`googleapis`/`google-auth-library`), mismo estilo sin framework que el
+  resto del repo.
+- `src/db/indexing-repository.ts` + tabla `indexing_queue` (migración:
+  `scripts/migrate-indexing-queue.ts`) — cola persistente; el presupuesto
+  diario se calcula contra filas `sent` reales de las últimas 24h, no un
+  contador en memoria.
+- Hooks: `saveJobs()` encola `URL_UPDATED` para cada vacante nueva
+  (batched, una sola query extra por tick, no por vacante);
+  `purgeOldJobs()` encola `URL_DELETED` con `DELETE ... RETURNING` antes
+  de perder la fila.
+- `scripts/run-indexing-tick.ts` — drena la cola respetando el
+  presupuesto diario; pensado para un workflow de GitHub Actions aparte
+  (`indexing-tick.yml`), no metido dentro del tick de scraping existente.
+- `scripts/backfill-indexing-queue.ts` — encola `URL_UPDATED` una sola
+  vez para las ~10,170 vacantes que ya existían antes de este sistema
+  (los hooks de arriba solo cubren lo que pasa de ahora en adelante).
+
+### 7.2 Lo que falta y depende del usuario
+
+1. Crear proyecto en Google Cloud (o reusar uno existente) → habilitar
+   "Web Search Indexing API".
+2. IAM → crear cuenta de servicio → generar clave JSON.
+3. Search Console → propiedad `buscotrabajo.co` (ya verificada, sección
+   5.1) → Configuración → Usuarios y permisos → agregar el email de la
+   cuenta de servicio con permiso **Propietario** (no "Completo" — con
+   "Completo" el publish falla con 403 silencioso).
+4. Agregar a `.env` (nunca pegar los valores en el chat, por lo mismo que
+   pasó con la contraseña de Google en esta sesión):
+   - `GOOGLE_INDEXING_CLIENT_EMAIL`
+   - `GOOGLE_INDEXING_PRIVATE_KEY` (con `\n` literales, no saltos de
+     línea reales — así es como un valor multilínea sobrevive en `.env`)
+5. Mismos dos secrets en GitHub Actions (Settings → Secrets) para que
+   `indexing-tick.yml` pueda correr.
+6. Correr `npx tsx scripts/migrate-indexing-queue.ts` una vez (aditivo,
+   no toca `jobs`).
+
+### 7.3 Lo que se pudo verificar sin credenciales reales, y lo que no
+
+Verificado (`npm run test:seo`, sin red): la firma del JWT es
+estructuralmente correcta — generado un keypair RSA descartable,
+firmado, y verificado con `crypto.createVerify` que el header/claims
+(`iss`, `scope`, `aud`, `exp`) tienen la forma que Google espera. **No
+verificable sin las credenciales reales del usuario**: el intercambio
+OAuth contra `oauth2.googleapis.com/token` ni la llamada real a
+`urlNotifications:publish` — eso solo se puede probar después del setup
+de la sección 7.2.
+
+### 7.4 Cuota — expectativa realista
+
+200 solicitudes/día por defecto. El backfill de las ~10,170 vacantes
+existentes tarda **~51 días** en drenarse a ese ritmo — es una cola que
+se vacía sola, no algo urgente de forzar. Después del backfill, el
+volumen diario real (vacantes nuevas + expiradas) es mucho menor y se
+mantiene al día en tiempo real.
+
+**Un detalle que puede hacer que el backfill parezca estancado:** una
+vacante que sigue viva el día 31 se purga (`URL_DELETED`) y en el
+siguiente tick de scraping se vuelve a insertar como fila nueva —
+`gen_random_uuid()` nuevo, URL nueva, `URL_UPDATED` — porque
+`purgeOldJobs()` no sabe que "es la misma vacante", solo ve una fila
+vieja. Es la misma oferta real, pero cuesta 2 unidades de cuota (una
+`URL_DELETED` + una `URL_UPDATED`) en vez de 0. Con suficiente volumen de
+vacantes de larga duración, este churn puede terminar dominando el
+presupuesto diario de 200 — si el backfill parece no avanzar, revisar
+cuánto de la cuota diaria se está yendo en este flip-flop antes de asumir
+que algo está roto. Es también el argumento más fuerte para pedir un
+aumento de cuota temprano en vez de esperar a necesitarlo.

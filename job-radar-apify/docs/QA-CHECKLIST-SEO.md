@@ -61,7 +61,7 @@ exactamente lo que Googlebot lee antes de ejecutar JavaScript.
       `twitter:title`, `twitter:description` — todos actualizados, cada
       uno una sola vez.
 - [ ] Hay un `<script type="application/ld+json">` con `"@type":
-      "JobPosting"` (además de los de Organization/WebSite que ya
+"JobPosting"` (además de los de Organization/WebSite que ya
       existían — esos deben seguir intactos).
 - [ ] Copiar ese bloque JSON-LD y pegarlo en
       [Google Rich Results Test](https://search.google.com/test/rich-results)
@@ -115,6 +115,36 @@ exactamente lo que Googlebot lee antes de ejecutar JavaScript.
       verificada desde antes, este paso no necesita nada de DNS).
 - [ ] Unos días después: revisar Indexación → Páginas para ver si
       empiezan a aparecer vacantes indexadas (no solo `/` y `/dashboard`).
+
+## 5. Google Indexing API (Fase 3)
+
+Repetir tras cualquier cambio en `src/lib/google-indexing.ts`,
+`src/db/indexing-repository.ts`, los hooks en `saveJobs()`/`purgeOldJobs()`,
+o `scripts/run-indexing-tick.ts`.
+
+- [ ] `npm run test:seo` en verde, incluida la Parte 3 (firma JWT +
+      round-trip de `indexing_queue`) — cubre todo lo que no necesita las
+      credenciales reales de Google.
+- [ ] `npm run indexing:tick` con `.env` **sin** `GOOGLE_INDEXING_CLIENT_EMAIL`/
+      `GOOGLE_INDEXING_PRIVATE_KEY` configuradas: debe salir con "skipping,
+      queue left pending" y código 0 — nunca debe marcar filas como
+      `failed` solo porque las credenciales no están puestas todavía.
+- [ ] Insertar una vacante de prueba real (o esperar al próximo tick de
+      scraping) y confirmar con `SELECT * FROM indexing_queue ORDER BY
+created_at DESC LIMIT 5` que aparece una fila `URL_UPDATED` `pending`
+      con la URL correcta de `/empleos/...`.
+- [ ] Después de configurar las credenciales reales (ver
+      `docs/SEO-PLAN.md` sección 7.2): correr `npm run indexing:tick` una
+      vez a mano y confirmar que al menos una fila pasa a `sent` con
+      `sent_at` reciente — si falla, revisar `error` en esa fila (403 casi
+      siempre significa que la cuenta de servicio no tiene permiso de
+      **Propietario** en Search Console, no "Completo").
+- [ ] `getIndexingBudgetRemaining()` nunca debe permitir que
+      `run-indexing-tick.ts` envíe más de 200 en 24 horas reales, sin
+      importar cuántas veces corra el cron en ese período — confirmar
+      contando `SELECT COUNT(*) FROM indexing_queue WHERE status='sent'
+AND sent_at > NOW() - INTERVAL '24 hours'` no supera 200 después de
+      varias corridas seguidas.
 
 ## Nota de seguridad sobre este checklist y los tests automatizados
 

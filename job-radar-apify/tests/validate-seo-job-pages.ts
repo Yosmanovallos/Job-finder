@@ -1,6 +1,7 @@
 import { spawn, ChildProcess } from "child_process";
 import path from "path";
 import { fileURLToPath } from "url";
+import crypto from "crypto";
 import dotenv from "dotenv";
 import { getJobs, maskLockedFields } from "../src/db/job-repository.js";
 import {
@@ -15,6 +16,15 @@ import {
   buildSitemapIndexXml,
   SeoJob
 } from "../src/lib/job-seo.js";
+import { buildJwtAssertion } from "../src/lib/google-indexing.js";
+import {
+  enqueueIndexingNotifications,
+  getPendingIndexingBatch,
+  markIndexingSent,
+  markIndexingFailed,
+  getIndexingBudgetRemaining
+} from "../src/db/indexing-repository.js";
+import { pool } from "../src/db/client.js";
 
 dotenv.config();
 
@@ -59,7 +69,7 @@ function runPureFunctionTests() {
   const escaped = escapeHtml(evilTitle);
   check(
     !escaped.includes("<") && !escaped.includes(">") && !escaped.includes('"'),
-    "escapeHtml() neutraliza <, >, \" en texto de vacantes potencialmente adversarial.",
+    'escapeHtml() neutraliza <, >, " en texto de vacantes potencialmente adversarial.',
     `escapeHtml() dejó pasar caracteres peligrosos: "${escaped}"`
   );
 
@@ -88,9 +98,20 @@ function runPureFunctionTests() {
   );
 
   const posting = buildJobPosting(openJob);
-  check(posting !== null, "buildJobPosting() genera JobPosting para una vacante abierta.", "buildJobPosting() devolvió null para una vacante abierta.");
+  check(
+    posting !== null,
+    "buildJobPosting() genera JobPosting para una vacante abierta.",
+    "buildJobPosting() devolvió null para una vacante abierta."
+  );
   if (posting) {
-    const requiredKeys = ["title", "description", "datePosted", "hiringOrganization", "jobLocation", "validThrough"];
+    const requiredKeys = [
+      "title",
+      "description",
+      "datePosted",
+      "hiringOrganization",
+      "jobLocation",
+      "validThrough"
+    ];
     const missing = requiredKeys.filter((k) => !(k in posting));
     check(
       missing.length === 0,
@@ -98,7 +119,8 @@ function runPureFunctionTests() {
       `Faltan campos requeridos por Google en el JobPosting: ${missing.join(", ")}`
     );
     check(
-      new Date((posting as any).validThrough).getTime() > new Date((posting as any).datePosted).getTime(),
+      new Date((posting as any).validThrough).getTime() >
+        new Date((posting as any).datePosted).getTime(),
       "validThrough queda después de datePosted (no una fecha ya vencida al momento de generarse).",
       "validThrough no es posterior a datePosted — el listado nacería ya expirado."
     );
@@ -106,7 +128,13 @@ function runPureFunctionTests() {
 
   // Locked (masked) job — same shape maskLockedFields() produces for a
   // <48h job when PAYWALL_ENABLED is true: company/location/url nulled out.
-  const lockedJob: SeoJob = { ...openJob, jobId: "test-locked-1", company: null as any, location: null as any, url: null as any };
+  const lockedJob: SeoJob = {
+    ...openJob,
+    jobId: "test-locked-1",
+    company: null as any,
+    location: null as any,
+    url: null as any
+  };
   check(
     !isPubliclyDescribable(lockedJob),
     "Una vacante enmascarada (bloqueada) NO se considera públicamente describible.",
@@ -202,7 +230,9 @@ function killServerTree(server: ChildProcess): void {
 }
 
 async function runHttpTests() {
-  console.log(`\n--- Parte 2: HTTP real contra el servidor (solo lectura — no escribe en la tabla jobs) ---\n`);
+  console.log(
+    `\n--- Parte 2: HTTP real contra el servidor (solo lectura — no escribe en la tabla jobs) ---\n`
+  );
 
   // Deliberately read-only: this suite never calls saveJobs()/clearRepository(),
   // unlike validate-paywall-auth.ts. There is no separate test database for
@@ -235,7 +265,11 @@ async function runHttpTests() {
     // Regression: existing routes must be completely unaffected.
     for (const route of ["/", "/dashboard", "/api/health", "/api/jobs"]) {
       const res = await fetch(`${BASE_URL}${route}`);
-      check(res.status === 200, `${route} sigue respondiendo 200 sin cambios.`, `${route} respondió ${res.status} — regresión.`);
+      check(
+        res.status === 200,
+        `${route} sigue respondiendo 200 sin cambios.`,
+        `${route} respondió ${res.status} — regresión.`
+      );
     }
 
     // /dashboard must ship real vacancy links in its raw HTML, not rely on
@@ -287,15 +321,23 @@ async function runHttpTests() {
     const res = await fetch(`${BASE_URL}${jobPath}`);
     const html = await res.text();
 
-    check(res.status === 200, `GET ${jobPath} responde 200.`, `GET ${jobPath} respondió ${res.status}.`);
+    check(
+      res.status === 200,
+      `GET ${jobPath} responde 200.`,
+      `GET ${jobPath} respondió ${res.status}.`
+    );
 
     const titleCount = (html.match(/<title>/g) || []).length;
-    check(titleCount === 1, "La página de la vacante tiene exactamente un <title>.", `La página tiene ${titleCount} tags <title> (index.html ya trae uno — debe reemplazarse, no agregarse).`);
+    check(
+      titleCount === 1,
+      "La página de la vacante tiene exactamente un <title>.",
+      `La página tiene ${titleCount} tags <title> (index.html ya trae uno — debe reemplazarse, no agregarse).`
+    );
 
     const canonicalCount = (html.match(/rel="canonical"/g) || []).length;
     check(
       canonicalCount === 1,
-      "La página tiene exactamente un <link rel=\"canonical\">.",
+      'La página tiene exactamente un <link rel="canonical">.',
       `La página tiene ${canonicalCount} canonicals — con más de uno Google elige arbitrariamente cuál usar.`
     );
     check(
@@ -304,20 +346,31 @@ async function runHttpTests() {
       "El canonical no contiene la ruta de la vacante — probablemente sigue apuntando a la home."
     );
 
-    const ldJsonBlocks = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)];
+    const ldJsonBlocks = [
+      ...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)
+    ];
     let jobPosting: any = null;
     for (const block of ldJsonBlocks) {
       try {
         const parsed = JSON.parse(block[1]);
         if (parsed["@type"] === "JobPosting") jobPosting = parsed;
       } catch {
-        check(false, "", `Un bloque JSON-LD en la página no es JSON válido: ${block[1].slice(0, 200)}`);
+        check(
+          false,
+          "",
+          `Un bloque JSON-LD en la página no es JSON válido: ${block[1].slice(0, 200)}`
+        );
       }
     }
-    check(jobPosting !== null, "La página incluye un bloque JSON-LD válido de tipo JobPosting.", "No se encontró un JobPosting JSON-LD válido en la página.");
+    check(
+      jobPosting !== null,
+      "La página incluye un bloque JSON-LD válido de tipo JobPosting.",
+      "No se encontró un JobPosting JSON-LD válido en la página."
+    );
     if (jobPosting) {
       check(
-        jobPosting.title === realJob.title && jobPosting.hiringOrganization?.name === realJob.company,
+        jobPosting.title === realJob.title &&
+          jobPosting.hiringOrganization?.name === realJob.company,
         "Los datos del JobPosting coinciden con los datos reales de la vacante (nada inventado).",
         "Los datos del JobPosting no coinciden con la vacante real que se pidió."
       );
@@ -339,7 +392,9 @@ async function runHttpTests() {
     const indexRes = await fetch(`${BASE_URL}/sitemap.xml`);
     const indexXml = await indexRes.text();
     check(
-      indexRes.status === 200 && indexXml.includes("sitemap-jobs.xml") && indexXml.includes("sitemap-pages.xml"),
+      indexRes.status === 200 &&
+        indexXml.includes("sitemap-jobs.xml") &&
+        indexXml.includes("sitemap-pages.xml"),
       "/sitemap.xml es un índice que referencia sitemap-pages.xml y sitemap-jobs.xml.",
       "/sitemap.xml no tiene la estructura de índice esperada."
     );
@@ -374,6 +429,112 @@ async function runHttpTests() {
   }
 }
 
+// --- Part 3: Google Indexing API (SEO Fase 3) -------------------------------
+//
+// The JWT signing path is network-free and fully testable with a throwaway
+// keypair. The OAuth exchange and the real urlNotifications:publish call
+// cannot be tested here — they require the user's real Google Cloud
+// credentials (see docs/SEO-PLAN.md section 7.2/7.3).
+//
+// The indexing_queue repository round-trip writes to the real DB (there's
+// no separate test DB in this project — same constraint as everywhere else
+// in this suite), but only to indexing_queue, never to `jobs`, and it
+// deletes its own test rows in a `finally` so it never leaves residue that
+// could confuse a real send.
+
+function runIndexingJwtTests() {
+  console.log(`\n--- Parte 3a: firma JWT de Google Indexing API (sin red) ---\n`);
+
+  const { publicKey, privateKey } = crypto.generateKeyPairSync("rsa", {
+    modulusLength: 2048,
+    publicKeyEncoding: { type: "spki", format: "pem" },
+    privateKeyEncoding: { type: "pkcs8", format: "pem" }
+  });
+
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  const jwt = buildJwtAssertion("test-sa@example.iam.gserviceaccount.com", privateKey, nowSeconds);
+  const [headerB64, claimsB64, signatureB64] = jwt.split(".");
+
+  check(
+    Boolean(headerB64 && claimsB64 && signatureB64),
+    "buildJwtAssertion() produce un JWT con 3 segmentos (header.claims.signature).",
+    `buildJwtAssertion() produjo un JWT mal formado: "${jwt}"`
+  );
+
+  const header = JSON.parse(Buffer.from(headerB64, "base64url").toString("utf8"));
+  const claims = JSON.parse(Buffer.from(claimsB64, "base64url").toString("utf8"));
+
+  check(
+    header.alg === "RS256" && header.typ === "JWT",
+    "El header del JWT declara RS256/JWT, lo que Google exige para el flujo de cuenta de servicio.",
+    `Header inesperado: ${JSON.stringify(header)}`
+  );
+
+  check(
+    claims.iss === "test-sa@example.iam.gserviceaccount.com" &&
+      claims.scope === "https://www.googleapis.com/auth/indexing" &&
+      claims.aud === "https://oauth2.googleapis.com/token" &&
+      claims.exp === claims.iat + 3600,
+    "Las claims (iss/scope/aud/exp) tienen la forma exacta que Google's OAuth token endpoint espera.",
+    `Claims inesperadas: ${JSON.stringify(claims)}`
+  );
+
+  const signingInput = `${headerB64}.${claimsB64}`;
+  const verifier = crypto.createVerify("RSA-SHA256");
+  verifier.update(signingInput);
+  const signatureValid = verifier.verify(
+    publicKey,
+    Buffer.from(signatureB64.replace(/-/g, "+").replace(/_/g, "/"), "base64")
+  );
+  check(
+    signatureValid,
+    "La firma RS256 verifica contra la clave pública del par descartable — el firmado en sí es correcto.",
+    "La firma del JWT no verificó contra la clave pública esperada."
+  );
+}
+
+async function runIndexingQueueTests() {
+  console.log(
+    `\n--- Parte 3b: cola indexing_queue (escribe y borra sus propias filas de prueba) ---\n`
+  );
+
+  const testUrl = `https://buscotrabajo.co/empleos/__test-${crypto.randomUUID()}__/prueba`;
+
+  try {
+    await enqueueIndexingNotifications([{ url: testUrl, type: "URL_UPDATED" }]);
+    const pending = await getPendingIndexingBatch(1000);
+    const found = pending.find((row) => row.url === testUrl);
+
+    check(
+      Boolean(found),
+      "enqueueIndexingNotifications() inserta y getPendingIndexingBatch() la puede leer de vuelta.",
+      "La fila insertada no apareció en el batch de pendientes."
+    );
+
+    if (found) {
+      await markIndexingSent(found.id);
+      const stillPending = await getPendingIndexingBatch(1000);
+      check(
+        !stillPending.some((row) => row.id === found.id),
+        "markIndexingSent() saca la fila de la cola de pendientes.",
+        "La fila seguía apareciendo como pendiente después de markIndexingSent()."
+      );
+    }
+
+    const budget = await getIndexingBudgetRemaining();
+    check(
+      typeof budget === "number" && budget >= 0 && budget <= 200,
+      `getIndexingBudgetRemaining() devuelve un número válido dentro de la cuota diaria (${budget}/200).`,
+      `getIndexingBudgetRemaining() devolvió un valor fuera de rango: ${budget}`
+    );
+  } finally {
+    // Always clean up, whether the checks above passed or not — this test
+    // must never leave residue in a table a real production drain script
+    // reads from.
+    await pool.query(`DELETE FROM indexing_queue WHERE url = $1`, [testUrl]);
+  }
+}
+
 async function main() {
   console.log(`\n==================================================`);
   console.log(`🧪 SUITE DE VALIDACIÓN — PÁGINAS SEO POR VACANTE (/empleos/:id/:slug)`);
@@ -381,6 +542,8 @@ async function main() {
 
   runPureFunctionTests();
   await runHttpTests();
+  runIndexingJwtTests();
+  await runIndexingQueueTests();
 
   console.log(`\n==================================================`);
   if (failures > 0) {

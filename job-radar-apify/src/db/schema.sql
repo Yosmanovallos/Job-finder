@@ -118,6 +118,27 @@ CREATE TABLE IF NOT EXISTS source_circuit_state (
     open_until   TIMESTAMPTZ
 );
 
+-- 8. Tabla `indexing_queue`: cola de notificaciones a la Google Indexing API
+-- (SEO Fase 3). Guarda la URL ya resuelta, no el job_id — para URL_DELETED,
+-- la fila de `jobs` que le dio origen ya no existe para el momento en que se
+-- envía (purgeOldJobs() la borró), así que no hay FK que recalcular la URL
+-- a partir de un id. `status='sent'` en las últimas 24h es lo que
+-- run-indexing-tick.ts usa para no exceder la cuota diaria de Google (200/día
+-- por defecto) sin depender de un contador en memoria que un cron de 15 min
+-- reiniciaría en cada corrida.
+CREATE TABLE IF NOT EXISTS indexing_queue (
+    id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    url                TEXT NOT NULL,
+    notification_type  VARCHAR(20) NOT NULL,          -- 'URL_UPDATED' | 'URL_DELETED'
+    status             VARCHAR(20) DEFAULT 'pending',  -- 'pending' | 'sent' | 'failed'
+    error              TEXT,
+    created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    sent_at            TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_indexing_queue_status ON indexing_queue (status) WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS idx_indexing_queue_sent_at ON indexing_queue (sent_at) WHERE status = 'sent';
+
 -- =============================================================================
 -- ROW LEVEL SECURITY: every read/write from this app goes through the `pool`
 -- (direct `pg` connection as the `postgres` role, which has BYPASSRLS — see
@@ -138,3 +159,4 @@ ALTER TABLE social_posts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE role_source_runs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE source_circuit_state ENABLE ROW LEVEL SECURITY;
+ALTER TABLE indexing_queue ENABLE ROW LEVEL SECURITY;

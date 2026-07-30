@@ -1,0 +1,39 @@
+name: Google Indexing API Drain
+
+on:
+  schedule:
+    - cron: "0 * * * *" # Hourly — the daily 200-request budget only needs
+    # ~8/hour to pace evenly; the actual cap is enforced in the script
+    # itself against real `sent` rows in the last 24h, not this cadence.
+  workflow_dispatch:
+
+concurrency:
+  group: indexing-tick
+  cancel-in-progress: false
+
+jobs:
+  indexing-tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Dependencies
+        run: |
+          cd job-radar-apify
+          npm ci || npm install
+
+      - name: Drain indexing queue
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          GOOGLE_INDEXING_CLIENT_EMAIL: ${{ secrets.GOOGLE_INDEXING_CLIENT_EMAIL }}
+          GOOGLE_INDEXING_PRIVATE_KEY: ${{ secrets.GOOGLE_INDEXING_PRIVATE_KEY }}
+        run: |
+          cd job-radar-apify
+          npx tsx scripts/run-indexing-tick.ts

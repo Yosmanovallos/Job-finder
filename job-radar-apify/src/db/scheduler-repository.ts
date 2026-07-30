@@ -1,4 +1,6 @@
 import { pool } from "./client.js";
+import { buildJobUrl, isPubliclyDescribable } from "../lib/job-seo.js";
+import { enqueueIndexingNotifications } from "./indexing-repository.js";
 
 /**
  * Idempotent upsert of the known role list into `search_roles` — safe to
@@ -120,7 +122,44 @@ export async function markGlobalSourceRun(sourceName: string): Promise<void> {
 }
 
 /** Cron C — keeps the corpus bounded to the last 30 days. */
+// RETURNING the deleted rows (not a separate SELECT-then-DELETE) so this
+// stays atomic — a two-step version could lose rows to a concurrent insert/
+// delete between the two statements. Once a row is gone, its title/location
+// can never be recomputed for the URL these jobs' pages lived at, so this is
+// the only point that can ever notify Google those pages are now dead (SEO
+// Fase 3 — see indexing-repository.ts). `is_active` is NOT part of this: it
+// is only ever set by the one-off scripts/migrate-dedupe.ts cleanup, never
+// flipped as part of normal ingestion — a hard DELETE here is the real (and
+// only) expiration signal in this codebase.
 export async function purgeOldJobs(): Promise<number> {
-  const result = await pool.query(`DELETE FROM jobs WHERE created_at < NOW() - INTERVAL '30 days'`);
+  const result = await pool.query(
+    `DELETE FROM jobs WHERE created_at < NOW() - INTERVAL '30 days'
+     RETURNING id, title, company, location, url, source, published_at`
+  );
+
+  const deletedUrls = result.rows
+    .map((row) => ({
+      jobId: row.id,
+      title: row.title,
+      company: row.company,
+      location: row.location,
+      url: row.url,
+      source: row.source,
+      publishedAt: row.published_at,
+      dateText: ""
+    }))
+    .filter(isPubliclyDescribable)
+    .map((job) => buildJobUrl(job));
+
+  if (deletedUrls.length > 0) {
+    try {
+      await enqueueIndexingNotifications(
+        deletedUrls.map((url) => ({ url, type: "URL_DELETED" as const }))
+      );
+    } catch (err) {
+      console.warn(`⚠️ [purgeOldJobs] Failed to enqueue URL_DELETED notifications:`, err);
+    }
+  }
+
   return result.rowCount ?? 0;
 }

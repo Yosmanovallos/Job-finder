@@ -5,6 +5,8 @@ import { Job, normalizeJobUrl } from "../sources/types.js";
 import { saveRunToCache, getAllCachedRuns } from "../cache-manager.js";
 import { validateJobs } from "./job-validator.js";
 import { PAYWALL_ENABLED } from "../config.js";
+import { buildJobUrl, isPubliclyDescribable } from "../lib/job-seo.js";
+import { enqueueIndexingNotifications } from "./indexing-repository.js";
 
 dotenv.config();
 
@@ -42,6 +44,11 @@ export async function saveJobs(
 ): Promise<{ savedCount: number; duplicateCount: number }> {
   let savedCount = 0;
   let duplicateCount = 0;
+  // Collected across the loop, enqueued in one batched INSERT after it —
+  // SEO Fase 3 (Google Indexing API), see indexing-repository.ts. Doing
+  // this per-iteration would triple the query count of a loop that already
+  // runs over every scraped job on every 15-min tick.
+  const newlyInsertedUrls: string[] = [];
 
   const { valid, discarded } = validateJobs(jobs);
   if (discarded.length > 0) {
@@ -93,7 +100,7 @@ export async function saveJobs(
            WHEN jobs.sources @> to_jsonb(EXCLUDED.source::text) THEN jobs.sources
            ELSE jobs.sources || to_jsonb(EXCLUDED.source::text)
          END
-       RETURNING (xmax = 0) AS inserted`,
+       RETURNING id, (xmax = 0) AS inserted`,
       [
         hash,
         job.title,
@@ -111,8 +118,24 @@ export async function saveJobs(
 
     if (result.rows[0]?.inserted) {
       savedCount++;
+      const savedJob = { ...job, jobId: result.rows[0].id, publishedAt };
+      if (isPubliclyDescribable(savedJob)) {
+        newlyInsertedUrls.push(buildJobUrl(savedJob));
+      }
     } else {
       duplicateCount++;
+    }
+  }
+
+  if (newlyInsertedUrls.length > 0) {
+    try {
+      await enqueueIndexingNotifications(
+        newlyInsertedUrls.map((url) => ({ url, type: "URL_UPDATED" as const }))
+      );
+    } catch (err) {
+      // Never let an indexing-queue write fail the actual save — jobs are
+      // already committed above, this is a best-effort SEO side-channel.
+      console.warn(`⚠️ [saveJobs] Failed to enqueue indexing notifications:`, err);
     }
   }
 
