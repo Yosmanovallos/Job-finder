@@ -29,14 +29,6 @@ jobs:
           cd job-radar-apify
           npm ci || npm install
 
-      - name: TEMP - Diagnose key format
-        env:
-          GOOGLE_INDEXING_CLIENT_EMAIL: ${{ secrets.GOOGLE_INDEXING_CLIENT_EMAIL }}
-          GOOGLE_INDEXING_PRIVATE_KEY: ${{ secrets.GOOGLE_INDEXING_PRIVATE_KEY }}
-        run: |
-          cd job-radar-apify
-          npx tsx scripts/diag-indexing-key.ts
-
       - name: Drain indexing queue
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}

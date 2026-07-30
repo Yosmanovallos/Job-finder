@@ -245,7 +245,7 @@ en combinaciones infinitas de la misma data que ya vive en `/empleos/`.
 | **0** | Auditoría: robots.txt/sitemap sanos, sin `noindex`, confirmar qué tiene Google indexado hoy                       | Ver sección 5.1                                                                                    | ✅ Hecho                                        |
 | **1** | Ruta `/empleos/:id/:slug` con SSR + JSON-LD `JobPosting` + meta tags, página cliente equivalente                  | `npm run test:seo` + `docs/QA-CHECKLIST-SEO.md`                                                    | ✅ Hecho                                        |
 | **2** | Sitemap dinámico (índice + jobs) + robots.txt actualizado                                                         | `curl` al sitemap, validación XML, envío manual una vez en Search Console                          | ✅ Hecho                                        |
-| **3** | Integración con Google Indexing API (cuenta de servicio + hook en `saveJobs()`/`purgeOldJobs()`, ver sección 5.5) | Log de submits exitosos; una vacante nueva aparece en el reporte de cobertura en horas, no semanas | 🟡 Código listo, falta setup de GCP del usuario |
+| **3** | Integración con Google Indexing API (cuenta de servicio + hook en `saveJobs()`/`purgeOldJobs()`, ver sección 5.5) | Log de submits exitosos; una vacante nueva aparece en el reporte de cobertura en horas, no semanas | ✅ Hecho — verificado en producción (2026-07-30): 106/106 notificaciones reales enviadas en la primera corrida |
 | **4** | Páginas de categoría (`/empleos/<ciudad>`, `/empleos/<rol>`)                                                      | Igual que fase 1, sobre una categoría                                                              | Pendiente                                       |
 | **5** | Manejo de vencimiento (410 / `validThrough`) atado al `DELETE` duro de `purgeOldJobs()`                           | Vacante purgada devuelve 410 en vez de 404 genérico; JSON-LD deja de emitirse                      | Pendiente                                       |
 
@@ -493,11 +493,27 @@ Google Cloud del usuario para poder probarlo de punta a punta.
 Verificado (`npm run test:seo`, sin red): la firma del JWT es
 estructuralmente correcta — generado un keypair RSA descartable,
 firmado, y verificado con `crypto.createVerify` que el header/claims
-(`iss`, `scope`, `aud`, `exp`) tienen la forma que Google espera. **No
-verificable sin las credenciales reales del usuario**: el intercambio
-OAuth contra `oauth2.googleapis.com/token` ni la llamada real a
-`urlNotifications:publish` — eso solo se puede probar después del setup
-de la sección 7.2.
+(`iss`, `scope`, `aud`, `exp`) tienen la forma que Google espera.
+
+**Actualización 2026-07-30 — verificado de punta a punta con credenciales
+reales.** El usuario completó el setup de GCP (cuenta de servicio
+`indexing-bot@job-finder-503421.iam.gserviceaccount.com`, permiso
+Propietario en Search Console, secrets en GitHub Actions). La primera
+corrida manual (`gh workflow run indexing-tick.yml`) falló con
+`error:1E08010C:DECODER routines::unsupported` — el circuit-breaker de 5
+fallos consecutivos cortó la corrida antes de gastar las 53 solicitudes
+pendientes (funcionó como estaba pensado: es exactamente el escenario de
+"cuenta mal configurada" que ese breaker existe para atajar). Diagnosticado
+con un script temporal (`scripts/diag-indexing-key.ts`, ya borrado) que
+solo reporta hechos estructurales de la clave (longitud, presencia de
+marcadores PEM, etc.) sin loguear nunca el contenido — la clave privada
+en el secret de GitHub tenía las comillas del JSON del service account
+pegadas junto con el valor (`"private_key": "-----BEGIN..."` copiado
+completo, comillas incluidas). Arreglado en `google-indexing.ts`
+(`readCredentials()` ahora quita un par de comillas envolventes antes de
+desescapar) — no fue necesario que el usuario tocara el secret de nuevo.
+Segunda corrida: **106/106 notificaciones reales enviadas exitosamente**
+(`Sent: 106, Failed: 0`).
 
 ### 7.4 Cuota — expectativa realista
 
