@@ -13,6 +13,16 @@ import {
 } from "./db/job-repository.js";
 import { markRoleForImmediateRescan } from "./db/scheduler-repository.js";
 import { applyJobFilters, sortByPreferredRoles, JobFilterParams } from "./lib/job-filters.js";
+import {
+  escapeHtml,
+  escapeJsonForScriptTag,
+  isPubliclyDescribable,
+  buildJobMeta,
+  buildJobPosting,
+  buildJobPath,
+  buildJobsSitemapXml,
+  buildSitemapIndexXml
+} from "./lib/job-seo.js";
 import { verifySession } from "./auth/verify-session.js";
 import { startPaymentCheckout } from "./payments/checkout.js";
 import { handleWompiWebhook } from "./payments/webhook.js";
@@ -347,6 +357,224 @@ const server = http.createServer(async (req, res) => {
         res.end(JSON.stringify({ error: e?.message || "Payload inválido" }));
       }
     });
+    return;
+  }
+
+  // 7b. GET /empleos/:id/:slug — server-rendered per-job page for
+  // crawlers (SEO Fase 1, ver docs/SEO-PLAN.md). The `:slug` segment is
+  // purely decorative for click-through readability; matching is always by
+  // `:id` (a jobId, stable), so a stale slug from a since-edited title never
+  // 404s — the canonical tag below just points at the freshly computed one.
+  // Reuses the same getJobsCached()+maskLockedFields() the public
+  // /api/jobs/:id route already uses, so a crawler (unauthenticated, same
+  // as an anonymous visitor) can never see more than a real visitor would —
+  // no separate cloaking-risk logic to keep in sync if PAYWALL_ENABLED is
+  // ever turned back on.
+  if (pathname.startsWith("/empleos/") && method === "GET") {
+    const segments = pathname.slice("/empleos/".length).split("/").filter(Boolean);
+    const id = segments[0];
+    const session = await verifySession(req);
+    const tier = session?.tier || "free";
+    const jobs = await getJobsCached(50000);
+    const job = jobs.find((j: any) => j.jobId === id);
+
+    if (!id || !job) {
+      res.writeHead(404, { "Content-Type": "text/html; charset=utf-8" });
+      res.end(
+        "<!doctype html><html lang=\"es\"><head><meta charset=\"utf-8\"><title>Vacante no encontrada | BuscoTrabajo</title><meta name=\"robots\" content=\"noindex\"></head><body><h1>Vacante no encontrada</h1><p><a href=\"/dashboard\">Ver todas las vacantes</a></p></body></html>"
+      );
+      return;
+    }
+
+    const [visible] = maskLockedFields([job], tier);
+
+    let indexHtml: string;
+    try {
+      indexHtml = fs.readFileSync(path.join(PUBLIC_DIR, "index.html"), "utf-8");
+    } catch {
+      res.writeHead(500, { "Content-Type": "text/plain" });
+      res.end("Server Error: build not found");
+      return;
+    }
+
+    if (!isPubliclyDescribable(visible)) {
+      // <48h and the paywall is active for this caller — same info an
+      // anonymous visitor already gets on the dashboard's PaywallCard, no
+      // more. Deliberately not indexed: there isn't enough public data yet
+      // to justify a page a crawler should rank, and it'll get a full page
+      // once it ages past the lock window (or PAYWALL_ENABLED is off, as
+      // it is today, in which case this branch never triggers).
+      const title = `Vacante reservada para suscriptores Pro | BuscoTrabajo`;
+      indexHtml = indexHtml
+        .replace(/<title>[\s\S]*?<\/title>/, `<title>${escapeHtml(title)}</title>`)
+        .replace(/<meta[^>]*name=["']robots["'][^>]*>/i, "")
+        .replace("</head>", `  <meta name="robots" content="noindex">\n</head>`);
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+      res.end(indexHtml);
+      return;
+    }
+
+    const meta = buildJobMeta(visible);
+    const jobPosting = buildJobPosting(visible);
+
+    indexHtml = indexHtml
+      .replace(/<title>[\s\S]*?<\/title>/, `<title>${escapeHtml(meta.title)}</title>`)
+      .replace(
+        /<meta[^>]*name=["']description["'][^>]*>/,
+        `<meta name="description" content="${escapeHtml(meta.description)}" />`
+      )
+      .replace(
+        /<link[^>]*rel=["']canonical["'][^>]*>/,
+        `<link rel="canonical" href="${escapeHtml(meta.canonicalUrl)}" />`
+      )
+      .replace(
+        /<meta[^>]*property=["']og:title["'][^>]*>/,
+        `<meta property="og:title" content="${escapeHtml(meta.title)}" />`
+      )
+      .replace(
+        /<meta[^>]*property=["']og:description["'][^>]*>/,
+        `<meta property="og:description" content="${escapeHtml(meta.description)}" />`
+      )
+      .replace(
+        /<meta[^>]*name=["']twitter:title["'][^>]*>/,
+        `<meta name="twitter:title" content="${escapeHtml(meta.title)}" />`
+      )
+      .replace(
+        /<meta[^>]*name=["']twitter:description["'][^>]*>/,
+        `<meta name="twitter:description" content="${escapeHtml(meta.description)}" />`
+      )
+      .replace(
+        "</head>",
+        `  <script type="application/ld+json">${escapeJsonForScriptTag(jobPosting)}</script>\n</head>`
+      );
+
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+    res.end(indexHtml);
+    return;
+  }
+
+  // 7c. GET /dashboard — same SSR principle as /empleos/:id/:slug above,
+  // applied to the dashboard itself. Confirmed via Search Console (2026-07)
+  // that Google's own rendered snapshot of this page showed "0 de 0
+  // vacantes": the real listings only ever existed behind the browser's
+  // fetch() to /api/jobs, and whatever rendering budget Googlebot allotted
+  // ran out before that fetch resolved. This injects the same first page
+  // /api/jobs would return directly into the HTML, so a crawler sees real
+  // vacancies immediately regardless of JS/API timing. React still owns the
+  // interactive experience — createRoot().render() (not hydrateRoot)
+  // replaces this markup the instant the bundle executes, so a real visitor
+  // sees at most a brief flash of it, never a mismatch warning.
+  if (pathname === "/dashboard" && method === "GET") {
+    // Note on tier: verifySession() reads the Authorization header, which a
+    // plain page navigation never carries (only the client's own later
+    // fetch() calls attach it) — so `tier` here is always "free" regardless
+    // of who's actually visiting. That's fine for the crawler-facing
+    // markup below (a crawler is anonymous anyway) and is exactly why the
+    // embedded JSON further down is only ever consumed client-side for an
+    // anonymous, default-filter first load — see Dashboard.tsx's comment
+    // where it reads window.__SSR_JOBS__. A real Pro session always
+    // re-fetches for real once its token resolves, same as it already did
+    // before this change.
+    const session = await verifySession(req);
+    const tier = session?.tier || "free";
+    const jobs = await getJobsCached(50000);
+    const visibleJobs = maskLockedFields(jobs, tier);
+    const allFiltered = applyJobFilters(visibleJobs, {});
+    const firstPage = allFiltered.slice(0, 24);
+    const total = allFiltered.length;
+    const hasMore = total > firstPage.length;
+
+    let indexHtml: string;
+    try {
+      indexHtml = fs.readFileSync(path.join(PUBLIC_DIR, "index.html"), "utf-8");
+    } catch {
+      res.writeHead(500, { "Content-Type": "text/plain" });
+      res.end("Server Error: build not found");
+      return;
+    }
+
+    // Locked jobs (isLocked, only possible if PAYWALL_ENABLED is ever
+    // turned back on) never had company/location/url unmasked — no link to
+    // build, so they're skipped here entirely rather than linked with
+    // placeholder data. The JSON embed below keeps them (with nulled
+    // fields, same as /api/jobs) since the client already knows how to
+    // render PaywallCard for those.
+    const items = firstPage
+      .filter((job: any) => isPubliclyDescribable(job))
+      .map((job: any) => {
+        const href = buildJobPath(job);
+        const title = escapeHtml(job.title);
+        const company = escapeHtml(job.company || "Confidencial");
+        const location = escapeHtml(job.location || "Colombia");
+        const source = escapeHtml(job.source || "");
+        return `<li><a href="${href}">${title}</a> — ${company} · ${location} · ${source}</li>`;
+      })
+      .join("\n");
+
+    const ssrSnippet = `<nav aria-label="Vacantes recientes"><ul>\n${items}\n</ul></nav>`;
+    indexHtml = indexHtml.replace('<div id="app"></div>', `<div id="app">${ssrSnippet}</div>`);
+
+    // Lets the client skip its own redundant first fetch to /api/jobs when
+    // nothing (auth, filters) has changed what it would ask for — see the
+    // safety notes above and in Dashboard.tsx. escapeJsonForScriptTag (not
+    // plain JSON.stringify) matters here for the same reason it does on
+    // the /empleos/ route: job titles are scraped, untrusted text.
+    const ssrJobsPayload = escapeJsonForScriptTag({ jobs: firstPage, total, hasMore });
+    indexHtml = indexHtml.replace(
+      "</head>",
+      `  <script>window.__SSR_JOBS__=${ssrJobsPayload};</script>\n</head>`
+    );
+
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+    res.end(indexHtml);
+    return;
+  }
+
+  // 7d. Sitemap (SEO Fase 2, ver docs/SEO-PLAN.md). /sitemap.xml — the URL
+  // robots.txt already points at — is now an index instead of a flat list,
+  // referencing the static marketing pages (unchanged, still the source
+  // file at static/sitemap.xml) and a dynamic one for every job. All three
+  // routes intercept ahead of the static-file fallback below, which would
+  // otherwise just serve the old flat public/sitemap.xml verbatim (it still
+  // exists on disk — this only changes what's served at that URL).
+  if (pathname === "/sitemap.xml" && method === "GET") {
+    const xml = buildSitemapIndexXml([
+      "https://buscotrabajo.co/sitemap-pages.xml",
+      "https://buscotrabajo.co/sitemap-jobs.xml"
+    ]);
+    res.writeHead(200, { "Content-Type": "application/xml; charset=utf-8" });
+    res.end(xml);
+    return;
+  }
+
+  if (pathname === "/sitemap-pages.xml" && method === "GET") {
+    // The static marketing-page list itself didn't change — just serving
+    // the already-built file (public/sitemap.xml, copied verbatim from
+    // static/sitemap.xml at build time) under its new URL instead of
+    // duplicating that list here.
+    let staticSitemap: string;
+    try {
+      staticSitemap = fs.readFileSync(path.join(PUBLIC_DIR, "sitemap.xml"), "utf-8");
+    } catch {
+      res.writeHead(500, { "Content-Type": "text/plain" });
+      res.end("Server Error: build not found");
+      return;
+    }
+    res.writeHead(200, { "Content-Type": "application/xml; charset=utf-8" });
+    res.end(staticSitemap);
+    return;
+  }
+
+  if (pathname === "/sitemap-jobs.xml" && method === "GET") {
+    // Always the public (tier: "free") view, same as any anonymous
+    // crawler — a sitemap has no session to resolve a real tier from
+    // anyway, and it must never list a page (see isPubliclyDescribable
+    // inside buildJobsSitemapXml) it wouldn't also show that visitor.
+    const jobs = await getJobsCached(50000);
+    const visibleJobs = maskLockedFields(jobs, "free");
+    const xml = buildJobsSitemapXml(visibleJobs);
+    res.writeHead(200, { "Content-Type": "application/xml; charset=utf-8" });
+    res.end(xml);
     return;
   }
 

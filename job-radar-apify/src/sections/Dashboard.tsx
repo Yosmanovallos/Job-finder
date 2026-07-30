@@ -123,6 +123,30 @@ export default function Dashboard() {
   // Reset + fetch the first page whenever a filter changes.
   useEffect(() => {
     const myRequestId = ++requestIdRef.current;
+
+    // server.ts's /dashboard route embeds this exact response (same
+    // getJobsCached()/maskLockedFields()/applyJobFilters() the fetch below
+    // would hit) directly in the HTML, so a first anonymous visitor with
+    // untouched filters doesn't need the round trip at all — it's the same
+    // data. Deliberately gated to !accessToken: a plain page navigation
+    // never carries the Authorization header verifySession() needs, so the
+    // embedded payload is always the anonymous/free view regardless of who
+    // is actually visiting. A signed-in user's accessToken resolving
+    // shortly after (Supabase session restore) re-runs this effect and
+    // takes the real fetch path below — exactly what already happened
+    // before this shortcut existed, just without an extra empty round trip
+    // first. Deleted immediately after one use so neither a later filter
+    // change nor that same auth-resolution re-run can reuse stale data.
+    const ssrJobs = (window as any).__SSR_JOBS__;
+    if (ssrJobs && !accessToken && filterKey === JSON.stringify(EMPTY_FILTERS)) {
+      delete (window as any).__SSR_JOBS__;
+      setJobs(Array.isArray(ssrJobs.jobs) ? ssrJobs.jobs : []);
+      setTotal(ssrJobs.total || 0);
+      setHasMore(!!ssrJobs.hasMore);
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     setJobs([]);
 

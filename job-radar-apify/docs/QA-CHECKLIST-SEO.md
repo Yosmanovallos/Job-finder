@@ -1,0 +1,132 @@
+# Checklist manual de QA — SEO / páginas individuales de vacante
+
+Todo lo que `npm run test:seo` no puede cubrir porque requiere un navegador
+real, ver el render visual, o validar contra herramientas externas de
+Google. Repetir esta lista completa después de cualquier cambio en
+`src/lib/job-seo.ts`, `src/server.ts` (rutas `/empleos/` y `/dashboard`),
+`src/App.tsx`, `src/sections/JobLanding.tsx`, `src/sections/Dashboard.tsx`,
+o `src/index.html`.
+
+**Antes que nada: correr `npm run test:seo`.** Es de solo lectura (nunca
+escribe en la tabla `jobs` — no hay entorno de test separado en este
+proyecto, ver la nota de seguridad al final) y cubre la lógica pura y la
+integración HTTP básica. Este checklist es el paso siguiente, no un
+sustituto.
+
+## 0. Regresión — lo que ya funcionaba, primero
+
+Antes de revisar lo nuevo, confirmar que nada de lo existente se rompió
+(el motivo de esta sección: evitar repetir el incidente de esta sesión
+donde un cambio en el layout del dashboard rompió silenciosamente el
+`position: sticky` de la barra de búsqueda).
+
+- [ ] `/dashboard` carga, los filtros funcionan, el panel de detalle sigue
+      pegado (`sticky`) al hacer scroll hasta el fondo de una lista larga.
+- [ ] El buscador de arriba (`Título, empresa o palabra clave...`) y los
+      selects rápidos de fecha/modalidad/ciudad siguen funcionando.
+- [ ] `/`, `/login`, `/pricing`, `/legal/*` cargan sin error de consola.
+- [ ] `npm run test:dashboard-filters` sigue en verde.
+
+## 0.1 `/dashboard` — HTML crudo (vista de crawler, no lo que ves en pantalla)
+
+Confirmado en Search Console (2026-07-29) que Google había indexado
+`/dashboard` con "0 de 0 vacantes" — el contenido real solo existía
+detrás de un `fetch()` del navegador que el rastreo de Google no esperó
+a que terminara. Se corrigió inyectando la primera página de vacantes
+directo en el HTML que entrega el servidor. Repetir esto tras cualquier
+cambio a `Dashboard.tsx` o a la ruta `/dashboard` de `server.ts`:
+
+- [ ] `curl -s http://localhost:3000/dashboard | grep 'href="/empleos/'`
+      devuelve varias líneas (no vacío).
+- [ ] Ese mismo HTML crudo **no** contiene el texto "No se encontraron
+      vacantes".
+- [ ] En un navegador real, el dashboard se ve y funciona exactamente
+      igual que antes — el HTML de arriba se reemplaza casi
+      instantáneamente al montar React (no debe quedar visible ni
+      duplicar contenido).
+
+## 1. Página individual de vacante (`/empleos/:id/:slug`) — vista de crawler
+
+Usar "Ver código fuente" del navegador (Ctrl+U) o `curl`, **no** las
+herramientas de desarrollador con JS ya corrido — el objetivo es ver
+exactamente lo que Googlebot lee antes de ejecutar JavaScript.
+
+- [ ] El `<title>` es el de la vacante (no el genérico de
+      "BuscoTrabajo — Vacantes de Empleo..."), y aparece **una sola vez**.
+- [ ] `<link rel="canonical">` apunta a `/empleos/<id>/<slug>` de esa
+      vacante — no a `https://buscotrabajo.co/` (el bug obvio si alguna
+      vez se vuelve a "agregar" en vez de "reemplazar" los tags de
+      `index.html`). Debe aparecer **una sola vez**.
+- [ ] `<meta name="description">`, `og:title`, `og:description`,
+      `twitter:title`, `twitter:description` — todos actualizados, cada
+      uno una sola vez.
+- [ ] Hay un `<script type="application/ld+json">` con `"@type":
+      "JobPosting"` (además de los de Organization/WebSite que ya
+      existían — esos deben seguir intactos).
+- [ ] Copiar ese bloque JSON-LD y pegarlo en
+      [Google Rich Results Test](https://search.google.com/test/rich-results)
+      — debe validar sin errores (warnings de campos opcionales como
+      `employmentType` son aceptables, no hay esa data y no se inventa).
+- [ ] Probar con una vacante cuyo título tenga tildes, paréntesis o
+      símbolos raros (`Ingeniero(a) — Bogotá`) — la URL generada no debe
+      romperse ni el JSON-LD debe corromperse.
+- [ ] Un id que no existe (`/empleos/00000000-0000-0000-0000-000000000000/x`)
+      responde 404 real (ver el código de estado, no solo el mensaje en
+      pantalla).
+
+## 2. Página individual — vista de usuario real (después de que carga JS)
+
+- [ ] Entrar a la URL de una vacante real directamente (pegarla en la
+      barra de direcciones, no navegar desde dentro de la app) — carga,
+      muestra la vacante, el título de la pestaña coincide con el de la
+      vacante.
+- [ ] El link "← Ver todas las vacantes" vuelve a `/dashboard`.
+- [ ] Botón "Aplicar en `<fuente>`" abre la URL externa real en una pestaña
+      nueva.
+- [ ] Estando deslogueado, hacer clic en "Aplicar" abre el modal de
+      registro (`ApplyGateModal`), igual que en el dashboard.
+- [ ] Vacante con `isLocked = true` (si el paywall llega a reactivarse,
+      `PAYWALL_ENABLED = true` en `config.ts`) muestra el `PaywallCard`,
+      no el detalle completo — y su versión servida al crawler debe tener
+      `<meta name="robots" content="noindex">` y **ningún** JSON-LD de
+      JobPosting (confirmarlo con "Ver código fuente", no solo en pantalla).
+
+## 3. Que nada de esto afecte el resto del sitio
+
+- [ ] El peso de la página de inicio/dashboard (Lighthouse o simplemente
+      "cuánto tarda en cargar") no cambió — las rutas nuevas son aditivas,
+      no deberían tocar el bundle que ya se carga en esas páginas.
+- [ ] `robots.txt` sigue permitiendo `/empleos/` (no hace falta agregarlo
+      explícitamente — el `Allow: /` genérico ya lo cubre — pero confirmar
+      que no hay un `Disallow` que lo bloquee por accidente).
+
+## 4. Sitemap (Fase 2)
+
+- [ ] `https://buscotrabajo.co/sitemap.xml` abre y es un `<sitemapindex>`
+      con dos entradas (`sitemap-pages.xml`, `sitemap-jobs.xml`) — no una
+      lista plana de URLs como antes.
+- [ ] `https://buscotrabajo.co/sitemap-jobs.xml` abre, tiene miles de
+      `<url>` con `/empleos/...` reales, y el navegador no marca error de
+      XML mal formado.
+- [ ] Tomar 2-3 URLs al azar de ese sitemap y pegarlas directo en el
+      navegador — deben cargar la vacante (200), no un 404.
+- [ ] En Search Console → Sitemaps: reemplazar/reenviar
+      `https://buscotrabajo.co/sitemap.xml` (la propiedad ya está
+      verificada desde antes, este paso no necesita nada de DNS).
+- [ ] Unos días después: revisar Indexación → Páginas para ver si
+      empiezan a aparecer vacantes indexadas (no solo `/` y `/dashboard`).
+
+## Nota de seguridad sobre este checklist y los tests automatizados
+
+Este proyecto **no tiene una base de datos de test separada** — el mismo
+`DATABASE_URL` de `.env` es el mismo que usa producción (ver
+`docs/BACKLOG.md` / el comentario de `clearRepository()` en
+`job-repository.ts`). Por eso:
+
+- `npm run test:seo` es **de solo lectura**: nunca llama a `saveJobs()` ni
+  `clearRepository()`, solo lee vacantes que ya existen para probar contra
+  ellas. Es seguro correrlo en cualquier momento.
+- Otros tests de este proyecto (`test:paywall`, `test:payment-flow`) **sí**
+  usan `clearRepository()` y **borran vacantes reales** — requieren
+  `ALLOW_TEST_DB_WIPE=true` a propósito para que nadie los corra sin
+  querer. No correr esos como parte de la verificación de SEO.
