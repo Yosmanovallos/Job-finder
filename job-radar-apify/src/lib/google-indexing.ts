@@ -24,13 +24,21 @@ const SCOPE = "https://www.googleapis.com/auth/indexing";
 export type NotificationType = "URL_UPDATED" | "URL_DELETED";
 
 function base64url(input: Buffer | string): string {
-  return Buffer.from(input).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+  return Buffer.from(input)
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
 }
 
 // Pure/synchronous and network-free on purpose — lets tests/validate-seo
 // verify the JWT's shape (header, claims, signature) with a throwaway
 // keypair, without needing real Google credentials or hitting the network.
-export function buildJwtAssertion(clientEmail: string, privateKeyPem: string, nowSeconds: number): string {
+export function buildJwtAssertion(
+  clientEmail: string,
+  privateKeyPem: string,
+  nowSeconds: number
+): string {
   const header = { alg: "RS256", typ: "JWT" };
   const claims = {
     iss: clientEmail,
@@ -53,9 +61,15 @@ function readCredentials(): { clientEmail: string; privateKey: string } {
       "GOOGLE_INDEXING_CLIENT_EMAIL / GOOGLE_INDEXING_PRIVATE_KEY no están configuradas en .env"
     );
   }
-  // .env can't hold real newlines inside a single-line value — the private
-  // key is stored with literal "\n" and unescaped here before use.
-  return { clientEmail, privateKey: privateKeyRaw.replace(/\\n/g, "\n") };
+  // .env/GitHub secrets can't hold real newlines inside a single-line
+  // value — the private key is stored with literal "\n" and unescaped here
+  // before use. Also strips a leading/trailing quote if present: the most
+  // common way this gets pasted wrong is copying the `"private_key": "..."`
+  // field straight out of the downloaded service account JSON, wrapping
+  // quotes and all, which otherwise breaks PEM parsing with an opaque
+  // OpenSSL "DECODER routines::unsupported" error.
+  const trimmed = privateKeyRaw.trim().replace(/^"(.*)"$/s, "$1");
+  return { clientEmail, privateKey: trimmed.replace(/\\n/g, "\n") };
 }
 
 let cachedToken: { accessToken: string; expiresAt: number } | null = null;
