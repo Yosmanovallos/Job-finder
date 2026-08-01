@@ -1,6 +1,6 @@
 # Plan de reputación de empleador — BuscoTrabajo.co
 
-Estado: **Fases R0, R1, R2 y R3 completas.** Igual que `SEO-PLAN.md`,
+Estado: **Fases R0-R3 completas, R4 bloqueada (decisión del usuario: quedarnos en 2 fuentes).** Igual que `SEO-PLAN.md`,
 esto se ejecuta en fases, una por sesión, cada una verificable antes de
 seguir con la siguiente — no es un commit de una sola vez.
 
@@ -155,8 +155,8 @@ placeholder ni "unknown" visible).
 | **R1** | Esqueleto: tabla `company_reputation`, generalización de `executeWithResilience`, `run-reputation-tick.ts` (sin fetcher real todavía) + workflow, tests | `npm run build` + tests en verde, cero regresión en scraping/SEO existente | ✅ Hecho |
 | **R2** | Fetcher de Merco Talento + tabla `company_reputation_alias` + alias curados iniciales + UI de atribución | Datos reales de Merco visibles en una vacante real, tests, QA manual | ✅ Hecho |
 | **R3** | Fetcher de Great Place to Work Colombia (insignia binaria) | Insignia visible, tests, QA manual | ✅ Hecho |
-| **R4** | Fetcher de Computrabajo — checkpoint explícito antes de codear, dado el lenguaje específico de su Aviso Legal | Datos reales visibles, tests, QA manual | Pendiente |
-| **R5** | Badge de LinkedIn (Follow Company Plugin, solo frontend) | Badge visible, sin cambios en BD | Pendiente |
+| **R4** | Fetcher de Computrabajo — checkpoint explícito antes de codear, dado el lenguaje específico de su Aviso Legal | Datos reales visibles, tests, QA manual | ❌ Bloqueada (ver §5.4) |
+| **R5** | Badge de LinkedIn (Follow Company Plugin, solo frontend) | Badge visible, sin cambios en BD | Pendiente (opcional) |
 
 ### 5.1 Resultado de la Fase R1
 
@@ -295,6 +295,55 @@ consola): la vacante real de Accenture muestra las dos entradas
 correctamente, cada una con su "Ver fuente" — nunca un logo. `npm run
 test:seo` y `npm run test:dashboard-filters` en verde.
 
+### 5.4 Fase R4 — bloqueada (Computrabajo)
+
+El usuario confirmó el mismo criterio de riesgo ya aceptado para el
+scraping de vacantes de Computrabajo (proceder pese a su Aviso Legal). El
+bloqueo real no fue ese — fue técnico: **no hay forma segura de descubrir
+a escala la URL de evaluaciones de una empresa arbitraria**.
+
+Investigación en vivo esta sesión:
+
+- La página de evaluaciones en sí **sí es accesible directo, sin
+  bloqueo** (`co.computrabajo.com/empresas/evaluaciones-en-<slug>-<hash>`,
+  200 real, verificado con Alpina: score `4.6`, `9.306` reseñas —
+  patrones DOM exactos ya identificados:
+  `<span class="fwB mr5"> 4.6</span>` y
+  `<span class="fc_gray">9.306</span>` junto al link "Evaluaciones"). El
+  `slug` es cosmético igual que en nuestras propias URLs de vacante — solo
+  el `hash` importa para resolver la página.
+- El **descubrimiento** del hash por nombre de empresa no tiene camino
+  limpio:
+  - `/empresas/` (directorio/buscador) → 403, probado con `curl` y con un
+    navegador real (Playwright) — bloqueo real, no solo de bots simples.
+  - Existe una API de autocompletado dedicada
+    (`api-sug.computrabajo.com/company/get`, visible en el HTML del
+    formulario de búsqueda) pero no se pudo determinar su formato exacto
+    de parámetros sin acceso a las devtools de una sesión de navegador
+    real — varios intentos razonables devolvieron `"Bad Request"`.
+  - Usando el mismo proxy de traducción que ya usa
+    `scrapeComputrabajo()` para vacantes (`translate.goog`) con
+    Playwright para observar la petición real: **Google respondió con un
+    reCAPTCHA** (`google.com/sorry/...`) tras pocas peticiones en poco
+    tiempo — detenido de inmediato, evadir un CAPTCHA está prohibido por
+    la regla 8 de `AGENTS.md`. Ese mismo proxy es del que depende hoy en
+    producción el scraping de vacantes de Computrabajo cada 15 minutos —
+    seguir insistiendo arriesgaba ese servicio ya funcionando, no solo
+    esta feature nueva.
+  - Buscar por nombre de empresa como palabra clave de vacante (reusando
+    el patrón ya probado del scraper de vacantes) es ruidoso: trae
+    ofertas de empresas no relacionadas que solo mencionan el nombre
+    buscado en el texto, no un link confiable al perfil real de esa
+    empresa.
+
+**Decisión del usuario**: quedarse en las 2 fuentes ya construidas (Merco
++ GPTW) en vez de forzar un mecanismo de descubrimiento poco confiable o
+arriesgar el scraper de vacantes ya en producción. R4 queda bloqueada,
+no cancelada — si en el futuro aparece una forma legítima de resolver el
+descubrimiento (ej. alguien inspecciona a mano la petición real desde
+las devtools de un navegador con sesión), se puede retomar reusando el
+parser de la página de evaluaciones ya identificado arriba.
+
 ## 6. Riesgos y cómo se mitigan
 
 - **ToS de Computrabajo**: riesgo aceptado explícitamente por el usuario,
@@ -312,13 +361,17 @@ test:seo` y `npm run test:dashboard-filters` en verde.
 
 ## 7. Próximo paso
 
-**Fase R4** — Computrabajo (rating real 1-5 + conteo de reseñas, fuente que
-este proyecto ya scrapea para vacantes). A diferencia de Merco/GPTW, su
-Aviso Legal prohíbe **expresamente** el scraping/reuso de datos (cláusula
-específica, no genérica) — el usuario ya aceptó ese mismo tipo de riesgo
-para el scraping de vacantes de Computrabajo, pero el plan pide un
-checkpoint explícito de confirmación antes de escribir código en esta
-fase específica, dado el lenguaje más concreto de esa cláusula. También
-requiere resolver primero el patrón de descubrimiento (la URL de
-evaluaciones de cada empresa tiene un hash no derivable del nombre, según
-la investigación previa) antes de poder construir el fetcher.
+**El pipeline se considera completo en su alcance actual**: 2 fuentes
+reales en producción (Merco Talento + Great Place to Work Colombia),
+354 filas verificadas, UI funcionando con atribución en texto. R4
+(Computrabajo) queda bloqueada por un problema técnico real de
+descubrimiento, no por falta de intención — ver §5.4. No hay una fase de
+código pendiente forzada.
+
+Opcional, sin urgencia: **Fase R5** (badge de seguidores de LinkedIn vía
+su "Follow Company Plugin" oficial) — no depende del bloqueo de R4, es
+puramente frontend (no toca la base de datos), pero requiere primero
+resolver cómo obtener el Company ID numérico de LinkedIn por empresa, algo
+que la investigación original dejó sin verificar en profundidad. Evaluar
+si vale la pena dado que no es un score real, solo una señal de
+legitimidad/tamaño.
