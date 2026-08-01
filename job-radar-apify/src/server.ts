@@ -13,6 +13,7 @@ import {
 } from "./db/job-repository.js";
 import { markRoleForImmediateRescan } from "./db/scheduler-repository.js";
 import { wasJobPurged } from "./db/indexing-repository.js";
+import { getReputationForCompanies, ReputationEntry } from "./db/company-reputation-repository.js";
 import { applyJobFilters, sortByPreferredRoles, JobFilterParams } from "./lib/job-filters.js";
 import {
   escapeHtml,
@@ -38,6 +39,17 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PUBLIC_DIR = path.join(__dirname, "..", "public");
 const PORT = process.env.PORT || 3000;
+
+// Reputación de empleador (docs/COMPANY-REPUTATION-PLAN.md, Fase R2) — one
+// batched query for however many jobs are in the caller's current page
+// (never the whole corpus, never N+1 per job). A job whose company has no
+// confirmed alias just gets an empty array, never a guessed/fuzzy result.
+async function attachReputation<T extends { company: string }>(
+  jobs: T[]
+): Promise<(T & { reputation: ReputationEntry[] })[]> {
+  const reputationMap = await getReputationForCompanies(jobs.map((j) => j.company));
+  return jobs.map((j) => ({ ...j, reputation: reputationMap.get(j.company) || [] }));
+}
 
 // Native Node HTTP Server
 const server = http.createServer(async (req, res) => {
@@ -101,7 +113,7 @@ const server = http.createServer(async (req, res) => {
 
     const limit = Math.min(Math.max(parseInt(params.get("limit") || "24", 10) || 24, 1), 100);
     const offset = Math.max(parseInt(params.get("offset") || "0", 10) || 0, 0);
-    const page = filtered.slice(offset, offset + limit);
+    const page = await attachReputation(filtered.slice(offset, offset + limit));
 
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(
@@ -131,8 +143,9 @@ const server = http.createServer(async (req, res) => {
       return;
     }
     const [visible] = maskLockedFields([job], tier);
+    const [withReputation] = await attachReputation([visible]);
     res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ job: visible }));
+    res.end(JSON.stringify({ job: withReputation }));
     return;
   }
 
@@ -600,7 +613,11 @@ const server = http.createServer(async (req, res) => {
     const jobs = await getJobsCached(50000);
     const visibleJobs = maskLockedFields(jobs, tier);
     const allFiltered = applyJobFilters(visibleJobs, {});
-    const firstPage = allFiltered.slice(0, 24);
+    // Reputation attached here too (not just /api/jobs) so the very first
+    // anonymous paint — which reads window.__SSR_JOBS__ below instead of
+    // re-fetching /api/jobs, see Dashboard.tsx — can show it immediately
+    // if that first page's selected job happens to have it.
+    const firstPage = await attachReputation(allFiltered.slice(0, 24));
     const total = allFiltered.length;
     const hasMore = total > firstPage.length;
 

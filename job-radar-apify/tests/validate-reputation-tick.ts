@@ -1,30 +1,45 @@
 /**
- * Validation suite for the company-reputation batch pipeline skeleton
- * (docs/COMPANY-REPUTATION-PLAN.md, Fase R1): the generalized
- * executeWithResilience<T>, company-reputation-repository.ts's upsert, and
- * scripts/run-reputation-tick.ts end-to-end with zero fetchers registered.
+ * Validation suite for the company-reputation batch pipeline
+ * (docs/COMPANY-REPUTATION-PLAN.md): the generalized executeWithResilience<T>,
+ * company-reputation-repository.ts's upsert/lookup, and (Fase R2) the Merco
+ * Talento fetcher's HTML parsing.
  *
- * No real fetcher exists yet (Fase R2 adds the first one, Merco Talento) —
- * this suite is entirely read/write against test-only rows it creates and
+ * Deliberately no live network call to Merco (or any real source) in this
+ * suite — parseMercoTalentoHtml() is tested against real, saved fixtures
+ * instead (tests/fixtures/merco-talento-sample.html, a trimmed but faithful
+ * excerpt of the real public ranking page captured this session). The real
+ * end-to-end fetch is verified once by hand during manual QA
+ * (docs/QA-CHECKLIST-REPUTATION.md), same reasoning tests/validate-adapters.ts
+ * already accepts for its own live characterization tests, kept separate
+ * from this file's read/write-only-test-rows convention.
+ *
+ * This suite is entirely read/write against test-only rows it creates and
  * cleans up itself, same security posture as tests/validate-seo-job-pages.ts:
  * this project has no separate test database (the same DATABASE_URL backs
  * local dev and production), so every write here targets only
- * `company_reputation`/`source_circuit_state` with fake, clearly-marked
- * identifiers, and every row is deleted in a `finally`. Never touches `jobs`.
+ * `company_reputation`/`company_reputation_alias`/`source_circuit_state`
+ * with fake, clearly-marked identifiers, and every row is deleted in a
+ * `finally`. Never touches `jobs`.
  */
-import { spawn } from "child_process";
+import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 import { pool } from "../src/db/client.js";
 import { executeWithResilience, isSourceDegraded } from "../src/engine/resilient-fetch.js";
-import { upsertReputationScores } from "../src/db/company-reputation-repository.js";
+import {
+  upsertReputationScores,
+  upsertReputationAliases,
+  getReputationForCompanies
+} from "../src/db/company-reputation-repository.js";
 import { REPUTATION_SOURCES } from "../src/sources/reputation/index.js";
 import { ReputationScoreInput } from "../src/sources/reputation/types.js";
+import { parseMercoTalentoHtml } from "../src/sources/reputation/merco.js";
 
 dotenv.config();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const FIXTURES_DIR = path.join(__dirname, "fixtures");
 
 let failures = 0;
 
@@ -93,15 +108,17 @@ async function runResilienceTests() {
   }
 }
 
-// --- Part 2: REPUTATION_SOURCES is deliberately empty in Fase R1 ----------
+// --- Part 2: REPUTATION_SOURCES has exactly the sources built so far ------
 
 function runRegistryTests() {
-  console.log(`\n--- Parte 2: registro de fuentes (debe estar vacío hasta la Fase R2) ---\n`);
+  console.log(`\n--- Parte 2: registro de fuentes (Merco Talento, Fase R2 — nada más todavía) ---\n`);
 
   check(
-    Array.isArray(REPUTATION_SOURCES) && REPUTATION_SOURCES.length === 0,
-    "REPUTATION_SOURCES está vacío — ningún fetcher real corre todavía (Fase R2 registra el primero, Merco Talento).",
-    `REPUTATION_SOURCES tiene ${REPUTATION_SOURCES.length} entrada(s) — se esperaba 0 en esta fase.`
+    Array.isArray(REPUTATION_SOURCES) &&
+      REPUTATION_SOURCES.length === 1 &&
+      REPUTATION_SOURCES[0].name === "Merco Talento",
+    "REPUTATION_SOURCES tiene exactamente el fetcher de Merco Talento (Fase R2) — GPTW/Computrabajo llegan en R3/R4.",
+    `REPUTATION_SOURCES no tiene el estado esperado: ${JSON.stringify(REPUTATION_SOURCES.map((s) => s.name))}`
   );
 }
 
@@ -170,52 +187,108 @@ async function runUpsertTests() {
   }
 }
 
-// --- Part 4: the real script runs cleanly end-to-end with 0 sources -------
+// --- Part 4: parseMercoTalentoHtml() against real, saved fixtures ---------
 
-function runScriptEndToEnd(): Promise<void> {
-  console.log(`\n--- Parte 4: scripts/run-reputation-tick.ts corre limpio de punta a punta (0 fuentes) ---\n`);
+function runMercoParserTests() {
+  console.log(`\n--- Parte 4: parseMercoTalentoHtml() contra fixtures reales (sin red) ---\n`);
 
-  return new Promise((resolve) => {
-    const scriptPath = path.join(__dirname, "..", "scripts", "run-reputation-tick.ts");
-    const child = spawn("npx", ["tsx", scriptPath], {
-      cwd: path.join(__dirname, ".."),
-      shell: true,
-      env: process.env
-    });
+  const realHtml = fs.readFileSync(path.join(FIXTURES_DIR, "merco-talento-sample.html"), "utf-8");
+  const rows = parseMercoTalentoHtml(realHtml);
 
-    let stdout = "";
-    child.stdout.on("data", (chunk) => {
-      stdout += chunk.toString();
-    });
-    child.stderr.on("data", (chunk) => {
-      stdout += chunk.toString();
-    });
+  check(
+    rows.length === 200,
+    `parseMercoTalentoHtml() parsea las 200 filas reales del fixture (obtuvo ${rows.length}).`,
+    `parseMercoTalentoHtml() parseó ${rows.length} filas, se esperaban 200.`
+  );
+  check(
+    rows[0].companyName === "BANCOLOMBIA" && rows[0].score === 10000,
+    "La primera fila parseada coincide con el dato real (BANCOLOMBIA, 10000).",
+    `La primera fila no coincide: ${JSON.stringify(rows[0])}`
+  );
+  check(
+    rows.every((r) => r.source === "merco" && r.scoreScale === "merco-talento-index" && r.reviewCount === null),
+    "Todas las filas traen source/scoreScale consistentes y reviewCount null (Merco no tiene ese dato).",
+    "Alguna fila no trae los campos fijos esperados."
+  );
+  check(
+    rows.some((r) => r.companyName === "NESTLÉ"),
+    "Los nombres con entidades HTML numéricas se decodifican correctamente (ej. NESTLÉ, no NESTL&#201;).",
+    `No se encontró "NESTLÉ" decodificado entre los nombres: ${rows.slice(0, 15).map((r) => r.companyName)}`
+  );
 
-    child.on("close", (code) => {
-      check(
-        code === 0,
-        "run-reputation-tick.ts termina con código 0 (todo el cableado compila y corre sin errores).",
-        `run-reputation-tick.ts terminó con código ${code}. Salida: ${stdout.slice(-500)}`
-      );
-      check(
-        stdout.includes("0 fuente(s) registrada(s)") && stdout.includes("Total upserted: 0"),
-        "run-reputation-tick.ts reporta 0 fuentes y 0 filas actualizadas — estado real y honesto de la Fase R1.",
-        `La salida no reportó el estado vacío esperado: ${stdout.slice(-500)}`
-      );
-      resolve();
-    });
-  });
+  const fallbackHtml = fs.readFileSync(path.join(FIXTURES_DIR, "merco-fallback-sample.html"), "utf-8");
+  let threwOnFallback = false;
+  try {
+    parseMercoTalentoHtml(fallbackHtml);
+  } catch {
+    threwOnFallback = true;
+  }
+  check(
+    threwOnFallback,
+    "parseMercoTalentoHtml() lanza error ante la página de fallback ('la página no existe') en vez de devolver datos parciales.",
+    "parseMercoTalentoHtml() no lanzó error ante el fixture de fallback — riesgo de guardar datos corruptos/parciales."
+  );
+}
+
+// --- Part 5: alias table + batched company lookup (own test rows only) ---
+
+async function runAliasAndLookupTests() {
+  console.log(`\n--- Parte 5: alias curados + getReputationForCompanies() (filas de prueba propias) ---\n`);
+
+  const testCompany = `__TEST ALIAS COMPANY ${Date.now()}__`;
+  const testRaw = `__test raw name ${Date.now()}__`;
+  const testSource = "test";
+
+  try {
+    await upsertReputationScores([
+      {
+        companyName: testCompany,
+        source: testSource,
+        score: 88,
+        scoreScale: "0-100",
+        reviewCount: 5,
+        sourceUrl: "https://example.com/alias-test"
+      }
+    ]);
+    await upsertReputationAliases([
+      { rawCompanyName: testRaw, source: testSource, canonicalName: testCompany }
+    ]);
+
+    const resolved = await getReputationForCompanies([testRaw, "__empresa sin alias, no debe aparecer__"]);
+    const entries = resolved.get(testRaw);
+
+    check(
+      Boolean(entries) && entries!.length === 1 && entries![0].score === 88,
+      "Una empresa con alias confirmado resuelve su reputación real vía el join alias→company_reputation.",
+      `getReputationForCompanies() no resolvió la fila esperada: ${JSON.stringify(resolved)}`
+    );
+    check(
+      !resolved.has("__empresa sin alias, no debe aparecer__"),
+      "Una empresa sin alias confirmado no aparece en el resultado — nunca un fuzzy-match improvisado en tiempo de lectura.",
+      "Una empresa sin alias apareció en el resultado — riesgo de dato inventado."
+    );
+  } finally {
+    await pool.query(`DELETE FROM company_reputation_alias WHERE raw_company_name = $1 AND source = $2`, [
+      testRaw,
+      testSource
+    ]);
+    await pool.query(`DELETE FROM company_reputation WHERE company_name = $1 AND source = $2`, [
+      testCompany,
+      testSource
+    ]);
+  }
 }
 
 async function main() {
   console.log(`\n==================================================`);
-  console.log(`🧪 SUITE DE VALIDACIÓN — Reputación de empleador, Fase R1 (esqueleto)`);
+  console.log(`🧪 SUITE DE VALIDACIÓN — Reputación de empleador (Fases R1 + R2)`);
   console.log(`==================================================`);
 
   await runResilienceTests();
   runRegistryTests();
   await runUpsertTests();
-  await runScriptEndToEnd();
+  runMercoParserTests();
+  await runAliasAndLookupTests();
 
   console.log(`\n==================================================`);
   if (failures > 0) {
@@ -223,7 +296,7 @@ async function main() {
     console.log(`==================================================\n`);
     process.exit(1);
   }
-  console.log(`🎉 [TEST SUITE PASSED] Esqueleto de reputación de empleador verificado.`);
+  console.log(`🎉 [TEST SUITE PASSED] Pipeline de reputación de empleador (esqueleto + Merco Talento) verificado.`);
   console.log(`==================================================\n`);
   await pool.end();
   process.exit(0);

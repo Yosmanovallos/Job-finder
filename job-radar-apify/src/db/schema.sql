@@ -165,6 +165,24 @@ CREATE TABLE IF NOT EXISTS company_reputation (
     UNIQUE (company_name, source)
 );
 
+-- 10. Tabla `company_reputation_alias`: mapeo curado a mano entre el
+-- nombre crudo de una empresa tal como aparece en `jobs.company` y el
+-- nombre canónico que usa cada fuente de reputación (docs/COMPANY-
+-- REPUTATION-PLAN.md, Fase R2). Nunca poblada por fuzzy-match automático
+-- — cada fila representa una coincidencia confirmada a mano (ver
+-- scripts/seed-merco-aliases.ts). `canonical_name` debe coincidir con
+-- `company_reputation.company_name` para esa misma `source`; una empresa
+-- sin fila aquí simplemente no tiene reputación mostrable.
+CREATE TABLE IF NOT EXISTS company_reputation_alias (
+    id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    raw_company_name  VARCHAR(255) NOT NULL,
+    source            VARCHAR(50) NOT NULL,
+    canonical_name    VARCHAR(255) NOT NULL,
+    UNIQUE (raw_company_name, source)
+);
+
+CREATE INDEX IF NOT EXISTS idx_company_reputation_alias_raw_name ON company_reputation_alias (raw_company_name);
+
 -- =============================================================================
 -- ROW LEVEL SECURITY: every read/write from this app goes through the `pool`
 -- (direct `pg` connection as the `postgres` role, which has BYPASSRLS — see
@@ -187,3 +205,4 @@ ALTER TABLE role_source_runs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE source_circuit_state ENABLE ROW LEVEL SECURITY;
 ALTER TABLE indexing_queue ENABLE ROW LEVEL SECURITY;
 ALTER TABLE company_reputation ENABLE ROW LEVEL SECURITY;
+ALTER TABLE company_reputation_alias ENABLE ROW LEVEL SECURITY;

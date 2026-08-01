@@ -34,22 +34,38 @@ de test separada).
       GitHub, pestaña Actions, tras el push; no hace falta ejecutarlo a
       mano todavía, no hay nada que drenar con 0 fuentes registradas).
 
-## 2. Fase R2 en adelante (Merco, GPTW, Computrabajo) — placeholder
+## 2. Fase R2 — Merco Talento (primer fetcher real)
 
-Se completa cuando exista el primer fetcher real. Como mínimo debe cubrir:
+Repetir tras cualquier cambio en `src/sources/reputation/merco.ts`,
+`company-reputation-repository.ts`, `scripts/seed-merco-aliases.ts`,
+`ReputationBadges.tsx`, o los 3 puntos de `server.ts` que adjuntan
+`reputation` (`GET /api/jobs`, `GET /api/jobs/:id`, `/dashboard` SSR).
 
-- [ ] Un dato real de la fuente aparece en `company_reputation` tras correr
-      `npm run reputation:tick` localmente.
-- [ ] La página de una vacante real de una empresa con alias confirmado
-      muestra la sección "Reputación" con atribución en texto + link —
-      nunca un logo de la fuente.
+- [ ] `npx tsx scripts/migrate.ts` — crea `company_reputation_alias` sin
+      tocar nada existente.
+- [ ] `npm run test:reputation` en verde (incluye el parser contra el
+      fixture real de 200 filas y el fixture de fallback).
+- [ ] `npx tsx scripts/seed-merco-aliases.ts` — inserta/actualiza los
+      alias curados (87 filas al momento de escribir esto).
+- [ ] `npm run reputation:tick` — reporta `1 fuente(s) registrada(s)` y
+      ~200 filas actualizadas en `company_reputation` (dato real, en vivo
+      contra merco.info).
+- [ ] Con el servidor local corriendo: una vacante real de una empresa con
+      alias confirmado (ej. Bancolombia, Rappi, Nestlé, Google, Amazon,
+      IBM, Accenture, Falabella, Netflix) muestra "Reputación como
+      empleador" con "Merco Talento: `<score>` (merco-talento-index)" y un
+      link "Ver fuente" — **nunca un logo**. El link resuelve 200 y va a
+      `merco.info`, no a la home de BuscoTrabajo.
 - [ ] Una vacante de una empresa SIN alias confirmado no muestra la
-      sección en absoluto (ni un placeholder, ni "unknown" visible).
-- [ ] El link de atribución de cada fuente resuelve 200 y lleva a la
-      página real de esa fuente (no a la home de BuscoTrabajo).
-- [ ] `score_scale` distinto por fuente es visible/legible — nunca dos
-      scores de fuentes distintas se muestran como si fueran comparables
-      entre sí.
+      sección en absoluto — ni una caja vacía, ni "unknown" visible.
+      Verificado visualmente (captura de pantalla), no solo por API.
+- [ ] Regresión visual: `/dashboard` (lista + panel de detalle,
+      `sticky`, filtros) y una página de vacante individual sin
+      reputación se ven exactamente igual que antes — cero cambio visual
+      fuera de la sección nueva. Confirmado con `run-job-radar-apify`
+      (0 errores de consola en ambas rutas).
+- [ ] `npm run test:seo` y `npm run test:dashboard-filters` en verde
+      (regresión de fases anteriores).
 
 ## Nota de seguridad
 

@@ -1,6 +1,6 @@
 # Plan de reputación de empleador — BuscoTrabajo.co
 
-Estado: **Fases R0 y R1 completas.** Igual que `SEO-PLAN.md`,
+Estado: **Fases R0, R1 y R2 completas.** Igual que `SEO-PLAN.md`,
 esto se ejecuta en fases, una por sesión, cada una verificable antes de
 seguir con la siguiente — no es un commit de una sola vez.
 
@@ -153,7 +153,7 @@ placeholder ni "unknown" visible).
 |---|---|---|---|
 | **R0** | Este documento | Aprobado | ✅ Hecho |
 | **R1** | Esqueleto: tabla `company_reputation`, generalización de `executeWithResilience`, `run-reputation-tick.ts` (sin fetcher real todavía) + workflow, tests | `npm run build` + tests en verde, cero regresión en scraping/SEO existente | ✅ Hecho |
-| **R2** | Fetcher de Merco Talento + tabla `company_reputation_alias` + alias curados iniciales + UI de atribución | Datos reales de Merco visibles en una vacante real, tests, QA manual | Pendiente |
+| **R2** | Fetcher de Merco Talento + tabla `company_reputation_alias` + alias curados iniciales + UI de atribución | Datos reales de Merco visibles en una vacante real, tests, QA manual | ✅ Hecho |
 | **R3** | Fetcher de Great Place to Work Colombia (insignia binaria) | Insignia visible, tests, QA manual | Pendiente |
 | **R4** | Fetcher de Computrabajo — checkpoint explícito antes de codear, dado el lenguaje específico de su Aviso Legal | Datos reales visibles, tests, QA manual | Pendiente |
 | **R5** | Badge de LinkedIn (Follow Company Plugin, solo frontend) | Badge visible, sin cambios en BD | Pendiente |
@@ -193,6 +193,64 @@ relacionada con este cambio, confirmado con el diff de
 `resilient-fetch.ts` (solo cambio de tipos, cero cambio de lógica en
 runtime).
 
+### 5.2 Resultado de la Fase R2
+
+Construido:
+
+- `src/db/schema.sql` — tabla `company_reputation_alias`.
+- `src/sources/reputation/merco.ts` — fetcher real: maneja el salto de
+  cookie de merco.info (`fetch` nativo, sin librería de cookie-jar
+  nueva), parser por regex verificado contra el HTML real, y una
+  validación de **contenido** (≥150 filas), no solo de status code —
+  merco.info responde 200 con "la página no existe" para rutas mal
+  formadas, así que confiar solo en el status habría podido guardar
+  datos vacíos/corruptos.
+- `src/db/company-reputation-repository.ts` — `upsertReputationAliases()`
+  y `getReputationForCompanies()` (una sola query batcheada por página,
+  nunca N+1; una empresa sin alias confirmado no aparece en el resultado,
+  nunca un fuzzy-match en tiempo de lectura).
+- `scripts/seed-merco-aliases.ts` — 87 filas de alias (cubriendo 77 de
+  las 200 empresas de Merco), cada una verificada a mano cruzando el
+  nombre real contra los ~5,000 nombres distintos de `jobs.company`. Un
+  cruce más laxo (substring) daba 127 "candidatos" con falsos positivos
+  reales (`SURA` → `Truchas Suralá SAS`, `LATAM` → 35 empresas no
+  relacionadas) — descartado a propósito.
+- `src/server.ts` — `reputation` adjunta a `GET /api/jobs`, `GET
+  /api/jobs/:id`, y al `firstPage` que alimenta `window.__SSR_JOBS__` de
+  `/dashboard`. La rama SSR de `/empleos/:id/:slug` se dejó **fuera**
+  deliberadamente: esa ruta nunca serializa el job (solo arma `<head>`),
+  así que no hay ningún consumidor para el dato ahí — agregarlo habría
+  sido código sin uso.
+- `src/components/ReputationBadges.tsx` — texto + link, nunca logo;
+  no renderiza nada si no hay entradas. Montado en `JobDetailPanel.tsx`
+  (que ya es compartido por `Dashboard.tsx` y `JobLanding.tsx` vía
+  spread del objeto `job` — ninguno de los dos necesitó cambios propios).
+- `tests/validate-reputation-tick.ts` — extendido con el parser contra
+  dos fixtures reales (`tests/fixtures/merco-talento-sample.html`, un
+  recorte fiel de la página pública real con las 200 filas intactas, y
+  un fixture corto de fallback) y con la tabla de alias/lookup (filas de
+  prueba propias, nunca red real en la suite automática — el fetch en
+  vivo se corrió a mano, ver abajo).
+- `docs/QA-CHECKLIST-REPUTATION.md` — sección 2 completa.
+
+**Verificado en esta sesión, de punta a punta contra producción real** (no
+solo tests): `npm run build` y `npm run test:reputation` en verde (16
+checks). `npx tsx scripts/seed-merco-aliases.ts` insertó 87 alias reales.
+`npm run reputation:tick` corrió contra merco.info en vivo:
+**200/200 filas reales** insertadas en `company_reputation`
+(`1 fuente(s) registrada(s)`, `Total upserted: 200`). Confirmado por query
+directa: Bancolombia (10000), Nestlé (7264), Rappi (5405), todos con
+`source_url` apuntando a la página real. `GET /api/jobs/:id` de una
+vacante real de Bancolombia devuelve la reputación correcta; vacantes de
+empresas sin alias devuelven `reputation: []`. **Verificación visual con
+capturas de pantalla reales** (`run-job-radar-apify`, 0 errores de
+consola): la sección "Reputación como empleador" se ve limpia en la
+página de vacante individual, con atribución en texto y link "Ver
+fuente" — sin logo; el `/dashboard` (lista, panel de detalle, filtros)
+se ve exactamente igual que antes para una vacante sin reputación — cero
+regresión visual. `npm run test:seo` y `npm run test:dashboard-filters`
+en verde.
+
 ## 6. Riesgos y cómo se mitigan
 
 - **ToS de Computrabajo**: riesgo aceptado explícitamente por el usuario,
@@ -210,8 +268,8 @@ runtime).
 
 ## 7. Próximo paso
 
-**Fase R2** — primer fetcher real: Merco Talento (la fuente más limpia, sin
-cláusula anti-scraping hallada, ~200 empresas en una sola página HTML). Trae
-consigo la tabla `company_reputation_alias`, el primer lote de alias
-curados a mano, y la sección "Reputación" en `JobDetailPanel.tsx`/
-`JobLanding.tsx` con atribución en texto + link (nunca logo).
+**Fase R3** — Great Place to Work Colombia (insignia binaria
+certificado/no certificado, sin score continuo — ver §2). Mismo patrón que
+R2: fetcher propio, alias curados adicionales, la insignia se muestra en
+`ReputationBadges.tsx` junto a lo que ya haya de Merco para esa empresa
+(una empresa puede tener entradas de varias fuentes a la vez).

@@ -6,9 +6,18 @@ import { getModalityLabel } from "../lib/job-filters.js";
 import { useAuth } from "../auth/auth-provider.js";
 import { Button } from "./ui/button.js";
 import { Badge } from "./ui/badge.js";
+import { ReputationBadges, ReputationEntryProps } from "./ReputationBadges.js";
 
 export interface JobDetailPanelProps {
-  job: (Job & { alsoIn?: string[]; isSaved?: boolean; isApplied?: boolean; salary?: string }) | null;
+  job:
+    | (Job & {
+        alsoIn?: string[];
+        isSaved?: boolean;
+        isApplied?: boolean;
+        salary?: string;
+        reputation?: ReputationEntryProps[];
+      })
+    | null;
   onSaveToggle?: (jobId: string) => void;
   onAppliedToggle?: (jobId: string) => void;
   onApplyClick?: (job: any) => void;
@@ -137,6 +146,12 @@ export const JobDetailPanel: React.FC<JobDetailPanelProps> = ({
             </div>
           )}
         </div>
+
+        {job.reputation && job.reputation.length > 0 && (
+          <div className="mt-5">
+            <ReputationBadges entries={job.reputation} />
+          </div>
+        )}
 
         <p className="text-xs text-muted-foreground mt-5">
           La descripción completa y el formulario de aplicación están en la página de{" "}
