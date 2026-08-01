@@ -21,7 +21,11 @@ import {
   buildJobPosting,
   buildJobPath,
   buildJobsSitemapXml,
-  buildSitemapIndexXml
+  buildSitemapIndexXml,
+  isUuid,
+  resolveCategorySlug,
+  buildCategoryMeta,
+  buildCategoriesSitemapXml
 } from "./lib/job-seo.js";
 import { verifySession } from "./auth/verify-session.js";
 import { startPaymentCheckout } from "./payments/checkout.js";
@@ -373,6 +377,107 @@ const server = http.createServer(async (req, res) => {
   if (pathname.startsWith("/empleos/") && method === "GET") {
     const segments = pathname.slice("/empleos/".length).split("/").filter(Boolean);
     const id = segments[0];
+
+    // 7b-cat. Category "hub" pages (SEO Fase 4, ver docs/SEO-PLAN.md §4.4).
+    // A jobId is always a UUID (gen_random_uuid()) — a city/role slug never
+    // is, so isUuid() alone disambiguates this from the job-detail branch
+    // below without a new route prefix. Always the public (tier: "free")
+    // view, same as the sitemap routes: a category page has no session-
+    // specific content to gate, only the same maskLockedFields output any
+    // anonymous visitor already gets.
+    if (id && !isUuid(id)) {
+      const category = resolveCategorySlug(id);
+      if (!category) {
+        res.writeHead(404, { "Content-Type": "text/html; charset=utf-8" });
+        res.end(
+          "<!doctype html><html lang=\"es\"><head><meta charset=\"utf-8\"><title>Categoría no encontrada | BuscoTrabajo</title><meta name=\"robots\" content=\"noindex\"></head><body><h1>Categoría no encontrada</h1><p><a href=\"/dashboard\">Ver todas las vacantes</a></p></body></html>"
+        );
+        return;
+      }
+
+      const jobs = await getJobsCached(50000);
+      const visibleJobs = maskLockedFields(jobs, "free");
+      const filterParams: JobFilterParams =
+        category.kind === "ciudad" ? { cities: [category.label] } : { roles: [category.label] };
+      // isPubliclyDescribable filters out any locked job the same way
+      // buildJobsSitemapXml/the job-detail branch already do — a category
+      // page must never list a job it can't also link a working page for.
+      const matched = applyJobFilters(visibleJobs, filterParams).filter(isPubliclyDescribable);
+      const total = matched.length;
+      const page = matched.slice(0, 60);
+
+      let indexHtml: string;
+      try {
+        indexHtml = fs.readFileSync(path.join(PUBLIC_DIR, "index.html"), "utf-8");
+      } catch {
+        res.writeHead(500, { "Content-Type": "text/plain" });
+        res.end("Server Error: build not found");
+        return;
+      }
+
+      const meta = buildCategoryMeta(category.kind, category.label, total);
+
+      // Same "real links in the raw HTML" pattern /dashboard already uses
+      // (see 7c below) — this page's whole SEO value is being a crawlable
+      // hub linking into the individual job pages, unlike the job-detail
+      // branch below (which only needs JSON-LD in <head>, no visible list).
+      const items = page
+        .map((job: any) => {
+          const href = buildJobPath(job);
+          const title = escapeHtml(job.title);
+          const company = escapeHtml(job.company || "Confidencial");
+          const location = escapeHtml(job.location || "Colombia");
+          const source = escapeHtml(job.source || "");
+          return `<li><a href="${href}">${title}</a> — ${company} · ${location} · ${source}</li>`;
+        })
+        .join("\n");
+      const emptyNotice =
+        total === 0 ? "<p>No hay vacantes en esta categoría por ahora.</p>" : "";
+      const ssrSnippet = `<h1>${escapeHtml(meta.heading)}</h1>\n${emptyNotice}<nav aria-label="Vacantes"><ul>\n${items}\n</ul></nav>`;
+      indexHtml = indexHtml.replace('<div id="app"></div>', `<div id="app">${ssrSnippet}</div>`);
+
+      indexHtml = indexHtml
+        .replace(/<title>[\s\S]*?<\/title>/, `<title>${escapeHtml(meta.title)}</title>`)
+        .replace(
+          /<meta[^>]*name=["']description["'][^>]*>/,
+          `<meta name="description" content="${escapeHtml(meta.description)}" />`
+        )
+        .replace(
+          /<link[^>]*rel=["']canonical["'][^>]*>/,
+          `<link rel="canonical" href="${escapeHtml(meta.canonicalUrl)}" />`
+        )
+        .replace(
+          /<meta[^>]*property=["']og:title["'][^>]*>/,
+          `<meta property="og:title" content="${escapeHtml(meta.title)}" />`
+        )
+        .replace(
+          /<meta[^>]*property=["']og:description["'][^>]*>/,
+          `<meta property="og:description" content="${escapeHtml(meta.description)}" />`
+        )
+        .replace(
+          /<meta[^>]*name=["']twitter:title["'][^>]*>/,
+          `<meta name="twitter:title" content="${escapeHtml(meta.title)}" />`
+        )
+        .replace(
+          /<meta[^>]*name=["']twitter:description["'][^>]*>/,
+          `<meta name="twitter:description" content="${escapeHtml(meta.description)}" />`
+        );
+
+      // Empty category (0 real matches today): a valid 200, honest copy,
+      // but noindex — same "thin content" mitigation docs/SEO-PLAN.md §6
+      // already applies elsewhere, so an empty category never sits in
+      // Google's index looking like a doorway page until it fills up.
+      if (total === 0) {
+        indexHtml = indexHtml
+          .replace(/<meta[^>]*name=["']robots["'][^>]*>/i, "")
+          .replace("</head>", `  <meta name="robots" content="noindex">\n</head>`);
+      }
+
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+      res.end(indexHtml);
+      return;
+    }
+
     const session = await verifySession(req);
     const tier = session?.tier || "free";
     const jobs = await getJobsCached(50000);
@@ -540,7 +645,8 @@ const server = http.createServer(async (req, res) => {
   if (pathname === "/sitemap.xml" && method === "GET") {
     const xml = buildSitemapIndexXml([
       "https://buscotrabajo.co/sitemap-pages.xml",
-      "https://buscotrabajo.co/sitemap-jobs.xml"
+      "https://buscotrabajo.co/sitemap-jobs.xml",
+      "https://buscotrabajo.co/sitemap-categories.xml"
     ]);
     res.writeHead(200, { "Content-Type": "application/xml; charset=utf-8" });
     res.end(xml);
@@ -573,6 +679,15 @@ const server = http.createServer(async (req, res) => {
     const jobs = await getJobsCached(50000);
     const visibleJobs = maskLockedFields(jobs, "free");
     const xml = buildJobsSitemapXml(visibleJobs);
+    res.writeHead(200, { "Content-Type": "application/xml; charset=utf-8" });
+    res.end(xml);
+    return;
+  }
+
+  if (pathname === "/sitemap-categories.xml" && method === "GET") {
+    // Static taxonomy (CITY_OPTIONS + DEFAULT_ROLES_200) — no DB query
+    // needed, unlike sitemap-jobs.xml above.
+    const xml = buildCategoriesSitemapXml();
     res.writeHead(200, { "Content-Type": "application/xml; charset=utf-8" });
     res.end(xml);
     return;

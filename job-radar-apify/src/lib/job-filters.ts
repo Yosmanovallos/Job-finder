@@ -77,6 +77,24 @@ export function getModalityLabel(location: string | undefined | null): string | 
   return "Presencial";
 }
 
+// Raw `location` values are messy free text (hundreds of variants like
+// "Bogotá, D.C., Capital District, Colombia" vs plain "Bogotá"), so this is a
+// substring bucket per major city rather than an exact-match dropdown over
+// the raw field. Lives here (not FilterBar.tsx) so server.ts can import it
+// without pulling in React/Radix — this file is already the shared
+// server+client home for filtering/taxonomy logic.
+export const CITY_OPTIONS = [
+  "Bogotá",
+  "Medellín",
+  "Cali",
+  "Barranquilla",
+  "Cartagena",
+  "Bucaramanga",
+  "Pereira",
+  "Manizales",
+  "Remoto"
+];
+
 export interface JobFilterParams {
   search?: string;
   sources?: string[];

@@ -1,6 +1,6 @@
 # Plan de SEO / indexación en Google — BuscoTrabajo.co
 
-Estado: **Fase 0 y Fase 1 implementadas** (ver sección 5). Este documento
+Estado: **Fases 0-4 implementadas** (ver sección 5). Este documento
 es la referencia para ejecutar el resto del trabajo en fases (una por
 sesión, cada una verificable antes de seguir con la siguiente), no un
 commit de una sola vez.
@@ -246,7 +246,7 @@ en combinaciones infinitas de la misma data que ya vive en `/empleos/`.
 | **1** | Ruta `/empleos/:id/:slug` con SSR + JSON-LD `JobPosting` + meta tags, página cliente equivalente                  | `npm run test:seo` + `docs/QA-CHECKLIST-SEO.md`                                                    | ✅ Hecho                                        |
 | **2** | Sitemap dinámico (índice + jobs) + robots.txt actualizado                                                         | `curl` al sitemap, validación XML, envío manual una vez en Search Console                          | ✅ Hecho                                        |
 | **3** | Integración con Google Indexing API (cuenta de servicio + hook en `saveJobs()`/`purgeOldJobs()`, ver sección 5.5) | Log de submits exitosos; una vacante nueva aparece en el reporte de cobertura en horas, no semanas | ✅ Hecho — verificado en producción (2026-07-30): 106/106 notificaciones reales enviadas en la primera corrida |
-| **4** | Páginas de categoría (`/empleos/<ciudad>`, `/empleos/<rol>`)                                                      | Igual que fase 1, sobre una categoría                                                              | Pendiente                                       |
+| **4** | Páginas de categoría (`/empleos/<ciudad>`, `/empleos/<rol>`)                                                      | Igual que fase 1, sobre una categoría                                                              | ✅ Hecho                                        |
 | **5** | Manejo de vencimiento (410 / `validThrough`) atado al `DELETE` duro de `purgeOldJobs()`                           | Vacante purgada devuelve 410 en vez de 404 genérico; JSON-LD deja de emitirse                      | Pendiente                                       |
 
 ### 5.1 Resultado de la Fase 0 (corregido — ver nota abajo)
@@ -421,6 +421,74 @@ y el flujo normal de scroll/cambio de filtro sigue disparando fetches
 como antes. `npm run test:seo` verifica que `window.__SSR_JOBS__` esté
 presente y sea JSON válido con vacantes reales.
 
+### 5.5 Resultado de la Fase 4
+
+Implementado sin ruta nueva ni prefijo (`/empleos/ciudad/...`,
+`/empleos/rol/...`): se reutilizó exactamente el esquema plano de §4.1
+(`/empleos/<slug>`), el mismo que ya usaba `/empleos/:id/:slug?` de la
+Fase 1. La colisión aparente (un slug de ciudad/rol cabe en el mismo hueco
+que un `:id`) se resuelve con `isUuid()` — un `jobId` siempre es un
+`gen_random_uuid()` (§3b), un slug de categoría nunca tiene esa forma, así
+que ambos lados (servidor y cliente) despachan por esa única señal, sin
+necesidad de una ruta separada ni de tocar la Fase 1 en absoluto.
+
+**Corrección sobre el nombre `DEFAULT_ROLES_200`**: pese al nombre, hoy
+tiene **32 roles reales**, no 200 (aspiracional/histórico — ver
+[[product-vision-scaling]] en memoria: "soportar 200+ roles" sigue siendo
+una meta de escala, no algo ya alcanzado). Total real de páginas de
+categoría hoy: **41** (9 ciudades de `CITY_OPTIONS` + 32 roles de
+`DEFAULT_ROLES_200`), verificado sin overlaps de slug entre ambas listas.
+
+Construido:
+
+- `src/lib/job-filters.ts` — `CITY_OPTIONS` se movió aquí desde
+  `FilterBar.tsx` (que ahora lo importa) para que `server.ts`, que corre en
+  Node puro, no arrastre imports de React/Radix.
+- `src/lib/job-seo.ts` — `isUuid`, `resolveCategorySlug` (busca el slug
+  contra `CITY_OPTIONS ∪ DEFAULT_ROLES_200`, `null` si no matchea ninguna →
+  404 real, nunca una doorway page), `buildCategoryPath`/`buildCategoryUrl`,
+  `buildCategoryMeta` (título/descripción/canonical con el **conteo real**
+  de vacantes, nunca inventado — una categoría vacía dice literalmente "0
+  vacantes"), `buildCategoriesSitemapXml`.
+- `src/server.ts` — dentro del bloque `/empleos/` ya existente: si el
+  primer segmento no es UUID, rama nueva que reutiliza
+  `getJobsCached()` + `maskLockedFields()` + `applyJobFilters()` (los
+  mismos filtros `cities`/`roles` que ya usa `/api/jobs`, cero lógica de
+  matching nueva) y aplica el mismo patrón "datos ya en el HTML" que
+  `/dashboard` (Fase 1, §5.3) — hasta 60 vacantes reales embebidas como
+  `<nav><ul>` con links a `/empleos/:id/:slug`, no a la URL externa. Rutas
+  nuevas `GET /sitemap-categories.xml` y el índice `/sitemap.xml` ahora
+  lista 3 sub-sitemaps en vez de 2.
+- `src/sections/EmpleosRoute.tsx` (nuevo, despachador) — la ruta de React
+  Router sigue siendo la misma `/empleos/:id/:slug?` de la Fase 1; este
+  componente decide con `isUuid()` si monta `JobLanding` (sin cambios) o
+  `CategoryLanding` (nuevo).
+- `src/sections/CategoryLanding.tsx` + `src/components/CategoryJobRow.tsx`
+  (nuevos) — vista de cliente tras hidratar. Reusa el endpoint
+  `/api/jobs?cities=`/`?roles=` que ya existía (cero API nueva).
+  `CategoryJobRow` es un componente chico nuevo en vez de forzar
+  `JobCard`/`JobListItem`: `JobCard` enlaza directo a la URL externa
+  (correcto en el dashboard, no aquí) y `JobListItem` es un botón atado al
+  estado de selección del split-pane, ninguno de los dos es un link interno
+  reutilizable tal cual.
+- `tests/validate-seo-job-pages.ts` (`npm run test:seo`) — extendido con
+  funciones puras (`isUuid`, `resolveCategorySlug`, `buildCategoryMeta`,
+  incluido el caso de conteo 0) y HTTP real (ciudad real, rol real, slug
+  inventado → 404, `sitemap-categories.xml`, índice con 3 entradas).
+- `docs/QA-CHECKLIST-SEO.md` — nueva sección 6.
+
+**Verificado en esta sesión**, `npm run build` y `npm run test:seo` en
+verde (60 checks), más manualmente contra la base real:
+`/empleos/bogota` → 5713 vacantes, `/empleos/desarrollador-node-js` → 24,
+título/canonical/meta-description correctos y con conteo real en ambos,
+60 links reales a `/empleos/<uuid>/...` en el HTML crudo, slug inventado →
+404 real, `/sitemap-categories.xml` → 41 URLs, `/sitemap.xml` → 3 entradas.
+Caso de categoría vacía confirmado con datos reales: "Data Engineer" tiene
+0 matches hoy — la página responde 200 con "No hay vacantes en esta
+categoría por ahora" y `noindex`, en vez de indexarse vacía. Cero regresión
+en `/dashboard`, `/`, `/api/jobs`, ni en una página de vacante individual
+real (mismo comportamiento que antes de esta fase).
+
 ## 6. Riesgos y cómo se mitigan
 
 - **Thin content / doorway pages**: mitigado con contenido real variable
@@ -443,10 +511,11 @@ presente y sea JSON válido con vacantes reales.
   en las últimas 24h reales), no un contador en memoria que un cron de
   15 min reiniciaría en cada corrida; ver `indexing-repository.ts`.
 
-## 7. Próximo paso
+## 7. Detalle de implementación de la Fase 3 (Google Indexing API)
 
-**Fase 3** (Google Indexing API) — código ya escrito, falta el setup de
-Google Cloud del usuario para poder probarlo de punta a punta.
+Sección histórica — la Fase 3 ya está terminada y verificada en producción
+(§5, tabla de fases). Se deja el detalle completo porque documenta el setup
+real de Google Cloud/Search Console que no hay que repetir.
 
 ### 7.1 Qué se construyó
 
@@ -535,3 +604,15 @@ presupuesto diario de 200 — si el backfill parece no avanzar, revisar
 cuánto de la cuota diaria se está yendo en este flip-flop antes de asumir
 que algo está roto. Es también el argumento más fuerte para pedir un
 aumento de cuota temprano en vez de esperar a necesitarlo.
+
+## 8. Próximo paso
+
+**Fase 5** (manejo de vencimiento — 410 en vez de 404 genérico, ver §3e):
+hoy `/empleos/:id/:slug` de una vacante purgada por `purgeOldJobs()` cae en
+el 404 genérico porque simplemente ya no está en `getJobsCached()` — no hay
+forma de distinguir "este id nunca existió" de "esta vacante existió y
+venció". La Fase 5 conecta eso al `DELETE ... RETURNING` que ya usa
+`purgeOldJobs()` para encolar `URL_DELETED` (§3b), de modo que Google reciba
+la señal explícita de que la página no vuelve, en vez de un 404 ambiguo que
+también protege el resto del sitio de la penalización por vacantes vencidas
+todavía indexadas (§3e, §6).

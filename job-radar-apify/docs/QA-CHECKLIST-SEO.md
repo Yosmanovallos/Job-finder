@@ -146,6 +146,53 @@ created_at DESC LIMIT 5` que aparece una fila `URL_UPDATED` `pending`
 AND sent_at > NOW() - INTERVAL '24 hours'` no supera 200 después de
       varias corridas seguidas.
 
+## 6. Páginas de categoría (Fase 4) — `/empleos/<slug-ciudad-o-rol>`
+
+Repetir tras cualquier cambio en `resolveCategorySlug`/`buildCategoryMeta`/
+`buildCategoriesSitemapXml` (`src/lib/job-seo.ts`), la rama de categoría
+dentro de `pathname.startsWith("/empleos/")` en `src/server.ts`,
+`src/sections/EmpleosRoute.tsx`, `src/sections/CategoryLanding.tsx`, o
+`src/components/CategoryJobRow.tsx`. Mismo esquema de URL que las vacantes
+individuales (`/empleos/<slug>`, sin prefijo nuevo) — el `id` se distingue
+por ser o no un UUID, ver `isUuid()`/`resolveCategorySlug()`.
+
+- [ ] `curl http://localhost:3000/empleos/bogota` (o cualquier ciudad de
+      `CITY_OPTIONS`) responde 200 y trae exactamente un `<title>` y un
+      `<link rel="canonical">` apuntando a esa misma URL de categoría, no a
+      la home.
+- [ ] El `<meta name="description">` incluye el conteo real de vacantes de
+      esa categoría (nunca un número inventado — comparar contra
+      `curl .../api/jobs?cities=Bogotá` para confirmar que coincide).
+- [ ] El HTML crudo (`curl`, no dev tools con JS corrido) contiene varios
+      `href="/empleos/<uuid>/..."` — links reales a páginas de vacante
+      individual, no solo a `/dashboard`. Este es el "hub → item" que le da
+      sentido SEO a la página.
+- [ ] Repetir con un rol real de `DEFAULT_ROLES_200` (ej.
+      `/empleos/project-manager`) — mismos checks.
+- [ ] Un slug inventado (`/empleos/esto-no-existe-de-verdad`) responde 404
+      real (código de estado, no solo el mensaje en pantalla).
+- [ ] Una categoría con 0 vacantes reales hoy (buscar una con
+      `curl .../api/jobs?roles=<rol>&limit=1` → `"total":0`) responde 200,
+      con copy honesto ("No hay vacantes en esta categoría por ahora") y
+      `<meta name="robots" content="noindex">` — nunca se indexa una
+      categoría vacía como si tuviera contenido real.
+- [ ] En un navegador real: entrar directo a la URL de una categoría
+      (pegarla en la barra de direcciones) — carga, muestra el listado, el
+      link "← Ver todas las vacantes" vuelve a `/dashboard`, y cada card
+      lleva a la página interna de la vacante (`/empleos/:id/:slug`), nunca
+      directo a la URL externa de aplicar.
+- [ ] Regresión: una página de vacante individual (`/empleos/:id/:slug`)
+      real sigue funcionando exactamente igual que antes de la Fase 4 (el
+      dispatcher `EmpleosRoute.tsx` no debe cambiar su comportamiento).
+- [ ] `https://buscotrabajo.co/sitemap-categories.xml` abre, es un
+      `<urlset>` válido, con tantas `<url>` como
+      `CITY_OPTIONS.length + DEFAULT_ROLES_200.length` (41 al momento de
+      escribir esto — 9 ciudades + 32 roles).
+- [ ] `https://buscotrabajo.co/sitemap.xml` (índice) ahora lista 3 entradas:
+      `sitemap-pages.xml`, `sitemap-jobs.xml`, `sitemap-categories.xml`. En
+      Search Console → Sitemaps: no hace falta reenviar nada aparte (el
+      índice ya apunta a la nueva URL automáticamente en el próximo rastreo).
+
 ## Nota de seguridad sobre este checklist y los tests automatizados
 
 Este proyecto **no tiene una base de datos de test separada** — el mismo

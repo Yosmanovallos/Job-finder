@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { DEFAULT_ROLES_200 } from "../queue/scheduler.js";
+import { CITY_OPTIONS } from "../lib/job-filters.js";
 import { Checkbox } from "./ui/checkbox.js";
 import { RadioGroup, RadioGroupItem } from "./ui/radio-group.js";
 import { Input } from "./ui/input.js";
@@ -25,22 +26,6 @@ export const EMPTY_FILTERS: FilterState = {
   selectedRoles: [],
   cities: []
 };
-
-// Raw `location` values are messy free text (hundreds of variants like
-// "Bogotá, D.C., Capital District, Colombia" vs plain "Bogotá"), so this is a
-// substring bucket per major city rather than an exact-match dropdown over
-// the raw field.
-export const CITY_OPTIONS = [
-  "Bogotá",
-  "Medellín",
-  "Cali",
-  "Barranquilla",
-  "Cartagena",
-  "Bucaramanga",
-  "Pereira",
-  "Manizales",
-  "Remoto"
-];
 
 export const SOURCE_OPTIONS = [
   "LinkedIn",

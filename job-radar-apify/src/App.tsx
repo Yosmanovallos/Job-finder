@@ -15,7 +15,10 @@ import RequireAuth from "./auth/require-auth.js";
 // Code-split everything past the landing page — visitors hitting "/" (the
 // most common entrypoint) don't pay for Dashboard/Login/Pricing/Legal JS.
 const Dashboard = lazy(() => import("./sections/Dashboard.js"));
-const JobLanding = lazy(() => import("./sections/JobLanding.js"));
+// Dispatches to JobLanding (jobId, a UUID) or CategoryLanding (city/role
+// slug) — see EmpleosRoute.tsx / job-seo.ts's isUuid for why one route
+// pattern still covers both without colliding with server.ts's split.
+const EmpleosRoute = lazy(() => import("./sections/EmpleosRoute.js"));
 const Login = lazy(() => import("./sections/Login.js"));
 const ResetPassword = lazy(() => import("./sections/ResetPassword.js"));
 const AuthCallback = lazy(() => import("./sections/AuthCallback.js"));
@@ -77,7 +80,7 @@ export default function App() {
               <Routes>
                 <Route path="/" element={<Landing />} />
                 <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/empleos/:id/:slug?" element={<JobLanding />} />
+                <Route path="/empleos/:id/:slug?" element={<EmpleosRoute />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/auth/callback" element={<AuthCallback />} />

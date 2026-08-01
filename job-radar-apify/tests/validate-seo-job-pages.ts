@@ -14,8 +14,15 @@ import {
   buildJobMeta,
   buildJobsSitemapXml,
   buildSitemapIndexXml,
+  isUuid,
+  resolveCategorySlug,
+  buildCategoryMeta,
+  buildCategoryPath,
+  buildCategoriesSitemapXml,
   SeoJob
 } from "../src/lib/job-seo.js";
+import { CITY_OPTIONS } from "../src/lib/job-filters.js";
+import { DEFAULT_ROLES_200 } from "../src/queue/scheduler.js";
 import { buildJwtAssertion } from "../src/lib/google-indexing.js";
 import {
   enqueueIndexingNotifications,
@@ -191,6 +198,68 @@ function runPureFunctionTests() {
     indexXml.includes("<sitemapindex") && indexXml.includes("sitemap-jobs.xml"),
     "buildSitemapIndexXml() genera un índice válido que referencia el sitemap de vacantes.",
     "buildSitemapIndexXml() no generó la estructura esperada."
+  );
+
+  // --- Category pages (Fase 4) ---
+  check(
+    isUuid("e582c93b-bb2f-4dba-b983-647aedda5510") && !isUuid("bogota") && !isUuid("analista-de-datos"),
+    "isUuid() distingue un jobId real de un slug de categoría.",
+    "isUuid() no distinguió correctamente un UUID real de un slug de categoría."
+  );
+
+  const realCity = CITY_OPTIONS[0];
+  const citySlug = slugify(realCity);
+  const cityMatch = resolveCategorySlug(citySlug);
+  check(
+    cityMatch?.kind === "ciudad" && cityMatch.label === realCity,
+    `resolveCategorySlug("${citySlug}") resuelve a la ciudad real "${realCity}".`,
+    `resolveCategorySlug("${citySlug}") no resolvió a la ciudad esperada: ${JSON.stringify(cityMatch)}`
+  );
+
+  const realRole = DEFAULT_ROLES_200[0];
+  const roleSlug = slugify(realRole);
+  const roleMatch = resolveCategorySlug(roleSlug);
+  check(
+    roleMatch?.kind === "rol" && roleMatch.label === realRole,
+    `resolveCategorySlug("${roleSlug}") resuelve al rol real "${realRole}".`,
+    `resolveCategorySlug("${roleSlug}") no resolvió al rol esperado: ${JSON.stringify(roleMatch)}`
+  );
+
+  check(
+    resolveCategorySlug("esto-no-existe-como-categoria") === null,
+    "resolveCategorySlug() devuelve null para un slug que no matchea ninguna ciudad ni rol — evita páginas doorway.",
+    "resolveCategorySlug() devolvió un match para un slug inventado."
+  );
+
+  check(
+    buildCategoryPath(realCity) === `/empleos/${citySlug}`,
+    "buildCategoryPath() genera la ruta plana /empleos/<slug> sin prefijo nuevo.",
+    `buildCategoryPath("${realCity}") produjo una ruta inesperada: ${buildCategoryPath(realCity)}`
+  );
+
+  const cityMeta = buildCategoryMeta("ciudad", realCity, 42);
+  check(
+    cityMeta.title.includes(realCity) &&
+      cityMeta.title.includes("42") &&
+      cityMeta.canonicalUrl.endsWith(buildCategoryPath(realCity)),
+    "buildCategoryMeta() para una ciudad incluye el nombre real, el conteo real y un canonical consistente.",
+    `buildCategoryMeta("ciudad", "${realCity}", 42) produjo metadata inconsistente: ${JSON.stringify(cityMeta)}`
+  );
+
+  const emptyRoleMeta = buildCategoryMeta("rol", realRole, 0);
+  check(
+    emptyRoleMeta.description.includes("0 vacantes"),
+    "buildCategoryMeta() nunca infla el conteo — una categoría vacía dice '0 vacantes', no un número inventado.",
+    `buildCategoryMeta("rol", "${realRole}", 0) no reportó 0 vacantes: ${emptyRoleMeta.description}`
+  );
+
+  const categoriesSitemapXml = buildCategoriesSitemapXml();
+  const categoryLocs = [...categoriesSitemapXml.matchAll(/<loc>(.*?)<\/loc>/g)];
+  check(
+    categoryLocs.length === CITY_OPTIONS.length + DEFAULT_ROLES_200.length &&
+      categoriesSitemapXml.includes(buildCategoryPath(realCity)),
+    `buildCategoriesSitemapXml() lista exactamente ${CITY_OPTIONS.length + DEFAULT_ROLES_200.length} URLs (${CITY_OPTIONS.length} ciudades + ${DEFAULT_ROLES_200.length} roles).`,
+    `buildCategoriesSitemapXml() listó ${categoryLocs.length} URLs, se esperaban ${CITY_OPTIONS.length + DEFAULT_ROLES_200.length}.`
   );
 }
 
@@ -424,6 +493,63 @@ async function runHttpTests() {
         `La URL del sitemap ${sampleUrl.pathname} respondió ${sampleRes.status} en vez de 200 — el sitemap está listando ids que /empleos/:id no encuentra.`
       );
     }
+
+    // Category pages (Fase 4) — real city.
+    const cityPath = buildCategoryPath(CITY_OPTIONS[0]);
+    const cityRes = await fetch(`${BASE_URL}${cityPath}`);
+    const cityHtml = await cityRes.text();
+    check(
+      cityRes.status === 200,
+      `GET ${cityPath} (categoría de ciudad real) responde 200.`,
+      `GET ${cityPath} respondió ${cityRes.status}.`
+    );
+    check(
+      (cityHtml.match(/<title>/g) || []).length === 1 &&
+        (cityHtml.match(/rel="canonical"/g) || []).length === 1,
+      `La página de categoría ${cityPath} tiene exactamente un <title> y un canonical.`,
+      `La página de categoría ${cityPath} tiene un número inesperado de tags <title>/canonical.`
+    );
+    check(
+      /href="\/empleos\/[0-9a-f-]{36}\//.test(cityHtml),
+      `La página de categoría ${cityPath} incluye al menos un link real a una página de vacante individual en el HTML crudo.`,
+      `La página de categoría ${cityPath} no tiene ningún link /empleos/<uuid>/... en el HTML crudo.`
+    );
+
+    // Category pages — real role.
+    const rolePath = buildCategoryPath(DEFAULT_ROLES_200[0]);
+    const roleRes = await fetch(`${BASE_URL}${rolePath}`);
+    check(
+      roleRes.status === 200,
+      `GET ${rolePath} (categoría de rol real) responde 200.`,
+      `GET ${rolePath} respondió ${roleRes.status}.`
+    );
+
+    // Category pages — slug inventado debe 404 real, no la SPA con 200.
+    const badCategoryRes = await fetch(`${BASE_URL}/empleos/esto-no-es-una-categoria-real`);
+    check(
+      badCategoryRes.status === 404,
+      "Un slug de categoría inventado responde 404 real.",
+      `Un slug de categoría inventado respondió ${badCategoryRes.status} en vez de 404.`
+    );
+
+    // sitemap-categories.xml + índice actualizado (ahora 3 entradas).
+    const categoriesSitemapRes = await fetch(`${BASE_URL}/sitemap-categories.xml`);
+    const categoriesSitemapXml = await categoriesSitemapRes.text();
+    const categoryLocsHttp = [...categoriesSitemapXml.matchAll(/<loc>(.*?)<\/loc>/g)];
+    check(
+      categoriesSitemapRes.status === 200 &&
+        categoryLocsHttp.length === CITY_OPTIONS.length + DEFAULT_ROLES_200.length,
+      `/sitemap-categories.xml responde 200 con ${categoryLocsHttp.length} URLs (${CITY_OPTIONS.length} ciudades + ${DEFAULT_ROLES_200.length} roles).`,
+      `/sitemap-categories.xml respondió ${categoriesSitemapRes.status} o listó un número de URLs inesperado (${categoryLocsHttp.length}).`
+    );
+
+    const indexResV2 = await fetch(`${BASE_URL}/sitemap.xml`);
+    const indexXmlV2 = await indexResV2.text();
+    check(
+      indexXmlV2.includes("sitemap-categories.xml"),
+      "/sitemap.xml (índice) ahora también referencia sitemap-categories.xml.",
+      "/sitemap.xml no incluye sitemap-categories.xml en el índice."
+    );
   } finally {
     killServerTree(server);
   }
@@ -537,7 +663,9 @@ async function runIndexingQueueTests() {
 
 async function main() {
   console.log(`\n==================================================`);
-  console.log(`🧪 SUITE DE VALIDACIÓN — PÁGINAS SEO POR VACANTE (/empleos/:id/:slug)`);
+  console.log(
+    `🧪 SUITE DE VALIDACIÓN — PÁGINAS SEO (vacante /empleos/:id/:slug + categoría /empleos/:slug)`
+  );
   console.log(`==================================================`);
 
   runPureFunctionTests();
