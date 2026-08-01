@@ -88,14 +88,14 @@ export const JobDetailPanel: React.FC<JobDetailPanelProps> = ({
                 {job.title}
               </h2>
               <p className="text-sm text-foreground/80">
-                {job.company && job.reputation && job.reputation.length > 0 ? (
-                  // Only linked when reputation data exists for this
-                  // company — see JobCard.tsx's identical guard for why.
+                {job.company ? (
+                  // Every real company resolves — see JobCard.tsx's
+                  // identical link for the reasoning.
                   <Link to={buildCompanyPath(job.company)} className="hover:underline hover:text-primary">
                     {job.company}
                   </Link>
                 ) : (
-                  job.company || "Confidencial"
+                  "Confidencial"
                 )}
                 <span className="text-muted-foreground"> · {job.location || "Colombia"}</span>
               </p>

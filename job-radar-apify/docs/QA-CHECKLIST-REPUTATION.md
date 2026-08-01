@@ -117,14 +117,21 @@ Repetir tras cualquier cambio en `resolveCompanyBySlug()`
       (ambas fuentes si tiene las dos) y sus vacantes activas
       (reutilizando `CategoryJobRow`, mismo componente que las páginas de
       categoría de SEO).
-- [ ] Abrir una vacante de una empresa **sin** reputación (la mayoría) —
-      el nombre **no** debe ser un link (texto plano, sin subrayado al
-      pasar el mouse). Esto es a propósito: como `/empresas/:slug` solo
-      resuelve empresas con al menos un alias confirmado
-      (`company_reputation_alias`), enlazar una empresa sin reputación
-      llevaría a un 404 — verificado en esta sesión con "Caseware" antes
-      de agregar esta condición, corregido.
-- [ ] `curl -s -o /dev/null -w '%{http_code}' localhost:3000/api/companies/<slug-inventado>`
+- [ ] Abrir una vacante de una empresa **sin** reputación curada (la
+      mayoría, ej. una empresa cualquiera fuera de Merco/GPTW) — el
+      nombre **también** debe ser un link (todo `job.company` truthy lo
+      es). Clic → llega a `/empresas/<slug>` mostrando el nombre real y
+      sus vacantes activas reales, **sin** sección de reputación (nunca
+      inventada). **Corrección real hecha en esta sesión**: la primera
+      versión solo enlazaba cuando había reputación, dejando sin link (y
+      sin forma de ver sus propias vacantes agrupadas) a la inmensa
+      mayoría de empresas — reportado por el usuario en vivo con "BAE
+      Systems USA". Corregido con `resolveCompanyNameFromJobs()` como
+      fallback en `GET /api/companies/:slug`: si el slug no está en la
+      tabla de alias, se resuelve igual contra cualquier empresa real del
+      corpus de vacantes — solo un slug que no matchea absolutamente nada
+      es un 404 real.
+- [ ] `curl -s -o /dev/null -w '%{http_code}' localhost:3000/api/companies/<slug-inventado-que-no-existe-en-nada>`
       → 404 real.
 - [ ] Regresión visual (captura de pantalla real, `run-job-radar-apify`,
       0 errores de consola): `JobCard`/`JobDetailPanel` se ven igual que

@@ -232,6 +232,24 @@ export function buildCompanyUrl(companyName: string): string {
   return `${SITE_URL}${buildCompanyPath(companyName)}`;
 }
 
+// Fallback resolution for /empresas/:slug when the slug isn't one of the
+// ~116 companies with curated reputation (resolveCompanyBySlug() in
+// company-reputation-repository.ts) — every real company that has ever
+// posted a job should still get a working page (just without a
+// reputation section), not a dead link. Matches against whatever job list
+// the caller already has in memory (never a separate query) — same
+// in-memory slug-match pattern as resolveCategorySlug()/resolveCompanyBySlug().
+// Slug collisions between two differently-punctuated/cased company names
+// are possible (there's no unique company id in this schema) — accepted
+// as a rare, low-stakes edge case, same tradeoff every slug-based URL
+// scheme here already makes.
+export function resolveCompanyNameFromJobs(slug: string, jobs: Job[]): string | null {
+  for (const job of jobs) {
+    if (job.company && slugify(job.company) === slug) return job.company;
+  }
+  return null;
+}
+
 export interface CategoryMeta {
   title: string;
   // Plain page heading (no " | BuscoTrabajo" suffix, no count) — kept

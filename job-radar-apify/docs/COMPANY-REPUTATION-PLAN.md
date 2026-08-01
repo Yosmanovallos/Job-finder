@@ -425,19 +425,37 @@ una fase SEO; el fallback SPA genérico ya cubre una carga directa de
 fase aparte, mismo patrón que ya se usó para `/dashboard` y las
 categorías.
 
-**Corrección hecha en esta misma sesión, antes de dar la fase por
-terminada**: la primera versión enlazaba el nombre de *cualquier* empresa,
-sin verificar si tenía reputación — como `/empresas/:slug` solo resuelve
-empresas con al menos un alias confirmado, esto llevaba a un 404 real
-para la inmensa mayoría de empresas (verificado en vivo con "Caseware").
-Corregido: el nombre solo es un link cuando `job.reputation.length > 0`
-(dato que el backend ya adjunta a cada job) — nunca un link roto.
+**Dos correcciones reales hechas en esta sesión, antes de dar la fase por
+terminada — en direcciones opuestas, vale la pena dejar registrado el
+porqué de cada una:**
 
-**Verificado en esta sesión**: `npm run build` y `npm run test:reputation`
-en verde (29 checks). Navegación real de punta a punta con Playwright:
-desde la página de una vacante de Accenture, clic en el nombre de la
-empresa → llega a `/empresas/accenture`, con Merco + GPTW mostrados
-correctamente y su vacante activa listada — 0 errores de consola.
-Confirmado con captura de pantalla que una empresa sin reputación
-("Caseware") ya no muestra ningún link. `npm run test:seo` y
+1. Primer intento: enlazar el nombre de *cualquier* empresa sin verificar
+   nada — pero `/empresas/:slug` solo resolvía contra la tabla de alias
+   curada, así que era un 404 real para la inmensa mayoría de empresas
+   (verificado en vivo con "Caseware"). Corregido en ese momento
+   restringiendo el link a `job.reputation.length > 0`.
+2. **El usuario reportó en vivo** (captura de pantalla real del
+   dashboard, empresa "BAE Systems USA") que esa restricción dejaba sin
+   link — y sin forma de ver sus propias vacantes agrupadas — a la
+   inmensa mayoría de empresas reales, que simplemente no tienen
+   reputación curada (Merco/GPTW cubren solo ~116 empresas grandes). La
+   intención real del feature era "toda empresa lleva a una página con
+   sus vacantes, con reputación si existe" — no "solo las 116 con
+   reputación son navegables". Corregido agregando
+   `resolveCompanyNameFromJobs()` (`job-seo.ts`) como segundo paso de
+   resolución en `GET /api/companies/:slug`: si el slug no está en la
+   tabla de alias, se busca igual contra cualquier empresa real del
+   corpus de vacantes ya cargado en esa misma request (sin query nueva).
+   El link volvió a ser incondicional (`job.company` truthy). Solo un
+   slug que no matchea absolutamente nada (ni alias ni ninguna empresa
+   real) es un 404 real.
+
+**Verificado en esta sesión, ambas rondas**: `npm run build` y
+`npm run test:reputation` en verde (30 checks tras la segunda corrección,
+incluida una prueba nueva que confirma el fallback: una empresa real sin
+reputación resuelve 200 con sus vacantes reales y `reputation: []`).
+Navegación real de punta a punta con Playwright, dos veces: Accenture
+(con reputación, Merco + GPTW mostrados) y BAE Systems USA (sin
+reputación, sus 2 vacantes reales listadas, sin sección de reputación) —
+0 errores de consola en ambos casos. `npm run test:seo` y
 `npm run test:dashboard-filters` en verde.

@@ -118,12 +118,12 @@ export const JobCard: React.FC<JobCardProps> = ({
             </h3>
 
             <p className="text-sm text-foreground/80 mb-2">
-              {job.company && job.reputation && job.reputation.length > 0 ? (
-                // Only linked when this job's company actually has curated
-                // reputation data (company_reputation_alias) — that's the
-                // same condition /empresas/:slug's resolveCompanyBySlug()
-                // needs to resolve successfully, so this can never be a
-                // dead link to a 404 for the ~99% of companies without it.
+              {job.company ? (
+                // Every real company gets a working /empresas/:slug page —
+                // resolveCompanyNameFromJobs() in server.ts falls back to
+                // matching any company from the live job corpus when it's
+                // not one of the curated reputation companies, so this is
+                // never a dead link (see docs/COMPANY-REPUTATION-PLAN.md §8).
                 <Link
                   to={buildCompanyPath(job.company)}
                   className="hover:underline hover:text-primary"
@@ -132,7 +132,7 @@ export const JobCard: React.FC<JobCardProps> = ({
                   {job.company}
                 </Link>
               ) : (
-                job.company || "Confidencial"
+                "Confidencial"
               )}
               <span className="text-muted-foreground"> · {job.location || "Colombia"}</span>
             </p>

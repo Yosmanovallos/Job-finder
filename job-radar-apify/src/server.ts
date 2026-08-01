@@ -31,7 +31,8 @@ import {
   isUuid,
   resolveCategorySlug,
   buildCategoryMeta,
-  buildCategoriesSitemapXml
+  buildCategoriesSitemapXml,
+  resolveCompanyNameFromJobs
 } from "./lib/job-seo.js";
 import { verifySession } from "./auth/verify-session.js";
 import { startPaymentCheckout } from "./payments/checkout.js";
@@ -155,23 +156,29 @@ const server = http.createServer(async (req, res) => {
 
   // 4a-bis. GET /api/companies/:slug — company page (dashboard navigation,
   // see docs/COMPANY-REPUTATION-PLAN.md's "empresas" note; not one of the
-  // R0-R5 reputation fases, a later extension reusing that pipeline). Slug
-  // resolves against the same curated alias table the reputation pipeline
-  // already relies on (resolveCompanyBySlug) — never a fuzzy match, a slug
-  // with no confirmed alias is a real 404, not a guessed page.
+  // R0-R5 reputation fases, a later extension reusing that pipeline).
+  // Two-step resolution: try the curated alias table first (the ~116
+  // companies with real Merco/GPTW reputation — resolveCompanyBySlug),
+  // then fall back to matching any real company from the live job corpus
+  // (resolveCompanyNameFromJobs) so every company a job actually links to
+  // gets a working page, just without a reputation section when there's
+  // no curated data for it. Only a slug matching neither is a real 404 —
+  // never a guessed/invented page.
   if (pathname.startsWith("/api/companies/") && method === "GET") {
     const slug = pathname.slice("/api/companies/".length);
-    const companyName = await resolveCompanyBySlug(slug);
+
+    const session = await verifySession(req);
+    const tier = session?.tier || "free";
+    const jobs = await getJobsCached(50000);
+    const visibleJobs = maskLockedFields(jobs, tier);
+
+    const companyName = (await resolveCompanyBySlug(slug)) || resolveCompanyNameFromJobs(slug, visibleJobs);
     if (!companyName) {
       res.writeHead(404, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: "Empresa no encontrada" }));
       return;
     }
 
-    const session = await verifySession(req);
-    const tier = session?.tier || "free";
-    const jobs = await getJobsCached(50000);
-    const visibleJobs = maskLockedFields(jobs, tier);
     const matched = applyJobFilters(visibleJobs, { company: companyName });
     const page = matched.slice(0, 60);
     const reputationMap = await getReputationForCompanies([companyName]);

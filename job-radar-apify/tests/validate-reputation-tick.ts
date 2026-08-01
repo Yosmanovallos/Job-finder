@@ -468,6 +468,33 @@ async function runCompanyEndpointTests() {
       "Un slug de empresa inventado responde 404 real.",
       `Un slug inventado respondió ${notFoundRes.status} en vez de 404.`
     );
+
+    // A real company with NO curated reputation must still resolve (the
+    // resolveCompanyNameFromJobs fallback in server.ts) — every company a
+    // job actually links to gets a working page, never a dead link, even
+    // without a reputation section. Picks whatever real company the first
+    // page of /api/jobs actually has, rather than hardcoding a name that
+    // could rotate out of the live corpus.
+    const jobsRes = await fetch(`${BASE_URL}/api/jobs?limit=50`);
+    const jobsBody = await jobsRes.json();
+    const noReputationJob = jobsBody.jobs.find((j: any) => j.company && (j.reputation || []).length === 0);
+    if (noReputationJob) {
+      const fallbackSlug = buildCompanyPath(noReputationJob.company).replace("/empresas/", "");
+      const fallbackRes = await fetch(`${BASE_URL}/api/companies/${fallbackSlug}`);
+      const fallbackBody = await fallbackRes.json();
+      check(
+        fallbackRes.status === 200 &&
+          fallbackBody.companyName === noReputationJob.company &&
+          fallbackBody.reputation.length === 0 &&
+          fallbackBody.jobs.length > 0,
+        `Una empresa real sin reputación curada ("${noReputationJob.company}") igual resuelve 200 con sus vacantes reales, reputation vacío (nunca inventado).`,
+        `El fallback no resolvió correctamente para "${noReputationJob.company}": ${fallbackRes.status}, ${JSON.stringify(fallbackBody).slice(0, 300)}`
+      );
+    } else {
+      console.warn(
+        "⚠️ [SKIPPED] No se encontró en la primera página ninguna vacante de una empresa sin reputación — normal si el corpus cambió, no es una falla."
+      );
+    }
   } finally {
     killServerTree(server);
   }
