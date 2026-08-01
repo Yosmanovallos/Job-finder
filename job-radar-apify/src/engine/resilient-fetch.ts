@@ -1,4 +1,3 @@
-import { Job } from "../sources/types.js";
 import { pool } from "../db/client.js";
 
 /**
@@ -81,13 +80,16 @@ export async function recordSuccess(sourceName: string): Promise<void> {
 
 /**
  * Resilient execution wrapper around scraper functions with exponential backoff (1s, 3s, 9s)
- * and Circuit Breaker isolation.
+ * and Circuit Breaker isolation. Generic over T (not just Job) — reused as-is
+ * by the reputation batch pipeline (docs/COMPANY-REPUTATION-PLAN.md, Fase R1),
+ * which shares this same source_circuit_state table and retry/backoff logic
+ * but fetches ReputationScoreInput rows, not Job rows.
  */
-export async function executeWithResilience(
+export async function executeWithResilience<T>(
   sourceName: string,
-  fetcher: () => Promise<Job[]>,
+  fetcher: () => Promise<T[]>,
   maxRetries: number = 3
-): Promise<Job[]> {
+): Promise<T[]> {
   if (await isSourceDegraded(sourceName)) {
     console.warn(
       `[ResilientEngine] ${sourceName} está en estado DEGRADADO (Circuit Breaker ABIERTO). Omitiendo ejecución sin detener el sistema.`
@@ -104,7 +106,7 @@ export async function executeWithResilience(
         await recordSuccess(sourceName);
         return results;
       }
-      throw new Error(`Resultado inválido (esperado Array de Jobs)`);
+      throw new Error(`Resultado inválido (esperado Array)`);
     } catch (err: any) {
       console.warn(
         `⚠️ [ResilientEngine] ${sourceName} - Intento ${attempt}/${maxRetries} falló: ${err?.message || err}`

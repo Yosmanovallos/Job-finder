@@ -1,0 +1,37 @@
+name: Company Reputation Tick
+
+on:
+  schedule:
+    - cron: "0 6 * * 1" # Weekly, Monday 06:00 UTC — reputation rankings
+      # change on an annual/semi-annual cadence, not worth running more
+      # often (unlike scrape-jobs.yml's 15 min or indexing-tick.yml's hourly).
+  workflow_dispatch:
+
+concurrency:
+  group: reputation-tick
+  cancel-in-progress: false
+
+jobs:
+  reputation-tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Dependencies
+        run: |
+          cd job-radar-apify
+          npm ci || npm install
+
+      - name: Run reputation tick
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          cd job-radar-apify
+          npx tsx scripts/run-reputation-tick.ts

@@ -139,6 +139,32 @@ CREATE TABLE IF NOT EXISTS indexing_queue (
 CREATE INDEX IF NOT EXISTS idx_indexing_queue_status ON indexing_queue (status) WHERE status = 'pending';
 CREATE INDEX IF NOT EXISTS idx_indexing_queue_sent_at ON indexing_queue (sent_at) WHERE status = 'sent';
 
+-- 9. Tabla `company_reputation`: reputación de empresas como empleador,
+-- agregada de varias fuentes (docs/COMPANY-REPUTATION-PLAN.md, Fase R1).
+-- Poblada por scripts/run-reputation-tick.ts, un proceso batch aparte del
+-- scraping de vacantes (cadencia semanal/mensual, no cada 15 min — estos
+-- rankings cambian con frecuencia anual/semestral). `company_name` es el
+-- nombre EXACTO tal como lo publica esa fuente (nunca normalizado/adivinado
+-- contra `jobs.company` aquí — ese matching curado a mano vive en la tabla
+-- de alias que introduce la Fase R2, junto con el primer fetcher real).
+-- `score_scale` es obligatorio porque las escalas de distintas fuentes NO
+-- son comparables entre sí (índice Merco 0-10000 vs. rating Computrabajo
+-- 1-5 vs. insignia binaria de GPTW) — nunca normalizar a un solo número.
+-- `source_url` es obligatorio: es el link real de atribución que el UI
+-- muestra en vez de renderizar el logo de la fuente (ninguna de las fuentes
+-- con dato real autoriza su reuso, ver el plan).
+CREATE TABLE IF NOT EXISTS company_reputation (
+    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    company_name  VARCHAR(255) NOT NULL,
+    source        VARCHAR(50) NOT NULL,
+    score         NUMERIC,
+    score_scale   VARCHAR(50) NOT NULL,
+    review_count  INTEGER,
+    source_url    TEXT NOT NULL,
+    fetched_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (company_name, source)
+);
+
 -- =============================================================================
 -- ROW LEVEL SECURITY: every read/write from this app goes through the `pool`
 -- (direct `pg` connection as the `postgres` role, which has BYPASSRLS — see
@@ -160,3 +186,4 @@ ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE role_source_runs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE source_circuit_state ENABLE ROW LEVEL SECURITY;
 ALTER TABLE indexing_queue ENABLE ROW LEVEL SECURITY;
+ALTER TABLE company_reputation ENABLE ROW LEVEL SECURITY;
