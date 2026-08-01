@@ -1,6 +1,6 @@
 # Plan de reputación de empleador — BuscoTrabajo.co
 
-Estado: **Fases R0-R3 completas, R4 bloqueada (decisión del usuario: quedarnos en 2 fuentes).** Igual que `SEO-PLAN.md`,
+Estado: **Fases R0-R3 completas, R4 y R5 bloqueadas (decisión del usuario: quedarnos en 2 fuentes).** Igual que `SEO-PLAN.md`,
 esto se ejecuta en fases, una por sesión, cada una verificable antes de
 seguir con la siguiente — no es un commit de una sola vez.
 
@@ -156,7 +156,7 @@ placeholder ni "unknown" visible).
 | **R2** | Fetcher de Merco Talento + tabla `company_reputation_alias` + alias curados iniciales + UI de atribución | Datos reales de Merco visibles en una vacante real, tests, QA manual | ✅ Hecho |
 | **R3** | Fetcher de Great Place to Work Colombia (insignia binaria) | Insignia visible, tests, QA manual | ✅ Hecho |
 | **R4** | Fetcher de Computrabajo — checkpoint explícito antes de codear, dado el lenguaje específico de su Aviso Legal | Datos reales visibles, tests, QA manual | ❌ Bloqueada (ver §5.4) |
-| **R5** | Badge de LinkedIn (Follow Company Plugin, solo frontend) | Badge visible, sin cambios en BD | Pendiente (opcional) |
+| **R5** | Badge de LinkedIn (Follow Company Plugin, solo frontend) | Badge visible, sin cambios en BD | ❌ Bloqueada (ver §5.5) |
 
 ### 5.1 Resultado de la Fase R1
 
@@ -344,6 +344,33 @@ descubrimiento (ej. alguien inspecciona a mano la petición real desde
 las devtools de un navegador con sesión), se puede retomar reusando el
 parser de la página de evaluaciones ya identificado arriba.
 
+### 5.5 Fase R5 — bloqueada (LinkedIn)
+
+Mismo bloqueo estructural que R4, encontrado en vivo esta sesión:
+
+- El widget oficial "Follow Company Plugin" de LinkedIn (el único de las
+  15 fuentes investigadas originalmente pensado para terceros, ver §2)
+  necesita el **ID numérico** de la empresa (`data-id="1234"`), no su
+  nombre ni su slug de vanidad.
+- El listado de vacantes de LinkedIn que este proyecto ya scrapea
+  (`scrapeLinkedIn()`) **no expone ese ID en ningún lado** — verificado
+  contra una respuesta real del endpoint de guest jobs: cada tarjeta de
+  vacante solo trae el link de vanidad de la empresa
+  (`linkedin.com/company/<slug>`), nunca un `urn:li:company:<id>` ni
+  equivalente.
+- El único lugar donde ese ID numérico es obtenible es la propia página
+  de empresa de LinkedIn (`/company/<slug>`) — y el `robots.txt` de
+  LinkedIn bloquea **todo** `/` para el grupo genérico `User-agent: *`
+  (confirmado de nuevo esta sesión), el mismo bloqueo total que ya
+  encontró la investigación original para las páginas de vacantes.
+  Conseguirlo automatizadamente repetiría exactamente el tipo de acción
+  que ya se evitó en R4 (regla 8 de `AGENTS.md`).
+
+**Decisión del usuario**: mismo criterio que R4 — quedarse en las 2
+fuentes ya construidas (Merco + GPTW) en vez de perseguir un mecanismo de
+descubrimiento que requeriría scraping bloqueado. R5 queda bloqueada, no
+cancelada.
+
 ## 6. Riesgos y cómo se mitigan
 
 - **ToS de Computrabajo**: riesgo aceptado explícitamente por el usuario,
@@ -361,17 +388,17 @@ parser de la página de evaluaciones ya identificado arriba.
 
 ## 7. Próximo paso
 
-**El pipeline se considera completo en su alcance actual**: 2 fuentes
-reales en producción (Merco Talento + Great Place to Work Colombia),
-354 filas verificadas, UI funcionando con atribución en texto. R4
-(Computrabajo) queda bloqueada por un problema técnico real de
-descubrimiento, no por falta de intención — ver §5.4. No hay una fase de
-código pendiente forzada.
+**El pipeline queda completo en su alcance actual, las 5 fases planeadas
+resueltas**: R0-R3 construidas y en producción (2 fuentes reales, Merco
+Talento + Great Place to Work Colombia, 354 filas verificadas, UI con
+atribución en texto). R4 (Computrabajo) y R5 (LinkedIn) quedan bloqueadas
+por el mismo tipo de problema técnico real — descubrimiento de
+identificador por empresa sin scraping prohibido — no por falta de
+intención (ver §5.4 y §5.5). No hay ninguna fase de código pendiente
+forzada.
 
-Opcional, sin urgencia: **Fase R5** (badge de seguidores de LinkedIn vía
-su "Follow Company Plugin" oficial) — no depende del bloqueo de R4, es
-puramente frontend (no toca la base de datos), pero requiere primero
-resolver cómo obtener el Company ID numérico de LinkedIn por empresa, algo
-que la investigación original dejó sin verificar en profundidad. Evaluar
-si vale la pena dado que no es un score real, solo una señal de
-legitimidad/tamaño.
+Si en el futuro aparece una forma legítima de resolver el descubrimiento
+en cualquiera de las dos (ej. acceso a devtools de una sesión real de
+navegador, o un cambio en la política de acceso de esas plataformas),
+ambas quedan documentadas con el parser/patrón ya identificado, listas
+para retomar sin tener que reinvestigar desde cero.
