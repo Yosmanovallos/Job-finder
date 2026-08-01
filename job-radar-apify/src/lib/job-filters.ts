@@ -102,6 +102,12 @@ export interface JobFilterParams {
   modality?: string;
   freshness?: string;
   roles?: string[];
+  // Exact (not fuzzy, not case-insensitive) match against job.company —
+  // used by the /empresas/:slug company page (company-reputation-repository.ts's
+  // getReputationForCompanies/resolveCompanyBySlug key reputation by this
+  // same exact raw string, e.g. "TERPEL " with a trailing space; any other
+  // matching semantics here would drift out of sync with that pipeline).
+  company?: string;
 }
 
 const normalizeText = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
@@ -224,6 +230,11 @@ export function applyJobFilters(jobs: Job[], filters: JobFilterParams): Job[] {
   if (filters.roles && filters.roles.length > 0) {
     const roles = filters.roles;
     result = result.filter((j) => roles.some((role) => jobMatchesRole(role, j)));
+  }
+
+  if (filters.company) {
+    const company = filters.company;
+    result = result.filter((j: any) => j.company === company);
   }
 
   return result;

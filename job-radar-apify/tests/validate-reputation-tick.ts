@@ -26,18 +26,26 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { spawn, ChildProcess } from "child_process";
 import dotenv from "dotenv";
 import { pool } from "../src/db/client.js";
 import { executeWithResilience, isSourceDegraded } from "../src/engine/resilient-fetch.js";
 import {
   upsertReputationScores,
   upsertReputationAliases,
-  getReputationForCompanies
+  getReputationForCompanies,
+  resolveCompanyBySlug
 } from "../src/db/company-reputation-repository.js";
 import { REPUTATION_SOURCES } from "../src/sources/reputation/index.js";
 import { ReputationScoreInput } from "../src/sources/reputation/types.js";
 import { parseMercoTalentoHtml } from "../src/sources/reputation/merco.js";
 import { filterCurrentCertifications } from "../src/sources/reputation/gptw.js";
+import { buildCompanyPath } from "../src/lib/job-seo.js";
+
+// Own port, distinct from validate-seo-job-pages.ts's (3981) so both can
+// run without EADDRINUSE if ever invoked together.
+const TEST_PORT = 3982;
+const BASE_URL = `http://localhost:${TEST_PORT}`;
 
 dotenv.config();
 
@@ -372,9 +380,102 @@ function runGptwParserTests() {
   );
 }
 
+// --- Part 7: resolveCompanyBySlug() (empresas/:slug) -----------------------
+//
+// Uses real, permanent seed data (scripts/seed-merco-aliases.ts already
+// ran "Bancolombia" → "BANCOLOMBIA" into production) instead of test-only
+// rows — same reasoning as the Merco/GPTW parser tests trusting real
+// fixtures: this is stable curated data, not something that flakes.
+
+async function runCompanySlugTests() {
+  console.log(`\n--- Parte 7: resolveCompanyBySlug() (/empresas/:slug) ---\n`);
+
+  const resolved = await resolveCompanyBySlug("bancolombia");
+  check(
+    resolved === "Bancolombia",
+    `resolveCompanyBySlug("bancolombia") resuelve al nombre real curado ("Bancolombia").`,
+    `resolveCompanyBySlug("bancolombia") devolvió "${resolved}", se esperaba "Bancolombia".`
+  );
+
+  const notFound = await resolveCompanyBySlug("esto-no-es-una-empresa-real-de-verdad");
+  check(
+    notFound === null,
+    "Un slug que no matchea ningún alias confirmado devuelve null — nunca un fuzzy-match.",
+    `resolveCompanyBySlug() devolvió "${notFound}" para un slug inventado, se esperaba null.`
+  );
+}
+
+// --- Part 8: GET /api/companies/:slug end-to-end ---------------------------
+
+async function waitForServer(maxAttempts = 40, delayMs = 250): Promise<void> {
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      const res = await fetch(`${BASE_URL}/api/health`);
+      if (res.ok) return;
+    } catch {
+      // not up yet
+    }
+    await new Promise((r) => setTimeout(r, delayMs));
+  }
+  throw new Error(`El servidor no respondió en ${maxAttempts * delayMs}ms`);
+}
+
+function startServer(): ChildProcess {
+  const serverPath = path.join(__dirname, "..", "src", "server.ts");
+  return spawn("npx", ["tsx", serverPath], {
+    cwd: path.join(__dirname, ".."),
+    shell: true,
+    detached: true,
+    env: { ...process.env, PORT: String(TEST_PORT) }
+  });
+}
+
+function killServerTree(server: ChildProcess): void {
+  if (server.pid) {
+    try {
+      process.kill(-server.pid, "SIGKILL");
+    } catch {
+      // Group may already be gone.
+    }
+  }
+}
+
+async function runCompanyEndpointTests() {
+  console.log(`\n--- Parte 8: GET /api/companies/:slug contra un servidor real (solo lectura) ---\n`);
+
+  const server = startServer();
+  try {
+    await waitForServer();
+
+    const slug = buildCompanyPath("Bancolombia").replace("/empresas/", "");
+    const apiPath = `/api/companies/${slug}`;
+    const res = await fetch(`${BASE_URL}${apiPath}`);
+    const body = await res.json();
+    check(
+      res.status === 200 && body.companyName === "Bancolombia" && Array.isArray(body.reputation),
+      `GET ${apiPath} responde 200 con la empresa real y su reputación.`,
+      `GET respondió ${res.status} o con forma inesperada: ${JSON.stringify(body).slice(0, 300)}`
+    );
+    check(
+      body.reputation.some((r: any) => r.source === "merco" && typeof r.score === "number"),
+      "La reputación de Bancolombia incluye el score real de Merco Talento.",
+      `No se encontró la entrada de Merco esperada: ${JSON.stringify(body.reputation)}`
+    );
+
+    const notFoundRes = await fetch(`${BASE_URL}/api/companies/esto-no-es-una-empresa-real`);
+    check(
+      notFoundRes.status === 404,
+      "Un slug de empresa inventado responde 404 real.",
+      `Un slug inventado respondió ${notFoundRes.status} en vez de 404.`
+    );
+  } finally {
+    killServerTree(server);
+  }
+}
+
 async function main() {
   console.log(`\n==================================================`);
-  console.log(`🧪 SUITE DE VALIDACIÓN — Reputación de empleador (Fases R1-R3)`);
+  console.log(`🧪 SUITE DE VALIDACIÓN — Reputación de empleador (Fases R1-R3 + /empresas/:slug)`);
   console.log(`==================================================`);
 
   await runResilienceTests();
@@ -383,6 +484,8 @@ async function main() {
   runMercoParserTests();
   await runAliasAndLookupTests();
   runGptwParserTests();
+  await runCompanySlugTests();
+  await runCompanyEndpointTests();
 
   console.log(`\n==================================================`);
   if (failures > 0) {

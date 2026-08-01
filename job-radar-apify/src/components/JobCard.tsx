@@ -1,12 +1,15 @@
 import React, { useState } from "react";
+import { Link } from "react-router-dom";
 import { Star, Check, ArrowRight } from "lucide-react";
 import { Job } from "../sources/types.js";
 import { getSourceColor } from "../lib/source-colors.js";
 import { getModalityLabel } from "../lib/job-filters.js";
+import { buildCompanyPath } from "../lib/job-seo.js";
 import { useAuth } from "../auth/auth-provider.js";
 import { Button } from "./ui/button.js";
 import { Badge } from "./ui/badge.js";
 import { cn } from "../lib/utils.js";
+import { ReputationEntryProps } from "./ReputationBadges.js";
 
 export interface JobCardProps {
   job: Job & {
@@ -14,6 +17,7 @@ export interface JobCardProps {
     isSaved?: boolean;
     isApplied?: boolean;
     salary?: string;
+    reputation?: ReputationEntryProps[];
   };
   onSaveToggle?: (jobId: string) => void;
   onAppliedToggle?: (jobId: string) => void;
@@ -114,7 +118,22 @@ export const JobCard: React.FC<JobCardProps> = ({
             </h3>
 
             <p className="text-sm text-foreground/80 mb-2">
-              {job.company || "Confidencial"}
+              {job.company && job.reputation && job.reputation.length > 0 ? (
+                // Only linked when this job's company actually has curated
+                // reputation data (company_reputation_alias) — that's the
+                // same condition /empresas/:slug's resolveCompanyBySlug()
+                // needs to resolve successfully, so this can never be a
+                // dead link to a 404 for the ~99% of companies without it.
+                <Link
+                  to={buildCompanyPath(job.company)}
+                  className="hover:underline hover:text-primary"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {job.company}
+                </Link>
+              ) : (
+                job.company || "Confidencial"
+              )}
               <span className="text-muted-foreground"> · {job.location || "Colombia"}</span>
             </p>
 

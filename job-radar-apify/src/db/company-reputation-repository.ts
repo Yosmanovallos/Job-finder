@@ -1,5 +1,6 @@
 import { pool } from "./client.js";
 import { ReputationScoreInput } from "../sources/reputation/types.js";
+import { slugify } from "../lib/job-seo.js";
 
 export interface ReputationAliasInput {
   rawCompanyName: string;
@@ -102,4 +103,16 @@ export async function getReputationForCompanies(
   }
 
   return map;
+}
+
+// Company page (/empresas/:slug) resolver — same in-memory slug-match
+// pattern as resolveCategorySlug() in job-seo.ts, just backed by the
+// alias table's distinct raw names (116 today) instead of a static array.
+// A slug with no match returns null → a real 404, never a fuzzy guess.
+export async function resolveCompanyBySlug(slug: string): Promise<string | null> {
+  const result = await pool.query(`SELECT DISTINCT raw_company_name FROM company_reputation_alias`);
+  for (const row of result.rows) {
+    if (slugify(row.raw_company_name) === slug) return row.raw_company_name;
+  }
+  return null;
 }

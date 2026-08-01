@@ -402,3 +402,42 @@ en cualquiera de las dos (ej. acceso a devtools de una sesión real de
 navegador, o un cambio en la política de acceso de esas plataformas),
 ambas quedan documentadas con el parser/patrón ya identificado, listas
 para retomar sin tener que reinvestigar desde cero.
+
+## 8. Extensión: página de empresa (`/empresas/:slug`)
+
+Pedido posterior del usuario, no una de las fases R0-R5: desde el
+dashboard, al ver una vacante, el nombre de la empresa lleva a una página
+propia con su reputación completa y sus vacantes activas — sin tener que
+consultar la base de datos a mano.
+
+Reutiliza casi todo lo ya construido: `getReputationForCompanies()`,
+`ReputationBadges.tsx`, y `CategoryJobRow.tsx` (el mismo componente de fila
+que ya usan las páginas de categoría de SEO). Piezas nuevas:
+`resolveCompanyBySlug()` (mismo patrón de resolución en memoria que
+`resolveCategorySlug()`, respaldado por los `raw_company_name` distintos
+de `company_reputation_alias` en vez de un array estático),
+`GET /api/companies/:slug`, `CompanyLanding.tsx`, y un filtro `company`
+**exacto** (no fuzzy) nuevo en `applyJobFilters()`.
+
+**Alcance deliberado**: sin SSR todavía — es navegación de dashboard, no
+una fase SEO; el fallback SPA genérico ya cubre una carga directa de
+`/empresas/:slug`. Si se quiere el beneficio SEO más adelante, es una
+fase aparte, mismo patrón que ya se usó para `/dashboard` y las
+categorías.
+
+**Corrección hecha en esta misma sesión, antes de dar la fase por
+terminada**: la primera versión enlazaba el nombre de *cualquier* empresa,
+sin verificar si tenía reputación — como `/empresas/:slug` solo resuelve
+empresas con al menos un alias confirmado, esto llevaba a un 404 real
+para la inmensa mayoría de empresas (verificado en vivo con "Caseware").
+Corregido: el nombre solo es un link cuando `job.reputation.length > 0`
+(dato que el backend ya adjunta a cada job) — nunca un link roto.
+
+**Verificado en esta sesión**: `npm run build` y `npm run test:reputation`
+en verde (29 checks). Navegación real de punta a punta con Playwright:
+desde la página de una vacante de Accenture, clic en el nombre de la
+empresa → llega a `/empresas/accenture`, con Merco + GPTW mostrados
+correctamente y su vacante activa listada — 0 errores de consola.
+Confirmado con captura de pantalla que una empresa sin reputación
+("Caseware") ya no muestra ningún link. `npm run test:seo` y
+`npm run test:dashboard-filters` en verde.

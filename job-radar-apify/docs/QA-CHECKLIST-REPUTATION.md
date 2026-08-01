@@ -97,6 +97,41 @@ Repetir tras cualquier cambio en `src/sources/reputation/gptw.ts`,
       fuentes se ve limpia, sin romper el layout existente.
 - [ ] `npm run test:seo` y `npm run test:dashboard-filters` en verde.
 
+## 4. Página de empresa (`/empresas/:slug`, navegación desde dashboard)
+
+Extensión posterior a las fases R0-R5 (no una de ellas) — reusa el pipeline
+de reputación para que, desde el dashboard, el nombre de la empresa en una
+vacante lleve a una página propia con su reputación y sus vacantes activas.
+Repetir tras cualquier cambio en `resolveCompanyBySlug()`
+(`company-reputation-repository.ts`), `buildCompanyPath()`/`buildCompanyUrl()`
+(`job-seo.ts`), la ruta `GET /api/companies/:slug` en `server.ts`,
+`CompanyLanding.tsx`, o el filtro `company` de `applyJobFilters()`.
+
+- [ ] `npm run test:reputation` en verde (incluye `resolveCompanyBySlug()`
+      contra datos reales curados y `GET /api/companies/:slug` contra un
+      servidor de prueba propio, sin red externa).
+- [ ] Con el servidor local corriendo: abrir una vacante real de una
+      empresa **con** reputación (ej. Accenture, Bancolombia) — el nombre
+      de la empresa aparece como link. Clic → llega a
+      `/empresas/<slug>` mostrando el nombre real, su reputación completa
+      (ambas fuentes si tiene las dos) y sus vacantes activas
+      (reutilizando `CategoryJobRow`, mismo componente que las páginas de
+      categoría de SEO).
+- [ ] Abrir una vacante de una empresa **sin** reputación (la mayoría) —
+      el nombre **no** debe ser un link (texto plano, sin subrayado al
+      pasar el mouse). Esto es a propósito: como `/empresas/:slug` solo
+      resuelve empresas con al menos un alias confirmado
+      (`company_reputation_alias`), enlazar una empresa sin reputación
+      llevaría a un 404 — verificado en esta sesión con "Caseware" antes
+      de agregar esta condición, corregido.
+- [ ] `curl -s -o /dev/null -w '%{http_code}' localhost:3000/api/companies/<slug-inventado>`
+      → 404 real.
+- [ ] Regresión visual (captura de pantalla real, `run-job-radar-apify`,
+      0 errores de consola): `JobCard`/`JobDetailPanel` se ven igual que
+      antes para vacantes sin reputación; el layout de `/dashboard` no
+      cambió.
+- [ ] `npm run test:seo` y `npm run test:dashboard-filters` en verde.
+
 ## Nota de seguridad
 
 Este proyecto **no tiene una base de datos de test separada** — el mismo

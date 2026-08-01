@@ -19,6 +19,7 @@ const Dashboard = lazy(() => import("./sections/Dashboard.js"));
 // slug) — see EmpleosRoute.tsx / job-seo.ts's isUuid for why one route
 // pattern still covers both without colliding with server.ts's split.
 const EmpleosRoute = lazy(() => import("./sections/EmpleosRoute.js"));
+const CompanyLanding = lazy(() => import("./sections/CompanyLanding.js"));
 const Login = lazy(() => import("./sections/Login.js"));
 const ResetPassword = lazy(() => import("./sections/ResetPassword.js"));
 const AuthCallback = lazy(() => import("./sections/AuthCallback.js"));
@@ -81,6 +82,7 @@ export default function App() {
                 <Route path="/" element={<Landing />} />
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/empleos/:id/:slug?" element={<EmpleosRoute />} />
+                <Route path="/empresas/:slug" element={<CompanyLanding />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/auth/callback" element={<AuthCallback />} />

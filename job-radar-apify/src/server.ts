@@ -13,7 +13,11 @@ import {
 } from "./db/job-repository.js";
 import { markRoleForImmediateRescan } from "./db/scheduler-repository.js";
 import { wasJobPurged } from "./db/indexing-repository.js";
-import { getReputationForCompanies, ReputationEntry } from "./db/company-reputation-repository.js";
+import {
+  getReputationForCompanies,
+  resolveCompanyBySlug,
+  ReputationEntry
+} from "./db/company-reputation-repository.js";
 import { applyJobFilters, sortByPreferredRoles, JobFilterParams } from "./lib/job-filters.js";
 import {
   escapeHtml,
@@ -146,6 +150,41 @@ const server = http.createServer(async (req, res) => {
     const [withReputation] = await attachReputation([visible]);
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ job: withReputation }));
+    return;
+  }
+
+  // 4a-bis. GET /api/companies/:slug — company page (dashboard navigation,
+  // see docs/COMPANY-REPUTATION-PLAN.md's "empresas" note; not one of the
+  // R0-R5 reputation fases, a later extension reusing that pipeline). Slug
+  // resolves against the same curated alias table the reputation pipeline
+  // already relies on (resolveCompanyBySlug) — never a fuzzy match, a slug
+  // with no confirmed alias is a real 404, not a guessed page.
+  if (pathname.startsWith("/api/companies/") && method === "GET") {
+    const slug = pathname.slice("/api/companies/".length);
+    const companyName = await resolveCompanyBySlug(slug);
+    if (!companyName) {
+      res.writeHead(404, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Empresa no encontrada" }));
+      return;
+    }
+
+    const session = await verifySession(req);
+    const tier = session?.tier || "free";
+    const jobs = await getJobsCached(50000);
+    const visibleJobs = maskLockedFields(jobs, tier);
+    const matched = applyJobFilters(visibleJobs, { company: companyName });
+    const page = matched.slice(0, 60);
+    const reputationMap = await getReputationForCompanies([companyName]);
+
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(
+      JSON.stringify({
+        companyName,
+        reputation: reputationMap.get(companyName) || [],
+        jobs: page,
+        total: matched.length
+      })
+    );
     return;
   }
 

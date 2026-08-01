@@ -218,6 +218,20 @@ export function buildCategoryUrl(label: string): string {
   return `${SITE_URL}${buildCategoryPath(label)}`;
 }
 
+// Company page (dashboard navigation, not an SEO-driven fase like the
+// category pages above — see the "empresas" feature note in
+// docs/COMPANY-REPUTATION-PLAN.md). Same flat single-slug shape; the
+// company name (never an id) is what resolveCompanyBySlug() in
+// company-reputation-repository.ts matches back against, mirroring
+// resolveCategorySlug()'s pattern.
+export function buildCompanyPath(companyName: string): string {
+  return `/empresas/${slugify(companyName)}`;
+}
+
+export function buildCompanyUrl(companyName: string): string {
+  return `${SITE_URL}${buildCompanyPath(companyName)}`;
+}
+
 export interface CategoryMeta {
   title: string;
   // Plain page heading (no " | BuscoTrabajo" suffix, no count) — kept

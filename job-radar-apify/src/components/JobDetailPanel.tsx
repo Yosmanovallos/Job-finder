@@ -1,8 +1,10 @@
 import React from "react";
+import { Link } from "react-router-dom";
 import { Star, Check, ArrowUpRight, Search } from "lucide-react";
 import { Job } from "../sources/types.js";
 import { getSourceColor } from "../lib/source-colors.js";
 import { getModalityLabel } from "../lib/job-filters.js";
+import { buildCompanyPath } from "../lib/job-seo.js";
 import { useAuth } from "../auth/auth-provider.js";
 import { Button } from "./ui/button.js";
 import { Badge } from "./ui/badge.js";
@@ -86,7 +88,15 @@ export const JobDetailPanel: React.FC<JobDetailPanelProps> = ({
                 {job.title}
               </h2>
               <p className="text-sm text-foreground/80">
-                {job.company || "Confidencial"}
+                {job.company && job.reputation && job.reputation.length > 0 ? (
+                  // Only linked when reputation data exists for this
+                  // company — see JobCard.tsx's identical guard for why.
+                  <Link to={buildCompanyPath(job.company)} className="hover:underline hover:text-primary">
+                    {job.company}
+                  </Link>
+                ) : (
+                  job.company || "Confidencial"
+                )}
                 <span className="text-muted-foreground"> · {job.location || "Colombia"}</span>
               </p>
             </div>
