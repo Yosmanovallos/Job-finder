@@ -13,7 +13,8 @@ export interface ReputationEntryProps {
 // docs/COMPANY-REPUTATION-PLAN.md's research summary), so this is the
 // deliberate, permanent design, not a placeholder for a future logo.
 const SOURCE_LABELS: Record<string, string> = {
-  merco: "Merco Talento"
+  merco: "Merco Talento",
+  gptw: "Great Place to Work"
 };
 
 export interface ReputationBadgesProps {

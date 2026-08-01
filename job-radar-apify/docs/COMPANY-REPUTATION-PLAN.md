@@ -1,6 +1,6 @@
 # Plan de reputación de empleador — BuscoTrabajo.co
 
-Estado: **Fases R0, R1 y R2 completas.** Igual que `SEO-PLAN.md`,
+Estado: **Fases R0, R1, R2 y R3 completas.** Igual que `SEO-PLAN.md`,
 esto se ejecuta en fases, una por sesión, cada una verificable antes de
 seguir con la siguiente — no es un commit de una sola vez.
 
@@ -35,7 +35,7 @@ embebible por terceros?, ¿dato numérico real y matcheable por empresa?,
 |---|---|---|
 | **Merco Talento** (Colombia) | ✅ GO-CON-CUIDADO | Índice real 0-10000, ~200 empresas grandes, HTML plano sin JS, sin cláusula anti-scraping hallada. Sin política de logo (tratar como no autorizado). |
 | **Computrabajo** (ya se scrapea para vacantes) | ✅ GO-CON-CUIDADO | Rating real 1-5 + conteo de reseñas, verificado en vivo (ej. Alpina 4.6★/9.305 reseñas). Su Aviso Legal prohíbe scraping y logo expresamente — mismo riesgo ya aceptado hoy para vacantes. |
-| **Great Place to Work Colombia** | ✅ GO-CON-CUIDADO (alcance reducido) | Solo insignia certificado/no certificado (~357 orgs/ciclo), sin score continuo. ToS prohíbe reuso comercial y logo sin permiso escrito. |
+| **Great Place to Work Colombia** | ✅ GO-CON-CUIDADO (alcance reducido) | Solo insignia certificado/no certificado, sin score continuo. **Corrección tras implementar (Fase R3)**: sí expone una API REST pública real de WordPress (`wp-json/wp/v2/certificaciones`, sin auth) — mejor de lo que encontró la investigación inicial (que solo veía el AJAX+nonce del front-end). Es un archivo histórico (806 filas desde 2021), no solo el ciclo vigente — filtrado a ±13 meses (certificaciones GPTW valen 12 meses) da ~154 vigentes reales. ToS del sitio sigue prohibiendo reuso comercial y logo sin permiso escrito — sin cambios en ese riesgo. |
 | **LinkedIn** | ✅ GO-CON-CUIDADO (solo badge en vivo) | No tiene rating, solo conteo de seguidores. Único widget oficial de los 15 pensado para terceros ("Follow Company Plugin") — pero renderiza client-side, no es un número que el backend pueda guardar/cachear. |
 | **Google Places API** | ❌ Descartado | Mide satisfacción de clientes, no de empleados (dato equivocado). Su ToS prohíbe cachear el valor del rating — choca con la arquitectura ya acordada. Campo `rating` solo en el SKU Enterprise (de pago). |
 | Glassdoor | ❌ NO-GO | Sin API self-serve; WAF bloquea con 403 el 100% de solicitudes verificadas, incluidas páginas de reviews (no solo vacantes); ToS exige "permiso escrito expreso". |
@@ -154,7 +154,7 @@ placeholder ni "unknown" visible).
 | **R0** | Este documento | Aprobado | ✅ Hecho |
 | **R1** | Esqueleto: tabla `company_reputation`, generalización de `executeWithResilience`, `run-reputation-tick.ts` (sin fetcher real todavía) + workflow, tests | `npm run build` + tests en verde, cero regresión en scraping/SEO existente | ✅ Hecho |
 | **R2** | Fetcher de Merco Talento + tabla `company_reputation_alias` + alias curados iniciales + UI de atribución | Datos reales de Merco visibles en una vacante real, tests, QA manual | ✅ Hecho |
-| **R3** | Fetcher de Great Place to Work Colombia (insignia binaria) | Insignia visible, tests, QA manual | Pendiente |
+| **R3** | Fetcher de Great Place to Work Colombia (insignia binaria) | Insignia visible, tests, QA manual | ✅ Hecho |
 | **R4** | Fetcher de Computrabajo — checkpoint explícito antes de codear, dado el lenguaje específico de su Aviso Legal | Datos reales visibles, tests, QA manual | Pendiente |
 | **R5** | Badge de LinkedIn (Follow Company Plugin, solo frontend) | Badge visible, sin cambios en BD | Pendiente |
 
@@ -251,6 +251,50 @@ se ve exactamente igual que antes para una vacante sin reputación — cero
 regresión visual. `npm run test:seo` y `npm run test:dashboard-filters`
 en verde.
 
+### 5.3 Resultado de la Fase R3
+
+Construido:
+
+- `src/sources/reputation/gptw.ts` — fetcher paginado contra
+  `wp-json/wp/v2/certificaciones` (API REST real, sin auth), filtro de
+  vigencia a 395 días (GPTW certifica por 12 meses; el endpoint es un
+  archivo histórico desde 2021, no solo el ciclo vigente — sin este
+  filtro se mostraría una certificación vencida como si estuviera activa
+  hoy, justo el tipo de inferencia que prohíbe la regla 5 de
+  `AGENTS.md`), y una validación de rango de sanidad (50-1000 filas
+  vigentes) en vez de un conteo fijo como Merco.
+- `src/sources/reputation/html-entities.ts` — decodificador de entidades
+  numéricas extraído de `merco.ts` a un módulo compartido, porque GPTW
+  también las usa (`&#8217;` → `'`, `&#038;` → `&`) — evita duplicar la
+  misma función en dos fetchers.
+- `scripts/seed-gptw-aliases.ts` — 35 filas de alias (30 empresas),
+  verificadas cruzando las ~154 certificaciones vigentes contra
+  `jobs.company`, mismo estándar que Merco (nunca fuzzy-match). Varias
+  empresas coinciden con las que ya tenían alias de Merco (Accenture,
+  Deloitte, Compensar, etc.) — el esquema ya lo soportaba sin cambios.
+- `src/components/ReputationBadges.tsx` — agregado el label de GPTW; la
+  rama de "sin score, solo certificación" ya existía desde R2 y no
+  necesitó ningún cambio de lógica.
+- `tests/validate-reputation-tick.ts` — extendido con
+  `filterCurrentCertifications()` contra un fixture real (154 filas
+  vigentes + 5 viejas de 2021, mismo estándar de "fixture real, no
+  inventado" que Merco) y con el caso nuevo de una empresa con alias de
+  **dos** fuentes a la vez resolviendo ambas entradas sin mezclarlas.
+- `docs/QA-CHECKLIST-REPUTATION.md` — sección 3 completa.
+
+**Verificado en esta sesión, de punta a punta contra producción real**:
+`npm run build` y `npm run test:reputation` en verde (25 checks). `npx tsx
+scripts/seed-gptw-aliases.ts` insertó 35 alias reales. `npm run
+reputation:tick` corrió **2 fuentes registradas**: Merco (200 filas, sin
+cambios) + GPTW (154 filas nuevas, en vivo contra
+`greatplacetowork.com.co`) — 354 filas totales. Confirmado por query
+directa: Accenture resuelve **ambas** fuentes (Merco 1149/merco-talento-
+index, GPTW certificación) con sus propias URLs. **Verificación visual
+con captura de pantalla real** (`run-job-radar-apify`, 0 errores de
+consola): la vacante real de Accenture muestra las dos entradas
+correctamente, cada una con su "Ver fuente" — nunca un logo. `npm run
+test:seo` y `npm run test:dashboard-filters` en verde.
+
 ## 6. Riesgos y cómo se mitigan
 
 - **ToS de Computrabajo**: riesgo aceptado explícitamente por el usuario,
@@ -268,8 +312,13 @@ en verde.
 
 ## 7. Próximo paso
 
-**Fase R3** — Great Place to Work Colombia (insignia binaria
-certificado/no certificado, sin score continuo — ver §2). Mismo patrón que
-R2: fetcher propio, alias curados adicionales, la insignia se muestra en
-`ReputationBadges.tsx` junto a lo que ya haya de Merco para esa empresa
-(una empresa puede tener entradas de varias fuentes a la vez).
+**Fase R4** — Computrabajo (rating real 1-5 + conteo de reseñas, fuente que
+este proyecto ya scrapea para vacantes). A diferencia de Merco/GPTW, su
+Aviso Legal prohíbe **expresamente** el scraping/reuso de datos (cláusula
+específica, no genérica) — el usuario ya aceptó ese mismo tipo de riesgo
+para el scraping de vacantes de Computrabajo, pero el plan pide un
+checkpoint explícito de confirmación antes de escribir código en esta
+fase específica, dado el lenguaje más concreto de esa cláusula. También
+requiere resolver primero el patrón de descubrimiento (la URL de
+evaluaciones de cada empresa tiene un hash no derivable del nombre, según
+la investigación previa) antes de poder construir el fetcher.

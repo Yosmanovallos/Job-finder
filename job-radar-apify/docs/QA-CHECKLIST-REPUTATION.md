@@ -67,6 +67,36 @@ Repetir tras cualquier cambio en `src/sources/reputation/merco.ts`,
 - [ ] `npm run test:seo` y `npm run test:dashboard-filters` en verde
       (regresión de fases anteriores).
 
+## 3. Fase R3 — Great Place to Work Colombia (segunda fuente)
+
+Repetir tras cualquier cambio en `src/sources/reputation/gptw.ts`,
+`src/sources/reputation/html-entities.ts`, o `scripts/seed-gptw-aliases.ts`.
+
+- [ ] `npm run test:reputation` en verde (incluye el filtro de vigencia de
+      395 días contra el fixture real de 154 certificaciones vigentes +
+      5 viejas de 2021, y el caso de una empresa con alias de 2 fuentes a
+      la vez).
+- [ ] `npx tsx scripts/seed-gptw-aliases.ts` — inserta/actualiza los alias
+      curados (35 filas al momento de escribir esto).
+- [ ] `npm run reputation:tick` — reporta **2 fuente(s) registrada(s)**
+      (Merco + GPTW), ~200 filas de Merco sin cambios + ~154 filas nuevas
+      de GPTW (el número exacto de GPTW varía con el tiempo — son
+      certificaciones que vencen a los 12 meses).
+- [ ] Con el servidor local corriendo: una vacante real de una empresa con
+      alias de **ambas** fuentes (ej. Accenture, Deloitte, Compensar)
+      muestra **dos** entradas en "Reputación como empleador" — Merco con
+      score real y "Great Place to Work — certificación", cada una con su
+      propio link "Ver fuente" (GPTW usa una URL por empresa, no
+      compartida como Merco) — **nunca un logo**.
+- [ ] Una certificación GPTW de hace más de ~13 meses nunca aparece como
+      vigente (verificar contra la fecha real de una empresa vieja si hay
+      forma de confirmarla, o confiar en el test automatizado que ya cubre
+      esto con datos reales de 2021).
+- [ ] Regresión visual (captura de pantalla real,
+      `run-job-radar-apify`, 0 errores de consola): la vacante con las 2
+      fuentes se ve limpia, sin romper el layout existente.
+- [ ] `npm run test:seo` y `npm run test:dashboard-filters` en verde.
+
 ## Nota de seguridad
 
 Este proyecto **no tiene una base de datos de test separada** — el mismo

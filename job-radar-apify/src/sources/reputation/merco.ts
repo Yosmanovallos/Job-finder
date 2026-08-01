@@ -1,4 +1,5 @@
 import { ReputationScoreInput, ReputationSourceAdapter } from "./types.js";
+import { decodeNumericHtmlEntities } from "./html-entities.js";
 
 const MERCO_TALENTO_URL = "https://www.merco.info/co/ranking-merco-talento";
 
@@ -21,7 +22,9 @@ async function fetchMercoHtml(url: string): Promise<string> {
   if (first.status === 302) {
     const setCookie = first.headers.get("set-cookie");
     if (!setCookie) {
-      throw new Error(`[Merco] Redirigió (302) sin Set-Cookie — comportamiento inesperado del sitio`);
+      throw new Error(
+        `[Merco] Redirigió (302) sin Set-Cookie — comportamiento inesperado del sitio`
+      );
     }
     const cookieValue = setCookie.split(";")[0];
     const second = await fetch(url, {
@@ -34,13 +37,6 @@ async function fetchMercoHtml(url: string): Promise<string> {
   }
 
   throw new Error(`[Merco] HTTP ${first.status} inesperado`);
-}
-
-// merco.info emits accented company names as numeric HTML entities
-// (e.g. "&#201;" = "É") — no named entities observed, so this is
-// deliberately narrow rather than a general-purpose HTML decoder.
-function decodeNumericEntities(text: string): string {
-  return text.replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)));
 }
 
 // Matches only the "table-ranking-1" table's data rows — the position
@@ -67,7 +63,7 @@ export function parseMercoTalentoHtml(html: string): ReputationScoreInput[] {
   }
 
   const rows: ReputationScoreInput[] = [...tableMatch[0].matchAll(ROW_PATTERN)].map((m) => ({
-    companyName: decodeNumericEntities(m[1].trim()),
+    companyName: decodeNumericHtmlEntities(m[1].trim()),
     source: "merco",
     score: Number(m[2]),
     scoreScale: "merco-talento-index",
