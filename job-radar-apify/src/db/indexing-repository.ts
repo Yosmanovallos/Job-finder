@@ -1,5 +1,6 @@
 import { pool } from "./client.js";
 import { NotificationType } from "../lib/google-indexing.js";
+import { buildJobUrlPrefix } from "../lib/job-seo.js";
 
 // Google's default Indexing API quota (Search Console-verified project,
 // no quota increase requested). Budget is derived from what's actually
@@ -82,4 +83,20 @@ export async function markIndexingFailed(id: string, error: string): Promise<voi
     id,
     error
   ]);
+}
+
+// SEO Fase 5 (docs/SEO-PLAN.md §5.6): once a job row is gone,
+// purgeOldJobs() (scheduler-repository.ts) is the only place its URL is
+// ever known — but it already writes that URL into a URL_DELETED row here
+// before losing it. Reusing that as a tombstone (LIKE 'prefix%', a
+// right-anchored wildcard so the idx_indexing_queue_url_prefix index
+// below actually gets used, not a full scan) means /empleos/:id/:slug can
+// tell "this id existed and expired" apart from "this id never existed"
+// without a new table or column.
+export async function wasJobPurged(jobId: string): Promise<boolean> {
+  const result = await pool.query(
+    `SELECT 1 FROM indexing_queue WHERE notification_type = 'URL_DELETED' AND url LIKE $1 LIMIT 1`,
+    [`${buildJobUrlPrefix(jobId)}%`]
+  );
+  return (result.rowCount ?? 0) > 0;
 }

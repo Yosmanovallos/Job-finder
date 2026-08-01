@@ -193,6 +193,33 @@ por ser o no un UUID, ver `isUuid()`/`resolveCategorySlug()`.
       Search Console → Sitemaps: no hace falta reenviar nada aparte (el
       índice ya apunta a la nueva URL automáticamente en el próximo rastreo).
 
+## 7. Vencimiento (Fase 5) — 410 para vacantes purgadas
+
+Repetir tras cualquier cambio en `wasJobPurged()`/`buildJobUrlPrefix()`
+(`src/db/indexing-repository.ts`/`src/lib/job-seo.ts`), el bloque
+`if (!id || !job)` de la ruta `/empleos/` en `src/server.ts`, o
+`scripts/migrate-indexing-queue.ts`.
+
+- [ ] `npm run test:seo` en verde — cubre el caso end-to-end (fila
+      `URL_DELETED` de prueba → 410) sin necesidad de esperar a que una
+      vacante real venza.
+- [ ] Confirmar que `idx_indexing_queue_url_prefix` existe: correr
+      `npx tsx scripts/migrate-indexing-queue.ts` una vez (idempotente,
+      aditivo, seguro de re-correr).
+- [ ] Un `/empleos/<uuid-al-azar-nunca-visto>/x` sigue respondiendo 404
+      (no 410) — regresión: sin este check, un bug podría marcar cualquier
+      id inexistente como "vencido".
+- [ ] Una vacante real (`/empleos/:id/:slug` de una vacante activa) sigue
+      respondiendo 200 sin cambios.
+- [ ] El HTML del 410 trae `<meta name="robots" content="noindex">` y
+      **ningún** bloque `application/ld+json` — un 410 nunca debe llevar
+      JobPosting.
+- [ ] En Search Console, para una URL que ya se sabe purgada (o simulando
+      con Inspección de URLs): confirmar que Google eventualmente la marca
+      como removida en el reporte de cobertura — esto tarda días, no es
+      instantáneo, solo verificar que no quede "atascada" como indexada
+      semanas después.
+
 ## Nota de seguridad sobre este checklist y los tests automatizados
 
 Este proyecto **no tiene una base de datos de test separada** — el mismo

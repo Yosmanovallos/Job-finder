@@ -82,6 +82,17 @@ export function buildJobUrl(job: SeoJob): string {
   return `${SITE_URL}${buildJobPath(job)}`;
 }
 
+// The one fixed part of a job's URL that survives its deletion — the slug
+// half is title-derived and lost forever once the row is gone (see
+// purgeOldJobs()'s comment in scheduler-repository.ts), but every URL this
+// app ever generates for a given jobId starts with this exact prefix, so a
+// LIKE '<prefix>%' lookup against indexing_queue's stored URL_DELETED rows
+// (Fase 5) can recognize "this id existed and expired" without needing a
+// separate tombstone table/column.
+export function buildJobUrlPrefix(jobId: string): string {
+  return `${SITE_URL}/empleos/${jobId}/`;
+}
+
 // A job is only eligible for a public, indexable page once
 // `maskLockedFields` has already run — this checks the *result* of that
 // (company/location/url present), not `isLocked` directly, so it can never

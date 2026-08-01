@@ -10,6 +10,7 @@ import {
   escapeJsonForScriptTag,
   isPubliclyDescribable,
   buildJobPath,
+  buildJobUrl,
   buildJobPosting,
   buildJobMeta,
   buildJobsSitemapXml,
@@ -19,6 +20,7 @@ import {
   buildCategoryMeta,
   buildCategoryPath,
   buildCategoriesSitemapXml,
+  buildJobUrlPrefix,
   SeoJob
 } from "../src/lib/job-seo.js";
 import { CITY_OPTIONS } from "../src/lib/job-filters.js";
@@ -29,7 +31,8 @@ import {
   getPendingIndexingBatch,
   markIndexingSent,
   markIndexingFailed,
-  getIndexingBudgetRemaining
+  getIndexingBudgetRemaining,
+  wasJobPurged
 } from "../src/db/indexing-repository.js";
 import { pool } from "../src/db/client.js";
 
@@ -174,6 +177,14 @@ function runPureFunctionTests() {
     meta.title.includes(openJob.title) && meta.canonicalUrl.includes(openJob.jobId),
     "buildJobMeta() produce un título y canonical consistentes con la vacante.",
     "buildJobMeta() produjo metadata inconsistente."
+  );
+
+  // --- Vencimiento (Fase 5) ---
+  const prefix = buildJobUrlPrefix(openJob.jobId);
+  check(
+    prefix.endsWith(`/empleos/${openJob.jobId}/`) && buildJobUrl(openJob).startsWith(prefix),
+    "buildJobUrlPrefix() produce el mismo prefijo con el que se construyó la URL real de la vacante.",
+    `buildJobUrlPrefix("${openJob.jobId}") produjo "${prefix}", no es prefijo de buildJobUrl(): "${buildJobUrl(openJob)}"`
   );
 
   // --- Sitemap (Fase 2) ---
@@ -550,6 +561,47 @@ async function runHttpTests() {
       "/sitemap.xml (índice) ahora también referencia sitemap-categories.xml.",
       "/sitemap.xml no incluye sitemap-categories.xml en el índice."
     );
+
+    // Vencimiento (Fase 5) — un id nunca visto sigue dando 404 real
+    // (regresión explícita: sin esto, un bug futuro podría marcar
+    // cualquier id inexistente como "vencido").
+    const neverExistedId = crypto.randomUUID();
+    const neverExistedRes = await fetch(`${BASE_URL}/empleos/${neverExistedId}/x`);
+    check(
+      neverExistedRes.status === 404,
+      "Un jobId que nunca existió sigue respondiendo 404 (no 410) — nunca visto en indexing_queue.",
+      `Un jobId nunca visto respondió ${neverExistedRes.status} en vez de 404.`
+    );
+
+    // Un jobId que sí existió y fue purgado (misma fila URL_DELETED que
+    // purgeOldJobs() ya encola) debe responder 410, no 404 genérico.
+    const purgedJobId = crypto.randomUUID();
+    const purgedUrl = `${buildJobUrlPrefix(purgedJobId)}vacante-de-prueba`;
+    try {
+      await enqueueIndexingNotifications([{ url: purgedUrl, type: "URL_DELETED" }]);
+      const purgedCheck = await wasJobPurged(purgedJobId);
+      check(
+        purgedCheck === true,
+        "wasJobPurged() reconoce un jobId con una fila URL_DELETED real en indexing_queue.",
+        "wasJobPurged() no reconoció un jobId recién encolado como URL_DELETED."
+      );
+
+      const purgedRes = await fetch(`${BASE_URL}/empleos/${purgedJobId}/x`);
+      check(
+        purgedRes.status === 410,
+        `GET /empleos/${purgedJobId}/x (jobId purgado) responde 410, no 404.`,
+        `GET /empleos/${purgedJobId}/x respondió ${purgedRes.status} en vez de 410.`
+      );
+      const purgedHtml = await purgedRes.text();
+      check(
+        purgedHtml.includes('name="robots" content="noindex"') &&
+          !purgedHtml.includes("application/ld+json"),
+        "La página 410 trae noindex y ningún JSON-LD (nada que Google deba seguir indexando).",
+        "La página 410 no trae noindex, o incluyó JSON-LD indebidamente."
+      );
+    } finally {
+      await pool.query(`DELETE FROM indexing_queue WHERE url = $1`, [purgedUrl]);
+    }
   } finally {
     killServerTree(server);
   }

@@ -12,6 +12,7 @@ import {
   getTransactionsForUser
 } from "./db/job-repository.js";
 import { markRoleForImmediateRescan } from "./db/scheduler-repository.js";
+import { wasJobPurged } from "./db/indexing-repository.js";
 import { applyJobFilters, sortByPreferredRoles, JobFilterParams } from "./lib/job-filters.js";
 import {
   escapeHtml,
@@ -484,6 +485,20 @@ const server = http.createServer(async (req, res) => {
     const job = jobs.find((j: any) => j.jobId === id);
 
     if (!id || !job) {
+      // SEO Fase 5 (docs/SEO-PLAN.md §5.6): distinguish "this id existed and
+      // expired" (410 — a real, permanent removal Google should trust and
+      // drop, not keep re-checking) from "this id never existed" (plain
+      // 404). `id` is always a real UUID here — the category branch above
+      // already intercepted any non-UUID segment — so this only ever
+      // queries wasJobPurged() with a well-formed jobId.
+      if (id && (await wasJobPurged(id))) {
+        res.writeHead(410, { "Content-Type": "text/html; charset=utf-8" });
+        res.end(
+          "<!doctype html><html lang=\"es\"><head><meta charset=\"utf-8\"><title>Vacante ya no disponible | BuscoTrabajo</title><meta name=\"robots\" content=\"noindex\"></head><body><h1>Esta vacante ya no está disponible</h1><p>Fue retirada porque venció (más de 30 días publicada).</p><p><a href=\"/dashboard\">Ver vacantes activas</a></p></body></html>"
+        );
+        return;
+      }
+
       res.writeHead(404, { "Content-Type": "text/html; charset=utf-8" });
       res.end(
         "<!doctype html><html lang=\"es\"><head><meta charset=\"utf-8\"><title>Vacante no encontrada | BuscoTrabajo</title><meta name=\"robots\" content=\"noindex\"></head><body><h1>Vacante no encontrada</h1><p><a href=\"/dashboard\">Ver todas las vacantes</a></p></body></html>"

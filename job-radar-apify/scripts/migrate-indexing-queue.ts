@@ -34,6 +34,13 @@ async function main() {
   await pool.query(
     `CREATE INDEX IF NOT EXISTS idx_indexing_queue_sent_at ON indexing_queue (sent_at) WHERE status = 'sent'`
   );
+  // SEO Fase 5 (docs/SEO-PLAN.md §5.6): text_pattern_ops is what lets a
+  // `LIKE 'prefix%'` lookup (wasJobPurged() in indexing-repository.ts) use
+  // this index instead of a full table scan — a plain btree index doesn't
+  // support LIKE-prefix matching in the default locale.
+  await pool.query(
+    `CREATE INDEX IF NOT EXISTS idx_indexing_queue_url_prefix ON indexing_queue (url text_pattern_ops)`
+  );
   console.log("   ✅ Indexes ready.");
 
   await pool.query(`ALTER TABLE indexing_queue ENABLE ROW LEVEL SECURITY`);

@@ -247,7 +247,7 @@ en combinaciones infinitas de la misma data que ya vive en `/empleos/`.
 | **2** | Sitemap dinámico (índice + jobs) + robots.txt actualizado                                                         | `curl` al sitemap, validación XML, envío manual una vez en Search Console                          | ✅ Hecho                                        |
 | **3** | Integración con Google Indexing API (cuenta de servicio + hook en `saveJobs()`/`purgeOldJobs()`, ver sección 5.5) | Log de submits exitosos; una vacante nueva aparece en el reporte de cobertura en horas, no semanas | ✅ Hecho — verificado en producción (2026-07-30): 106/106 notificaciones reales enviadas en la primera corrida |
 | **4** | Páginas de categoría (`/empleos/<ciudad>`, `/empleos/<rol>`)                                                      | Igual que fase 1, sobre una categoría                                                              | ✅ Hecho                                        |
-| **5** | Manejo de vencimiento (410 / `validThrough`) atado al `DELETE` duro de `purgeOldJobs()`                           | Vacante purgada devuelve 410 en vez de 404 genérico; JSON-LD deja de emitirse                      | Pendiente                                       |
+| **5** | Manejo de vencimiento (410 / `validThrough`) atado al `DELETE` duro de `purgeOldJobs()`                           | Vacante purgada devuelve 410 en vez de 404 genérico; JSON-LD deja de emitirse                      | ✅ Hecho                                        |
 
 ### 5.1 Resultado de la Fase 0 (corregido — ver nota abajo)
 
@@ -489,6 +489,51 @@ categoría por ahora" y `noindex`, en vez de indexarse vacía. Cero regresión
 en `/dashboard`, `/`, `/api/jobs`, ni en una página de vacante individual
 real (mismo comportamiento que antes de esta fase).
 
+### 5.6 Resultado de la Fase 5
+
+Sin tabla ni columna nueva: `purgeOldJobs()` (`src/db/scheduler-repository.ts`)
+ya encolaba una fila `URL_DELETED` en `indexing_queue` con la URL completa
+de cada vacante justo antes de perder la fila (Fase 3, §3b) — esa tabla ya
+era, sin usarse para esto, el tombstone que hacía falta para distinguir
+"este id existió y venció" de "este id nunca existió".
+
+Construido:
+
+- `src/lib/job-seo.ts` — `buildJobUrlPrefix(jobId)`, el prefijo fijo
+  (`.../empleos/<jobId>/`) que sobrevive aunque el slug (derivado del
+  título) se pierda con la fila.
+- `src/db/indexing-repository.ts` — `wasJobPurged(jobId)`, `SELECT 1 ...
+  WHERE notification_type = 'URL_DELETED' AND url LIKE $1` (match de
+  prefijo, no de substring, para poder usar índice).
+- `scripts/migrate-indexing-queue.ts` — nuevo `idx_indexing_queue_url_prefix`
+  (`text_pattern_ops`, el operator class que Postgres necesita para que un
+  `LIKE 'prefijo%'` use el índice en vez de escanear la tabla completa, hoy
+  con 15,290+ filas y creciendo). Re-corrido en esta sesión sin tocar datos
+  existentes.
+- `src/server.ts` — dentro del mismo bloque `if (!id || !job)` que ya
+  existía: si `wasJobPurged(id)` es `true`, 410 con copy distinto
+  ("Esta vacante ya no está disponible... venció") + `noindex`, en vez del
+  404 genérico. Sin JSON-LD en ningún caso — el 410 por sí solo ya es la
+  señal de "no indexar esto". La vacante real encontrada y el 404 genérico
+  para ids nunca vistos no cambiaron.
+- `tests/validate-seo-job-pages.ts` (`npm run test:seo`) — función pura
+  (`buildJobUrlPrefix`), y HTTP real: inserta su propia fila `URL_DELETED`
+  de prueba (limpiada en `finally`, nunca toca `jobs`) y confirma 410 +
+  noindex + ausencia de JSON-LD; confirma explícitamente que un UUID nunca
+  encolado sigue dando 404 (regresión, para que un bug futuro no marque
+  todo como "vencido").
+- `docs/QA-CHECKLIST-SEO.md` — nueva sección 7.
+
+**Verificado en esta sesión**: `npm run build` y `npm run test:seo` en
+verde (64 checks). Manualmente contra un servidor local: insertada una fila
+`URL_DELETED` real para un jobId de prueba → `/empleos/<ese-id>/x` responde
+**410** con el copy de vencimiento, `noindex`, sin JSON-LD; un UUID nunca
+visto sigue en **404**; una vacante real y una página de categoría
+(`/empleos/bogota`) siguen en **200** sin cambios — cero regresión.
+
+Con esto, **las 6 fases del plan original de SEO están completas** (Fases
+0-5). Ver §8 para qué sigue, si algo.
+
 ## 6. Riesgos y cómo se mitigan
 
 - **Thin content / doorway pages**: mitigado con contenido real variable
@@ -607,12 +652,25 @@ aumento de cuota temprano en vez de esperar a necesitarlo.
 
 ## 8. Próximo paso
 
-**Fase 5** (manejo de vencimiento — 410 en vez de 404 genérico, ver §3e):
-hoy `/empleos/:id/:slug` de una vacante purgada por `purgeOldJobs()` cae en
-el 404 genérico porque simplemente ya no está en `getJobsCached()` — no hay
-forma de distinguir "este id nunca existió" de "esta vacante existió y
-venció". La Fase 5 conecta eso al `DELETE ... RETURNING` que ya usa
-`purgeOldJobs()` para encolar `URL_DELETED` (§3b), de modo que Google reciba
-la señal explícita de que la página no vuelve, en vez de un 404 ambiguo que
-también protege el resto del sitio de la penalización por vacantes vencidas
-todavía indexadas (§3e, §6).
+Las 6 fases del plan original (0-5) están completas y verificadas en
+producción — no queda ningún ítem de código pendiente de este documento.
+
+Lo que sigue de aquí en adelante es monitoreo, no construcción:
+
+1. **Search Console**: confirmar que `sitemap-categories.xml` (Fase 4) se
+   lee correctamente (Sitemaps → debería mostrar 41 URLs descubiertas), y
+   seguir revisando "Indexación → Páginas" hasta que empiecen a aparecer
+   vacantes y categorías indexadas (no solo `/` y `/dashboard`) — cuestión
+   de tiempo de rastreo en un dominio nuevo, no de código.
+2. **Descripciones reales por vacante**: limitación conocida desde la Fase 1
+   (§5.2) — el `description` del JSON-LD sigue siendo plantilla, ningún
+   adaptador captura descripción real de la fuente hoy. Evaluado y
+   deliberadamente no perseguido por ahora: requeriría una petición HTTP
+   extra por vacante encontrada en cada una de las 13 fuentes, lo que sube
+   el riesgo de bloqueo justo donde ya hay fricción (Indeed/Glassdoor).
+   Si se retoma, es su propia investigación fuente por fuente, no un ajuste
+   rápido.
+
+Cualquier trabajo nuevo de SEO a partir de aquí (backlinks, contenido
+adicional, más fuentes) es exploratorio y necesitaría su propio
+diagnóstico — no hay una "Fase 6" ya definida en este documento.
