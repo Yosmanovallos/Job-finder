@@ -234,3 +234,22 @@ ALTER TABLE indexing_queue ENABLE ROW LEVEL SECURITY;
 ALTER TABLE company_reputation ENABLE ROW LEVEL SECURITY;
 ALTER TABLE company_reputation_alias ENABLE ROW LEVEL SECURITY;
 ALTER TABLE company_user_reviews ENABLE ROW LEVEL SECURITY;
+
+-- Defense-in-depth on top of the RLS-with-zero-policies block above: Supabase
+-- grants anon/authenticated broad SELECT/INSERT/UPDATE/DELETE on every
+-- `public` table by default (confirmed live via information_schema —
+-- 2026-08-02 security audit). RLS alone already blocks all of that today
+-- (verified with the real anon key: every table returns [] on SELECT, a
+-- write attempt gets a clean 42501 RLS-violation, no schema leaked) — but it
+-- is the ONLY thing blocking it. If anyone ever adds a single permissive RLS
+-- policy to any one of these tables later (even by accident, e.g. via
+-- Supabase Studio's "add policy" wizard while debugging something unrelated),
+-- these pre-existing grants mean that table's data is immediately reachable
+-- with the public anon key — no second gate catches the mistake. Explicitly
+-- revoking removes that fallback exposure regardless of what RLS policies
+-- exist later; `postgres` (this app's own connection, see src/db/client.ts)
+-- has BYPASSRLS and is unaffected by any of this.
+REVOKE ALL ON jobs, search_roles, users, social_posts, transactions,
+  role_source_runs, source_circuit_state, indexing_queue, company_reputation,
+  company_reputation_alias, company_user_reviews
+  FROM anon, authenticated;

@@ -117,11 +117,59 @@ function searchCompanies(
   };
 }
 
+// A route's own validation always returns its own specific, safe 400
+// before ever reaching a catch block — so whatever lands here is either a
+// JSON.parse SyntaxError (generic message, safe to show verbatim) or an
+// unexpected failure from a DB/network call. The latter's real message
+// (a raw pg error can name a table, column or constraint) is never sent to
+// the client — only logged server-side, where it's actually actionable.
+function respondToUnexpectedError(
+  res: http.ServerResponse,
+  err: any,
+  routeLabel: string,
+  fallbackMessage: string
+): void {
+  if (err instanceof SyntaxError) {
+    res.writeHead(400, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: "JSON inválido en el cuerpo de la solicitud" }));
+    return;
+  }
+  console.error(`[${routeLabel}] Error inesperado:`, err);
+  res.writeHead(500, { "Content-Type": "application/json" });
+  res.end(JSON.stringify({ error: fallbackMessage }));
+}
+
 // Native Node HTTP Server
 const server = http.createServer(async (req, res) => {
   const parsedUrl = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
   const pathname = parsedUrl.pathname;
   const method = req.method || "GET";
+  const requestStartedAt = Date.now();
+
+  // Minimal structured request/security log — one JSON line per response,
+  // to stdout (Render and most hosts capture that as searchable logs with
+  // no extra service needed). 401/403 flag auth-bypass attempts; a 404 on
+  // /api/* flags enumeration against a real route shape with a guessed
+  // resource (e.g. /api/companies/:slug, /api/jobs/:id with a made-up
+  // value — both return a real 404 from inside their own handler). Does
+  // NOT catch someone probing a path that matches no route at all
+  // (/api/whatever-i-guessed) — the SPA fallback at the bottom of this
+  // handler serves index.html (200) for anything unmatched, same as a
+  // normal page nav; that's a real gap, not something this check pretends
+  // to cover.
+  res.on("finish", () => {
+    const status = res.statusCode;
+    const suspicious = status === 401 || status === 403 || (status === 404 && pathname.startsWith("/api/"));
+    const logLine = {
+      ts: new Date().toISOString(),
+      method,
+      path: pathname,
+      status,
+      durationMs: Date.now() - requestStartedAt,
+      ip: (req.headers["x-forwarded-for"] as string | undefined)?.split(",")[0]?.trim() || req.socket.remoteAddress
+    };
+    (suspicious ? console.warn : console.log)(JSON.stringify(logLine));
+  });
 
   // 2. Health Check Endpoint
   if (pathname === "/api/health" && method === "GET") {
@@ -355,8 +403,7 @@ const server = http.createServer(async (req, res) => {
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ userReviews }));
       } catch (e: any) {
-        res.writeHead(400, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: e?.message || "Solicitud inválida" }));
+        respondToUnexpectedError(res, e, "POST /api/companies/:slug/reviews", "No se pudo guardar la reseña.");
       }
     });
     return;
@@ -421,8 +468,7 @@ const server = http.createServer(async (req, res) => {
           })
         );
       } catch (e: any) {
-        res.writeHead(400, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: e?.message || "Solicitud inválida" }));
+        respondToUnexpectedError(res, e, "PATCH /api/me", "No se pudo actualizar el nombre.");
       }
     });
     return;
@@ -473,8 +519,7 @@ const server = http.createServer(async (req, res) => {
           })
         );
       } catch (e: any) {
-        res.writeHead(400, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: e?.message || "Solicitud inválida" }));
+        respondToUnexpectedError(res, e, "PATCH /api/me/roles", "No se pudieron guardar los puestos.");
       }
     });
     return;
@@ -559,8 +604,7 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify(checkout));
     } catch (e: any) {
-      res.writeHead(500, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ error: e?.message || "No se pudo iniciar el checkout" }));
+      respondToUnexpectedError(res, e, "POST /api/checkout/start", "No se pudo iniciar el checkout.");
     }
     return;
   }
@@ -584,8 +628,7 @@ const server = http.createServer(async (req, res) => {
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ status: "ok" }));
       } catch (e: any) {
-        res.writeHead(400, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: e?.message || "Payload inválido" }));
+        respondToUnexpectedError(res, e, "POST /api/webhooks/wompi", "Payload inválido.");
       }
     });
     return;
