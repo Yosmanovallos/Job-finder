@@ -5,6 +5,7 @@ import { hoverStyle } from "../lib/hover-style.js";
 import { useAuth } from "../auth/auth-provider.js";
 import { PAYWALL_ENABLED } from "../config.js";
 import { Button } from "../components/ui/button.js";
+import { FlagIcon } from "../components/FlagIcon.js";
 import { getEffectiveCountry, setStoredCountry, isVePrefixed } from "../lib/country-context.js";
 
 // "Empresas" is the one nav link that's actually country-scoped (see
@@ -21,7 +22,6 @@ function getNavLinks(isVenezuela: boolean) {
   ];
 }
 
-const COUNTRY_FLAGS: Record<string, string> = { CO: "🇨🇴", VE: "🇻🇪" };
 const COUNTRY_LABELS: Record<string, string> = { CO: "Colombia", VE: "Venezuela" };
 const COUNTRY_ORDER = ["CO", "VE"];
 
@@ -114,7 +114,7 @@ function CountrySwitcher({ country, pathname, variant, onNavigate }: CountrySwit
               minHeight: "44px"
             }}
           >
-            <span style={{ fontSize: "1.1rem" }}>{COUNTRY_FLAGS[code]}</span>
+            <FlagIcon code={code} className="w-5 h-3.5 shrink-0" />
             {COUNTRY_LABELS[code]}
             {code === country && <Check className="h-3.5 w-3.5" style={{ color: "#0f6b4c" }} />}
           </Link>
@@ -142,7 +142,7 @@ function CountrySwitcher({ country, pathname, variant, onNavigate }: CountrySwit
         }}
         {...hoverStyle<HTMLButtonElement>({ borderColor: "#d3d6cf" }, { borderColor: "#e6e8e4" })}
       >
-        <span style={{ fontSize: "1.1rem", lineHeight: 1 }}>{COUNTRY_FLAGS[country]}</span>
+        <FlagIcon code={country} className="w-5 h-3.5 shrink-0" />
         <span className="text-sm font-mono" style={{ color: "#5b5f5c" }}>
           {country}
         </span>
@@ -185,7 +185,7 @@ function CountrySwitcher({ country, pathname, variant, onNavigate }: CountrySwit
                 { background: code === country ? "#f1f2f0" : "transparent" }
               )}
             >
-              <span style={{ fontSize: "1.1rem", lineHeight: 1 }}>{COUNTRY_FLAGS[code]}</span>
+              <FlagIcon code={code} className="w-5 h-3.5 shrink-0" />
               {COUNTRY_LABELS[code]}
               {code === country && (
                 <Check className="h-3.5 w-3.5 ml-auto" style={{ color: "#0f6b4c" }} />
