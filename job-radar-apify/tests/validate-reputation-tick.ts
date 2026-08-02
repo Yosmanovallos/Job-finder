@@ -2,13 +2,16 @@
  * Validation suite for the company-reputation batch pipeline
  * (docs/COMPANY-REPUTATION-PLAN.md): the generalized executeWithResilience<T>,
  * company-reputation-repository.ts's upsert/lookup, the Merco Talento
- * fetcher's HTML parsing (Fase R2), and the GPTW Colombia fetcher's
- * date-filtering logic (Fase R3).
+ * fetcher's HTML parsing (Fase R2), the GPTW Colombia fetcher's
+ * date-filtering logic (Fase R3), and Computrabajo's redirect-unwrap +
+ * evaluations-page parser (Fase R4).
  *
  * Deliberately no live network call to any real source in this suite —
- * parseMercoTalentoHtml()/filterCurrentCertifications() are tested against
- * real, saved fixtures instead (tests/fixtures/merco-talento-sample.html,
- * tests/fixtures/gptw-certificaciones-sample.json — both trimmed but
+ * parseMercoTalentoHtml()/filterCurrentCertifications()/parseComputrabajoEvaluationsPage()
+ * are tested against real, saved fixtures instead
+ * (tests/fixtures/merco-talento-sample.html,
+ * tests/fixtures/gptw-certificaciones-sample.json,
+ * tests/fixtures/computrabajo-evaluaciones-sample.html — all trimmed but
  * faithful excerpts of the real public data captured this session). The
  * real end-to-end fetch is verified once by hand during manual QA
  * (docs/QA-CHECKLIST-REPUTATION.md), same reasoning tests/validate-adapters.ts
@@ -40,6 +43,11 @@ import { REPUTATION_SOURCES } from "../src/sources/reputation/index.js";
 import { ReputationScoreInput } from "../src/sources/reputation/types.js";
 import { parseMercoTalentoHtml } from "../src/sources/reputation/merco.js";
 import { filterCurrentCertifications } from "../src/sources/reputation/gptw.js";
+import {
+  unwrapGoogleRedirect,
+  extractCompanySlugFromJobPageHtml,
+  parseComputrabajoEvaluationsPage
+} from "../src/sources/reputation/computrabajo.js";
 import { buildCompanyPath } from "../src/lib/job-seo.js";
 
 // Own port, distinct from validate-seo-job-pages.ts's (3981) so both can
@@ -128,16 +136,17 @@ async function runResilienceTests() {
 
 function runRegistryTests() {
   console.log(
-    `\n--- Parte 2: registro de fuentes (Merco Talento + GPTW, Fases R2-R3 — Computrabajo llega en R4) ---\n`
+    `\n--- Parte 2: registro de fuentes (Merco Talento + GPTW + Computrabajo, Fases R2-R4) ---\n`
   );
 
   const names = REPUTATION_SOURCES.map((s) => s.name);
   check(
     Array.isArray(REPUTATION_SOURCES) &&
-      names.length === 2 &&
+      names.length === 3 &&
       names.includes("Merco Talento") &&
-      names.includes("Great Place to Work Colombia"),
-    "REPUTATION_SOURCES tiene exactamente Merco Talento + Great Place to Work Colombia (Fases R2-R3).",
+      names.includes("Great Place to Work Colombia") &&
+      names.includes("Computrabajo"),
+    "REPUTATION_SOURCES tiene exactamente Merco Talento + Great Place to Work Colombia + Computrabajo (Fases R2-R4).",
     `REPUTATION_SOURCES no tiene el estado esperado: ${JSON.stringify(names)}`
   );
 }
@@ -368,7 +377,9 @@ function runGptwParserTests() {
     "Una certificación de 2021 pasó el filtro de vigencia — riesgo de mostrar una insignia vencida como actual."
   );
   check(
-    current.every((r) => r.source === "gptw" && r.score === null && r.scoreScale === "gptw-certified"),
+    current.every(
+      (r) => r.source === "gptw" && r.score === null && r.scoreScale === "gptw-certified"
+    ),
     "Todas las filas traen source/score/scoreScale consistentes (GPTW es binaria: nunca un score inventado).",
     "Alguna fila no trae los campos fijos esperados para una fuente sin score continuo."
   );
@@ -441,7 +452,9 @@ function killServerTree(server: ChildProcess): void {
 }
 
 async function runCompanyEndpointTests() {
-  console.log(`\n--- Parte 8: GET /api/companies/:slug contra un servidor real (solo lectura) ---\n`);
+  console.log(
+    `\n--- Parte 8: GET /api/companies/:slug contra un servidor real (solo lectura) ---\n`
+  );
 
   const server = startServer();
   try {
@@ -477,7 +490,9 @@ async function runCompanyEndpointTests() {
     // could rotate out of the live corpus.
     const jobsRes = await fetch(`${BASE_URL}/api/jobs?limit=50`);
     const jobsBody = await jobsRes.json();
-    const noReputationJob = jobsBody.jobs.find((j: any) => j.company && (j.reputation || []).length === 0);
+    const noReputationJob = jobsBody.jobs.find(
+      (j: any) => j.company && (j.reputation || []).length === 0
+    );
     if (noReputationJob) {
       const fallbackSlug = buildCompanyPath(noReputationJob.company).replace("/empresas/", "");
       const fallbackRes = await fetch(`${BASE_URL}/api/companies/${fallbackSlug}`);
@@ -500,9 +515,102 @@ async function runCompanyEndpointTests() {
   }
 }
 
+// --- Part 9: Computrabajo — unwrapGoogleRedirect() + evaluations parser ---
+//
+// The fixture (tests/fixtures/computrabajo-evaluaciones-sample.html) is a
+// trimmed but faithful excerpt of a real
+// co.computrabajo.com/soletanche/evaluaciones response captured live this
+// session (score 4,6 with the real Spanish decimal comma, 569 real
+// reviews) — same "real, saved fixture, no live network in this suite"
+// convention as Merco/GPTW. The live end-to-end discovery (job page →
+// slug → Referer-gated evaluations fetch) is only verified by hand in
+// manual QA (docs/QA-CHECKLIST-REPUTATION.md §5) — it can't be exercised
+// safely in an automated suite that might run repeatedly, given this
+// session's own observation that Computrabajo escalates blocking under
+// short-window repeated requests.
+
+function runComputrabajoParserTests() {
+  console.log(
+    `\n--- Parte 9: Computrabajo — unwrapGoogleRedirect() + parser (fixture real, sin red) ---\n`
+  );
+
+  const wrapped =
+    "https://www.google.com/url?q=https%3A%2F%2Fco.computrabajo.com%2Fsoletanche%2Fempleos&sa=D";
+  check(
+    unwrapGoogleRedirect(wrapped) === "https://co.computrabajo.com/soletanche/empleos",
+    "unwrapGoogleRedirect() extrae la URL real de un wrapper de Google.",
+    `unwrapGoogleRedirect() devolvió "${unwrapGoogleRedirect(wrapped)}", no la URL real esperada.`
+  );
+
+  const plainUrl = "https://co.computrabajo.com/soletanche/empleos";
+  check(
+    unwrapGoogleRedirect(plainUrl) === plainUrl,
+    "unwrapGoogleRedirect() deja intacta una URL que ya no está envuelta.",
+    `unwrapGoogleRedirect() modificó una URL que no tenía wrapper: "${unwrapGoogleRedirect(plainUrl)}".`
+  );
+
+  // Real fixture: a job page whose "Mostrar los N salarios" widget is
+  // absent (no salary submissions for this posting) — an earlier version
+  // of extractCompanySlugFromJobPageHtml() keyed off that widget instead
+  // of the universal offer-grid-article-company-url anchor, and silently
+  // returned null for real, resolvable companies like this one
+  // (Computrabajo lists it as "Concentrix"; its actual profile slug is
+  // the legacy name "convergys" — verified live end-to-end: that slug's
+  // /evaluaciones page really does resolve real reputation data).
+  const jobPageHtml = fs.readFileSync(
+    path.join(FIXTURES_DIR, "computrabajo-job-page-sample.html"),
+    "utf-8"
+  );
+  const extractedSlug = extractCompanySlugFromJobPageHtml(jobPageHtml);
+  check(
+    extractedSlug === "convergys",
+    `extractCompanySlugFromJobPageHtml() encuentra el slug real vía offer-grid-article-company-url ("convergys"), no el widget condicional de salarios.`,
+    `extractCompanySlugFromJobPageHtml() devolvió "${extractedSlug}", se esperaba "convergys".`
+  );
+  check(
+    extractCompanySlugFromJobPageHtml("<html><body>sin ningún link de empresa</body></html>") === null,
+    "extractCompanySlugFromJobPageHtml() devuelve null cuando no hay ningún link de empresa — nunca un slug inventado.",
+    "extractCompanySlugFromJobPageHtml() encontró un slug en una página sin ningún link de empresa."
+  );
+
+  const html = fs.readFileSync(
+    path.join(FIXTURES_DIR, "computrabajo-evaluaciones-sample.html"),
+    "utf-8"
+  );
+  const finalUrl = "https://co.computrabajo.com/soletanche/evaluaciones";
+  const parsed = parseComputrabajoEvaluationsPage(html, finalUrl, "soletanche");
+
+  check(
+    parsed !== null && parsed.score === 4.6 && parsed.reviewCount === 569,
+    `parseComputrabajoEvaluationsPage() lee el score real con coma decimal española (4,6 → 4.6) y el conteo real de reseñas (569): ${JSON.stringify(parsed)}.`,
+    `parseComputrabajoEvaluationsPage() no devolvió los valores reales esperados: ${JSON.stringify(parsed)}`
+  );
+  check(
+    parsed?.source === "computrabajo" && parsed?.scoreScale === "1-5",
+    "El resultado trae source/scoreScale fijos y consistentes.",
+    `El resultado no trae los campos fijos esperados: ${JSON.stringify(parsed)}`
+  );
+
+  // Same real fixture, but with a finalUrl that doesn't match the
+  // requested slug — this is exactly the "200 that silently landed on
+  // the homepage instead of the real company page" failure mode observed
+  // live this session (e.g. /alpina/evaluaciones), which a status-code-only
+  // check would miss entirely.
+  const redirectedAway = parseComputrabajoEvaluationsPage(
+    html,
+    "https://co.computrabajo.com/",
+    "soletanche"
+  );
+  check(
+    redirectedAway === null,
+    "Si la URL final tras seguir redirects no es la página de evaluaciones esperada, el parser devuelve null en vez de confiar en el contenido.",
+    `El parser no detectó una redirección silenciosa a la home: ${JSON.stringify(redirectedAway)}`
+  );
+}
+
 async function main() {
   console.log(`\n==================================================`);
-  console.log(`🧪 SUITE DE VALIDACIÓN — Reputación de empleador (Fases R1-R3 + /empresas/:slug)`);
+  console.log(`🧪 SUITE DE VALIDACIÓN — Reputación de empleador (Fases R1-R4 + /empresas/:slug)`);
   console.log(`==================================================`);
 
   await runResilienceTests();
@@ -513,6 +621,7 @@ async function main() {
   runGptwParserTests();
   await runCompanySlugTests();
   await runCompanyEndpointTests();
+  runComputrabajoParserTests();
 
   console.log(`\n==================================================`);
   if (failures > 0) {
@@ -521,7 +630,7 @@ async function main() {
     process.exit(1);
   }
   console.log(
-    `🎉 [TEST SUITE PASSED] Pipeline de reputación de empleador (esqueleto + Merco Talento + GPTW) verificado.`
+    `🎉 [TEST SUITE PASSED] Pipeline de reputación de empleador (esqueleto + Merco Talento + GPTW + Computrabajo) verificado.`
   );
   console.log(`==================================================\n`);
   await pool.end();

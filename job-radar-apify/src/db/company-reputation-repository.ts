@@ -32,7 +32,14 @@ export async function upsertReputationScores(rows: ReputationScoreInput[]): Prom
     values.push(
       `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, NOW())`
     );
-    params.push(row.companyName, row.source, row.score, row.scoreScale, row.reviewCount, row.sourceUrl);
+    params.push(
+      row.companyName,
+      row.source,
+      row.score,
+      row.scoreScale,
+      row.reviewCount,
+      row.sourceUrl
+    );
   });
 
   await pool.query(
@@ -115,4 +122,43 @@ export async function resolveCompanyBySlug(slug: string): Promise<string | null>
     if (slugify(row.raw_company_name) === slug) return row.raw_company_name;
   }
   return null;
+}
+
+export interface ComputrabajoDiscoveryCandidate {
+  company: string;
+  jobUrl: string;
+}
+
+// Computrabajo discovery target list (Fase R4) — unlike Merco/GPTW there's
+// no cross-platform name to reconcile: the target company is already the
+// exact, verified jobs.company string, paired with one of its own real
+// Computrabajo job URLs (the entry point the fetcher uses to find that
+// company's real page — see docs/COMPANY-REPUTATION-PLAN.md's R4 section).
+// Most-frequent-first (companies more jobs point to matter most to
+// users), excluding anything already discovered in a prior run so a
+// monthly tick only ever does incremental new work, never re-fetches
+// what it already has.
+export async function getComputrabajoDiscoveryCandidates(
+  limit: number
+): Promise<ComputrabajoDiscoveryCandidate[]> {
+  // "Confidencial" is the fallback placeholder used everywhere in this
+  // codebase for jobs whose real employer name isn't disclosed by the
+  // source — excluded explicitly, or its ~1,000+ postings from many
+  // unrelated anonymous employers would get treated as one fake "company"
+  // with an aggregated (meaningless) reputation.
+  const result = await pool.query(
+    `SELECT company, MIN(url) AS job_url, COUNT(*) AS cnt
+     FROM jobs
+     WHERE company IS NOT NULL
+       AND company != 'Confidencial'
+       AND (source = 'Computrabajo' OR sources @> '["Computrabajo"]'::jsonb)
+       AND company NOT IN (
+         SELECT raw_company_name FROM company_reputation_alias WHERE source = 'computrabajo'
+       )
+     GROUP BY company
+     ORDER BY cnt DESC
+     LIMIT $1`,
+    [limit]
+  );
+  return result.rows.map((row) => ({ company: row.company, jobUrl: row.job_url }));
 }

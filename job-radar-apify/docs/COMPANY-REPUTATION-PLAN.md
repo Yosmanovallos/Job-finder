@@ -1,6 +1,6 @@
 # Plan de reputación de empleador — BuscoTrabajo.co
 
-Estado: **Fases R0-R3 completas, R4 y R5 bloqueadas (decisión del usuario: quedarnos en 2 fuentes).** Igual que `SEO-PLAN.md`,
+Estado: **Fases R0-R4 completas (3 fuentes: Merco Talento, Great Place to Work Colombia, Computrabajo), R5 bloqueada.** Igual que `SEO-PLAN.md`,
 esto se ejecuta en fases, una por sesión, cada una verificable antes de
 seguir con la siguiente — no es un commit de una sola vez.
 
@@ -155,7 +155,7 @@ placeholder ni "unknown" visible).
 | **R1** | Esqueleto: tabla `company_reputation`, generalización de `executeWithResilience`, `run-reputation-tick.ts` (sin fetcher real todavía) + workflow, tests | `npm run build` + tests en verde, cero regresión en scraping/SEO existente | ✅ Hecho |
 | **R2** | Fetcher de Merco Talento + tabla `company_reputation_alias` + alias curados iniciales + UI de atribución | Datos reales de Merco visibles en una vacante real, tests, QA manual | ✅ Hecho |
 | **R3** | Fetcher de Great Place to Work Colombia (insignia binaria) | Insignia visible, tests, QA manual | ✅ Hecho |
-| **R4** | Fetcher de Computrabajo — checkpoint explícito antes de codear, dado el lenguaje específico de su Aviso Legal | Datos reales visibles, tests, QA manual | ❌ Bloqueada (ver §5.4) |
+| **R4** | Fetcher de Computrabajo — descubrimiento vía `jobs` propia (no directorio/API bloqueados), Referer real, resiliencia de 3 fallos consecutivos | Datos reales visibles, tests, QA manual | ✅ Hecho (retomada, ver §5.4) |
 | **R5** | Badge de LinkedIn (Follow Company Plugin, solo frontend) | Badge visible, sin cambios en BD | ❌ Bloqueada (ver §5.5) |
 
 ### 5.1 Resultado de la Fase R1
@@ -295,54 +295,88 @@ consola): la vacante real de Accenture muestra las dos entradas
 correctamente, cada una con su "Ver fuente" — nunca un logo. `npm run
 test:seo` y `npm run test:dashboard-filters` en verde.
 
-### 5.4 Fase R4 — bloqueada (Computrabajo)
+### 5.4 Fase R4 — Computrabajo (retomada, ✅ Hecho)
 
-El usuario confirmó el mismo criterio de riesgo ya aceptado para el
-scraping de vacantes de Computrabajo (proceder pese a su Aviso Legal). El
-bloqueo real no fue ese — fue técnico: **no hay forma segura de descubrir
-a escala la URL de evaluaciones de una empresa arbitraria**.
+**Bloqueo original** (primer intento, sesión anterior): el descubrimiento
+del identificador de empresa por nombre no tenía camino limpio —
+`/empresas/` (directorio) → 403 tanto con `curl` como con Playwright;
+la API de autocompletado (`api-sug.computrabajo.com/company/get`)
+devolvía `"Bad Request"` sin poder determinar sus parámetros exactos; y
+observar esa API en vivo vía el proxy de traducción
+(`translate.goog`, el mismo que usa `scrapeComputrabajo()` en
+producción) disparó un reCAPTCHA de Google — detenido de inmediato por la
+regla 8 de `AGENTS.md`. R4 quedó bloqueada, no cancelada.
 
-Investigación en vivo esta sesión:
+**Por qué se reabrió**: el usuario pidió reconsiderar, señalando
+correctamente dos cosas que la sesión anterior sobreestimó como riesgo:
+(1) este proceso corre aparte del scraper de vacantes, con cadencia
+mensual — no un proceso de alta frecuencia; (2) el scraper de vacantes
+depende del proxy de Google Translate (IP de Google), mientras que un
+proceso de reputación aparte pega directo a `co.computrabajo.com` (IP
+propia, ruta de red distinta) — un bloqueo en uno no debería tocar al
+otro.
 
-- La página de evaluaciones en sí **sí es accesible directo, sin
-  bloqueo** (`co.computrabajo.com/empresas/evaluaciones-en-<slug>-<hash>`,
-  200 real, verificado con Alpina: score `4.6`, `9.306` reseñas —
-  patrones DOM exactos ya identificados:
-  `<span class="fwB mr5"> 4.6</span>` y
-  `<span class="fc_gray">9.306</span>` junto al link "Evaluaciones"). El
-  `slug` es cosmético igual que en nuestras propias URLs de vacante — solo
-  el `hash` importa para resolver la página.
-- El **descubrimiento** del hash por nombre de empresa no tiene camino
-  limpio:
-  - `/empresas/` (directorio/buscador) → 403, probado con `curl` y con un
-    navegador real (Playwright) — bloqueo real, no solo de bots simples.
-  - Existe una API de autocompletado dedicada
-    (`api-sug.computrabajo.com/company/get`, visible en el HTML del
-    formulario de búsqueda) pero no se pudo determinar su formato exacto
-    de parámetros sin acceso a las devtools de una sesión de navegador
-    real — varios intentos razonables devolvieron `"Bad Request"`.
-  - Usando el mismo proxy de traducción que ya usa
-    `scrapeComputrabajo()` para vacantes (`translate.goog`) con
-    Playwright para observar la petición real: **Google respondió con un
-    reCAPTCHA** (`google.com/sorry/...`) tras pocas peticiones en poco
-    tiempo — detenido de inmediato, evadir un CAPTCHA está prohibido por
-    la regla 8 de `AGENTS.md`. Ese mismo proxy es del que depende hoy en
-    producción el scraping de vacantes de Computrabajo cada 15 minutos —
-    seguir insistiendo arriesgaba ese servicio ya funcionando, no solo
-    esta feature nueva.
-  - Buscar por nombre de empresa como palabra clave de vacante (reusando
-    el patrón ya probado del scraper de vacantes) es ruidoso: trae
-    ofertas de empresas no relacionadas que solo mencionan el nombre
-    buscado en el texto, no un link confiable al perfil real de esa
-    empresa.
+**Mecanismo de descubrimiento nuevo, sin API de autocompletado ni
+directorio**: las páginas individuales de vacante de Computrabajo
+(`co.computrabajo.com/ofertas-de-trabajo/...`) cargan directo, sin
+bloqueo, sin necesitar el proxy de traducción. Cada una trae un link real
+a la empresa con un **slug simple**, sin el hash raro usado en
+`/empresas/evaluaciones-en-<slug>-<hash>`. **Corrección real hecha en esta
+sesión**: la primera implementación extraía el slug del widget "Mostrar
+los N salarios" (`href=/soletanche/salarios`) — funcionaba para
+Soletanche, pero ese widget solo aparece cuando esa vacante puntual tiene
+datos de salario cargados, así que empresas reales y resolvibles (ej.
+"Concentrix", cuyo perfil real de Computrabajo vive bajo el nombre legado
+"convergys") quedaban descartadas como falso "sin datos" para siempre —
+consumiendo el tope del lote cada mes sin avanzar nunca. Corregido para
+leer el atributo `offer-grid-article-company-url`, el link real a la
+empresa que SÍ está presente en toda página de vacante probada (verificado
+con Concentrix: slug real "convergys", score 4.5, 9.812 reseñas — antes
+devolvía `null`). Ese mismo slug funciona para `/soletanche/evaluaciones`
+— pero **solo con un
+header `Referer` apuntando a la página de la vacante** (sin eso: 403; con
+eso: 200 y contenido real, simula honestamente la navegación real de
+"vine desde la vacante, hice clic en el link de la empresa"). El slug **no
+es adivinable** por nombre de empresa (`/alpina/evaluaciones` cae
+silenciosamente a la home con 200 — un "soft failure" real que el parser
+detecta comparando la URL final, no solo el status code). La fuente de
+descubrimiento es una vacante real de Computrabajo que **ya tenemos
+guardada en nuestra propia tabla `jobs`**, no algo que haya que buscar en
+su sitio.
 
-**Decisión del usuario**: quedarse en las 2 fuentes ya construidas (Merco
-+ GPTW) en vez de forzar un mecanismo de descubrimiento poco confiable o
-arriesgar el scraper de vacantes ya en producción. R4 queda bloqueada,
-no cancelada — si en el futuro aparece una forma legítima de resolver el
-descubrimiento (ej. alguien inspecciona a mano la petición real desde
-las devtools de un navegador con sesión), se puede retomar reusando el
-parser de la página de evaluaciones ya identificado arriba.
+**Señal de bloqueo adaptativo, observada en vivo**: varias peticiones
+seguidas en minutos hicieron que la misma URL de vacante que acababa de
+funcionar empezara a dar 403. `computrabajoAdapter` asume que esto va a
+pasar en cada corrida: lote chico (≤15 candidatos/corrida), `jitterDelay()`
+entre peticiones, y se detiene solo a los 3 fallos **consecutivos** en vez
+de insistir (mismo patrón que `run-indexing-tick.ts`).
+
+**Implementación** (`src/sources/reputation/computrabajo.ts`):
+`unwrapGoogleRedirect()`, `extractCompanySlugFromJobPageHtml()` (parser
+puro) + `fetchCompanySlugFromJobPage()`,
+`parseComputrabajoEvaluationsPage()` (parser puro, ambos testeados contra
+fixtures reales sin red) + `fetchCompanyReputation()`, y
+`computrabajoAdapter` que escribe sus propios alias como parte de
+`fetch()` — deliberadamente distinto al patrón de seed-script manual de
+Merco/GPTW, porque acá no hay nombre que reconciliar entre plataformas
+(el alias es literalmente `companyName === companyName`, tomado directo
+de `jobs.company`).
+
+**Verificado en producción esta sesión (dos corridas, antes y después de
+la corrección del punto anterior)**: `npm run reputation:tick` con las 3
+fuentes registradas resolvió 7 empresas reales de Computrabajo en la
+primera corrida (`ACTIVOS S A S`, `Adecco Colombia S.A.`, `AGENCIA DE
+EMPLEO COMFAMA`, `Eficacia`, `Manpower Group Colombia`, `SERDAN - MISION
+TEMPORAL`, `SOLVO S.A.S`) y 3 empresas nuevas más en una segunda corrida
+tras corregir el extractor de slug (incluyendo "Concentrix", el caso que
+expuso el bug), sin disparar el circuit breaker en ninguna de las dos. QA
+visual real en `/empresas/eficacia`: "computrabajo: 4.6 (1-5) · 21088
+reseñas" con link "Ver fuente" — nunca un logo, coincide exactamente con
+la fila real en `company_reputation`. Cadencia cambiada a mensual en
+`.github/workflows/reputation-tick.yml` (`0 6 1 * *`) — corridas futuras
+cubren más empresas de forma incremental (excluye las que ya tienen alias
+de `computrabajo`), nunca reprocesando las ya resueltas ni quedándose
+atascadas en las mismas empresas al inicio del lote.
 
 ### 5.5 Fase R5 — bloqueada (LinkedIn)
 
@@ -388,20 +422,21 @@ cancelada.
 
 ## 7. Próximo paso
 
-**El pipeline queda completo en su alcance actual, las 5 fases planeadas
-resueltas**: R0-R3 construidas y en producción (2 fuentes reales, Merco
-Talento + Great Place to Work Colombia, 354 filas verificadas, UI con
-atribución en texto). R4 (Computrabajo) y R5 (LinkedIn) quedan bloqueadas
-por el mismo tipo de problema técnico real — descubrimiento de
-identificador por empresa sin scraping prohibido — no por falta de
-intención (ver §5.4 y §5.5). No hay ninguna fase de código pendiente
-forzada.
+**R0-R4 construidas y en producción**: 3 fuentes reales (Merco Talento,
+Great Place to Work Colombia, Computrabajo), UI con atribución en texto,
+nunca logos. R5 (LinkedIn) queda bloqueada por el mismo tipo de problema
+técnico que R4 tuvo originalmente — descubrimiento de identificador por
+empresa sin scraping prohibido (`robots.txt` de LinkedIn bloquea `/`
+entero) — no por falta de intención (ver §5.5). No hay ninguna fase de
+código pendiente forzada.
 
 Si en el futuro aparece una forma legítima de resolver el descubrimiento
-en cualquiera de las dos (ej. acceso a devtools de una sesión real de
-navegador, o un cambio en la política de acceso de esas plataformas),
-ambas quedan documentadas con el parser/patrón ya identificado, listas
-para retomar sin tener que reinvestigar desde cero.
+en LinkedIn (ej. el email de whitelisting que su propio `robots.txt`
+sugiere, o un cambio en su política de acceso), queda documentado con el
+patrón ya identificado, listo para retomar sin tener que reinvestigar
+desde cero. Computrabajo (R4) ya no tiene ese problema — el mecanismo de
+descubrimiento vía `jobs` propia cubre incrementalmente más empresas en
+cada corrida mensual, sin necesitar el directorio ni la API bloqueados.
 
 ## 8. Extensión: página de empresa (`/empresas/:slug`)
 

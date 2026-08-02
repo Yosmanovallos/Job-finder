@@ -139,6 +139,56 @@ Repetir tras cualquier cambio en `resolveCompanyBySlug()`
       cambió.
 - [ ] `npm run test:seo` y `npm run test:dashboard-filters` en verde.
 
+## 5. Fase R4 (retomada) — Computrabajo (descubrimiento vía `jobs` propia)
+
+Repetir tras cualquier cambio en `src/sources/reputation/computrabajo.ts`,
+`getComputrabajoDiscoveryCandidates()` (`company-reputation-repository.ts`),
+o `.github/workflows/reputation-tick.yml`. A diferencia de Merco/GPTW, acá
+no hay script de seed manual — el propio `computrabajoAdapter.fetch()`
+descubre y escribe sus alias en la misma corrida (ver
+`docs/COMPANY-REPUTATION-PLAN.md` §R4 para el porqué).
+
+- [ ] `npm run test:reputation` en verde (incluye
+      `unwrapGoogleRedirect()`, `extractCompanySlugFromJobPageHtml()`
+      contra el fixture real `tests/fixtures/computrabajo-job-page-sample.html`
+      — el link real `offer-grid-article-company-url`, nunca el widget
+      condicional "Mostrar los N salarios" — y `parseComputrabajoEvaluationsPage()`
+      contra `tests/fixtures/computrabajo-evaluaciones-sample.html` — score
+      con coma decimal española, conteo real de reseñas, y el caso de URL
+      final redirigida silenciosamente a la home).
+- [ ] `npm run reputation:tick` — reporta **3 fuente(s) registrada(s)**
+      (Merco + GPTW + Computrabajo). Corridas reales de esta sesión: 7 de
+      hasta 15 candidatos resueltos en la primera (`ACTIVOS S A S`,
+      `Adecco Colombia S.A.`, `AGENCIA DE EMPLEO COMFAMA`, `Eficacia`,
+      `Manpower Group Colombia`, `SERDAN - MISION TEMPORAL`, `SOLVO
+      S.A.S`), sin disparar el circuit breaker (0 fallos consecutivos). Si
+      la corrida devuelve consistentemente 0 empresas nuevas en corridas
+      sucesivas mientras `getComputrabajoDiscoveryCandidates()` sigue
+      teniendo candidatos pendientes, es la señal de que el extractor de
+      slug volvió a quedar atascado en el mismo problema que ya se corrigió
+      una vez esta sesión (ver §5.4 del plan) — no asumir que esas
+      empresas "simplemente no tienen datos" sin antes probar
+      `extractCompanySlugFromJobPageHtml()` a mano contra la página de
+      vacante real de una de ellas.
+- [ ] Con el servidor local corriendo: `/empresas/<slug-de-una-empresa-recién-descubierta>`
+      (ej. `/empresas/eficacia`) muestra "Reputación como empleador" con
+      "computrabajo: `<score>` (1-5) · `<N>` reseñas" y un link "Ver
+      fuente" — **nunca un logo**. Verificado en vivo esta sesión con
+      Eficacia: `4.6 (1-5) · 21088 reseñas`, coincide exactamente con la
+      fila real en `company_reputation`.
+- [ ] Confirmar que `source_circuit_state` no tiene a "Computrabajo"
+      marcado como degradado tras una corrida normal (`SELECT * FROM
+      source_circuit_state WHERE source_name ILIKE '%computrabajo%'` →
+      vacío). Si aparece degradado, es la señal esperada de que el sitio
+      empezó a bloquear en esa corrida — no reintentar manualmente, dejar
+      que el circuit breaker se recupere solo (30 min) y la próxima
+      corrida mensual siga desde ahí.
+- [ ] `.github/workflows/reputation-tick.yml` — cron cambiado a mensual
+      (`0 6 1 * *`); confirmar sintaxis válida en la pestaña Actions tras
+      el push.
+- [ ] Regresión: `npm run build`, `npm run test:seo`,
+      `npm run test:dashboard-filters` en verde.
+
 ## Nota de seguridad
 
 Este proyecto **no tiene una base de datos de test separada** — el mismo

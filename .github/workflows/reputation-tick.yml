@@ -2,9 +2,13 @@ name: Company Reputation Tick
 
 on:
   schedule:
-    - cron: "0 6 * * 1" # Weekly, Monday 06:00 UTC — reputation rankings
+    - cron: "0 6 1 * *" # Monthly, 1st at 06:00 UTC — reputation rankings
       # change on an annual/semi-annual cadence, not worth running more
-      # often (unlike scrape-jobs.yml's 15 min or indexing-tick.yml's hourly).
+      # often (unlike scrape-jobs.yml's 15 min or indexing-tick.yml's
+      # hourly). Also matches Computrabajo's R4 discovery batch (~15
+      # companies/run): a monthly cadence lets it grow the curated set
+      # incrementally without re-hitting a source that hardens blocking
+      # under repeated short-window requests (see computrabajo.ts).
   workflow_dispatch:
 
 concurrency:
