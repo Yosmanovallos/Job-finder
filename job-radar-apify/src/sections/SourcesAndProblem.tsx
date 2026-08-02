@@ -1,17 +1,27 @@
 import { Browsers, Copy, LinkBreak } from "@phosphor-icons/react";
 
-const sources = [
-  "LinkedIn Jobs",
-  "Computrabajo",
-  "Elempleo",
-  "Magneto",
-  "Torre",
-  "GetOnBoard",
-  "RemoteOK",
-  "Remotive",
-  "Workana",
-  "WeRemoto"
-];
+// CO gets every source actually scraped for Colombia. VE only has
+// LinkedIn/Computrabajo country-scoped so far (see src/sources/*-ve.ts) —
+// the rest of CO's list (Elempleo, Magneto, Workana) has no Venezuela
+// adapter yet, so claiming them here would overpromise. The shared
+// remote-catalog sources (Torre, GetOnBoard, RemoteOK, Remotive, WeRemoto)
+// are genuinely connected for both — they show on /ve/dashboard too (see
+// countries/index.ts's ALWAYS_REMOTE_SOURCES / resolveJobCountry).
+const SOURCES_BY_COUNTRY: Record<string, string[]> = {
+  CO: [
+    "LinkedIn Jobs",
+    "Computrabajo",
+    "Elempleo",
+    "Magneto",
+    "Torre",
+    "GetOnBoard",
+    "RemoteOK",
+    "Remotive",
+    "Workana",
+    "WeRemoto"
+  ],
+  VE: ["LinkedIn Jobs", "Computrabajo", "Torre", "GetOnBoard", "RemoteOK", "Remotive", "WeRemoto"]
+};
 
 const problems = [
   {
@@ -34,7 +44,14 @@ const problems = [
   }
 ];
 
-export default function SourcesAndProblem() {
+export interface SourcesAndProblemProps {
+  // Defaults to "CO" so /fuentes (rendered outside the country-aware
+  // Landing route) keeps today's exact source list.
+  country?: string;
+}
+
+export default function SourcesAndProblem({ country = "CO" }: SourcesAndProblemProps) {
+  const sources = SOURCES_BY_COUNTRY[country] || SOURCES_BY_COUNTRY.CO;
   return (
     <section
       id="fuentes"

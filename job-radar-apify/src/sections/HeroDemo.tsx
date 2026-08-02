@@ -1,9 +1,21 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { getCountryConfig } from "../countries/index.js";
 
-export default function HeroDemo() {
+export interface HeroDemoProps {
+  // Defaults to "CO" so /como-funciona and /fuentes (which render this
+  // outside the country-aware Landing route) keep today's exact copy.
+  country?: string;
+}
+
+export default function HeroDemo({ country = "CO" }: HeroDemoProps) {
   const navigate = useNavigate();
   const [heroSearch, setHeroSearch] = useState("");
+  const countryConfig = getCountryConfig(country);
+  const dashboardPath = country === "VE" ? "/ve/dashboard" : "/dashboard";
+  // First city in the country's own list (Bogotá for CO, Caracas for VE) —
+  // same list the dashboard's own city filter uses (getCityOptionsForCountry).
+  const featuredCity = countryConfig.cities[0];
 
   // The search box and chips below all lead into the real Dashboard, and
   // whatever the user typed/picked here has to actually carry over — an
@@ -12,7 +24,7 @@ export default function HeroDemo() {
   const goToDashboard = (e?: React.FormEvent, params?: Record<string, string>) => {
     e?.preventDefault();
     const query = new URLSearchParams(params).toString();
-    navigate(query ? `/dashboard?${query}` : "/dashboard");
+    navigate(query ? `${dashboardPath}?${query}` : dashboardPath);
   };
 
   return (
@@ -42,12 +54,12 @@ export default function HeroDemo() {
             className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-foreground mb-4"
             style={{ fontFamily: "'Space Grotesk', sans-serif" }}
           >
-            Encuentra todas las vacantes de Colombia{" "}
+            Encuentra todas las vacantes de {countryConfig.name}{" "}
             <span style={{ color: "#0f6b4c" }}>en un solo lugar</span>
           </h1>
 
           <p className="text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto mb-8">
-            Sin duplicados, sin pestañas de más. Un solo buscador para todas las vacantes de Colombia.
+            Sin duplicados, sin pestañas de más. Un solo buscador para todas las vacantes de {countryConfig.name}.
           </p>
 
           <form
@@ -84,10 +96,10 @@ export default function HeroDemo() {
               Remoto
             </button>
             <button
-              onClick={() => goToDashboard(undefined, { cities: "Bogotá" })}
+              onClick={() => goToDashboard(undefined, { cities: featuredCity })}
               className="text-xs font-mono px-3.5 py-1.5 rounded-full border border-[#d3d6cf] text-muted-foreground hover:border-primary/40 hover:text-green-deep transition-colors"
             >
-              Bogotá
+              {featuredCity}
             </button>
           </div>
         </div>

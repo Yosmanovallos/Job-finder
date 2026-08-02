@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
 import { ReputationBadges, ReputationEntryProps } from "../components/ReputationBadges.js";
 import { CategoryJobRow } from "../components/CategoryJobRow.js";
 import { CompanyReviewForm } from "../components/CompanyReviewForm.js";
@@ -25,6 +25,13 @@ type LoadState = "loading" | "found" | "not-found";
 export default function CompanyLanding() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  // /empresas/:slug (Colombia, default) vs /ve/empresas/:slug (Venezuela) —
+  // same path-prefix pattern as Dashboard.tsx. Sent to the API so a slug
+  // that only resolves via the other country's jobs correctly 404s here
+  // instead of showing a cross-country company page (see server.ts's
+  // /api/companies/:slug country scoping).
+  const country = location.pathname.startsWith("/ve") ? "VE" : "CO";
   const { accessToken, loading: authLoading } = useAuth();
 
   const [companyName, setCompanyName] = useState<string | null>(null);
@@ -46,7 +53,7 @@ export default function CompanyLanding() {
     if (authLoading) return;
     setState("loading");
     const headers: HeadersInit = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
-    fetch(`/api/companies/${encodeURIComponent(slug)}`, { headers })
+    fetch(`/api/companies/${encodeURIComponent(slug)}?country=${country}`, { headers })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (data) {
@@ -61,7 +68,7 @@ export default function CompanyLanding() {
         }
       })
       .catch(() => setState("not-found"));
-  }, [slug, accessToken, authLoading]);
+  }, [slug, accessToken, authLoading, country]);
 
   usePageMeta({
     title: companyName ? `${companyName} | BuscoTrabajo` : "Cargando empresa... | BuscoTrabajo",
@@ -88,7 +95,9 @@ export default function CompanyLanding() {
             <span className="text-3xl block mb-2">🔍</span>
             No encontramos esta empresa.
             <div className="mt-4">
-              <Button onClick={() => navigate("/dashboard")}>Ver todas las vacantes</Button>
+              <Button onClick={() => navigate(country === "VE" ? "/ve/dashboard" : "/dashboard")}>
+                Ver todas las vacantes
+              </Button>
             </div>
           </div>
         )}

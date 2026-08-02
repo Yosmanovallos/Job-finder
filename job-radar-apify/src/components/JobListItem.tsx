@@ -3,6 +3,7 @@ import { getModalityLabel } from "../lib/job-filters.js";
 import { Badge } from "./ui/badge.js";
 import { cn } from "../lib/utils.js";
 import { Job } from "../sources/types.js";
+import { getCountryConfig } from "../countries/index.js";
 
 export interface JobListItemProps {
   job: Job & { salary?: string };
@@ -46,7 +47,7 @@ export const JobListItem: React.FC<JobListItemProps> = ({ job, selected, onClick
       </h3>
       <p className="text-xs text-foreground/80 mb-2 truncate">
         {job.company || "Confidencial"}
-        <span className="text-muted-foreground"> · {job.location || "Colombia"}</span>
+        <span className="text-muted-foreground"> · {job.location || getCountryConfig(job.country).name}</span>
       </p>
       <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
         {modality && <Badge variant={MODALITY_VARIANT[modality]}>{modality}</Badge>}

@@ -5,12 +5,39 @@ import { useAuth } from "../auth/auth-provider.js";
 import { PAYWALL_ENABLED } from "../config.js";
 import { Button } from "../components/ui/button.js";
 
-const navLinks = [
-  { label: "Cómo funciona", to: "/como-funciona" },
-  { label: "Empresas", to: "/empresas" },
-  ...(PAYWALL_ENABLED ? [{ label: "Precios", to: "/pricing" }] : []),
-  { label: "Preguntas", to: "/preguntas" }
-];
+// "Empresas" is the one nav link that's actually country-scoped (see
+// server.ts's /api/companies/* country filter) — /ve/empresas vs /empresas,
+// picked at render time below. The rest (Cómo funciona/Precios/Preguntas)
+// are shared informational pages, not job-data pages, so they stay
+// unprefixed for both countries.
+function getNavLinks(isVenezuela: boolean) {
+  return [
+    { label: "Cómo funciona", to: "/como-funciona" },
+    { label: "Empresas", to: isVenezuela ? "/ve/empresas" : "/empresas" },
+    ...(PAYWALL_ENABLED ? [{ label: "Precios", to: "/pricing" }] : []),
+    { label: "Preguntas", to: "/preguntas" }
+  ];
+}
+
+// Maps the current path to its equivalent under the OTHER country, keeping
+// the visitor on the same kind of page (landing stays landing, dashboard
+// stays dashboard, empresas stays empresas) instead of always bouncing to
+// the dashboard regardless of where the switch was clicked from. Anything
+// not in this list (login, pricing, legal, account...) isn't country-scoped
+// at all, so switching from there falls back to that country's dashboard —
+// the closest "still useful" destination.
+function getCountrySwitchHref(pathname: string, toVenezuela: boolean): string {
+  if (toVenezuela) {
+    if (pathname === "/") return "/ve";
+    if (pathname === "/dashboard") return "/ve/dashboard";
+    if (pathname === "/empresas") return "/ve/empresas";
+    return "/ve/dashboard";
+  }
+  if (pathname === "/ve") return "/";
+  if (pathname === "/ve/dashboard") return "/dashboard";
+  if (pathname === "/ve/empresas") return "/empresas";
+  return "/dashboard";
+}
 
 export default function Header() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -42,12 +69,10 @@ export default function Header() {
 
   // Same "/ve" prefix detection as Dashboard.tsx — shows the OTHER country
   // as the link target (switch-to, not current-state) since that's the
-  // action being offered. Only ever points at /dashboard or /ve/dashboard —
-  // company/category pages aren't country-scoped yet (see App.tsx's route
-  // comment), so switching from those always lands on the job list rather
-  // than a same-page-different-country equivalent that doesn't exist yet.
+  // action being offered.
   const isVenezuela = location.pathname.startsWith("/ve");
-  const countrySwitchHref = isVenezuela ? "/dashboard" : "/ve/dashboard";
+  const navLinks = getNavLinks(isVenezuela);
+  const countrySwitchHref = getCountrySwitchHref(location.pathname, !isVenezuela);
   const countrySwitchLabel = isVenezuela ? "🇨🇴 Colombia" : "🇻🇪 Venezuela";
 
   return (

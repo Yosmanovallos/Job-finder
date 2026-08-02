@@ -5,6 +5,7 @@ import { Job } from "../sources/types.js";
 import { getSourceColor } from "../lib/source-colors.js";
 import { getModalityLabel } from "../lib/job-filters.js";
 import { buildCompanyPath } from "../lib/job-seo.js";
+import { getCountryConfig } from "../countries/index.js";
 import { useAuth } from "../auth/auth-provider.js";
 import { Button } from "./ui/button.js";
 import { Badge } from "./ui/badge.js";
@@ -25,6 +26,13 @@ export interface JobCardProps {
   // to the external posting — the caller (Dashboard) owns the gate modal's
   // open/closed state so it can be shared with the split-pane detail panel.
   onApplyClick?: (job: JobCardProps["job"]) => void;
+  // Which dashboard context this card is rendered in ("CO" default, "VE" on
+  // /ve/dashboard) — NOT the same as job.country (which can be null for a
+  // shared remote posting). The company link below must stay inside
+  // whichever country page the visitor is already on, so it uses this, not
+  // job.country: a remote job shown on /ve/dashboard still links to
+  // /ve/empresas/:slug, never back out to the Colombia-scoped page.
+  country?: string;
 }
 
 function initialFor(job: JobCardProps["job"]): string {
@@ -48,7 +56,8 @@ export const JobCard: React.FC<JobCardProps> = ({
   job,
   onSaveToggle,
   onAppliedToggle,
-  onApplyClick
+  onApplyClick,
+  country
 }) => {
   const { isAuthenticated } = useAuth();
   const [saved, setSaved] = useState(job.isSaved || false);
@@ -125,7 +134,7 @@ export const JobCard: React.FC<JobCardProps> = ({
                 // not one of the curated reputation companies, so this is
                 // never a dead link (see docs/COMPANY-REPUTATION-PLAN.md §8).
                 <Link
-                  to={buildCompanyPath(job.company)}
+                  to={buildCompanyPath(job.company, country)}
                   className="hover:underline hover:text-primary"
                   onClick={(e) => e.stopPropagation()}
                 >
@@ -134,7 +143,7 @@ export const JobCard: React.FC<JobCardProps> = ({
               ) : (
                 "Confidencial"
               )}
-              <span className="text-muted-foreground"> · {job.location || "Colombia"}</span>
+              <span className="text-muted-foreground"> · {job.location || getCountryConfig(country || job.country).name}</span>
             </p>
 
             <div className="flex flex-wrap items-center gap-1.5 mb-2">

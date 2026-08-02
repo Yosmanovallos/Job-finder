@@ -1,5 +1,5 @@
 import { Suspense, lazy } from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import Header from "./sections/Header.js";
 import HeroDemo from "./sections/HeroDemo.js";
 import SourcesAndProblem from "./sections/SourcesAndProblem.js";
@@ -9,6 +9,7 @@ import Faq from "./sections/Faq.js";
 import Footer from "./sections/Footer.js";
 import ScrollToTop from "./components/ScrollToTop.js";
 import { usePageMeta, PageMeta } from "./lib/use-page-meta.js";
+import { getCountryConfig } from "./countries/index.js";
 import { AuthProvider } from "./auth/auth-provider.js";
 import RequireAuth from "./auth/require-auth.js";
 
@@ -29,16 +30,22 @@ const Legal = lazy(() => import("./sections/Legal.js"));
 const Account = lazy(() => import("./sections/Account.js"));
 
 function Landing() {
+  // "/" (Colombia, default) vs "/ve" (Venezuela) — same pattern as
+  // Dashboard.tsx: path-prefix detection, no route param, so this stays a
+  // plain literal route in App.tsx instead of an optional-segment route.
+  const location = useLocation();
+  const country = location.pathname.startsWith("/ve") ? "VE" : "CO";
+  const countryName = getCountryConfig(country).name;
+
   usePageMeta({
-    title: "BuscoTrabajo — Vacantes de Empleo en Colombia, Todas en un Solo Lugar",
-    description:
-      "Encuentra vacantes de empleo en Colombia de LinkedIn, Computrabajo, Elempleo, Magneto, Torre y otros portales, deduplicadas y verificadas en un solo dashboard. Gratis para vacantes con más de 48h publicadas."
+    title: `BuscoTrabajo — Vacantes de Empleo en ${countryName}, Todas en un Solo Lugar`,
+    description: `Encuentra vacantes de empleo en ${countryName} de LinkedIn, Computrabajo${country === "CO" ? ", Elempleo, Magneto" : ""}, Torre y otros portales, deduplicadas y verificadas en un solo dashboard. Gratis para vacantes con más de 48h publicadas.`
   });
 
   return (
     <>
-      <HeroDemo />
-      <SourcesAndProblem />
+      <HeroDemo country={country} />
+      <SourcesAndProblem country={country} />
       <ComparisonAndProcess />
       <ProductFeaturesPricingFaq />
     </>
@@ -82,20 +89,24 @@ export default function App() {
               <Routes>
                 <Route path="/" element={<Landing />} />
                 <Route path="/dashboard" element={<Dashboard />} />
-                {/* Venezuela mirror — same component, Dashboard.tsx reads the
-                    country off the "/ve" prefix itself (see its comment).
-                    Job detail pages are country-agnostic by design (see
-                    job-seo.ts's buildJobPath) and stay at the single
-                    /empleos/:id route below for every country — no /ve
-                    equivalent, so the sitemap/Indexing API pipeline (which
-                    only ever knows about /empleos/) never emits a URL this
-                    router wouldn't also serve. Category/city landing pages
-                    are still Colombia-only, left as a follow-up. */}
+                {/* Venezuela mirror — same components throughout, each one
+                    reads the country off the "/ve" prefix itself (see
+                    Dashboard.tsx's comment for the pattern every one of
+                    these follows). Job detail pages are the one exception:
+                    country-agnostic by design (see job-seo.ts's
+                    buildJobPath) and stay at the single /empleos/:id route
+                    for every country — no /ve equivalent, so the sitemap/
+                    Indexing API pipeline (which only ever knows about
+                    /empleos/) never emits a URL this router wouldn't also
+                    serve. Category/city landing pages are still
+                    Colombia-only, left as a follow-up. */}
+                <Route path="/ve" element={<Landing />} />
                 <Route path="/ve/dashboard" element={<Dashboard />} />
-                <Route path="/ve" element={<Navigate to="/ve/dashboard" replace />} />
                 <Route path="/empleos/:id/:slug?" element={<EmpleosRoute />} />
                 <Route path="/empresas" element={<CompaniesDirectory />} />
                 <Route path="/empresas/:slug" element={<CompanyLanding />} />
+                <Route path="/ve/empresas" element={<CompaniesDirectory />} />
+                <Route path="/ve/empresas/:slug" element={<CompanyLanding />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/auth/callback" element={<AuthCallback />} />

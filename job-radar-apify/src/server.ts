@@ -340,8 +340,14 @@ const server = http.createServer(async (req, res) => {
     const q = params.get("q") || "";
     const limit = Math.min(Math.max(parseInt(params.get("limit") || "20", 10) || 20, 1), 100);
     const offset = Math.max(parseInt(params.get("offset") || "0", 10) || 0, 0);
+    const country = params.get("country") || undefined;
     const jobs = await getJobsCached(50000);
-    const { companies, total } = searchCompanies(jobs, q, limit, offset);
+    // Country-scoped same as GET /api/jobs (country = $1 OR country IS NULL)
+    // — a company directory browsed from Venezuela must never surface a
+    // Colombia-only employer, and vice versa (remote-hiring companies still
+    // show in both, same as remote jobs do).
+    const countryJobs = country ? applyJobFilters(jobs, { country }) : jobs;
+    const { companies, total } = searchCompanies(countryJobs, q, limit, offset);
 
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ companies, total, hasMore: offset + limit < total }));
@@ -360,21 +366,39 @@ const server = http.createServer(async (req, res) => {
   // never a guessed/invented page.
   if (pathname.startsWith("/api/companies/") && method === "GET") {
     const slug = pathname.slice("/api/companies/".length);
+    const country = parsedUrl.searchParams.get("country") || undefined;
 
     const session = await verifySession(req);
     const tier = session?.tier || "free";
     const jobs = await getJobsCached(50000);
     const visibleJobs = maskLockedFields(jobs, tier);
+    // Same country scoping as the search endpoint above, applied BEFORE
+    // resolution — resolveCompanyNameFromJobs()'s fallback only matches
+    // against this country-scoped view, so a slug that only resolves via a
+    // job from the other country correctly falls through to the 404 below
+    // instead of resolving into a company page with zero jobs to show.
+    const countryJobs = country ? applyJobFilters(visibleJobs, { country }) : visibleJobs;
 
     const companyName =
-      (await resolveCompanyBySlug(slug)) || resolveCompanyNameFromJobs(slug, visibleJobs);
+      (await resolveCompanyBySlug(slug)) || resolveCompanyNameFromJobs(slug, countryJobs);
     if (!companyName) {
       res.writeHead(404, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: "Empresa no encontrada" }));
       return;
     }
 
-    const matched = applyJobFilters(visibleJobs, { company: companyName });
+    const matched = applyJobFilters(countryJobs, { company: companyName });
+    // resolveCompanyBySlug() (the curated Merco/GPTW alias table) is
+    // country-agnostic, so it can resolve a real companyName that simply
+    // has no jobs in this country's scoped view (e.g. a Colombia-only
+    // curated company hit while browsing from /ve/empresas). Treating that
+    // as "not found here" — not an empty-but-200 company page — is what
+    // keeps the two countries' directories from ever cross-linking.
+    if (country && matched.length === 0) {
+      res.writeHead(404, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Empresa no encontrada" }));
+      return;
+    }
     const page = matched.slice(0, 60);
     // Independent of each other (both only need companyName, already
     // resolved above) — run concurrently instead of one full DB round trip

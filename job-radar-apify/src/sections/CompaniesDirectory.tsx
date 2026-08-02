@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { Search } from "lucide-react";
 import { MonoLabel } from "../components/MonoLabel.js";
 import { Input } from "../components/ui/input.js";
 import { usePageMeta } from "../lib/use-page-meta.js";
 import { buildCompanyPath } from "../lib/job-seo.js";
+import { getCountryConfig } from "../countries/index.js";
 
 interface CompanyResult {
   company: string;
@@ -27,9 +28,15 @@ function initialFor(name: string): string {
 // (CompanyLanding.tsx), which already renders that company's reputation,
 // native reviews and job list — nothing here duplicates that.
 export default function CompaniesDirectory() {
+  // /empresas (Colombia, default) vs /ve/empresas (Venezuela) — same
+  // path-prefix pattern as Dashboard.tsx/Landing.
+  const location = useLocation();
+  const country = location.pathname.startsWith("/ve") ? "VE" : "CO";
+  const countryName = getCountryConfig(country).name;
+
   usePageMeta({
-    title: "Empresas | BuscoTrabajo",
-    description: "Explora empresas con vacantes activas en BuscoTrabajo — su reputación, reseñas y ofertas."
+    title: `Empresas en ${countryName} | BuscoTrabajo`,
+    description: `Explora empresas con vacantes activas en ${countryName} en BuscoTrabajo — su reputación, reseñas y ofertas.`
   });
 
   const [search, setSearch] = useState("");
@@ -52,11 +59,12 @@ export default function CompaniesDirectory() {
     (offset: number) => {
       const params = new URLSearchParams();
       if (debouncedSearch.trim()) params.set("q", debouncedSearch.trim());
+      params.set("country", country);
       params.set("limit", String(PAGE_SIZE));
       params.set("offset", String(offset));
       return params.toString();
     },
-    [debouncedSearch]
+    [debouncedSearch, country]
   );
 
   // Reset + fetch the first page whenever the (debounced) search changes.
@@ -169,7 +177,7 @@ export default function CompaniesDirectory() {
             {companies.map((c) => (
               <Link
                 key={c.company}
-                to={buildCompanyPath(c.company)}
+                to={buildCompanyPath(c.company, country)}
                 className="hud-corners flex items-center gap-3 rounded-lg border border-border bg-card p-4 hover:border-border-strong transition-colors"
               >
                 <div className="shrink-0 w-11 h-11 rounded-lg bg-gradient-to-br from-gold-1 to-gold-2 text-gold-ink font-heading font-semibold text-lg flex items-center justify-center">

@@ -5,6 +5,7 @@ import { Job } from "../sources/types.js";
 import { getSourceColor } from "../lib/source-colors.js";
 import { getModalityLabel } from "../lib/job-filters.js";
 import { buildCompanyPath } from "../lib/job-seo.js";
+import { getCountryConfig } from "../countries/index.js";
 import { useAuth } from "../auth/auth-provider.js";
 import { Button } from "./ui/button.js";
 import { Badge } from "./ui/badge.js";
@@ -23,6 +24,9 @@ export interface JobDetailPanelProps {
   onSaveToggle?: (jobId: string) => void;
   onAppliedToggle?: (jobId: string) => void;
   onApplyClick?: (job: any) => void;
+  // Dashboard context ("CO"/"VE") — see JobCard.tsx's identical prop for why
+  // this, not job.country, decides the company link's prefix.
+  country?: string;
 }
 
 const MODALITY_VARIANT: Record<string, "remote" | "hybrid" | "default"> = {
@@ -46,7 +50,8 @@ export const JobDetailPanel: React.FC<JobDetailPanelProps> = ({
   job,
   onSaveToggle,
   onAppliedToggle,
-  onApplyClick
+  onApplyClick,
+  country
 }) => {
   const { isAuthenticated } = useAuth();
 
@@ -91,13 +96,13 @@ export const JobDetailPanel: React.FC<JobDetailPanelProps> = ({
                 {job.company ? (
                   // Every real company resolves — see JobCard.tsx's
                   // identical link for the reasoning.
-                  <Link to={buildCompanyPath(job.company)} className="hover:underline hover:text-primary">
+                  <Link to={buildCompanyPath(job.company, country)} className="hover:underline hover:text-primary">
                     {job.company}
                   </Link>
                 ) : (
                   "Confidencial"
                 )}
-                <span className="text-muted-foreground"> · {job.location || "Colombia"}</span>
+                <span className="text-muted-foreground"> · {job.location || getCountryConfig(country || job.country).name}</span>
               </p>
             </div>
           </div>

@@ -252,12 +252,23 @@ export function buildCategoryUrl(label: string): string {
 // company name (never an id) is what resolveCompanyBySlug() in
 // company-reputation-repository.ts matches back against, mirroring
 // resolveCategorySlug()'s pattern.
-export function buildCompanyPath(companyName: string): string {
-  return `/empresas/${slugify(companyName)}`;
+//
+// `country` (optional, defaults to no prefix = Colombia) picks /ve/empresas
+// vs /empresas — unlike buildJobPath, this one DOES vary by country: the
+// company *directory/listing* is meant to stay fully separated per country
+// (server.ts's /api/companies/search and /api/companies/:slug now filter by
+// country too), so its URLs need to be distinguishable the same way
+// /dashboard vs /ve/dashboard are. Callers (JobCard/JobDetailPanel) pass the
+// dashboard context's country, not job.country, so a remote job shown on
+// /ve/dashboard still links to /ve/empresas/... — see those components' own
+// comments.
+export function buildCompanyPath(companyName: string, country?: string | null): string {
+  const prefix = country === "VE" ? "/ve" : "";
+  return `${prefix}/empresas/${slugify(companyName)}`;
 }
 
-export function buildCompanyUrl(companyName: string): string {
-  return `${SITE_URL}${buildCompanyPath(companyName)}`;
+export function buildCompanyUrl(companyName: string, country?: string | null): string {
+  return `${SITE_URL}${buildCompanyPath(companyName, country)}`;
 }
 
 // Fallback resolution for /empresas/:slug when the slug isn't one of the

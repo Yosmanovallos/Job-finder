@@ -718,6 +718,7 @@ export default function Dashboard() {
                         onSaveToggle={handleSaveToggle}
                         onAppliedToggle={handleAppliedToggle}
                         onApplyClick={setApplyGateJob}
+                        country={country}
                       />
                     )}
                   </div>
@@ -745,6 +746,7 @@ export default function Dashboard() {
                         onSaveToggle={handleSaveToggle}
                         onAppliedToggle={handleAppliedToggle}
                         onApplyClick={setApplyGateJob}
+                        country={country}
                       />
                     )
                   )}
