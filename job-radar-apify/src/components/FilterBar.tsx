@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { DEFAULT_ROLES_200 } from "../queue/scheduler.js";
 import { CITY_OPTIONS } from "../lib/job-filters.js";
 import { Checkbox } from "./ui/checkbox.js";
@@ -14,6 +14,10 @@ export interface FilterState {
   appliedOnly: boolean;
   selectedRoles: string[];
   cities: string[];
+  // Exact company name (never an array — single-select, matches the exact
+  // string applyJobFilters()/GET /api/jobs use, unlike sources/cities which
+  // are OR'd checkbox lists). "" = no filter.
+  company: string;
 }
 
 export const EMPTY_FILTERS: FilterState = {
@@ -24,8 +28,16 @@ export const EMPTY_FILTERS: FilterState = {
   savedOnly: false,
   appliedOnly: false,
   selectedRoles: [],
-  cities: []
+  cities: [],
+  company: ""
 };
+
+interface CompanySearchResult {
+  company: string;
+  count: number;
+}
+
+const COMPANY_SEARCH_DEBOUNCE_MS = 300;
 
 export const SOURCE_OPTIONS = [
   "LinkedIn",
@@ -99,8 +111,27 @@ const CheckRow: React.FC<{
 
 export const FilterBar: React.FC<FilterBarProps> = ({ filters, onFilterChange }) => {
   const [roleSearch, setRoleSearch] = useState("");
+  const [companySearch, setCompanySearch] = useState("");
+  const [companyResults, setCompanyResults] = useState<CompanySearchResult[]>([]);
+  const [companyLoading, setCompanyLoading] = useState(false);
 
   const update = (partial: Partial<FilterState>) => onFilterChange({ ...filters, ...partial });
+
+  // 5,525+ distinct companies in the real corpus (vs. ~10-13 cities/sources)
+  // — too many to ever send the client a full list like CITY_OPTIONS/
+  // SOURCE_OPTIONS. Server-side substring search instead, same debounce
+  // treatment as the dashboard's own free-text search box.
+  useEffect(() => {
+    setCompanyLoading(true);
+    const t = setTimeout(() => {
+      fetch(`/api/companies/search?q=${encodeURIComponent(companySearch)}&limit=20`)
+        .then((res) => (res.ok ? res.json() : { companies: [] }))
+        .then((data) => setCompanyResults(Array.isArray(data.companies) ? data.companies : []))
+        .catch(() => setCompanyResults([]))
+        .finally(() => setCompanyLoading(false));
+    }, COMPANY_SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(t);
+  }, [companySearch]);
 
   const toggleInArray = (key: "sources" | "cities" | "selectedRoles", value: string) => {
     const current = filters[key];
@@ -121,7 +152,8 @@ export const FilterBar: React.FC<FilterBarProps> = ({ filters, onFilterChange })
     filters.freshness !== "all" ||
     filters.selectedRoles.length > 0 ||
     filters.savedOnly ||
-    filters.appliedOnly;
+    filters.appliedOnly ||
+    filters.company !== "";
 
   return (
     <div className="w-full">
@@ -186,6 +218,55 @@ export const FilterBar: React.FC<FilterBarProps> = ({ filters, onFilterChange })
                 onChange={() => toggleInArray("cities", c)}
               />
             ))}
+          </div>
+        </FilterSection>
+
+        <FilterSection title="Empresa">
+          <Input
+            type="text"
+            value={companySearch}
+            onChange={(e) => setCompanySearch(e.target.value)}
+            placeholder="Buscar empresa..."
+            className="h-8 mb-2 text-xs"
+          />
+          <div className="max-h-48 overflow-y-auto space-y-2.5 pr-1">
+            {/* Keeps the active selection visible/removable even once it
+                scrolls out of the current search results — filters.company
+                itself never depends on what's currently rendered here. */}
+            {filters.company && !companyResults.some((c) => c.company === filters.company) && (
+              <button
+                type="button"
+                onClick={() => update({ company: "" })}
+                className="w-full flex items-center justify-between gap-2 text-left text-sm text-primary font-medium py-0.5"
+              >
+                <span className="truncate">{filters.company}</span>
+                <span className="text-[10px] font-mono text-ink-faint shrink-0">Quitar ✕</span>
+              </button>
+            )}
+            {companyLoading ? (
+              <p className="text-ink-faint text-xs py-1">Buscando...</p>
+            ) : companyResults.length === 0 ? (
+              <p className="text-ink-faint text-xs py-1">Sin coincidencias.</p>
+            ) : (
+              <RadioGroup
+                value={filters.company}
+                onValueChange={(v) => update({ company: v })}
+              >
+                {companyResults.map((c) => (
+                  <label
+                    key={c.company}
+                    htmlFor={`company-${c.company}`}
+                    className="flex items-center gap-2.5 text-sm text-muted-foreground cursor-pointer hover:text-foreground transition-colors"
+                  >
+                    <RadioGroupItem id={`company-${c.company}`} value={c.company} />
+                    <span className="truncate flex-1">{c.company}</span>
+                    <span className="text-[11px] font-mono text-ink-faint shrink-0">
+                      ({c.count})
+                    </span>
+                  </label>
+                ))}
+              </RadioGroup>
+            )}
           </div>
         </FilterSection>
 

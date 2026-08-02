@@ -20,6 +20,7 @@ const Dashboard = lazy(() => import("./sections/Dashboard.js"));
 // pattern still covers both without colliding with server.ts's split.
 const EmpleosRoute = lazy(() => import("./sections/EmpleosRoute.js"));
 const CompanyLanding = lazy(() => import("./sections/CompanyLanding.js"));
+const CompaniesDirectory = lazy(() => import("./sections/CompaniesDirectory.js"));
 const Login = lazy(() => import("./sections/Login.js"));
 const ResetPassword = lazy(() => import("./sections/ResetPassword.js"));
 const AuthCallback = lazy(() => import("./sections/AuthCallback.js"));
@@ -82,6 +83,7 @@ export default function App() {
                 <Route path="/" element={<Landing />} />
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/empleos/:id/:slug?" element={<EmpleosRoute />} />
+                <Route path="/empresas" element={<CompaniesDirectory />} />
                 <Route path="/empresas/:slug" element={<CompanyLanding />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/reset-password" element={<ResetPassword />} />

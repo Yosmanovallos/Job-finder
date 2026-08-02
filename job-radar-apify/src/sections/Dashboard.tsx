@@ -43,7 +43,8 @@ export default function Dashboard() {
     search: searchParams.get("search") || "",
     modality: searchParams.get("modality") || "all",
     freshness: searchParams.get("freshness") || "all",
-    cities: searchParams.get("cities") ? [searchParams.get("cities") as string] : []
+    cities: searchParams.get("cities") ? [searchParams.get("cities") as string] : [],
+    company: searchParams.get("company") || ""
   }));
   const [debouncedSearch, setDebouncedSearch] = useState(() => searchParams.get("search") || "");
   const [jobs, setJobs] = useState<any[]>([]);
@@ -108,6 +109,7 @@ export default function Dashboard() {
       if (effectiveFilters.modality !== "all") params.set("modality", effectiveFilters.modality);
       if (effectiveFilters.freshness !== "all") params.set("freshness", effectiveFilters.freshness);
       effectiveFilters.selectedRoles.forEach((r) => params.append("roles", r));
+      if (effectiveFilters.company) params.set("company", effectiveFilters.company);
       params.set("limit", String(PAGE_SIZE));
       params.set("offset", String(offset));
       return params.toString();
@@ -358,7 +360,8 @@ export default function Dashboard() {
     (filters.modality !== "all" ? 1 : 0) +
     (filters.freshness !== "all" ? 1 : 0) +
     (filters.savedOnly ? 1 : 0) +
-    (filters.appliedOnly ? 1 : 0);
+    (filters.appliedOnly ? 1 : 0) +
+    (filters.company ? 1 : 0);
 
   // Only the mobile full-screen sheet needs this (it opaquely covers
   // everything, so a locked background isn't noticeable). The desktop
@@ -563,6 +566,29 @@ export default function Dashboard() {
               )}
             </div>
           </div>
+
+          {/* Company filter has no inline quick-select (5,525+ distinct
+              values, unlike freshness/modality/city above) — it only lives
+              inside the "Filtros" sheet's search box. This chip is the one
+              always-visible, always-removable indicator that it's active,
+              same requirement as every other filter but surfaced here
+              instead of a dropdown since there's no small fixed option list
+              to show one of inline. */}
+          {filters.company && (
+            <div className="flex items-center gap-2 mt-2">
+              <span className="inline-flex items-center gap-1.5 pl-3 pr-1.5 py-1 rounded-full bg-primary/10 border border-primary/30 text-xs font-mono text-primary">
+                Empresa: {filters.company}
+                <button
+                  type="button"
+                  onClick={() => setFilters((f) => ({ ...f, company: "" }))}
+                  aria-label="Quitar filtro de empresa"
+                  className="w-4 h-4 rounded-full flex items-center justify-center hover:bg-primary/20"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Below lg: full-screen filter sheet (there's no room for a

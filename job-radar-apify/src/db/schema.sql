@@ -183,6 +183,33 @@ CREATE TABLE IF NOT EXISTS company_reputation_alias (
 
 CREATE INDEX IF NOT EXISTS idx_company_reputation_alias_raw_name ON company_reputation_alias (raw_company_name);
 
+-- 11. Tabla `company_user_reviews`: reseñas de empleadores escritas por
+-- usuarios registrados de BuscoTrabajo (Fase E2) — distinta de
+-- `company_reputation`/`company_reputation_alias` arriba, que son fuentes
+-- externas agregadas (Merco/GPTW/Computrabajo). La atribución en el UI es
+-- siempre genérica ("Usuario verificado de BuscoTrabajo"), nunca el nombre
+-- real ni una relación laboral que no podemos verificar (regla 5 de
+-- AGENTS.md) — esa decisión vive en el componente que renderiza esto, no
+-- en el schema. `company_name` sigue la misma convención de string exacto
+-- que `company_reputation_alias.raw_company_name` (el valor tal cual
+-- aparece en `jobs.company`, nunca normalizado/fusionado). `status`
+-- soporta moderación manual vía SQL desde el día uno ('visible'/'hidden');
+-- no hay panel de admin en v1. UNIQUE(user_id, company_name): una reseña
+-- por usuario por empresa, reescribible, nunca acumulable.
+CREATE TABLE IF NOT EXISTS company_user_reviews (
+    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id       UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    company_name  VARCHAR(255) NOT NULL,
+    rating        SMALLINT NOT NULL CHECK (rating BETWEEN 1 AND 5),
+    comment       TEXT,
+    status        VARCHAR(20) NOT NULL DEFAULT 'visible',
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (user_id, company_name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_company_user_reviews_company_name ON company_user_reviews (company_name) WHERE status = 'visible';
+
 -- =============================================================================
 -- ROW LEVEL SECURITY: every read/write from this app goes through the `pool`
 -- (direct `pg` connection as the `postgres` role, which has BYPASSRLS — see
@@ -206,3 +233,4 @@ ALTER TABLE source_circuit_state ENABLE ROW LEVEL SECURITY;
 ALTER TABLE indexing_queue ENABLE ROW LEVEL SECURITY;
 ALTER TABLE company_reputation ENABLE ROW LEVEL SECURITY;
 ALTER TABLE company_reputation_alias ENABLE ROW LEVEL SECURITY;
+ALTER TABLE company_user_reviews ENABLE ROW LEVEL SECURITY;

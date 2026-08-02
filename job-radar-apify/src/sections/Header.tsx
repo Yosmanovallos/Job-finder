@@ -7,7 +7,7 @@ import { Button } from "../components/ui/button.js";
 
 const navLinks = [
   { label: "Cómo funciona", to: "/como-funciona" },
-  { label: "Fuentes", to: "/fuentes" },
+  { label: "Empresas", to: "/empresas" },
   ...(PAYWALL_ENABLED ? [{ label: "Precios", to: "/pricing" }] : []),
   { label: "Preguntas", to: "/preguntas" }
 ];

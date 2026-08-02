@@ -23,6 +23,8 @@
     "test:seo": "tsx tests/validate-seo-job-pages.ts",
     "test:social-publisher": "tsx tests/validate-social-publisher.ts",
     "test:reputation": "tsx tests/validate-reputation-tick.ts",
+    "test:company-reviews": "tsx tests/validate-company-reviews.ts",
+    "test:companies-search": "tsx tests/validate-companies-search.ts",
     "indexing:migrate": "tsx scripts/migrate-indexing-queue.ts",
     "indexing:backfill": "tsx scripts/backfill-indexing-queue.ts",
     "indexing:tick": "tsx scripts/run-indexing-tick.ts",

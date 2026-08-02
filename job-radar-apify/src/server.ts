@@ -18,6 +18,11 @@ import {
   resolveCompanyBySlug,
   ReputationEntry
 } from "./db/company-reputation-repository.js";
+import {
+  upsertCompanyReview,
+  deleteCompanyReview,
+  getCompanyReviews
+} from "./db/company-reviews-repository.js";
 import { applyJobFilters, sortByPreferredRoles, JobFilterParams } from "./lib/job-filters.js";
 import {
   escapeHtml,
@@ -54,6 +59,62 @@ async function attachReputation<T extends { company: string }>(
 ): Promise<(T & { reputation: ReputationEntry[] })[]> {
   const reputationMap = await getReputationForCompanies(jobs.map((j) => j.company));
   return jobs.map((j) => ({ ...j, reputation: reputationMap.get(j.company) || [] }));
+}
+
+// GET /api/companies/search backing (Fase E4) — "Confidencial"/"Empresa
+// confidencial" are the fallback placeholders many sources use for an
+// undisclosed employer (~1,536 postings combined in the real corpus), never
+// a real company, so they're excluded before counting the same way
+// getComputrabajoDiscoveryCandidates() already excludes "Confidencial".
+// company_reputation_alias's exact-string convention applies here too — no
+// fuzzy merge of near-duplicate names (regla 5 de AGENTS.md).
+const COMPANY_SEARCH_EXCLUDED = new Set(["Confidencial", "Empresa confidencial"]);
+
+export interface CompanySearchResult {
+  company: string;
+  count: number;
+}
+
+export interface CompanySearchPage {
+  companies: CompanySearchResult[];
+  total: number;
+}
+
+// offset/limit (not just a fixed top-N) so /empresas (Fase E5, the company
+// directory) can page through all 5,525+ distinct companies via infinite
+// scroll, same pattern as GET /api/jobs — this same function also still
+// backs the small single-page FilterBar dropdown from Fase E4, which just
+// never passes an offset.
+function searchCompanies(
+  jobs: { company?: string }[],
+  query: string,
+  limit: number,
+  offset: number
+): CompanySearchPage {
+  const counts = new Map<string, number>();
+  for (const job of jobs) {
+    if (!job.company || COMPANY_SEARCH_EXCLUDED.has(job.company)) continue;
+    counts.set(job.company, (counts.get(job.company) || 0) + 1);
+  }
+
+  const q = query.trim().toLowerCase();
+  let entries = Array.from(counts.entries());
+  // Under 2 chars: too short to narrow anything meaningfully — return the
+  // top companies by vacancy count instead, so the UI has suggestions to
+  // show before the caller has typed enough to filter.
+  if (q.length >= 2) {
+    entries = entries.filter(([name]) => name.toLowerCase().includes(q));
+  }
+  // Stable tiebreak (alphabetical) on equal counts — without it, ties order
+  // by Map insertion (corpus iteration order), which can reshuffle between
+  // two page requests if getJobsCached()'s TTL refreshes in between,
+  // silently duplicating or skipping a company across an infinite-scroll
+  // page boundary.
+  entries.sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  return {
+    companies: entries.slice(offset, offset + limit).map(([company, count]) => ({ company, count })),
+    total: entries.length
+  };
 }
 
 // Native Node HTTP Server
@@ -106,7 +167,8 @@ const server = http.createServer(async (req, res) => {
       cities: params.getAll("cities").length ? params.getAll("cities") : undefined,
       modality: params.get("modality") || undefined,
       freshness: params.get("freshness") || undefined,
-      roles: params.getAll("roles").length ? params.getAll("roles") : undefined
+      roles: params.getAll("roles").length ? params.getAll("roles") : undefined,
+      company: params.get("company") || undefined
     };
     let filtered = applyJobFilters(visibleJobs, filters);
     // A manual role filter (checked in FilterBar) is an explicit, stronger
@@ -154,6 +216,25 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // 4a-search. GET /api/companies/search?q=&limit=&offset= — company
+  // autocomplete for the /dashboard filter (Fase E4) AND the paginated
+  // /empresas directory (Fase E5, infinite scroll). Exact pathname check,
+  // checked BEFORE the :slug route below — "/api/companies/search" also
+  // matches that route's startsWith("/api/companies/") prefix, so this
+  // must win first or "search" gets treated as a company slug.
+  if (pathname === "/api/companies/search" && method === "GET") {
+    const params = parsedUrl.searchParams;
+    const q = params.get("q") || "";
+    const limit = Math.min(Math.max(parseInt(params.get("limit") || "20", 10) || 20, 1), 100);
+    const offset = Math.max(parseInt(params.get("offset") || "0", 10) || 0, 0);
+    const jobs = await getJobsCached(50000);
+    const { companies, total } = searchCompanies(jobs, q, limit, offset);
+
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ companies, total, hasMore: offset + limit < total }));
+    return;
+  }
+
   // 4a-bis. GET /api/companies/:slug — company page (dashboard navigation,
   // see docs/COMPANY-REPUTATION-PLAN.md's "empresas" note; not one of the
   // R0-R5 reputation fases, a later extension reusing that pipeline).
@@ -181,17 +262,103 @@ const server = http.createServer(async (req, res) => {
 
     const matched = applyJobFilters(visibleJobs, { company: companyName });
     const page = matched.slice(0, 60);
-    const reputationMap = await getReputationForCompanies([companyName]);
+    // Independent of each other (both only need companyName, already
+    // resolved above) — run concurrently instead of one full DB round trip
+    // after another. Added getCompanyReviews here in Fase E2 as a third
+    // sequential await, which measurably slowed this endpoint; this
+    // parallelizes it back down to one round trip's worth of latency.
+    const [reputationMap, userReviews] = await Promise.all([
+      getReputationForCompanies([companyName]),
+      getCompanyReviews(companyName, session?.id || null)
+    ]);
 
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(
       JSON.stringify({
         companyName,
         reputation: reputationMap.get(companyName) || [],
+        userReviews,
         jobs: page,
         total: matched.length
       })
     );
+    return;
+  }
+
+  // 4a-ter. POST/DELETE /api/companies/:slug/reviews — native BuscoTrabajo
+  // reviews (Fase E2, distinto de la reputación externa agregada arriba).
+  // Requiere sesión real (isAuthenticated basta, sin depender de onboarding
+  // completado) — nunca un id ni un companyName de confianza ciega del
+  // cliente más allá del slug de la URL, que se resuelve con la misma
+  // regla de dos pasos que el GET (alias curado → corpus de vacantes real).
+  // Un slug que no resuelve a ninguna empresa real es 404: no se puede
+  // reseñar algo que no existe en el sistema.
+  if (pathname.startsWith("/api/companies/") && pathname.endsWith("/reviews") && (method === "POST" || method === "DELETE")) {
+    const slug = pathname.slice("/api/companies/".length, -"/reviews".length);
+
+    const session = await verifySession(req);
+    if (!session) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "No autenticado" }));
+      return;
+    }
+
+    const jobs = await getJobsCached(50000);
+    const visibleJobs = maskLockedFields(jobs, session.tier);
+    const companyName = (await resolveCompanyBySlug(slug)) || resolveCompanyNameFromJobs(slug, visibleJobs);
+    if (!companyName) {
+      res.writeHead(404, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Empresa no encontrada" }));
+      return;
+    }
+
+    if (method === "DELETE") {
+      await deleteCompanyReview(session.id, companyName);
+      const userReviews = await getCompanyReviews(companyName, session.id);
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ userReviews }));
+      return;
+    }
+
+    let bodyText = "";
+    req.on("data", (chunk) => {
+      bodyText += chunk.toString();
+    });
+    req.on("end", async () => {
+      try {
+        const parsed = JSON.parse(bodyText || "{}");
+        const rating = parsed.rating;
+        if (typeof rating !== "number" || !Number.isInteger(rating) || rating < 1 || rating > 5) {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "rating debe ser un entero entre 1 y 5" }));
+          return;
+        }
+
+        let comment: string | null = null;
+        if (parsed.comment !== undefined && parsed.comment !== null) {
+          if (typeof parsed.comment !== "string") {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: "comment debe ser texto" }));
+            return;
+          }
+          const trimmed = parsed.comment.trim();
+          if (trimmed.length > 1000) {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ error: "comment no puede superar 1000 caracteres" }));
+            return;
+          }
+          comment = trimmed.length > 0 ? trimmed : null;
+        }
+
+        await upsertCompanyReview({ userId: session.id, companyName, rating, comment });
+        const userReviews = await getCompanyReviews(companyName, session.id);
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ userReviews }));
+      } catch (e: any) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: e?.message || "Solicitud inválida" }));
+      }
+    });
     return;
   }
 
