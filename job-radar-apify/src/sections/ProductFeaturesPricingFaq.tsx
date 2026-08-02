@@ -33,43 +33,80 @@ const transparencyBlocks = [
 // only fields the product actually captures (title/company/location/
 // source/dateText). No salary, contract type or work mode: the scrapers
 // don't extract those today, so showing them here would be inventing data
-// the real product can't back up.
-const mockJobRows = [
-  {
-    id: "j1",
-    dateText: "hace 2 h",
-    fresh: true,
-    title: "Analista de Datos Senior",
-    company: "Bancolombia",
-    location: "Medellín, Colombia",
-    source: "LinkedIn",
-    also: "Computrabajo, Magneto"
-  },
-  {
-    id: "j2",
-    dateText: "hace 5 h",
-    fresh: true,
-    title: "Diseñadora UX / UI",
-    company: "Rappi",
-    location: "Bogotá · Remoto",
-    source: "Torre",
-    also: "GetOnBoard"
-  },
-  {
-    id: "j3",
-    dateText: "hace 3 días",
-    fresh: false,
-    title: "Coordinador de Logística",
-    company: "Grupo Éxito",
-    location: "Cali, Colombia",
-    source: "Elempleo",
-    also: "Computrabajo"
-  }
-];
+// the real product can't back up. Two sets (not one shared across
+// countries) so /ve's landing doesn't show Colombian companies/cities —
+// real, recognizable companies in each market, same illustrative role as
+// the originals, not claiming these are live listings.
+const mockJobRowsByCountry = {
+  CO: [
+    {
+      id: "j1",
+      dateText: "hace 2 h",
+      fresh: true,
+      title: "Analista de Datos Senior",
+      company: "Bancolombia",
+      location: "Medellín, Colombia",
+      source: "LinkedIn",
+      also: "Computrabajo, Magneto"
+    },
+    {
+      id: "j2",
+      dateText: "hace 5 h",
+      fresh: true,
+      title: "Diseñadora UX / UI",
+      company: "Rappi",
+      location: "Bogotá · Remoto",
+      source: "Torre",
+      also: "GetOnBoard"
+    },
+    {
+      id: "j3",
+      dateText: "hace 3 días",
+      fresh: false,
+      title: "Coordinador de Logística",
+      company: "Grupo Éxito",
+      location: "Cali, Colombia",
+      source: "Elempleo",
+      also: "Computrabajo"
+    }
+  ],
+  VE: [
+    {
+      id: "j1",
+      dateText: "hace 2 h",
+      fresh: true,
+      title: "Analista de Datos Senior",
+      company: "Banesco",
+      location: "Caracas, Venezuela",
+      source: "LinkedIn",
+      also: "Computrabajo"
+    },
+    {
+      id: "j2",
+      dateText: "hace 5 h",
+      fresh: true,
+      title: "Especialista en Soporte TI",
+      company: "Farmatodo",
+      location: "Valencia · Remoto",
+      source: "Torre",
+      also: "GetOnBoard"
+    },
+    {
+      id: "j3",
+      dateText: "hace 3 días",
+      fresh: false,
+      title: "Coordinador de Logística",
+      company: "Empresas Polar",
+      location: "Maracaibo, Venezuela",
+      source: "Computrabajo",
+      also: "LinkedIn"
+    }
+  ]
+};
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
-function MockJobRow({ row }: { row: (typeof mockJobRows)[0] }) {
+function MockJobRow({ row }: { row: (typeof mockJobRowsByCountry)["CO"][0] }) {
   const sourceColor = getSourceColor(row.source);
   return (
     <div
@@ -128,7 +165,13 @@ function MockJobRow({ row }: { row: (typeof mockJobRows)[0] }) {
 
 // ─── Main Component ──────────────────────────────────────────────────────────
 
-export default function ProductFeaturesPricingFaq() {
+export interface ProductFeaturesPricingFaqProps {
+  country?: string;
+}
+
+export default function ProductFeaturesPricingFaq({ country = "CO" }: ProductFeaturesPricingFaqProps) {
+  const mockJobRows = mockJobRowsByCountry[country as keyof typeof mockJobRowsByCountry] || mockJobRowsByCountry.CO;
+
   return (
     <section
       id="product-features-pricing-faq"
@@ -450,7 +493,7 @@ export default function ProductFeaturesPricingFaq() {
       </div>
       )}
 
-      <Faq />
+      <Faq country={country} />
     </section>
   );
 }

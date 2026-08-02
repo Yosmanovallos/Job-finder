@@ -48,6 +48,34 @@ export function isKnownCountry(code: string | undefined | null): boolean {
   return Boolean(code && COUNTRIES[code.toUpperCase()]);
 }
 
+// Single source of truth for "which sources does the marketing site claim
+// are connected for this country" — CO gets every source actually scraped
+// for Colombia. VE only has LinkedIn/Computrabajo country-scoped so far
+// (see src/sources/*-ve.ts) — the rest of CO's list (Elempleo, Magneto,
+// Workana) has no Venezuela adapter yet, so claiming them here would
+// overpromise. The shared remote-catalog sources (Torre, GetOnBoard,
+// RemoteOK, Remotive, WeRemoto) are genuinely connected for both — they
+// show on /ve/dashboard too (see ALWAYS_REMOTE_SOURCES/resolveJobCountry
+// above). Used by SourcesAndProblem.tsx (the "Conectado a" marquee),
+// Faq.tsx (faq-1's answer) and job-seo.ts's buildCategoryMeta — three
+// places that would otherwise silently drift out of sync with each other
+// if each kept its own copy.
+export const SOURCES_BY_COUNTRY: Record<string, string[]> = {
+  CO: [
+    "LinkedIn Jobs",
+    "Computrabajo",
+    "Elempleo",
+    "Magneto",
+    "Torre",
+    "GetOnBoard",
+    "RemoteOK",
+    "Remotive",
+    "Workana",
+    "WeRemoto"
+  ],
+  VE: ["LinkedIn Jobs", "Computrabajo", "Torre", "GetOnBoard", "RemoteOK", "Remotive", "WeRemoto"]
+};
+
 // Mirrors job-filters.ts's getModalityLabel remote detection
 // (loc.includes("remoto") / loc.includes("remote")) and
 // scripts/migrate-country.ts's backfill predicate. Deliberately duplicated

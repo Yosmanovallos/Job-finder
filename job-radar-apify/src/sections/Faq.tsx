@@ -1,13 +1,12 @@
 import { useState } from "react";
+import { useLocation } from "react-router-dom";
 import { MonoLabel } from "../components/MonoLabel.js";
+import { SOURCES_BY_COUNTRY } from "../countries/index.js";
+import { getEffectiveCountry } from "../lib/country-context.js";
 
-const faqItems = [
-  {
-    id: "faq-1",
-    question: "¿De qué portales trae las vacantes?",
-    answer:
-      "BuscoTrabajo consulta varias fuentes en paralelo: LinkedIn, Computrabajo, Elempleo, Magneto, Torre, GetOnBoard, RemoteOK, Remotive, Workana, WeRemoto, Indeed, Glassdoor y Jooble. La lista crece con cada actualización del producto."
-  },
+// Every item except faq-1 is country-neutral (how the product works, not
+// what it's connected to).
+const faqItemsRest = [
   {
     id: "faq-2",
     question: "¿Funciona para roles que no son de tecnología?",
@@ -40,12 +39,30 @@ const faqItems = [
   }
 ];
 
+// faq-1's answer is the one item that names actual sources — built from
+// SOURCES_BY_COUNTRY (same list SourcesAndProblem.tsx's marquee and
+// buildCategoryMeta use) instead of its own hardcoded string. This
+// component previously named Elempleo/Magneto/Workana unconditionally,
+// which overclaimed sources that have no Venezuela adapter whenever this
+// rendered inside /ve's landing page (see ProductFeaturesPricingFaq.tsx).
+function buildFaqItems(country: string) {
+  const sources = (SOURCES_BY_COUNTRY[country] || SOURCES_BY_COUNTRY.CO).join(", ");
+  return [
+    {
+      id: "faq-1",
+      question: "¿De qué portales trae las vacantes?",
+      answer: `BuscoTrabajo consulta varias fuentes en paralelo: ${sources}. La lista crece con cada actualización del producto.`
+    },
+    ...faqItemsRest
+  ];
+}
+
 function FaqItem({
   item,
   isOpen,
   onToggle
 }: {
-  item: (typeof faqItems)[0];
+  item: ReturnType<typeof buildFaqItems>[0];
   isOpen: boolean;
   onToggle: () => void;
 }) {
@@ -97,7 +114,20 @@ function FaqItem({
   );
 }
 
-export default function Faq() {
+export interface FaqProps {
+  // Optional: callers that already know their country (e.g.
+  // ProductFeaturesPricingFaq, itself given `country` by Landing) pass it
+  // explicitly. Standalone use (the /preguntas route) has no such caller,
+  // so it falls back to getEffectiveCountry — same pattern Header.tsx uses
+  // for pages with no /ve prefix of their own.
+  country?: string;
+}
+
+export default function Faq({ country }: FaqProps) {
+  const location = useLocation();
+  const effectiveCountry = country || getEffectiveCountry(location.pathname);
+  const faqItems = buildFaqItems(effectiveCountry);
+
   const [openFaq, setOpenFaq] = useState<string>("faq-1");
 
   const handleFaqToggle = (id: string) => {

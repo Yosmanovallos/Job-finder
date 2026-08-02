@@ -57,7 +57,7 @@ function Landing() {
       <HeroDemo country={country} />
       <SourcesAndProblem country={country} />
       <ComparisonAndProcess />
-      <ProductFeaturesPricingFaq />
+      <ProductFeaturesPricingFaq country={country} />
     </>
   );
 }
