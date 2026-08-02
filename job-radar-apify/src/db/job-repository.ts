@@ -2,6 +2,7 @@ import crypto from "crypto";
 import dotenv from "dotenv";
 import { pool } from "./client.js";
 import { Job, normalizeJobUrl } from "../sources/types.js";
+import { getCountryConfig } from "../countries/index.js";
 import { saveRunToCache, getAllCachedRuns } from "../cache-manager.js";
 import { validateJobs } from "./job-validator.js";
 import { PAYWALL_ENABLED } from "../config.js";
@@ -26,11 +27,21 @@ export function computeUrlHash(url: string): string {
  * Secondary dedup key based on content (title + company + location).
  * Catches the same posting even when its URL varies between searches.
  */
+// Fallback is the job's own country's name — NOT a literal "colombia" — so a
+// Venezuela job with no location can never collide with a Colombia job with
+// no location just because they share the same fallback bucket (they used
+// to, before jobs.country existed). This is provably a no-op for every row
+// that predates the Venezuela expansion: pre-existing rows all have
+// country='CO' (or NULL, meaning remote), and getCountryConfig treats both
+// as Colombia (see countries/index.ts's DEFAULT_COUNTRY) — same as
+// getCountryConfig('CO').name.toLowerCase() === "colombia", the exact
+// literal this replaces. See scripts/verify-fingerprint-compat.ts, which
+// confirms that empirically against the real corpus before this ships.
 export function computeContentFingerprint(job: Job): string {
   const normalized = [
     job.title.toLowerCase().trim(),
     (job.company || "confidencial").toLowerCase().trim(),
-    (job.location || "colombia").toLowerCase().trim()
+    (job.location || getCountryConfig(job.country).name).toLowerCase().trim()
   ].join("|");
   return crypto.createHash("sha256").update(normalized).digest("hex");
 }
@@ -93,8 +104,8 @@ export async function saveJobs(
     }
 
     const result = await pool.query(
-      `INSERT INTO jobs (url_hash, content_fingerprint, title, company, location, url, source, sources, date_text, published_at, role_origin)
-       VALUES ($1, $11, $2, $3, $4, $5, $6, jsonb_build_array($10::text), $7, $8, $9)
+      `INSERT INTO jobs (url_hash, content_fingerprint, title, company, location, url, source, sources, date_text, published_at, role_origin, country)
+       VALUES ($1, $11, $2, $3, $4, $5, $6, jsonb_build_array($10::text), $7, $8, $9, $12)
        ON CONFLICT (url_hash) DO UPDATE SET
          sources = CASE
            WHEN jobs.sources @> to_jsonb(EXCLUDED.source::text) THEN jobs.sources
@@ -112,7 +123,14 @@ export async function saveJobs(
         publishedAt,
         roleOrigin,
         job.source,
-        fingerprint
+        fingerprint,
+        // undefined -> NULL (pg driver), same as any other unset field —
+        // callers that don't stamp country (tests, ad-hoc scripts) simply
+        // get a NULL row, same as a remote job. ON CONFLICT deliberately
+        // does NOT update country on a re-scrape of an existing URL: a
+        // job's country is a fact about where it was posted, not about
+        // which tick most recently re-discovered it.
+        job.country ?? null
       ]
     );
 
@@ -188,12 +206,12 @@ export async function getJobs(
   // chronologically so the dashboard's default order is preserved.
   const result = await pool.query(
     `SELECT * FROM (
-       SELECT DISTINCT ON (lower(trim(title)), lower(trim(COALESCE(company, 'confidencial'))), lower(trim(COALESCE(location, 'colombia'))))
-              id, url_hash, title, company, location, url, source, sources, date_text, published_at, role_origin,
+       SELECT DISTINCT ON (lower(trim(title)), lower(trim(COALESCE(company, 'confidencial'))), lower(trim(COALESCE(location, CASE country WHEN 'VE' THEN 'venezuela' ELSE 'colombia' END))))
+              id, url_hash, title, company, location, url, source, sources, date_text, published_at, role_origin, country,
               (published_at > NOW() - INTERVAL '48 hours') AS is_locked
        FROM jobs
        WHERE is_active = TRUE
-       ORDER BY lower(trim(title)), lower(trim(COALESCE(company, 'confidencial'))), lower(trim(COALESCE(location, 'colombia'))), published_at DESC
+       ORDER BY lower(trim(title)), lower(trim(COALESCE(company, 'confidencial'))), lower(trim(COALESCE(location, CASE country WHEN 'VE' THEN 'venezuela' ELSE 'colombia' END))), published_at DESC
      ) deduped
      ORDER BY published_at DESC, id DESC
      LIMIT $1 OFFSET $2`,
@@ -215,6 +233,7 @@ export async function getJobs(
       sources,
       alsoIn,
       role_origin: row.role_origin,
+      country: row.country,
       publishedAt: row.published_at,
       isLocked: row.is_locked
     };

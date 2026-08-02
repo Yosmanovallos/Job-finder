@@ -1,0 +1,55 @@
+name: Job Radar Scraper Tick (Venezuela)
+
+# Mirror of scrape-jobs.yml, same cadence/budget/timeout — see
+# job-radar-apify/backlog/venezuela-expansion.md's Día 1. Deliberately a
+# SEPARATE workflow file (not more sources inside the Colombia tick's
+# MAX_ROLES_PER_RUN=8 budget): sharing that budget across countries would
+# dilute both countries' freshness. As its own workflow, GitHub treats it as
+# an independent concurrent job (well under the account's 20-concurrent-jobs
+# limit) and it still costs $0 on this public repo.
+
+on:
+  # No `schedule:` yet, deliberately — workflow_dispatch only until a few
+  # manual runs are validated against real production data (fresh listings
+  # actually landing with country='VE', reasonable per-source yield). Add
+  # back the same `schedule: - cron: "*/15 * * * *"` scrape-jobs.yml uses
+  # once that's confirmed, matching Colombia's cadence exactly.
+  workflow_dispatch:
+
+# A DIFFERENT group name than scrape-jobs.yml's "scrape-jobs-tick" is the
+# whole point — concurrency groups are global across workflow files, not
+# scoped per file, so reusing that name here would serialize Venezuela's
+# runs behind Colombia's instead of letting them run in parallel.
+concurrency:
+  group: scrape-jobs-ve-tick
+  cancel-in-progress: false
+
+jobs:
+  scrape-tick-ve:
+    runs-on: ubuntu-latest
+    timeout-minutes: 27
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Dependencies
+        run: |
+          cd job-radar-apify
+          npm ci || npm install
+
+      - name: Run Scraper Tick (Venezuela)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
+          # Optional — Jooble-VE adapter no-ops (returns 0 jobs) if unset.
+          JOOBLE_API_KEY: ${{ secrets.JOOBLE_API_KEY }}
+          TICK_COUNTRY: VE
+        run: |
+          cd job-radar-apify
+          npx tsx scripts/run-scrape-tick.ts

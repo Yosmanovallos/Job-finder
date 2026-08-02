@@ -210,17 +210,26 @@ function parseDateText(
 }
 
 // Scrape LinkedIn Guest Jobs API (paginated with dynamic DATE_RANGE filter)
-export async function scrapeLinkedIn(keyword: string): Promise<Job[]> {
+// `locationQuery` defaults to "Colombia" — every existing call site (the CLI
+// main() below, src/sources/linkedin.ts) keeps its exact current behavior
+// with zero changes; src/sources/linkedin-ve.ts is the only caller that
+// passes "Venezuela".
+export async function scrapeLinkedIn(
+  keyword: string,
+  locationQuery: string = "Colombia"
+): Promise<Job[]> {
   const query = encodeURIComponent(keyword);
   const rangeConfig = getDateRangeConfig();
-  console.log(`[LinkedIn] Scraping for keyword "${keyword}" (Filtro: ${rangeConfig.label})...`);
+  console.log(
+    `[LinkedIn] Scraping for keyword "${keyword}" in "${locationQuery}" (Filtro: ${rangeConfig.label})...`
+  );
   const jobs: Job[] = [];
 
   const tprParam = rangeConfig.linkedinTpr ? `&f_TPR=${rangeConfig.linkedinTpr}` : "";
 
   try {
     for (const start of [0, 25, 50]) {
-      const url = `https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords=${query}&location=Colombia${tprParam}&start=${start}`;
+      const url = `https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords=${query}&location=${encodeURIComponent(locationQuery)}${tprParam}&start=${start}`;
       const response = await fetch(url, {
         headers: {
           "User-Agent": pickUserAgent()
@@ -253,7 +262,7 @@ export async function scrapeLinkedIn(keyword: string): Promise<Job[]> {
         const locMatch = item.match(/<span class="job-search-card__location">[^]*?<\/span>/);
         const location = locMatch
           ? htmlEntities(locMatch[0].replace(/<[^>]+>/g, "").trim())
-          : "Colombia";
+          : locationQuery;
 
         const dateMatch = item.match(/<time[^>]*>([^<]+)<\/time>/);
         const dateText = dateMatch ? htmlEntities(dateMatch[1].trim()) : "1 day ago";
@@ -285,19 +294,45 @@ export async function scrapeLinkedIn(keyword: string): Promise<Job[]> {
   }
 }
 
-// Scrape Computrabajo Colombia with Google Translate Cloud Proxy Bypass (100% IP Block Protection)
-export async function scrapeComputrabajo(keyword: string): Promise<Job[]> {
+// Per-country domain: Computrabajo runs a separate site per country, not a
+// path prefix off one domain, and Venezuela's real domain is `ve.computrabajo.com`
+// (not the `www.computrabajo.com.ve` a naive `.co`->`.ve` swap would guess) —
+// verified against the live site during the Venezuela-expansion research
+// (backlog/venezuela-expansion.md). Selectors/regex below are identical for
+// both: only the domain/proxy host and location fallback differ per country.
+const COMPUTRABAJO_COUNTRY_CONFIG: Record<
+  string,
+  { proxyHost: string; canonicalHost: string; fallbackLocation: string }
+> = {
+  CO: {
+    proxyHost: "www-computrabajo-com-co.translate.goog",
+    canonicalHost: "www.computrabajo.com.co",
+    fallbackLocation: "Colombia"
+  },
+  VE: {
+    proxyHost: "ve-computrabajo-com.translate.goog",
+    canonicalHost: "ve.computrabajo.com",
+    fallbackLocation: "Venezuela"
+  }
+};
+
+// Scrape Computrabajo with Google Translate Cloud Proxy Bypass (100% IP Block Protection).
+// `country` defaults to "CO" — every existing call site (CLI main() below,
+// src/sources/computrabajo.ts) keeps today's exact behavior with zero
+// changes; src/sources/computrabajo-ve.ts is the only caller passing "VE".
+export async function scrapeComputrabajo(keyword: string, country: string = "CO"): Promise<Job[]> {
+  const domainConfig = COMPUTRABAJO_COUNTRY_CONFIG[country] || COMPUTRABAJO_COUNTRY_CONFIG.CO;
   const query = encodeURIComponent(keyword.replace(/\s+/g, "-"));
   const rangeConfig = getDateRangeConfig();
   console.log(
-    `[Computrabajo] Scraping for keyword "${keyword}" (Multi-page, Filtro: ${rangeConfig.label})...`
+    `[Computrabajo] Scraping for keyword "${keyword}" in ${country} (Multi-page, Filtro: ${rangeConfig.label})...`
   );
   const jobs: Job[] = [];
 
   try {
     for (let page = 1; page <= 3; page++) {
       const pathPart = page === 1 ? `trabajo-de-${query}` : `trabajo-de-${query}?p=${page}`;
-      const proxyUrl = `https://www-computrabajo-com-co.translate.goog/${pathPart}?_x_tr_sl=es&_x_tr_tl=en&_x_tr_hl=es`;
+      const proxyUrl = `https://${domainConfig.proxyHost}/${pathPart}?_x_tr_sl=es&_x_tr_tl=en&_x_tr_hl=es`;
 
       let html = "";
       try {
@@ -332,11 +367,12 @@ export async function scrapeComputrabajo(keyword: string): Promise<Job[]> {
         const cleanPath = rawHref
           .replace("https://co-computrabajo-com.translate.goog", "")
           .replace("https://www-computrabajo-com-co.translate.goog", "")
+          .replace(`https://${domainConfig.proxyHost}`, "")
           .split("?")[0]
           .split("#")[0];
 
         const cleanPathFormatted = cleanPath.startsWith("/") ? cleanPath : `/${cleanPath}`;
-        const canonicalUrl = `https://www.computrabajo.com.co${cleanPathFormatted}`;
+        const canonicalUrl = `https://${domainConfig.canonicalHost}${cleanPathFormatted}`;
         const jobUrl = `https://www.google.com/url?q=${encodeURIComponent(canonicalUrl)}`;
 
         const idMatch = rawHref.match(/-([A-F0-9]{32})/i);
@@ -352,7 +388,7 @@ export async function scrapeComputrabajo(keyword: string): Promise<Job[]> {
         );
         const location = locMatch
           ? htmlEntities(locMatch[1].replace(/\s+/g, " ").trim())
-          : "Colombia";
+          : domainConfig.fallbackLocation;
 
         const dateMatch = item.match(/<p class="fs13 fc_aux mt15">\s*([^<]+)\s*<\/p>/i);
         const dateText = dateMatch ? htmlEntities(dateMatch[1].trim()) : "Hoy";
@@ -1026,14 +1062,17 @@ export async function scrapeRemotive(searchTerms: string[]): Promise<Job[]> {
 // actually rejects the blank keyword, this fails closed (0 jobs, surfaced
 // by the tick's "posible bloqueo" warning) rather than silently — same
 // integration risk as any external API assumption not covered by fixtures.
-export async function scrapeJooble(): Promise<Job[]> {
+// `locationQuery` defaults to "Colombia" — the CLI main() below and
+// src/sources/jooble.ts keep today's exact behavior with zero changes;
+// src/sources/jooble-ve.ts is the only caller passing "Venezuela".
+export async function scrapeJooble(locationQuery: string = "Colombia"): Promise<Job[]> {
   const apiKey = process.env.JOOBLE_API_KEY;
   if (!apiKey) {
     console.warn("[Jooble] JOOBLE_API_KEY no configurada — omitiendo (fuente opcional).");
     return [];
   }
 
-  console.log("[Jooble] Fetching postings...");
+  console.log(`[Jooble] Fetching postings for "${locationQuery}"...`);
   const jobs: Job[] = [];
   const now = Date.now();
 
@@ -1041,7 +1080,7 @@ export async function scrapeJooble(): Promise<Job[]> {
     const response = await fetch(`https://jooble.org/api/${apiKey}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ keywords: "", location: "Colombia" })
+      body: JSON.stringify({ keywords: "", location: locationQuery })
     });
 
     if (!response.ok) {
@@ -1064,7 +1103,7 @@ export async function scrapeJooble(): Promise<Job[]> {
         jobId: String(item.id),
         title: htmlEntities(item.title),
         company: htmlEntities(item.company || "Confidencial"),
-        location: htmlEntities(item.location || "Colombia"),
+        location: htmlEntities(item.location || locationQuery),
         url: item.link,
         dateText: "Reciente",
         source: "Jooble",

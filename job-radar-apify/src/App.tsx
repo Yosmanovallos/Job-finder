@@ -1,5 +1,5 @@
 import { Suspense, lazy } from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Header from "./sections/Header.js";
 import HeroDemo from "./sections/HeroDemo.js";
 import SourcesAndProblem from "./sections/SourcesAndProblem.js";
@@ -82,7 +82,17 @@ export default function App() {
               <Routes>
                 <Route path="/" element={<Landing />} />
                 <Route path="/dashboard" element={<Dashboard />} />
+                {/* Venezuela mirror — same components, Dashboard.tsx reads the
+                    country off the "/ve" prefix itself (see its comment).
+                    Job detail permalinks resolve by id regardless of prefix,
+                    so /ve/empleos/:id works out of the box; category/city
+                    landing pages (job-seo.ts's resolveCategorySlug) are still
+                    Colombia-only — a /ve/empleos/<city-slug> 404s today,
+                    left as a follow-up rather than half-wired. */}
+                <Route path="/ve/dashboard" element={<Dashboard />} />
+                <Route path="/ve" element={<Navigate to="/ve/dashboard" replace />} />
                 <Route path="/empleos/:id/:slug?" element={<EmpleosRoute />} />
+                <Route path="/ve/empleos/:id/:slug?" element={<EmpleosRoute />} />
                 <Route path="/empresas" element={<CompaniesDirectory />} />
                 <Route path="/empresas/:slug" element={<CompanyLanding />} />
                 <Route path="/login" element={<Login />} />

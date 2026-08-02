@@ -1,6 +1,7 @@
 import { Job } from "../sources/types.js";
 import { DEFAULT_ROLES_200 } from "../queue/scheduler.js";
 import { TRANSLATION_MAP } from "../ai-role-agent.js";
+import { getCountryConfig } from "../countries/index.js";
 
 // Shared between the server (GET /api/jobs, so a 10k+ job corpus is filtered
 // before it's ever serialized to the browser) and, previously, the client —
@@ -95,6 +96,15 @@ export const CITY_OPTIONS = [
   "Remoto"
 ];
 
+// Country-aware equivalent of CITY_OPTIONS above, for the multi-country
+// dashboard/FilterBar (see backlog/venezuela-expansion.md). CITY_OPTIONS
+// itself is left untouched — job-seo.ts's category pages/sitemap still
+// resolve against it directly and must keep working exactly as they do
+// today for Colombia.
+export function getCityOptionsForCountry(country: string | undefined | null): string[] {
+  return [...getCountryConfig(country).cities, "Remoto"];
+}
+
 export interface JobFilterParams {
   search?: string;
   sources?: string[];
@@ -108,6 +118,13 @@ export interface JobFilterParams {
   // same exact raw string, e.g. "TERPEL " with a trailing space; any other
   // matching semantics here would drift out of sync with that pipeline).
   company?: string;
+  // ISO 3166-1 alpha-2 ('CO'/'VE'). A job with country IS NULL (remote —
+  // see schema.sql's jobs.country comment) always passes regardless of this
+  // filter's value — remote postings are meant to show for every country,
+  // not just the one whose tick happened to discover them. Never filter on
+  // `country === value` alone; that silently drops every remote job (see
+  // GET /api/jobs in server.ts for the same rule applied server-side).
+  country?: string;
 }
 
 const normalizeText = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
@@ -235,6 +252,11 @@ export function applyJobFilters(jobs: Job[], filters: JobFilterParams): Job[] {
   if (filters.company) {
     const company = filters.company;
     result = result.filter((j: any) => j.company === company);
+  }
+
+  if (filters.country) {
+    const wanted = filters.country.toUpperCase();
+    result = result.filter((j: any) => j.country == null || j.country === wanted);
   }
 
   return result;

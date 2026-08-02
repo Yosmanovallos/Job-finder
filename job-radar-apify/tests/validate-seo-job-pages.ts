@@ -180,11 +180,18 @@ function runPureFunctionTests() {
   );
 
   // --- Vencimiento (Fase 5) ---
+  // Deliberately a substring check, not .startsWith(): buildJobUrlPrefix()
+  // is used as a LIKE '%segment%' match (see indexing-repository.ts's
+  // wasJobPurged), not a literal URL prefix — a Venezuela job's real URL is
+  // "https://.../ve/empleos/<id>/...", which a fixed leading prefix could
+  // never match while still working for Colombia's "https://.../empleos/<id>/...".
+  // jobId (a UUID) is unique regardless of country, so matching the segment
+  // anywhere in the URL is what actually stays correct for both.
   const prefix = buildJobUrlPrefix(openJob.jobId);
   check(
-    prefix.endsWith(`/empleos/${openJob.jobId}/`) && buildJobUrl(openJob).startsWith(prefix),
-    "buildJobUrlPrefix() produce el mismo prefijo con el que se construyó la URL real de la vacante.",
-    `buildJobUrlPrefix("${openJob.jobId}") produjo "${prefix}", no es prefijo de buildJobUrl(): "${buildJobUrl(openJob)}"`
+    prefix === `/empleos/${openJob.jobId}/` && buildJobUrl(openJob).includes(prefix),
+    "buildJobUrlPrefix() produce el segmento contenido en la URL real de la vacante.",
+    `buildJobUrlPrefix("${openJob.jobId}") produjo "${prefix}", no está contenido en buildJobUrl(): "${buildJobUrl(openJob)}"`
   );
 
   // --- Sitemap (Fase 2) ---

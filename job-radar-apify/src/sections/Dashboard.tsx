@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { useNavigate, useSearchParams, Link } from "react-router-dom";
+import { useNavigate, useSearchParams, useLocation, Link } from "react-router-dom";
 import { PRO_MONTHLY_PRICE_COP, formatCOP, PAYWALL_ENABLED } from "../config.js";
 import { JobCard } from "../components/JobCard.js";
 import { PaywallCard } from "../components/PaywallCard.js";
@@ -10,7 +10,8 @@ import { FilterBar, FilterState, EMPTY_FILTERS } from "../components/FilterBar.j
 import { StatsBar } from "../components/StatsBar.js";
 import { useAuth } from "../auth/auth-provider.js";
 import { usePageMeta } from "../lib/use-page-meta.js";
-import { CITY_OPTIONS } from "../lib/job-filters.js";
+import { getCityOptionsForCountry } from "../lib/job-filters.js";
+import { getCountryConfig } from "../countries/index.js";
 import { Input } from "../components/ui/input.js";
 import { Button } from "../components/ui/button.js";
 import { Search, SlidersHorizontal, Unlock, ArrowUpRight, X } from "lucide-react";
@@ -24,10 +25,20 @@ const PAGE_SIZE = 24;
 const SEARCH_DEBOUNCE_MS = 350;
 
 export default function Dashboard() {
+  // /dashboard (Colombia, default) vs /ve/dashboard (Venezuela) — same
+  // component, distinguished by path prefix rather than a route param, so
+  // this stays a plain literal-path addition in App.tsx instead of an
+  // optional-segment route (which would risk ambiguity against the existing
+  // static "/dashboard" route). See backlog/venezuela-expansion.md's Día 3+
+  // URL-shape decision (path prefix, not subdomain/query param).
+  const location = useLocation();
+  const country = location.pathname.startsWith("/ve") ? "VE" : "CO";
+  const countryConfig = getCountryConfig(country);
+  const cityOptions = useMemo(() => getCityOptionsForCountry(country), [country]);
+
   usePageMeta({
-    title: "Vacantes de Empleo en Colombia | BuscoTrabajo",
-    description:
-      "Explora vacantes actualizadas de LinkedIn, Computrabajo, Elempleo y más, filtradas y sin duplicados. Gratis para vacantes con más de 48h publicadas."
+    title: `Vacantes de Empleo en ${countryConfig.name} | BuscoTrabajo`,
+    description: `Explora vacantes actualizadas de LinkedIn, Computrabajo${country === "CO" ? ", Elempleo" : ""} y más en ${countryConfig.name}, filtradas y sin duplicados. Gratis para vacantes con más de 48h publicadas.`
   });
 
   const { tier, isAuthenticated, accessToken, user, refreshTier } = useAuth();
@@ -110,11 +121,12 @@ export default function Dashboard() {
       if (effectiveFilters.freshness !== "all") params.set("freshness", effectiveFilters.freshness);
       effectiveFilters.selectedRoles.forEach((r) => params.append("roles", r));
       if (effectiveFilters.company) params.set("company", effectiveFilters.company);
+      params.set("country", country);
       params.set("limit", String(PAGE_SIZE));
       params.set("offset", String(offset));
       return params.toString();
     },
-    [effectiveFilters]
+    [effectiveFilters, country]
   );
 
   // Personal filters (saved/applied) aren't persisted server-side today, so
@@ -519,13 +531,16 @@ export default function Dashboard() {
             <select
               value={filters.cities[0] || "all"}
               onChange={(e) =>
-                setFilters((f) => ({ ...f, cities: e.target.value === "all" ? [] : [e.target.value] }))
+                setFilters((f) => ({
+                  ...f,
+                  cities: e.target.value === "all" ? [] : [e.target.value]
+                }))
               }
               className="hidden lg:block h-12 rounded-full border border-border-strong bg-card px-4 text-sm shadow-sm"
               aria-label="Ciudad"
             >
               <option value="all">Cualquier ciudad</option>
-              {CITY_OPTIONS.map((c) => (
+              {cityOptions.map((c) => (
                 <option key={c} value={c}>
                   {c}
                 </option>
@@ -560,7 +575,11 @@ export default function Dashboard() {
                       "Limpiar todo") — this wrapper only positions/sizes/
                       scrolls it, no second header on top of that one. */}
                   <div className="absolute right-0 top-full mt-2 w-[26rem] max-h-[70vh] overflow-y-auto rounded-xl shadow-xl z-20">
-                    <FilterBar filters={filters} onFilterChange={setFilters} />
+                    <FilterBar
+                      filters={filters}
+                      onFilterChange={setFilters}
+                      cityOptions={cityOptions}
+                    />
                   </div>
                 </>
               )}
@@ -608,7 +627,7 @@ export default function Dashboard() {
               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-4 max-w-xl w-full mx-auto">
-              <FilterBar filters={filters} onFilterChange={setFilters} />
+              <FilterBar filters={filters} onFilterChange={setFilters} cityOptions={cityOptions} />
             </div>
             <div className="shrink-0 p-4 border-t border-[#e6e8e4] bg-[#ffffff]">
               <button
@@ -625,88 +644,29 @@ export default function Dashboard() {
         <div>
           <StatsBar totalJobs={total} filteredJobs={visibleJobs.length} />
 
-            {isLoading ? (
-              <div className="space-y-3">
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="rounded-xl p-5 border border-[#e6e8e4] bg-[#ffffff] animate-pulse space-y-3"
-                  >
-                    <div className="h-4 w-3/4 rounded bg-[#f1f2f0]" />
-                    <div className="h-3 w-1/2 rounded bg-[#f1f2f0]" />
-                    <div className="h-3 w-2/3 rounded bg-[#f1f2f0]" />
-                  </div>
-                ))}
-              </div>
-            ) : visibleJobs.length > 0 ? (
-              <>
-                {isDesktop ? (
-                  /* Desktop split-pane: compact clickable list on the left,
+          {isLoading ? (
+            <div className="space-y-3">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="rounded-xl p-5 border border-[#e6e8e4] bg-[#ffffff] animate-pulse space-y-3"
+                >
+                  <div className="h-4 w-3/4 rounded bg-[#f1f2f0]" />
+                  <div className="h-3 w-1/2 rounded bg-[#f1f2f0]" />
+                  <div className="h-3 w-2/3 rounded bg-[#f1f2f0]" />
+                </div>
+              ))}
+            </div>
+          ) : visibleJobs.length > 0 ? (
+            <>
+              {isDesktop ? (
+                /* Desktop split-pane: compact clickable list on the left,
                      sticky detail panel on the right — same master-detail
                      pattern JobLeads/LinkedIn Jobs use. Both columns follow
                      normal page flow (no inner overflow-y-auto column) so
                      there's a single native scrollbar for the whole page —
                      same as the plain stacked list always had. */
-                  <div className="grid grid-cols-[380px_1fr] gap-4 items-start">
-                    <div className="space-y-3">
-                      {visibleJobs.map((job) =>
-                        job.isLocked ? (
-                          <PaywallCard
-                            key={job.jobId || job.url}
-                            job={job}
-                            onUnlockClick={() => navigate("/pricing")}
-                          />
-                        ) : (
-                          <JobListItem
-                            key={job.jobId || job.url}
-                            job={job}
-                            selected={job.jobId === selectedJobId}
-                            onClick={() => setSelectedJobId(job.jobId)}
-                          />
-                        )
-                      )}
-                    </div>
-
-                    {/* top-40 (160px), not top-32 (128px): the sticky
-                        search bar above sits at top-16 (64px) and is
-                        76px tall, so its own bottom edge lands at 140px.
-                        Anything less than that here and the search bar's
-                        opaque z-40 background paints over the top of this
-                        card while scrolled, wiping out its color strip —
-                        this leaves a clean 20px gap below it instead. */}
-                    <div className="sticky top-40">
-                      {selectedJob?.isLocked ? (
-                        <div className="rounded-lg border border-border bg-card p-8 text-center">
-                          <p className="text-sm text-muted-foreground mb-4">
-                            Esta vacante es reciente y está reservada para suscriptores Pro.
-                          </p>
-                          <Button variant="gold" onClick={() => navigate("/pricing")}>
-                            <Unlock className="h-3.5 w-3.5" />
-                            Desbloquear Pro
-                          </Button>
-                        </div>
-                      ) : (
-                        <JobDetailPanel
-                          job={
-                            selectedJob
-                              ? {
-                                  ...selectedJob,
-                                  isSaved: savedJobIds.has(selectedJob.jobId),
-                                  isApplied: appliedJobIds.has(selectedJob.jobId)
-                                }
-                              : null
-                          }
-                          onSaveToggle={handleSaveToggle}
-                          onAppliedToggle={handleAppliedToggle}
-                          onApplyClick={setApplyGateJob}
-                        />
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  /* Mobile / below-lg: stacked full-card list — there's no
-                     room for a second pane, so each card carries its own
-                     actions (as it always has). */
+                <div className="grid grid-cols-[380px_1fr] gap-4 items-start">
                   <div className="space-y-3">
                     {visibleJobs.map((job) =>
                       job.isLocked ? (
@@ -716,47 +676,104 @@ export default function Dashboard() {
                           onUnlockClick={() => navigate("/pricing")}
                         />
                       ) : (
-                        <JobCard
+                        <JobListItem
                           key={job.jobId || job.url}
-                          job={{
-                            ...job,
-                            isSaved: savedJobIds.has(job.jobId),
-                            isApplied: appliedJobIds.has(job.jobId)
-                          }}
-                          onSaveToggle={handleSaveToggle}
-                          onAppliedToggle={handleAppliedToggle}
-                          onApplyClick={setApplyGateJob}
+                          job={job}
+                          selected={job.jobId === selectedJobId}
+                          onClick={() => setSelectedJobId(job.jobId)}
                         />
                       )
                     )}
                   </div>
-                )}
 
-                {!personalFilterActive && (
-                  <div ref={sentinelRef} className="h-10 flex items-center justify-center mt-4">
-                    {isLoadingMore && (
-                      <span className="w-5 h-5 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-                    )}
-                    {!hasMore && jobs.length > 0 && (
-                      <span className="text-xs font-mono text-ink-faint">
-                        Ya viste todas las vacantes que coinciden.
-                      </span>
+                  {/* top-40 (160px), not top-32 (128px): the sticky
+                        search bar above sits at top-16 (64px) and is
+                        76px tall, so its own bottom edge lands at 140px.
+                        Anything less than that here and the search bar's
+                        opaque z-40 background paints over the top of this
+                        card while scrolled, wiping out its color strip —
+                        this leaves a clean 20px gap below it instead. */}
+                  <div className="sticky top-40">
+                    {selectedJob?.isLocked ? (
+                      <div className="rounded-lg border border-border bg-card p-8 text-center">
+                        <p className="text-sm text-muted-foreground mb-4">
+                          Esta vacante es reciente y está reservada para suscriptores Pro.
+                        </p>
+                        <Button variant="gold" onClick={() => navigate("/pricing")}>
+                          <Unlock className="h-3.5 w-3.5" />
+                          Desbloquear Pro
+                        </Button>
+                      </div>
+                    ) : (
+                      <JobDetailPanel
+                        job={
+                          selectedJob
+                            ? {
+                                ...selectedJob,
+                                isSaved: savedJobIds.has(selectedJob.jobId),
+                                isApplied: appliedJobIds.has(selectedJob.jobId)
+                              }
+                            : null
+                        }
+                        onSaveToggle={handleSaveToggle}
+                        onAppliedToggle={handleAppliedToggle}
+                        onApplyClick={setApplyGateJob}
+                      />
                     )}
                   </div>
-                )}
-              </>
-            ) : (
-              <div className="text-center py-16 px-4 rounded-2xl border border-[#e6e8e4] bg-[#ffffff] text-muted-foreground font-mono">
-                <span className="text-3xl block mb-2">🔍</span>
-                No se encontraron vacantes con los filtros seleccionados.
-              </div>
-            )}
-          </div>
-        </div>
+                </div>
+              ) : (
+                /* Mobile / below-lg: stacked full-card list — there's no
+                     room for a second pane, so each card carries its own
+                     actions (as it always has). */
+                <div className="space-y-3">
+                  {visibleJobs.map((job) =>
+                    job.isLocked ? (
+                      <PaywallCard
+                        key={job.jobId || job.url}
+                        job={job}
+                        onUnlockClick={() => navigate("/pricing")}
+                      />
+                    ) : (
+                      <JobCard
+                        key={job.jobId || job.url}
+                        job={{
+                          ...job,
+                          isSaved: savedJobIds.has(job.jobId),
+                          isApplied: appliedJobIds.has(job.jobId)
+                        }}
+                        onSaveToggle={handleSaveToggle}
+                        onAppliedToggle={handleAppliedToggle}
+                        onApplyClick={setApplyGateJob}
+                      />
+                    )
+                  )}
+                </div>
+              )}
 
-      {applyGateJob && (
-        <ApplyGateModal job={applyGateJob} onClose={() => setApplyGateJob(null)} />
-      )}
+              {!personalFilterActive && (
+                <div ref={sentinelRef} className="h-10 flex items-center justify-center mt-4">
+                  {isLoadingMore && (
+                    <span className="w-5 h-5 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+                  )}
+                  {!hasMore && jobs.length > 0 && (
+                    <span className="text-xs font-mono text-ink-faint">
+                      Ya viste todas las vacantes que coinciden.
+                    </span>
+                  )}
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="text-center py-16 px-4 rounded-2xl border border-[#e6e8e4] bg-[#ffffff] text-muted-foreground font-mono">
+              <span className="text-3xl block mb-2">🔍</span>
+              No se encontraron vacantes con los filtros seleccionados.
+            </div>
+          )}
+        </div>
+      </div>
+
+      {applyGateJob && <ApplyGateModal job={applyGateJob} onClose={() => setApplyGateJob(null)} />}
     </section>
   );
 }

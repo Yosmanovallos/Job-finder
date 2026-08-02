@@ -2,6 +2,7 @@ import { allAdapters, Job, SourceAdapter } from "../sources/index.js";
 import { saveJobs } from "../db/job-repository.js";
 import { markRoleSourceRun } from "../db/scheduler-repository.js";
 import { generateRoleKeywordsWithAI } from "../ai-role-agent.js";
+import { DEFAULT_COUNTRY, isRemoteLocation } from "../countries/index.js";
 
 interface WorkerJobOptions {
   roleName: string;
@@ -10,6 +11,14 @@ interface WorkerJobOptions {
    * to respect per-source cadence). Defaults to all sources, preserving the
    * existing manual/admin trigger behavior. */
   adapters?: SourceAdapter[];
+  /** Which country tick this is (see run-scrape-tick.ts's TICK_COUNTRY).
+   * Defaults to 'CO' so any caller that doesn't pass it (manual/admin
+   * triggers, older call sites) keeps today's behavior unchanged. Stamped
+   * onto every fetched job below UNLESS its own location reads as remote,
+   * in which case it's left null — remote jobs must stay visible to every
+   * country regardless of which country's tick happened to discover them
+   * (see schema.sql's jobs.country comment). */
+  country?: string;
 }
 
 export class ScrapeWorker {
@@ -50,7 +59,12 @@ export class ScrapeWorker {
   }> {
     this.checkMemory();
 
-    const { roleName, dateRange = "48h", adapters = allAdapters } = options;
+    const {
+      roleName,
+      dateRange = "48h",
+      adapters = allAdapters,
+      country = DEFAULT_COUNTRY
+    } = options;
     console.log(
       `\n⚙️ [ScrapeWorker] Procesando rol: "${roleName}" (Concurrencia activa: ${this.activeJobsCount + 1}/${this.maxConcurrency}, fuentes: [${adapters.map((a) => a.name).join(", ")}])...`
     );
@@ -80,6 +94,10 @@ export class ScrapeWorker {
         const fetched = Array.isArray(results) ? results.length : 0;
         totalJobs += fetched;
         perSource[adapter.name] = { fetched };
+
+        for (const job of results) {
+          job.country = isRemoteLocation(job.location) ? null : country;
+        }
 
         if (fetched > 0) {
           const saved = await saveJobs(results, roleName);

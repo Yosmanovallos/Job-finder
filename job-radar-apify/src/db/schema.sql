@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS jobs (
     content_fingerprint VARCHAR(64),                 -- SHA-256 de (title+company+location) normalizado, dedup secundaria
     title         VARCHAR(500) NOT NULL,
     company       VARCHAR(255) DEFAULT 'Confidencial',
-    location      VARCHAR(255) DEFAULT 'Colombia',
+    location      VARCHAR(255),
     url           TEXT NOT NULL,
     source        VARCHAR(100) NOT NULL,            -- Fuente primaria (ej. 'LinkedIn')
     sources       JSONB DEFAULT '[]'::jsonb,         -- Array de fuentes deduplicadas (ej. ["LinkedIn", "Computrabajo"])
@@ -22,6 +22,25 @@ CREATE TABLE IF NOT EXISTS jobs (
     role_origin   VARCHAR(255),                     -- Rol que la encontró (ej. "analista de datos")
     is_active     BOOLEAN DEFAULT TRUE
 );
+
+-- Country as a first-class data dimension (Venezuela expansion,
+-- backlog/venezuela-expansion.md Día 1). ISO 3166-1 alpha-2, e.g. 'CO'/'VE'.
+-- NULL means remote (mirrors the existing "Remoto" pseudo-city convention in
+-- CITY_OPTIONS/job-filters.ts) — remote jobs are meant to surface for every
+-- country, so NULL is a permanent value here, never a "not yet migrated"
+-- placeholder. See scripts/migrate-country.ts for the one-time backfill of
+-- pre-existing rows (must NOT blindly stamp every row 'CO' — that would
+-- destroy the shared-remote behavior by mislabeling remote jobs as Colombia
+-- only).
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS country VARCHAR(2);
+CREATE INDEX IF NOT EXISTS idx_jobs_country ON jobs (country);
+
+-- Older deployments created this column with DEFAULT 'Colombia'. saveJobs()
+-- always passes `location` explicitly (job-repository.ts), so the default
+-- never actually fired from that path — but leaving it in place would let a
+-- future direct INSERT silently mislabel a Venezuela row as Colombia. Drop
+-- is idempotent (no-op if the column already has no default).
+ALTER TABLE jobs ALTER COLUMN location DROP DEFAULT;
 
 -- Índices de alto rendimiento para Paywall y Consultas Instantáneas
 CREATE INDEX IF NOT EXISTS idx_jobs_published_at ON jobs (published_at DESC);

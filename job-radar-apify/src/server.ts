@@ -118,7 +118,9 @@ function searchCompanies(
   // page boundary.
   entries.sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
   return {
-    companies: entries.slice(offset, offset + limit).map(([company, count]) => ({ company, count })),
+    companies: entries
+      .slice(offset, offset + limit)
+      .map(([company, count]) => ({ company, count })),
     total: entries.length
   };
 }
@@ -155,7 +157,11 @@ const GENERAL_API_RATE_WINDOW_MS = 60 * 1000;
 const SENSITIVE_RATE_LIMIT = 10;
 const SENSITIVE_RATE_WINDOW_MS = 60 * 1000;
 
-function checkSensitiveRateLimit(ip: string, res: http.ServerResponse, routeLabel: string): boolean {
+function checkSensitiveRateLimit(
+  ip: string,
+  res: http.ServerResponse,
+  routeLabel: string
+): boolean {
   if (checkRateLimit(ip, SENSITIVE_RATE_LIMIT, SENSITIVE_RATE_WINDOW_MS)) return true;
   recordSuspiciousEvent(ip, `rate-limit ${routeLabel}`);
   res.writeHead(429, { "Content-Type": "application/json", "Retry-After": "60" });
@@ -186,7 +192,8 @@ const server = http.createServer(async (req, res) => {
   // alert/auto-block thresholds in security-monitor.ts.
   res.on("finish", () => {
     const status = res.statusCode;
-    const suspicious = status === 401 || status === 403 || (status === 404 && pathname.startsWith("/api/"));
+    const suspicious =
+      status === 401 || status === 403 || (status === 404 && pathname.startsWith("/api/"));
     if (status === 401 || status === 403) {
       recordSuspiciousEvent(clientIp, `${method} ${pathname} -> ${status}`);
     }
@@ -273,7 +280,8 @@ const server = http.createServer(async (req, res) => {
       modality: params.get("modality") || undefined,
       freshness: params.get("freshness") || undefined,
       roles: params.getAll("roles").length ? params.getAll("roles") : undefined,
-      company: params.get("company") || undefined
+      company: params.get("company") || undefined,
+      country: params.get("country") || undefined
     };
     let filtered = applyJobFilters(visibleJobs, filters);
     // A manual role filter (checked in FilterBar) is an explicit, stronger
@@ -358,7 +366,8 @@ const server = http.createServer(async (req, res) => {
     const jobs = await getJobsCached(50000);
     const visibleJobs = maskLockedFields(jobs, tier);
 
-    const companyName = (await resolveCompanyBySlug(slug)) || resolveCompanyNameFromJobs(slug, visibleJobs);
+    const companyName =
+      (await resolveCompanyBySlug(slug)) || resolveCompanyNameFromJobs(slug, visibleJobs);
     if (!companyName) {
       res.writeHead(404, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: "Empresa no encontrada" }));
@@ -398,7 +407,11 @@ const server = http.createServer(async (req, res) => {
   // regla de dos pasos que el GET (alias curado → corpus de vacantes real).
   // Un slug que no resuelve a ninguna empresa real es 404: no se puede
   // reseñar algo que no existe en el sistema.
-  if (pathname.startsWith("/api/companies/") && pathname.endsWith("/reviews") && (method === "POST" || method === "DELETE")) {
+  if (
+    pathname.startsWith("/api/companies/") &&
+    pathname.endsWith("/reviews") &&
+    (method === "POST" || method === "DELETE")
+  ) {
     const slug = pathname.slice("/api/companies/".length, -"/reviews".length);
 
     const session = await verifySession(req);
@@ -411,7 +424,8 @@ const server = http.createServer(async (req, res) => {
 
     const jobs = await getJobsCached(50000);
     const visibleJobs = maskLockedFields(jobs, session.tier);
-    const companyName = (await resolveCompanyBySlug(slug)) || resolveCompanyNameFromJobs(slug, visibleJobs);
+    const companyName =
+      (await resolveCompanyBySlug(slug)) || resolveCompanyNameFromJobs(slug, visibleJobs);
     if (!companyName) {
       res.writeHead(404, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: "Empresa no encontrada" }));
@@ -461,7 +475,12 @@ const server = http.createServer(async (req, res) => {
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ userReviews }));
       } catch (e: any) {
-        respondToUnexpectedError(res, e, "POST /api/companies/:slug/reviews", "No se pudo guardar la reseña.");
+        respondToUnexpectedError(
+          res,
+          e,
+          "POST /api/companies/:slug/reviews",
+          "No se pudo guardar la reseña."
+        );
       }
     });
     return;
@@ -577,7 +596,12 @@ const server = http.createServer(async (req, res) => {
           })
         );
       } catch (e: any) {
-        respondToUnexpectedError(res, e, "PATCH /api/me/roles", "No se pudieron guardar los puestos.");
+        respondToUnexpectedError(
+          res,
+          e,
+          "PATCH /api/me/roles",
+          "No se pudieron guardar los puestos."
+        );
       }
     });
     return;
@@ -664,7 +688,12 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify(checkout));
     } catch (e: any) {
-      respondToUnexpectedError(res, e, "POST /api/checkout/start", "No se pudo iniciar el checkout.");
+      respondToUnexpectedError(
+        res,
+        e,
+        "POST /api/checkout/start",
+        "No se pudo iniciar el checkout."
+      );
     }
     return;
   }
@@ -720,7 +749,7 @@ const server = http.createServer(async (req, res) => {
       if (!category) {
         res.writeHead(404, { "Content-Type": "text/html; charset=utf-8" });
         res.end(
-          "<!doctype html><html lang=\"es\"><head><meta charset=\"utf-8\"><title>Categoría no encontrada | BuscoTrabajo</title><meta name=\"robots\" content=\"noindex\"></head><body><h1>Categoría no encontrada</h1><p><a href=\"/dashboard\">Ver todas las vacantes</a></p></body></html>"
+          '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Categoría no encontrada | BuscoTrabajo</title><meta name="robots" content="noindex"></head><body><h1>Categoría no encontrada</h1><p><a href="/dashboard">Ver todas las vacantes</a></p></body></html>'
         );
         return;
       }
@@ -761,8 +790,7 @@ const server = http.createServer(async (req, res) => {
           return `<li><a href="${href}">${title}</a> — ${company} · ${location} · ${source}</li>`;
         })
         .join("\n");
-      const emptyNotice =
-        total === 0 ? "<p>No hay vacantes en esta categoría por ahora.</p>" : "";
+      const emptyNotice = total === 0 ? "<p>No hay vacantes en esta categoría por ahora.</p>" : "";
       const ssrSnippet = `<h1>${escapeHtml(meta.heading)}</h1>\n${emptyNotice}<nav aria-label="Vacantes"><ul>\n${items}\n</ul></nav>`;
       indexHtml = indexHtml.replace('<div id="app"></div>', `<div id="app">${ssrSnippet}</div>`);
 
@@ -823,14 +851,14 @@ const server = http.createServer(async (req, res) => {
       if (id && (await wasJobPurged(id))) {
         res.writeHead(410, { "Content-Type": "text/html; charset=utf-8" });
         res.end(
-          "<!doctype html><html lang=\"es\"><head><meta charset=\"utf-8\"><title>Vacante ya no disponible | BuscoTrabajo</title><meta name=\"robots\" content=\"noindex\"></head><body><h1>Esta vacante ya no está disponible</h1><p>Fue retirada porque venció (más de 30 días publicada).</p><p><a href=\"/dashboard\">Ver vacantes activas</a></p></body></html>"
+          '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Vacante ya no disponible | BuscoTrabajo</title><meta name="robots" content="noindex"></head><body><h1>Esta vacante ya no está disponible</h1><p>Fue retirada porque venció (más de 30 días publicada).</p><p><a href="/dashboard">Ver vacantes activas</a></p></body></html>'
         );
         return;
       }
 
       res.writeHead(404, { "Content-Type": "text/html; charset=utf-8" });
       res.end(
-        "<!doctype html><html lang=\"es\"><head><meta charset=\"utf-8\"><title>Vacante no encontrada | BuscoTrabajo</title><meta name=\"robots\" content=\"noindex\"></head><body><h1>Vacante no encontrada</h1><p><a href=\"/dashboard\">Ver todas las vacantes</a></p></body></html>"
+        '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Vacante no encontrada | BuscoTrabajo</title><meta name="robots" content="noindex"></head><body><h1>Vacante no encontrada</h1><p><a href="/dashboard">Ver todas las vacantes</a></p></body></html>'
       );
       return;
     }

@@ -73,16 +73,18 @@ export async function getPendingIndexingBatch(limit: number): Promise<PendingInd
 }
 
 export async function markIndexingSent(id: string): Promise<void> {
-  await pool.query(`UPDATE indexing_queue SET status = 'sent', sent_at = NOW() WHERE id = $1`, [id]);
+  await pool.query(`UPDATE indexing_queue SET status = 'sent', sent_at = NOW() WHERE id = $1`, [
+    id
+  ]);
 }
 
 // sent_at doubles as "attempted at" here (see getIndexingBudgetRemaining) —
 // a failed attempt still consumed a real request against Google's quota.
 export async function markIndexingFailed(id: string, error: string): Promise<void> {
-  await pool.query(`UPDATE indexing_queue SET status = 'failed', error = $2, sent_at = NOW() WHERE id = $1`, [
-    id,
-    error
-  ]);
+  await pool.query(
+    `UPDATE indexing_queue SET status = 'failed', error = $2, sent_at = NOW() WHERE id = $1`,
+    [id, error]
+  );
 }
 
 // SEO Fase 5 (docs/SEO-PLAN.md §5.6): once a job row is gone,
@@ -96,7 +98,7 @@ export async function markIndexingFailed(id: string, error: string): Promise<voi
 export async function wasJobPurged(jobId: string): Promise<boolean> {
   const result = await pool.query(
     `SELECT 1 FROM indexing_queue WHERE notification_type = 'URL_DELETED' AND url LIKE $1 LIMIT 1`,
-    [`${buildJobUrlPrefix(jobId)}%`]
+    [`%${buildJobUrlPrefix(jobId)}%`]
   );
   return (result.rowCount ?? 0) > 0;
 }

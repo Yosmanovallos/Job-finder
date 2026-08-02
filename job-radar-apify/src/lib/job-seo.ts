@@ -1,6 +1,7 @@
 import { Job } from "../sources/types.js";
 import { getModalityLabel, CITY_OPTIONS } from "./job-filters.js";
 import { DEFAULT_ROLES_200 } from "../queue/scheduler.js";
+import { getCountryConfig } from "../countries/index.js";
 
 const SITE_URL = "https://buscotrabajo.co";
 // jobs older than this are purged from the DB (see job-repository.ts's
@@ -54,16 +55,18 @@ export function escapeJsonForScriptTag(value: unknown): string {
 const COMBINING_DIACRITICS = /[\u0300-\u036f]/g;
 
 export function slugify(text: string): string {
-  return (text || "")
-    .normalize("NFD")
-    // Strip combining diacritics left behind by NFD decomposition, e.g.
-    // "á" -> "a" + U+0301, "ñ" -> "n" + U+0303 — dropping U+0300-U+036F
-    // collapses both back to plain ASCII letters for a clean URL segment.
-    .replace(COMBINING_DIACRITICS, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 80) || "vacante";
+  return (
+    (text || "")
+      .normalize("NFD")
+      // Strip combining diacritics left behind by NFD decomposition, e.g.
+      // "á" -> "a" + U+0301, "ñ" -> "n" + U+0303 — dropping U+0300-U+036F
+      // collapses both back to plain ASCII letters for a clean URL segment.
+      .replace(COMBINING_DIACRITICS, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 80) || "vacante"
+  );
 }
 
 // The slug half of the URL is purely decorative/cosmetic for click-through
@@ -74,8 +77,14 @@ export function buildJobSlug(job: SeoJob): string {
   return slugify(`${job.title} ${job.location || ""}`);
 }
 
+// Remote jobs (job.country == null) stay on the plain /empleos/ path — the
+// /ve prefix is for Venezuela-specific postings, not for remote ones that
+// already show to every country (see schema.sql's jobs.country comment);
+// prefixing them would make the same posting resolve at two different
+// canonical URLs depending on which country's page linked to it.
 export function buildJobPath(job: SeoJob): string {
-  return `/empleos/${job.jobId}/${buildJobSlug(job)}`;
+  const prefix = job.country === "VE" ? "/ve" : "";
+  return `${prefix}/empleos/${job.jobId}/${buildJobSlug(job)}`;
 }
 
 export function buildJobUrl(job: SeoJob): string {
@@ -85,12 +94,18 @@ export function buildJobUrl(job: SeoJob): string {
 // The one fixed part of a job's URL that survives its deletion — the slug
 // half is title-derived and lost forever once the row is gone (see
 // purgeOldJobs()'s comment in scheduler-repository.ts), but every URL this
-// app ever generates for a given jobId starts with this exact prefix, so a
-// LIKE '<prefix>%' lookup against indexing_queue's stored URL_DELETED rows
+// app ever generates for a given jobId contains this exact segment, so a
+// LIKE '%<segment>%' lookup against indexing_queue's stored URL_DELETED rows
 // (Fase 5) can recognize "this id existed and expired" without needing a
-// separate tombstone table/column.
+// separate tombstone table/column. Deliberately NOT anchored to SITE_URL/
+// the start of the string (as it was before buildJobPath started
+// conditionally prepending "/ve") — jobId (a UUID) is globally unique
+// regardless of country, so matching the segment anywhere in the stored URL
+// correctly recognizes a purged job whether it was "/empleos/:id/..." or
+// "/ve/empleos/:id/..." without the caller (server.ts's wasJobPurged(id))
+// needing to know or pass the job's country.
 export function buildJobUrlPrefix(jobId: string): string {
-  return `${SITE_URL}/empleos/${jobId}/`;
+  return `/empleos/${jobId}/`;
 }
 
 // A job is only eligible for a public, indexable page once
@@ -109,12 +124,17 @@ export function isPubliclyDescribable(job: SeoJob): boolean {
 // sees a claim a real visitor wouldn't also see.
 export function buildJobDescription(job: SeoJob): string {
   const parts: string[] = [];
-  parts.push(`${job.title} en ${job.company || "una empresa confidencial"}, ${job.location || "Colombia"}.`);
+  const fallbackLocation = getCountryConfig(job.country).name;
+  parts.push(
+    `${job.title} en ${job.company || "una empresa confidencial"}, ${job.location || fallbackLocation}.`
+  );
 
   const modality = getModalityLabel(job.location);
   if (modality) parts.push(`Modalidad: ${modality}.`);
 
-  const otherSources = (job.alsoIn || (job.sources || []).filter((s) => s !== job.source)).filter(Boolean);
+  const otherSources = (job.alsoIn || (job.sources || []).filter((s) => s !== job.source)).filter(
+    Boolean
+  );
   if (otherSources.length > 0) {
     parts.push(`También publicada en: ${otherSources.join(", ")}.`);
   }
@@ -133,11 +153,12 @@ export interface JobMeta {
 }
 
 export function buildJobMeta(job: SeoJob): JobMeta {
-  const location = job.location || "Colombia";
+  const countryName = getCountryConfig(job.country).name;
+  const location = job.location || countryName;
   const company = job.company || "una empresa confidencial";
   return {
     title: `${job.title} — ${company} (${location}) | BuscoTrabajo`,
-    description: `${job.title} en ${company}, ${location}. Vacante agregada de ${job.source} en BuscoTrabajo — vacantes de empleo en Colombia.`,
+    description: `${job.title} en ${company}, ${location}. Vacante agregada de ${job.source} en BuscoTrabajo — vacantes de empleo en ${countryName}.`,
     canonicalUrl: buildJobUrl(job)
   };
 }
@@ -172,7 +193,11 @@ export function buildJobPosting(job: SeoJob): Record<string, unknown> | null {
       address: {
         "@type": "PostalAddress",
         addressLocality: job.location,
-        addressCountry: "CO"
+        // job.country is null for remote postings (schema.sql's convention)
+        // — falls back to CO via getCountryConfig's own default, same
+        // assumption this hardcoded "CO" already made for every job before
+        // the country column existed, not a new invention.
+        addressCountry: getCountryConfig(job.country).code
       }
     }
   };
@@ -264,9 +289,14 @@ export interface CategoryMeta {
 // capped to however many rows actually get embedded/rendered on the page
 // (see server.ts's 60-item cap), so the description never claims fewer or
 // more vacancies than truly exist right now.
-export function buildCategoryMeta(kind: CategoryKind, label: string, totalCount: number): CategoryMeta {
+export function buildCategoryMeta(
+  kind: CategoryKind,
+  label: string,
+  totalCount: number
+): CategoryMeta {
   const countLabel = totalCount === 1 ? "1 vacante" : `${totalCount} vacantes`;
-  const heading = kind === "ciudad" ? `Vacantes de empleo en ${label}` : `Vacantes de ${label} en Colombia`;
+  const heading =
+    kind === "ciudad" ? `Vacantes de empleo en ${label}` : `Vacantes de ${label} en Colombia`;
   return {
     title: `${heading} — ${countLabel} | BuscoTrabajo`,
     heading,
@@ -310,7 +340,12 @@ function xmlUrlEntry(loc: string, lastmod?: string): string {
 export function buildJobsSitemapXml(jobs: SeoJob[]): string {
   const urls = jobs
     .filter(isPubliclyDescribable)
-    .map((job) => xmlUrlEntry(buildJobUrl(job), job.publishedAt ? new Date(job.publishedAt).toISOString() : undefined))
+    .map((job) =>
+      xmlUrlEntry(
+        buildJobUrl(job),
+        job.publishedAt ? new Date(job.publishedAt).toISOString() : undefined
+      )
+    )
     .join("\n");
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`;
 }

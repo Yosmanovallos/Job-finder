@@ -1,9 +1,15 @@
 import fs from "fs";
 import dotenv from "dotenv";
 import { allAdapters, SourceAdapter } from "../src/sources/index.js";
-import { SOURCE_CADENCE_MS, GLOBAL_SOURCE_CADENCE_MS } from "../src/queue/source-cadence.js";
+import {
+  SOURCE_CADENCE_MS,
+  GLOBAL_SOURCE_CADENCE_MS,
+  SOURCE_CADENCE_MS_VE,
+  GLOBAL_SOURCE_CADENCE_MS_VE
+} from "../src/queue/source-cadence.js";
 import { DEFAULT_ROLES_200 } from "../src/queue/scheduler.js";
 import { ScrapeWorker } from "../src/queue/scrape-worker.js";
+import { isRemoteLocation } from "../src/countries/index.js";
 import {
   seedSearchRoles,
   getDueRoleSources,
@@ -15,6 +21,18 @@ import { saveJobs } from "../src/db/job-repository.js";
 import { pool } from "../src/db/client.js";
 
 dotenv.config();
+
+// Which country this tick run is for — see .github/workflows/scrape-jobs.yml
+// (unset, so this defaults to "CO", zero behavior change) vs.
+// scrape-jobs-ve.yml (sets TICK_COUNTRY=VE). Selects both the per-role and
+// global-catalog cadence maps below, so a VE run's due-check can never touch
+// a CO source's role_source_runs/source_circuit_state row and vice versa —
+// see source-cadence.ts's SOURCE_CADENCE_MS_VE comment for why that
+// isolation matters.
+const TICK_COUNTRY = (process.env.TICK_COUNTRY || "CO").toUpperCase();
+const ROLE_CADENCE_MS = TICK_COUNTRY === "VE" ? SOURCE_CADENCE_MS_VE : SOURCE_CADENCE_MS;
+const GLOBAL_CADENCE_MS =
+  TICK_COUNTRY === "VE" ? GLOBAL_SOURCE_CADENCE_MS_VE : GLOBAL_SOURCE_CADENCE_MS;
 
 // One-shot tick meant to be invoked on a schedule (e.g. GitHub Actions every
 // 15 min) — unlike the old in-process cron, this never retries a timed-out
@@ -62,7 +80,7 @@ async function runWithTimeout(
   });
 
   const workPromise = worker
-    .processRoleJob({ roleName, dateRange: "48h", adapters })
+    .processRoleJob({ roleName, dateRange: "48h", adapters, country: TICK_COUNTRY })
     .catch((err) => {
       console.error(`❌ [Tick] Rol "${roleName}" falló:`, err?.message || err);
       return null;
@@ -115,7 +133,7 @@ async function runBatched(
  * fold this in without a second code path.
  */
 async function runGlobalCatalogSources(): Promise<RoleResult | null> {
-  const dueSources = await getDueGlobalSources(GLOBAL_SOURCE_CADENCE_MS);
+  const dueSources = await getDueGlobalSources(GLOBAL_CADENCE_MS);
   if (dueSources.length === 0) return null;
 
   console.log(`🌐 [Tick] Fuentes de catálogo global vencidas: [${dueSources.join(", ")}]`);
@@ -131,6 +149,10 @@ async function runGlobalCatalogSources(): Promise<RoleResult | null> {
       const results = await adapter.fetch([], "48h");
       const fetched = Array.isArray(results) ? results.length : 0;
       perSource[sourceName] = { fetched };
+
+      for (const job of results) {
+        job.country = isRemoteLocation(job.location) ? null : TICK_COUNTRY;
+      }
 
       if (fetched > 0) {
         const saved = await saveJobs(results, "General");
@@ -244,6 +266,7 @@ function writeSummary(results: RoleResult[], deletedOld: number) {
 
 async function main() {
   const startedAt = Date.now();
+  console.log(`🌎 [Tick] TICK_COUNTRY=${TICK_COUNTRY}`);
   await seedSearchRoles(DEFAULT_ROLES_200);
 
   const trackedPromises: Promise<any>[] = [];
@@ -257,7 +280,7 @@ async function main() {
   // closing the pool.
   const globalResult = await runGlobalCatalogSourcesWithTimeout(trackedPromises);
 
-  const due = await getDueRoleSources(SOURCE_CADENCE_MS);
+  const due = await getDueRoleSources(ROLE_CADENCE_MS);
   const results: RoleResult[] = [];
 
   if (due.size === 0) {

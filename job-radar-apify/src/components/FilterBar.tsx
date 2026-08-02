@@ -58,6 +58,11 @@ export const SOURCE_OPTIONS = [
 export interface FilterBarProps {
   filters: FilterState;
   onFilterChange: (filters: FilterState) => void;
+  // Defaults to CITY_OPTIONS (Colombia) so every existing caller keeps
+  // today's exact list with zero changes — Dashboard.tsx is the only
+  // caller that passes country-specific cities (see getCityOptionsForCountry
+  // in job-filters.ts).
+  cityOptions?: string[];
 }
 
 // A single collapsible sidebar section — sections default open (matching the
@@ -109,7 +114,11 @@ const CheckRow: React.FC<{
   </label>
 );
 
-export const FilterBar: React.FC<FilterBarProps> = ({ filters, onFilterChange }) => {
+export const FilterBar: React.FC<FilterBarProps> = ({
+  filters,
+  onFilterChange,
+  cityOptions = CITY_OPTIONS
+}) => {
   const [roleSearch, setRoleSearch] = useState("");
   const [companySearch, setCompanySearch] = useState("");
   const [companyResults, setCompanyResults] = useState<CompanySearchResult[]>([]);
@@ -135,9 +144,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({ filters, onFilterChange })
 
   const toggleInArray = (key: "sources" | "cities" | "selectedRoles", value: string) => {
     const current = filters[key];
-    const next = current.includes(value)
-      ? current.filter((v) => v !== value)
-      : [...current, value];
+    const next = current.includes(value) ? current.filter((v) => v !== value) : [...current, value];
     update({ [key]: next } as Partial<FilterState>);
   };
 
@@ -187,10 +194,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({ filters, onFilterChange })
         </FilterSection>
 
         <FilterSection title="Fecha de publicación">
-          <RadioGroup
-            value={filters.freshness}
-            onValueChange={(v) => update({ freshness: v })}
-          >
+          <RadioGroup value={filters.freshness} onValueChange={(v) => update({ freshness: v })}>
             <RadioRow id="freshness-all" value="all" label="Todas" />
             <RadioRow id="freshness-24h" value="24h" label="Últimas 24 horas" />
             <RadioRow id="freshness-48h" value="48h" label="Últimas 48 horas" />
@@ -209,7 +213,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({ filters, onFilterChange })
 
         <FilterSection title="Ciudad">
           <div className="max-h-40 overflow-y-auto space-y-2.5 pr-1">
-            {CITY_OPTIONS.map((c) => (
+            {cityOptions.map((c) => (
               <CheckRow
                 key={c}
                 id={`city-${c}`}
@@ -248,10 +252,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({ filters, onFilterChange })
             ) : companyResults.length === 0 ? (
               <p className="text-ink-faint text-xs py-1">Sin coincidencias.</p>
             ) : (
-              <RadioGroup
-                value={filters.company}
-                onValueChange={(v) => update({ company: v })}
-              >
+              <RadioGroup value={filters.company} onValueChange={(v) => update({ company: v })}>
                 {companyResults.map((c) => (
                   <label
                     key={c.company}

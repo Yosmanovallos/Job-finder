@@ -12,6 +12,9 @@ import { remotiveAdapter } from "./remotive.js";
 import { indeedAdapter } from "./indeed.js";
 import { glassdoorAdapter } from "./glassdoor.js";
 import { joobleAdapter } from "./jooble.js";
+import { linkedinVEAdapter } from "./linkedin-ve.js";
+import { computrabajoVEAdapter } from "./computrabajo-ve.js";
+import { joobleVEAdapter } from "./jooble-ve.js";
 
 export * from "./types.js";
 
@@ -28,7 +31,10 @@ export const allAdapters: SourceAdapter[] = [
   remotiveAdapter,
   indeedAdapter,
   glassdoorAdapter,
-  joobleAdapter
+  joobleAdapter,
+  linkedinVEAdapter,
+  computrabajoVEAdapter,
+  joobleVEAdapter
 ];
 
 export {
@@ -44,5 +50,8 @@ export {
   remotiveAdapter,
   indeedAdapter,
   glassdoorAdapter,
-  joobleAdapter
+  joobleAdapter,
+  linkedinVEAdapter,
+  computrabajoVEAdapter,
+  joobleVEAdapter
 };

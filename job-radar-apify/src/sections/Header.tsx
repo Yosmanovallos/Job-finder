@@ -40,6 +40,16 @@ export default function Header() {
 
   const accountLabel = tier === "pro" ? `🌟 ${user?.email}` : user?.email || "Mi cuenta";
 
+  // Same "/ve" prefix detection as Dashboard.tsx — shows the OTHER country
+  // as the link target (switch-to, not current-state) since that's the
+  // action being offered. Only ever points at /dashboard or /ve/dashboard —
+  // company/category pages aren't country-scoped yet (see App.tsx's route
+  // comment), so switching from those always lands on the job list rather
+  // than a same-page-different-country equivalent that doesn't exist yet.
+  const isVenezuela = location.pathname.startsWith("/ve");
+  const countrySwitchHref = isVenezuela ? "/dashboard" : "/ve/dashboard";
+  const countrySwitchLabel = isVenezuela ? "🇨🇴 Colombia" : "🇻🇪 Venezuela";
+
   return (
     <header
       id="header"
@@ -100,6 +110,14 @@ export default function Header() {
 
         {/* Desktop right actions */}
         <div className="hidden lg:flex items-center gap-2">
+          <Link
+            to={countrySwitchHref}
+            className="px-3 py-2 rounded-sm text-sm font-mono focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+            style={{ color: "#5b5f5c", textDecoration: "none", border: "1px solid #e6e8e4" }}
+            {...hoverStyle<HTMLAnchorElement>({ color: "#0e0f10" }, { color: "#5b5f5c" })}
+          >
+            {countrySwitchLabel}
+          </Link>
           {loading ? (
             // Avoid a flash of "logged out" while the session (incl. an OAuth
             // redirect hash) is still being resolved on first paint.
@@ -226,6 +244,26 @@ export default function Header() {
                 {link.label}
               </Link>
             ))}
+            <Link
+              to={countrySwitchHref}
+              onClick={handleNavClick}
+              className="flex items-center rounded-sm transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+              style={{
+                fontFamily:
+                  'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+                fontSize: "1rem",
+                color: "#5b5f5c",
+                textDecoration: "none",
+                minHeight: "48px",
+                padding: "0 8px"
+              }}
+              {...hoverStyle<HTMLAnchorElement>(
+                { color: "#0e0f10", backgroundColor: "#f1f2f0" },
+                { color: "#5b5f5c", backgroundColor: "transparent" }
+              )}
+            >
+              {countrySwitchLabel}
+            </Link>
           </nav>
 
           {/* Divider */}

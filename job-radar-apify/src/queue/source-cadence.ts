@@ -51,3 +51,30 @@ export const GLOBAL_SOURCE_CADENCE_MS: Record<string, number> = {
   Jooble: 6 * HOUR_MS,
   WeRemoto: 4 * HOUR_MS
 };
+
+// --- Venezuela (backlog/venezuela-expansion.md, Día 1) ----------------------
+//
+// Separate maps, not new entries in the CO maps above — role_source_runs and
+// source_circuit_state are both keyed only by source name (no country
+// column), so a VE fetch under the SAME name as its CO counterpart would
+// share that row's cadence/circuit-breaker state across countries: whichever
+// country's tick ran first would silently "use up" the other's window, and a
+// real block on one country's fetch would degrade the other's too. The `-VE`
+// suffix on every key here is what keeps the two countries' bookkeeping rows
+// disjoint — see src/sources/*-ve.ts for the adapters registered under these
+// exact names.
+export const SOURCE_CADENCE_MS_VE: Record<string, number> = {
+  "LinkedIn-VE": 4 * HOUR_MS,
+  "Computrabajo-VE": 6 * HOUR_MS
+};
+
+// Deliberately does NOT include RemoteOK/GetOnBoard/WeRemoto: those already
+// return remote-scoped jobs shared across every country (country stamped
+// NULL, see scrape-worker.ts) — CO's tick already fetches them, so having
+// VE's tick fetch the identical catalog again would double the request
+// volume for zero new coverage. Jooble is different: its API takes a
+// location filter, so Jooble-VE's response is genuinely distinct content
+// from CO's Jooble fetch, not a re-fetch of the same catalog.
+export const GLOBAL_SOURCE_CADENCE_MS_VE: Record<string, number> = {
+  "Jooble-VE": 6 * HOUR_MS
+};

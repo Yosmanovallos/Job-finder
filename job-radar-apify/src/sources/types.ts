@@ -7,6 +7,11 @@ export interface Job {
   dateText: string;
   source: string;
   publishedAt?: string;
+  // ISO 3166-1 alpha-2 ('CO'/'VE'), or null for remote (shown to every
+  // country — see schema.sql's jobs.country comment). Stamped by
+  // ScrapeWorker.processRoleJob from the tick's country, not by individual
+  // adapters — see src/queue/scrape-worker.ts.
+  country?: string | null;
   [key: string]: any;
 }
 
