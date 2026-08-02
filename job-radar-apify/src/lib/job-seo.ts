@@ -77,14 +77,17 @@ export function buildJobSlug(job: SeoJob): string {
   return slugify(`${job.title} ${job.location || ""}`);
 }
 
-// Remote jobs (job.country == null) stay on the plain /empleos/ path — the
-// /ve prefix is for Venezuela-specific postings, not for remote ones that
-// already show to every country (see schema.sql's jobs.country comment);
-// prefixing them would make the same posting resolve at two different
-// canonical URLs depending on which country's page linked to it.
+// Deliberately country-agnostic — every job page lives at /empleos/:id
+// regardless of country, id-addressed and globally unique. An earlier
+// version of this prefixed Venezuela jobs with /ve/empleos/..., but
+// server.ts's SSR route matching, the sitemap, and the Google Indexing API
+// queue (saveJobs -> enqueueIndexingNotifications) all only ever knew about
+// /empleos/ — that would have submitted /ve/empleos/ URLs to Google with no
+// server route actually serving them. /ve stays scoped to the dashboard
+// listing (App.tsx's /ve/dashboard, Dashboard.tsx's own prefix check),
+// which never touches the sitemap/indexing pipeline.
 export function buildJobPath(job: SeoJob): string {
-  const prefix = job.country === "VE" ? "/ve" : "";
-  return `${prefix}/empleos/${job.jobId}/${buildJobSlug(job)}`;
+  return `/empleos/${job.jobId}/${buildJobSlug(job)}`;
 }
 
 export function buildJobUrl(job: SeoJob): string {

@@ -9,7 +9,7 @@ import {
 } from "../src/queue/source-cadence.js";
 import { DEFAULT_ROLES_200 } from "../src/queue/scheduler.js";
 import { ScrapeWorker } from "../src/queue/scrape-worker.js";
-import { isRemoteLocation } from "../src/countries/index.js";
+import { resolveJobCountry } from "../src/countries/index.js";
 import {
   seedSearchRoles,
   getDueRoleSources,
@@ -151,7 +151,7 @@ async function runGlobalCatalogSources(): Promise<RoleResult | null> {
       perSource[sourceName] = { fetched };
 
       for (const job of results) {
-        job.country = isRemoteLocation(job.location) ? null : TICK_COUNTRY;
+        job.country = resolveJobCountry(job, TICK_COUNTRY);
       }
 
       if (fetched > 0) {

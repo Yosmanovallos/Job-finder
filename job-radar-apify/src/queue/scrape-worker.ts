@@ -2,7 +2,7 @@ import { allAdapters, Job, SourceAdapter } from "../sources/index.js";
 import { saveJobs } from "../db/job-repository.js";
 import { markRoleSourceRun } from "../db/scheduler-repository.js";
 import { generateRoleKeywordsWithAI } from "../ai-role-agent.js";
-import { DEFAULT_COUNTRY, isRemoteLocation } from "../countries/index.js";
+import { DEFAULT_COUNTRY, resolveJobCountry } from "../countries/index.js";
 
 interface WorkerJobOptions {
   roleName: string;
@@ -96,7 +96,7 @@ export class ScrapeWorker {
         perSource[adapter.name] = { fetched };
 
         for (const job of results) {
-          job.country = isRemoteLocation(job.location) ? null : country;
+          job.country = resolveJobCountry(job, country);
         }
 
         if (fetched > 0) {

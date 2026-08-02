@@ -10,6 +10,14 @@
  * Venezuela's listing — silently breaking the one behavior the whole
  * single-app/single-DB architecture decision exists to preserve.
  *
+ * ALSO excludes ALWAYS_REMOTE_SOURCES (RemoteOK/Remotive/WeRemoto) from the
+ * location-text check entirely, same as resolveJobCountry() (countries/
+ * index.ts) does for newly-scraped jobs — their location field is real
+ * unfiltered upstream text ("Worldwide"/"Anywhere"/a specific country),
+ * which the remoto/remote substring check does not reliably catch. An
+ * earlier run of this script (before that source list existed) mislabeled
+ * 343 such rows 'CO'; this version doesn't reproduce that on a fresh re-run.
+ *
  * Run once after deploying the schema change:
  *   cd job-radar-apify && npx tsx scripts/migrate-country.ts
  *
@@ -18,11 +26,14 @@
  */
 import dotenv from "dotenv";
 import { pool } from "../src/db/client.js";
+import { ALWAYS_REMOTE_SOURCES } from "../src/countries/index.js";
 
 dotenv.config();
 
 async function main() {
   console.log("🔧 [migrate-country] Starting migration...\n");
+
+  const alwaysRemoteSources = Array.from(ALWAYS_REMOTE_SOURCES);
 
   const totalBefore = await pool.query(`SELECT COUNT(*) AS total FROM jobs`);
   console.log(`📊 Total jobs (before): ${totalBefore.rows[0].total}`);
@@ -33,14 +44,18 @@ async function main() {
   // the backfill entirely instead of correctly treating "no location" as
   // "not detectably remote, so CO".
   const remoteBefore = await pool.query(
-    `SELECT COUNT(*) AS total FROM jobs WHERE country IS NULL AND (lower(COALESCE(location, '')) LIKE '%remoto%' OR lower(COALESCE(location, '')) LIKE '%remote%')`
+    `SELECT COUNT(*) AS total FROM jobs WHERE country IS NULL
+       AND (source = ANY($1) OR lower(COALESCE(location, '')) LIKE '%remoto%' OR lower(COALESCE(location, '')) LIKE '%remote%')`,
+    [alwaysRemoteSources]
   );
-  console.log(`📊 Detected as remote (location-based, will stay country IS NULL): ${remoteBefore.rows[0].total}`);
+  console.log(`📊 Detected as remote (source-based or location-based, will stay country IS NULL): ${remoteBefore.rows[0].total}`);
 
   const result = await pool.query(
     `UPDATE jobs SET country = 'CO'
      WHERE country IS NULL
-       AND NOT (lower(COALESCE(location, '')) LIKE '%remoto%' OR lower(COALESCE(location, '')) LIKE '%remote%')`
+       AND NOT (source = ANY($1))
+       AND NOT (lower(COALESCE(location, '')) LIKE '%remoto%' OR lower(COALESCE(location, '')) LIKE '%remote%')`,
+    [alwaysRemoteSources]
   );
   console.log(`✅ Backfilled country='CO' on ${result.rowCount} rows.\n`);
 

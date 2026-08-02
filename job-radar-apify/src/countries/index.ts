@@ -57,7 +57,45 @@ export function isKnownCountry(code: string | undefined | null): boolean {
 // zero-dependency leaf so nothing here can accidentally change that file's
 // behavior via a shared refactor. All three copies check the same two
 // substrings — if one changes, change all three together.
+//
+// Only reliable for sources whose own scraper guarantees the literal string
+// "Remoto"/"Remote" whenever a posting is actually remote (LinkedIn,
+// Computrabajo, Torre, GetOnBoard, Jooble all do — their fallback/isRemote
+// branches set exactly that). It is NOT reliable for RemoteOK/Remotive/
+// WeRemoto below — see ALWAYS_REMOTE_SOURCES.
 export function isRemoteLocation(location: string | undefined | null): boolean {
   const loc = (location || "").toLowerCase();
   return loc.includes("remoto") || loc.includes("remote");
+}
+
+// Sources whose own scraper does NOT reliably tag "Remoto" on every remote
+// posting, so isRemoteLocation() alone would leak them into whichever
+// country happened to run the tick that fetched them. RemoteOK's location
+// field is `item.location || "Remote"` — a real, unfiltered upstream value
+// (often "Worldwide"/"Anywhere"/a specific country, never checked against
+// "remote"), same for Remotive's `candidate_required_location`. WeRemoto's
+// own brand is "remote" — every listing on it is remote-first by the
+// source's own nature, not something its regex-parsed location field
+// reliably confirms either. Once a job is saved, `saveJobs`'s
+// ON CONFLICT deliberately never updates `country` (see job-repository.ts) —
+// a wrong stamp here is permanent, not self-correcting on the next tick.
+//
+// Deliberately does NOT include GetOnBoard, Torre, or Jooble: those DO mix
+// genuinely country-specific results (GetOnBoard's own isColombia check,
+// Jooble's location-filtered API query) with remote ones, tagged reliably
+// enough for isRemoteLocation to tell them apart — forcing them to always-
+// null here would mislabel their real Colombia/Venezuela postings as
+// remote-only.
+export const ALWAYS_REMOTE_SOURCES = new Set(["RemoteOK", "Remotive", "WeRemoto"]);
+
+// Single source of truth for what country (if any) a freshly-fetched job
+// gets stamped with — used by both the per-role path (scrape-worker.ts) and
+// the global-catalog path (run-scrape-tick.ts's runGlobalCatalogSources) so
+// the two can never drift into different rules for the same source.
+export function resolveJobCountry(
+  job: { source: string; location: string },
+  tickCountry: string
+): string | null {
+  if (ALWAYS_REMOTE_SOURCES.has(job.source)) return null;
+  return isRemoteLocation(job.location) ? null : tickCountry;
 }
