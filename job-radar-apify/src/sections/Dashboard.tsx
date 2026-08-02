@@ -152,9 +152,19 @@ export default function Dashboard() {
     // before this shortcut existed, just without an extra empty round trip
     // first. Deleted immediately after one use so neither a later filter
     // change nor that same auth-resolution re-run can reuse stale data.
+    // window.__SSR_JOBS__ only ever comes from server.ts's exact-match
+    // "/dashboard" route (Colombia-only, see its comment) — there's no SSR
+    // branch for "/ve/dashboard" at all. A visitor whose stored country
+    // preference is Venezuela can still land here via a full navigation to
+    // bare "/dashboard" (App.tsx's redirect gate then bounces them to
+    // "/ve/dashboard" client-side, without a second HTTP round trip) — this
+    // component's very first mount is already at country="VE" in that case,
+    // so `country === "CO"` below is what stops the leftover Colombia
+    // payload from being trusted as if it were Venezuela's. Delete it
+    // either way so it can never be picked up by a later mount either.
     const ssrJobs = (window as any).__SSR_JOBS__;
-    if (ssrJobs && !accessToken && filterKey === JSON.stringify(EMPTY_FILTERS)) {
-      delete (window as any).__SSR_JOBS__;
+    delete (window as any).__SSR_JOBS__;
+    if (ssrJobs && country === "CO" && !accessToken && filterKey === JSON.stringify(EMPTY_FILTERS)) {
       setJobs(Array.isArray(ssrJobs.jobs) ? ssrJobs.jobs : []);
       setTotal(ssrJobs.total || 0);
       setHasMore(!!ssrJobs.hasMore);

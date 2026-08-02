@@ -980,7 +980,15 @@ const server = http.createServer(async (req, res) => {
     const tier = session?.tier || "free";
     const jobs = await getJobsCached(50000);
     const visibleJobs = maskLockedFields(jobs, tier);
-    const allFiltered = applyJobFilters(visibleJobs, {});
+    // This exact-match branch only ever serves the unprefixed "/dashboard"
+    // URL — Colombia by every other country-detection convention in this
+    // app (see country-context.ts) — never "/ve/dashboard" (no SSR branch
+    // exists for that path, see the comment above this route). Without this
+    // filter the embedded window.__SSR_JOBS__ payload mixed both countries,
+    // which Dashboard.tsx's SSR shortcut would then trust verbatim on first
+    // paint — exactly the CO/VE mixing this app's country separation exists
+    // to prevent.
+    const allFiltered = applyJobFilters(visibleJobs, { country: "CO" });
     // Reputation attached here too (not just /api/jobs) so the very first
     // anonymous paint — which reads window.__SSR_JOBS__ below instead of
     // re-fetching /api/jobs, see Dashboard.tsx — can show it immediately

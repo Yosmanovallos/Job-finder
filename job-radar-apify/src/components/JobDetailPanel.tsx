@@ -5,7 +5,7 @@ import { Job } from "../sources/types.js";
 import { getSourceColor } from "../lib/source-colors.js";
 import { getModalityLabel } from "../lib/job-filters.js";
 import { buildCompanyPath } from "../lib/job-seo.js";
-import { getCountryConfig } from "../countries/index.js";
+import { buildLocationLabel } from "../countries/index.js";
 import { useAuth } from "../auth/auth-provider.js";
 import { Button } from "./ui/button.js";
 import { Badge } from "./ui/badge.js";
@@ -67,7 +67,10 @@ export const JobDetailPanel: React.FC<JobDetailPanelProps> = ({
   }
 
   const otherSources =
-    job.alsoIn || (Array.isArray((job as any).sources) ? (job as any).sources.filter((s: string) => s !== job.source) : []);
+    job.alsoIn ||
+    (Array.isArray((job as any).sources)
+      ? (job as any).sources.filter((s: string) => s !== job.source)
+      : []);
   const modality = getModalityLabel(job.location);
   const sourceColor = getSourceColor(job.source);
 
@@ -96,13 +99,16 @@ export const JobDetailPanel: React.FC<JobDetailPanelProps> = ({
                 {job.company ? (
                   // Every real company resolves — see JobCard.tsx's
                   // identical link for the reasoning.
-                  <Link to={buildCompanyPath(job.company, country)} className="hover:underline hover:text-primary">
+                  <Link
+                    to={buildCompanyPath(job.company, country)}
+                    className="hover:underline hover:text-primary"
+                  >
                     {job.company}
                   </Link>
                 ) : (
                   "Confidencial"
                 )}
-                <span className="text-muted-foreground"> · {job.location || getCountryConfig(country || job.country).name}</span>
+                <span className="text-muted-foreground"> · {buildLocationLabel(job, country)}</span>
               </p>
             </div>
           </div>
@@ -114,7 +120,9 @@ export const JobDetailPanel: React.FC<JobDetailPanelProps> = ({
               onClick={() => onSaveToggle?.(job.jobId)}
               aria-label={job.isSaved ? "Quitar de guardados" : "Guardar"}
               className={
-                job.isSaved ? "bg-gold-1/40 border-gold-2/50 text-gold-ink hover:bg-gold-1/40" : undefined
+                job.isSaved
+                  ? "bg-gold-1/40 border-gold-2/50 text-gold-ink hover:bg-gold-1/40"
+                  : undefined
               }
             >
               <Star className="h-4 w-4" fill={job.isSaved ? "currentColor" : "none"} />
@@ -138,7 +146,9 @@ export const JobDetailPanel: React.FC<JobDetailPanelProps> = ({
         <div className="flex flex-wrap items-center gap-1.5 mb-5">
           {modality && <Badge variant={MODALITY_VARIANT[modality]}>{modality}</Badge>}
           {job.salary && <Badge>{job.salary}</Badge>}
-          <Badge style={{ background: sourceColor.bg, color: sourceColor.text }}>{job.source}</Badge>
+          <Badge style={{ background: sourceColor.bg, color: sourceColor.text }}>
+            {job.source}
+          </Badge>
         </div>
 
         <Button asChild size="lg" className="w-full mb-5 font-mono">
@@ -152,7 +162,9 @@ export const JobDetailPanel: React.FC<JobDetailPanelProps> = ({
         <div className="space-y-3 text-sm">
           <div className="flex justify-between gap-4">
             <span className="text-muted-foreground">Publicada</span>
-            <span className="text-foreground text-right">{job.dateText || job.publishedAt || "Reciente"}</span>
+            <span className="text-foreground text-right">
+              {job.dateText || job.publishedAt || "Reciente"}
+            </span>
           </div>
           {otherSources.length > 0 && (
             <div className="flex justify-between gap-4">
@@ -169,8 +181,8 @@ export const JobDetailPanel: React.FC<JobDetailPanelProps> = ({
         )}
 
         <p className="text-xs text-muted-foreground mt-5">
-          La descripción completa y el formulario de aplicación están en la página de{" "}
-          {job.source} — el botón de arriba te lleva directo.
+          La descripción completa y el formulario de aplicación están en la página de {job.source} —
+          el botón de arriba te lleva directo.
         </p>
       </div>
     </div>

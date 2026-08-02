@@ -1,9 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, type CSSProperties } from "react";
 import { Link, useLocation } from "react-router-dom";
+import { ChevronDown, Check } from "lucide-react";
 import { hoverStyle } from "../lib/hover-style.js";
 import { useAuth } from "../auth/auth-provider.js";
 import { PAYWALL_ENABLED } from "../config.js";
 import { Button } from "../components/ui/button.js";
+import { getEffectiveCountry, setStoredCountry, isVePrefixed } from "../lib/country-context.js";
 
 // "Empresas" is the one nav link that's actually country-scoped (see
 // server.ts's /api/companies/* country filter) — /ve/empresas vs /empresas,
@@ -19,24 +21,181 @@ function getNavLinks(isVenezuela: boolean) {
   ];
 }
 
-// Maps the current path to its equivalent under the OTHER country, keeping
+const COUNTRY_FLAGS: Record<string, string> = { CO: "🇨🇴", VE: "🇻🇪" };
+const COUNTRY_LABELS: Record<string, string> = { CO: "Colombia", VE: "Venezuela" };
+const COUNTRY_ORDER = ["CO", "VE"];
+
+// Maps the current path to its equivalent under a TARGET country, keeping
 // the visitor on the same kind of page (landing stays landing, dashboard
-// stays dashboard, empresas stays empresas) instead of always bouncing to
-// the dashboard regardless of where the switch was clicked from. Anything
-// not in this list (login, pricing, legal, account...) isn't country-scoped
-// at all, so switching from there falls back to that country's dashboard —
-// the closest "still useful" destination.
-function getCountrySwitchHref(pathname: string, toVenezuela: boolean): string {
-  if (toVenezuela) {
+// stays dashboard, empresas/company page stays empresas) instead of always
+// bouncing to the dashboard regardless of where the switch was clicked
+// from. Anything not covered here (login, pricing, legal, account, job
+// detail pages...) isn't country-scoped at all — those pages render
+// identical content either way, so switching from there just remembers the
+// preference (see AppRoutes' redirect gate in App.tsx) and lands on that
+// country's dashboard, the closest "still useful" destination.
+function getCountryTargetHref(pathname: string, targetCode: string): string {
+  const alreadyVe = isVePrefixed(pathname);
+  if (targetCode === "VE") {
+    if (alreadyVe) return pathname;
     if (pathname === "/") return "/ve";
     if (pathname === "/dashboard") return "/ve/dashboard";
     if (pathname === "/empresas") return "/ve/empresas";
+    if (pathname.startsWith("/empresas/")) return `/ve${pathname}`;
     return "/ve/dashboard";
   }
+  if (!alreadyVe) return pathname;
   if (pathname === "/ve") return "/";
   if (pathname === "/ve/dashboard") return "/dashboard";
   if (pathname === "/ve/empresas") return "/empresas";
+  if (pathname.startsWith("/ve/empresas/")) return pathname.slice(3);
   return "/dashboard";
+}
+
+interface CountrySwitcherProps {
+  country: string;
+  pathname: string;
+  variant: "desktop" | "mobile";
+  onNavigate?: () => void;
+}
+
+// Flag dropdown (desktop) / flag row (mobile, already inside a full-height
+// panel so a nested dropdown would just add a tap for no reason) replacing
+// the old single-pill "toggle to the other country" button — this shows
+// BOTH options at once, same size, with the current one visibly marked,
+// instead of making the visitor infer what clicking the pill will do.
+function CountrySwitcher({ country, pathname, variant, onNavigate }: CountrySwitcherProps) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [open]);
+
+  const handleSelect = (code: string) => {
+    setStoredCountry(code);
+    setOpen(false);
+    onNavigate?.();
+  };
+
+  const optionStyle = (code: string): CSSProperties => ({
+    display: "flex",
+    alignItems: "center",
+    gap: "0.5rem",
+    padding: "0.5rem 0.75rem",
+    borderRadius: "6px",
+    fontSize: "0.875rem",
+    color: code === country ? "#0e0f10" : "#5b5f5c",
+    fontWeight: code === country ? 600 : 400,
+    textDecoration: "none",
+    background: code === country ? "#f1f2f0" : "transparent"
+  });
+
+  if (variant === "mobile") {
+    return (
+      <div className="flex items-center gap-2">
+        {COUNTRY_ORDER.map((code) => (
+          <Link
+            key={code}
+            to={getCountryTargetHref(pathname, code)}
+            onClick={() => handleSelect(code)}
+            style={{
+              ...optionStyle(code),
+              flex: 1,
+              justifyContent: "center",
+              border: `1px solid ${code === country ? "#0f6b4c" : "#e6e8e4"}`,
+              minHeight: "44px"
+            }}
+          >
+            <span style={{ fontSize: "1.1rem" }}>{COUNTRY_FLAGS[code]}</span>
+            {COUNTRY_LABELS[code]}
+            {code === country && <Check className="h-3.5 w-3.5" style={{ color: "#0f6b4c" }} />}
+          </Link>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div ref={containerRef} style={{ position: "relative" }}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label={`País: ${COUNTRY_LABELS[country]}. Cambiar país`}
+        className="flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+        style={{
+          padding: "0.5rem 0.75rem",
+          borderRadius: "999px",
+          border: "1px solid #e6e8e4",
+          background: "#ffffff",
+          minHeight: "44px",
+          cursor: "pointer"
+        }}
+        {...hoverStyle<HTMLButtonElement>({ borderColor: "#d3d6cf" }, { borderColor: "#e6e8e4" })}
+      >
+        <span style={{ fontSize: "1.1rem", lineHeight: 1 }}>{COUNTRY_FLAGS[country]}</span>
+        <span className="text-sm font-mono" style={{ color: "#5b5f5c" }}>
+          {country}
+        </span>
+        <ChevronDown
+          className="h-3.5 w-3.5"
+          style={{
+            color: "#9a9d98",
+            transform: open ? "rotate(180deg)" : "none",
+            transition: "transform 150ms ease-out"
+          }}
+        />
+      </button>
+      {open && (
+        <div
+          role="listbox"
+          className="flex flex-col gap-1"
+          style={{
+            position: "absolute",
+            top: "calc(100% + 6px)",
+            right: 0,
+            minWidth: "168px",
+            padding: "0.375rem",
+            borderRadius: "10px",
+            border: "1px solid #e6e8e4",
+            background: "#ffffff",
+            boxShadow: "0 8px 24px rgba(14,15,16,0.10)",
+            zIndex: 60
+          }}
+        >
+          {COUNTRY_ORDER.map((code) => (
+            <Link
+              key={code}
+              to={getCountryTargetHref(pathname, code)}
+              role="option"
+              aria-selected={code === country}
+              onClick={() => handleSelect(code)}
+              style={optionStyle(code)}
+              {...hoverStyle<HTMLAnchorElement>(
+                { background: "#f1f2f0" },
+                { background: code === country ? "#f1f2f0" : "transparent" }
+              )}
+            >
+              <span style={{ fontSize: "1.1rem", lineHeight: 1 }}>{COUNTRY_FLAGS[code]}</span>
+              {COUNTRY_LABELS[code]}
+              {code === country && (
+                <Check className="h-3.5 w-3.5 ml-auto" style={{ color: "#0f6b4c" }} />
+              )}
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function Header() {
@@ -67,13 +226,15 @@ export default function Header() {
 
   const accountLabel = tier === "pro" ? `🌟 ${user?.email}` : user?.email || "Mi cuenta";
 
-  // Same "/ve" prefix detection as Dashboard.tsx — shows the OTHER country
-  // as the link target (switch-to, not current-state) since that's the
-  // action being offered.
-  const isVenezuela = location.pathname.startsWith("/ve");
+  // getEffectiveCountry (not a raw "/ve" prefix check) so the header still
+  // reflects a stored Venezuela preference on pages that don't carry the
+  // prefix themselves (Cómo funciona, Preguntas...) — see
+  // src/lib/country-context.ts.
+  const country = getEffectiveCountry(location.pathname);
+  const isVenezuela = country === "VE";
   const navLinks = getNavLinks(isVenezuela);
-  const countrySwitchHref = getCountrySwitchHref(location.pathname, !isVenezuela);
-  const countrySwitchLabel = isVenezuela ? "🇨🇴 Colombia" : "🇻🇪 Venezuela";
+  const homeHref = isVenezuela ? "/ve" : "/";
+  const dashboardHref = isVenezuela ? "/ve/dashboard" : "/dashboard";
 
   return (
     <header
@@ -93,7 +254,7 @@ export default function Header() {
       >
         {/* Brand */}
         <Link
-          to="/"
+          to={homeHref}
           className="flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 rounded-sm"
           style={{
             color: "#0e0f10",
@@ -135,14 +296,7 @@ export default function Header() {
 
         {/* Desktop right actions */}
         <div className="hidden lg:flex items-center gap-2">
-          <Link
-            to={countrySwitchHref}
-            className="px-3 py-2 rounded-sm text-sm font-mono focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-            style={{ color: "#5b5f5c", textDecoration: "none", border: "1px solid #e6e8e4" }}
-            {...hoverStyle<HTMLAnchorElement>({ color: "#0e0f10" }, { color: "#5b5f5c" })}
-          >
-            {countrySwitchLabel}
-          </Link>
+          <CountrySwitcher country={country} pathname={location.pathname} variant="desktop" />
           {loading ? (
             // Avoid a flash of "logged out" while the session (incl. an OAuth
             // redirect hash) is still being resolved on first paint.
@@ -157,7 +311,7 @@ export default function Header() {
                 <Link to={loginHref}>Iniciar sesión</Link>
               </Button>
               <Button size="lg" asChild>
-                <Link to="/dashboard">Probar gratis</Link>
+                <Link to={dashboardHref}>Probar gratis</Link>
               </Button>
             </>
           )}
@@ -269,26 +423,14 @@ export default function Header() {
                 {link.label}
               </Link>
             ))}
-            <Link
-              to={countrySwitchHref}
-              onClick={handleNavClick}
-              className="flex items-center rounded-sm transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-              style={{
-                fontFamily:
-                  'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-                fontSize: "1rem",
-                color: "#5b5f5c",
-                textDecoration: "none",
-                minHeight: "48px",
-                padding: "0 8px"
-              }}
-              {...hoverStyle<HTMLAnchorElement>(
-                { color: "#0e0f10", backgroundColor: "#f1f2f0" },
-                { color: "#5b5f5c", backgroundColor: "transparent" }
-              )}
-            >
-              {countrySwitchLabel}
-            </Link>
+            <div className="px-2 pt-2">
+              <CountrySwitcher
+                country={country}
+                pathname={location.pathname}
+                variant="mobile"
+                onNavigate={handleNavClick}
+              />
+            </div>
           </nav>
 
           {/* Divider */}
@@ -310,7 +452,7 @@ export default function Header() {
                   </Link>
                 </Button>
                 <Button size="lg" className="text-base" asChild>
-                  <Link to="/dashboard" onClick={handleNavClick}>
+                  <Link to={dashboardHref} onClick={handleNavClick}>
                     Probar gratis
                   </Link>
                 </Button>

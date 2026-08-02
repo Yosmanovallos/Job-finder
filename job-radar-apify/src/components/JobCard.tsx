@@ -5,7 +5,7 @@ import { Job } from "../sources/types.js";
 import { getSourceColor } from "../lib/source-colors.js";
 import { getModalityLabel } from "../lib/job-filters.js";
 import { buildCompanyPath } from "../lib/job-seo.js";
-import { getCountryConfig } from "../countries/index.js";
+import { buildLocationLabel } from "../countries/index.js";
 import { useAuth } from "../auth/auth-provider.js";
 import { Button } from "./ui/button.js";
 import { Badge } from "./ui/badge.js";
@@ -143,7 +143,7 @@ export const JobCard: React.FC<JobCardProps> = ({
               ) : (
                 "Confidencial"
               )}
-              <span className="text-muted-foreground"> · {job.location || getCountryConfig(country || job.country).name}</span>
+              <span className="text-muted-foreground"> · {buildLocationLabel(job, country)}</span>
             </p>
 
             <div className="flex flex-wrap items-center gap-1.5 mb-2">

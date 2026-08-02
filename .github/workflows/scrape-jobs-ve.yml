@@ -9,11 +9,15 @@ name: Job Radar Scraper Tick (Venezuela)
 # limit) and it still costs $0 on this public repo.
 
 on:
-  # No `schedule:` yet, deliberately — workflow_dispatch only until a few
-  # manual runs are validated against real production data (fresh listings
-  # actually landing with country='VE', reasonable per-source yield). Add
-  # back the same `schedule: - cron: "*/15 * * * *"` scrape-jobs.yml uses
-  # once that's confirmed, matching Colombia's cadence exactly.
+  # Manual runs validated against real production data (2026-08-02): 105 VE
+  # jobs saved with country='VE', role_source_runs rows correctly isolated
+  # under the "-VE" adapter names, no interference with Colombia's cadence
+  # tables. Same cadence as scrape-jobs.yml from here on — the separate
+  # concurrency group below (not "scrape-jobs-tick") is what keeps this
+  # running in parallel with Colombia's tick instead of queuing behind it,
+  # so Colombia's freshness never slows down because Venezuela was added.
+  schedule:
+    - cron: "*/15 * * * *"
   workflow_dispatch:
 
 # A DIFFERENT group name than scrape-jobs.yml's "scrape-jobs-tick" is the

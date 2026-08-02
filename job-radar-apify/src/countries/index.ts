@@ -99,3 +99,23 @@ export function resolveJobCountry(
   if (ALWAYS_REMOTE_SOURCES.has(job.source)) return null;
   return isRemoteLocation(job.location) ? null : tickCountry;
 }
+
+// Shared fallback used by every job card (JobCard, JobDetailPanel,
+// JobListItem, CategoryJobRow — dashboard AND /empresas alike): when a job
+// has no location text at all, show the country instead of a blank string.
+// Deliberately does NOT append a country qualifier to a bare "Remoto" the
+// way an earlier version of this function tried to — resolveJobCountry
+// forces job.country to null for any location containing "remoto"/"remote"
+// (see above), precisely because those postings (Torre, GetOnBoard...)
+// genuinely have no single-country answer; they're the SAME listing shown
+// on both /dashboard and /ve/dashboard. Appending a guessed country there
+// would be exactly the kind of unsupported inference AGENTS.md §5 forbids
+// — "Remoto" with nothing else is the honest answer, not a bug.
+export function buildLocationLabel(
+  job: { location?: string | null; country?: string | null },
+  contextCountry?: string | null
+): string {
+  const loc = (job.location || "").trim();
+  if (loc) return loc;
+  return getCountryConfig(job.country || contextCountry).name;
+}
