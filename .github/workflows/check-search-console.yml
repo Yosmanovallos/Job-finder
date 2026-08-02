@@ -1,0 +1,47 @@
+name: Search Console Sitemap Check
+
+# Manual diagnostic (scripts/check-search-console.ts, see
+# docs/SEO-PLAN.md §5.7 follow-up) — no schedule on purpose, this isn't a
+# recurring job, just a way to ask Google "do you already know about our
+# sitemap" without needing to log into Search Console. Reuses the same
+# GOOGLE_INDEXING_CLIENT_EMAIL/GOOGLE_INDEXING_PRIVATE_KEY secrets the
+# Indexing API drain (indexing-tick.yml) already has — same service
+# account, Owner on the property covers both APIs.
+
+on:
+  workflow_dispatch:
+    inputs:
+      submit:
+        description: "Actually PUT the sitemap (default: read-only report)"
+        type: boolean
+        default: false
+
+jobs:
+  check-search-console:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Dependencies
+        run: |
+          cd job-radar-apify
+          npm ci || npm install
+
+      - name: Check (and optionally submit) sitemap
+        env:
+          GOOGLE_INDEXING_CLIENT_EMAIL: ${{ secrets.GOOGLE_INDEXING_CLIENT_EMAIL }}
+          GOOGLE_INDEXING_PRIVATE_KEY: ${{ secrets.GOOGLE_INDEXING_PRIVATE_KEY }}
+        run: |
+          cd job-radar-apify
+          if [ "${{ inputs.submit }}" = "true" ]; then
+            npx tsx scripts/check-search-console.ts --submit
+          else
+            npx tsx scripts/check-search-console.ts
+          fi

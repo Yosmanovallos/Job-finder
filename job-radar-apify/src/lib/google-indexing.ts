@@ -34,15 +34,20 @@ function base64url(input: Buffer | string): string {
 // Pure/synchronous and network-free on purpose — lets tests/validate-seo
 // verify the JWT's shape (header, claims, signature) with a throwaway
 // keypair, without needing real Google credentials or hitting the network.
+// `scope` defaults to the Indexing API scope this file was built for —
+// scripts/check-search-console.ts reuses this same signer with the
+// Search Console (webmasters) scope instead, same service account
+// (already granted Owner on the property, see readCredentials below).
 export function buildJwtAssertion(
   clientEmail: string,
   privateKeyPem: string,
-  nowSeconds: number
+  nowSeconds: number,
+  scope: string = SCOPE
 ): string {
   const header = { alg: "RS256", typ: "JWT" };
   const claims = {
     iss: clientEmail,
-    scope: SCOPE,
+    scope,
     aud: TOKEN_URL,
     iat: nowSeconds,
     exp: nowSeconds + 3600
@@ -53,7 +58,7 @@ export function buildJwtAssertion(
   return `${signingInput}.${base64url(signature)}`;
 }
 
-function readCredentials(): { clientEmail: string; privateKey: string } {
+export function readCredentials(): { clientEmail: string; privateKey: string } {
   const clientEmail = process.env.GOOGLE_INDEXING_CLIENT_EMAIL;
   const privateKeyRaw = process.env.GOOGLE_INDEXING_PRIVATE_KEY;
   if (!clientEmail || !privateKeyRaw) {
