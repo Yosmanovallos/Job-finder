@@ -42,6 +42,12 @@ import {
 import { verifySession } from "./auth/verify-session.js";
 import { startPaymentCheckout } from "./payments/checkout.js";
 import { handleWompiWebhook } from "./payments/webhook.js";
+import {
+  getClientIp,
+  checkRateLimit,
+  isBlocked,
+  recordSuspiciousEvent
+} from "./lib/security-monitor.js";
 
 dotenv.config();
 
@@ -139,12 +145,31 @@ function respondToUnexpectedError(
   res.end(JSON.stringify({ error: fallbackMessage }));
 }
 
+// General cap on the whole /api/* surface (scraping-scale abuse, blind
+// endpoint hammering) — the per-route limits below (sensitive writes) are
+// tighter and checked separately inside those routes.
+const GENERAL_API_RATE_LIMIT = 120;
+const GENERAL_API_RATE_WINDOW_MS = 60 * 1000;
+// For endpoints that write data or cost real money/quota to call (reviews,
+// checkout, triggering a scrape) — a much lower bar than the general read cap.
+const SENSITIVE_RATE_LIMIT = 10;
+const SENSITIVE_RATE_WINDOW_MS = 60 * 1000;
+
+function checkSensitiveRateLimit(ip: string, res: http.ServerResponse, routeLabel: string): boolean {
+  if (checkRateLimit(ip, SENSITIVE_RATE_LIMIT, SENSITIVE_RATE_WINDOW_MS)) return true;
+  recordSuspiciousEvent(ip, `rate-limit ${routeLabel}`);
+  res.writeHead(429, { "Content-Type": "application/json", "Retry-After": "60" });
+  res.end(JSON.stringify({ error: "Demasiadas solicitudes — intenta de nuevo en un minuto." }));
+  return false;
+}
+
 // Native Node HTTP Server
 const server = http.createServer(async (req, res) => {
   const parsedUrl = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
   const pathname = parsedUrl.pathname;
   const method = req.method || "GET";
   const requestStartedAt = Date.now();
+  const clientIp = getClientIp(req);
 
   // Minimal structured request/security log — one JSON line per response,
   // to stdout (Render and most hosts capture that as searchable logs with
@@ -156,20 +181,52 @@ const server = http.createServer(async (req, res) => {
   // (/api/whatever-i-guessed) — the SPA fallback at the bottom of this
   // handler serves index.html (200) for anything unmatched, same as a
   // normal page nav; that's a real gap, not something this check pretends
-  // to cover.
+  // to cover. 401/403 also feed recordSuspiciousEvent, same counter the
+  // rate limiter's rejections feed — either kind of abuse can trip the
+  // alert/auto-block thresholds in security-monitor.ts.
   res.on("finish", () => {
     const status = res.statusCode;
     const suspicious = status === 401 || status === 403 || (status === 404 && pathname.startsWith("/api/"));
+    if (status === 401 || status === 403) {
+      recordSuspiciousEvent(clientIp, `${method} ${pathname} -> ${status}`);
+    }
     const logLine = {
       ts: new Date().toISOString(),
       method,
       path: pathname,
       status,
       durationMs: Date.now() - requestStartedAt,
-      ip: (req.headers["x-forwarded-for"] as string | undefined)?.split(",")[0]?.trim() || req.socket.remoteAddress
+      ip: clientIp
     };
     (suspicious ? console.warn : console.log)(JSON.stringify(logLine));
   });
+
+  // 1b. Temporary auto-block (Fase L3) — checked before anything else, so a
+  // blocked IP never reaches a route handler at all. Time-boxed and
+  // in-memory (see security-monitor.ts) — never a permanent ban list.
+  if (isBlocked(clientIp)) {
+    res.writeHead(429, { "Content-Type": "application/json", "Retry-After": "900" });
+    res.end(JSON.stringify({ error: "Demasiadas solicitudes — intenta de nuevo más tarde." }));
+    return;
+  }
+
+  // 1c. General rate limit across all of /api/* (Fase L1) — checked once
+  // here rather than per-route, since it's meant to catch corpus-scale
+  // scraping/hammering regardless of which specific endpoint it's aimed at.
+  // /api/health is exempt: hosting platforms and uptime monitors typically
+  // poll it every few seconds, well past what any user-facing limit should
+  // allow — rate-limiting it would produce false "service down" alerts, not
+  // catch an attacker.
+  if (
+    pathname.startsWith("/api/") &&
+    pathname !== "/api/health" &&
+    !checkRateLimit(clientIp, GENERAL_API_RATE_LIMIT, GENERAL_API_RATE_WINDOW_MS)
+  ) {
+    recordSuspiciousEvent(clientIp, `rate-limit general ${pathname}`);
+    res.writeHead(429, { "Content-Type": "application/json", "Retry-After": "60" });
+    res.end(JSON.stringify({ error: "Demasiadas solicitudes — intenta de nuevo en un minuto." }));
+    return;
+  }
 
   // 2. Health Check Endpoint
   if (pathname === "/api/health" && method === "GET") {
@@ -350,6 +407,7 @@ const server = http.createServer(async (req, res) => {
       res.end(JSON.stringify({ error: "No autenticado" }));
       return;
     }
+    if (!checkSensitiveRateLimit(clientIp, res, "POST/DELETE /reviews")) return;
 
     const jobs = await getJobsCached(50000);
     const visibleJobs = maskLockedFields(jobs, session.tier);
@@ -551,6 +609,7 @@ const server = http.createServer(async (req, res) => {
       res.end(JSON.stringify({ error: "No autenticado" }));
       return;
     }
+    if (!checkSensitiveRateLimit(clientIp, res, "POST /api/run-scraper")) return;
 
     let bodyText = "";
     req.on("data", (chunk) => {
@@ -598,6 +657,7 @@ const server = http.createServer(async (req, res) => {
       res.end(JSON.stringify({ error: "No autenticado" }));
       return;
     }
+    if (!checkSensitiveRateLimit(clientIp, res, "POST /api/checkout/start")) return;
 
     try {
       const checkout = await startPaymentCheckout({ userId: session.id, userEmail: session.email });
