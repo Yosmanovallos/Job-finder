@@ -1,7 +1,7 @@
 import { Job } from "../sources/types.js";
 import { getModalityLabel, CITY_OPTIONS } from "./job-filters.js";
 import { DEFAULT_ROLES_200 } from "../queue/scheduler.js";
-import { getCountryConfig } from "../countries/index.js";
+import { getCountryConfig, DEFAULT_COUNTRY } from "../countries/index.js";
 
 const SITE_URL = "https://buscotrabajo.co";
 // jobs older than this are purged from the DB (see job-repository.ts's
@@ -223,27 +223,56 @@ export function isUuid(value: string): boolean {
 
 export type CategoryKind = "ciudad" | "rol";
 
+export interface ResolvedCategory {
+  kind: CategoryKind;
+  label: string;
+  // For "ciudad": inherent to the matched city, independent of which prefix
+  // the request came in on — "Caracas" is Venezuela and "Bogotá" is
+  // Colombia no matter what URL you typed, city names between the two
+  // countries never collide (see countries/index.ts), so there's exactly
+  // one canonical URL per city and no /ve-prefixed alias for it (see
+  // buildCategoryPath below). For "rol": roles are shared vocabulary with
+  // no geography of their own — this just echoes back requestCountry, i.e.
+  // which of the two co-existing pages (/empleos/<rol> vs
+  // /ve/empleos/<rol>) was actually asked for, so a page never silently
+  // mixes both countries' listings under one URL the way it did before
+  // this field existed.
+  country: string;
+}
+
 // Looks a non-UUID `/empleos/` segment up against the same taxonomy the
-// dashboard's filters already use (CITY_OPTIONS, DEFAULT_ROLES_200) — no new
-// list to maintain, and a slug that matches neither is a real 404, not a
-// doorway page for arbitrary text.
-export function resolveCategorySlug(slug: string): { kind: CategoryKind; label: string } | null {
+// dashboard's filters already use (CITY_OPTIONS + Venezuela's own city list,
+// DEFAULT_ROLES_200) — no new list to maintain beyond what countries/
+// index.ts already has, and a slug that matches neither is a real 404, not
+// a doorway page for arbitrary text.
+export function resolveCategorySlug(
+  slug: string,
+  requestCountry: string = DEFAULT_COUNTRY
+): ResolvedCategory | null {
   const target = (slug || "").toLowerCase();
   for (const city of CITY_OPTIONS) {
-    if (slugify(city) === target) return { kind: "ciudad", label: city };
+    if (slugify(city) === target) return { kind: "ciudad", label: city, country: "CO" };
+  }
+  for (const city of getCountryConfig("VE").cities) {
+    if (slugify(city) === target) return { kind: "ciudad", label: city, country: "VE" };
   }
   for (const role of DEFAULT_ROLES_200) {
-    if (slugify(role) === target) return { kind: "rol", label: role };
+    if (slugify(role) === target) return { kind: "rol", label: role, country: requestCountry };
   }
   return null;
 }
 
-export function buildCategoryPath(label: string): string {
-  return `/empleos/${slugify(label)}`;
+// City pages never get a /ve prefix (see ResolvedCategory's comment) — only
+// role pages do, since two countries' role pages would otherwise be
+// indistinguishable URLs serving different (and previously silently mixed)
+// data.
+export function buildCategoryPath(category: { kind: CategoryKind; label: string; country: string }): string {
+  const prefix = category.kind === "rol" && category.country === "VE" ? "/ve" : "";
+  return `${prefix}/empleos/${slugify(category.label)}`;
 }
 
-export function buildCategoryUrl(label: string): string {
-  return `${SITE_URL}${buildCategoryPath(label)}`;
+export function buildCategoryUrl(category: { kind: CategoryKind; label: string; country: string }): string {
+  return `${SITE_URL}${buildCategoryPath(category)}`;
 }
 
 // Company page (dashboard navigation, not an SEO-driven fase like the
@@ -303,30 +332,50 @@ export interface CategoryMeta {
 // capped to however many rows actually get embedded/rendered on the page
 // (see server.ts's 60-item cap), so the description never claims fewer or
 // more vacancies than truly exist right now.
-export function buildCategoryMeta(
-  kind: CategoryKind,
-  label: string,
-  totalCount: number
-): CategoryMeta {
+export function buildCategoryMeta(category: ResolvedCategory, totalCount: number): CategoryMeta {
+  const { kind, label, country } = category;
   const countLabel = totalCount === 1 ? "1 vacante" : `${totalCount} vacantes`;
+  // City headings stay country-neutral text ("Vacantes de empleo en
+  // Caracas") — the city name alone already says which country, no need to
+  // spell it out twice. Role headings DO need the country spelled out
+  // ("... en Venezuela") since the same role label now backs two different
+  // pages (see ResolvedCategory's comment) — this is also what stops a
+  // Venezuela role page claiming "en Colombia" while actually listing
+  // Venezuela jobs, a real mismatch that existed before this country field.
+  const countryName = getCountryConfig(country).name;
   const heading =
-    kind === "ciudad" ? `Vacantes de empleo en ${label}` : `Vacantes de ${label} en Colombia`;
+    kind === "ciudad" ? `Vacantes de empleo en ${label}` : `Vacantes de ${label} en ${countryName}`;
+  // Elempleo/Magneto/Workana have no Venezuela adapter yet (see
+  // SourcesAndProblem.tsx's SOURCES_BY_COUNTRY) — naming them here for a
+  // Venezuela role page would overclaim sources that never actually
+  // contributed to it.
+  const sourcesPhrase =
+    country === "VE" ? "LinkedIn, Computrabajo y otros portales" : "LinkedIn, Computrabajo, Elempleo y otros portales";
   return {
     title: `${heading} — ${countLabel} | BuscoTrabajo`,
     heading,
-    description: `${countLabel} ${kind === "ciudad" ? `en ${label}` : `de ${label} en Colombia`} agregadas de LinkedIn, Computrabajo, Elempleo y otros portales — actualizadas en BuscoTrabajo.`,
-    canonicalUrl: buildCategoryUrl(label)
+    description: `${countLabel} ${kind === "ciudad" ? `en ${label}` : `de ${label} en ${countryName}`} agregadas de ${sourcesPhrase} — actualizadas en BuscoTrabajo.`,
+    canonicalUrl: buildCategoryUrl(category)
   };
 }
 
-// One flat sitemap covers all categories comfortably (9 cities + however
-// many roles DEFAULT_ROLES_200 has today — well under the 50k/file limit
+// One flat sitemap covers all categories comfortably (CO+VE cities + two
+// countries' worth of DEFAULT_ROLES_200 — well under the 50k/file limit
 // buildJobsSitemapXml's comment already covers), no lastmod: unlike a job
 // posting, a category page has no single "last changed" timestamp that
 // isn't already implicit in how often the sitemap itself gets re-crawled.
+// Role labels appear twice (once per country, at their two distinct URLs —
+// see ResolvedCategory's comment); city labels appear once each, since a
+// city page never has a /ve-prefixed alias.
 export function buildCategoriesSitemapXml(): string {
-  const labels = [...CITY_OPTIONS, ...DEFAULT_ROLES_200];
-  const urls = labels.map((label) => xmlUrlEntry(buildCategoryUrl(label))).join("\n");
+  const veCities = getCountryConfig("VE").cities;
+  const categories: ResolvedCategory[] = [
+    ...CITY_OPTIONS.map((label) => ({ kind: "ciudad" as const, label, country: "CO" })),
+    ...veCities.map((label) => ({ kind: "ciudad" as const, label, country: "VE" })),
+    ...DEFAULT_ROLES_200.map((label) => ({ kind: "rol" as const, label, country: "CO" })),
+    ...DEFAULT_ROLES_200.map((label) => ({ kind: "rol" as const, label, country: "VE" }))
+  ];
+  const urls = categories.map((category) => xmlUrlEntry(buildCategoryUrl(category))).join("\n");
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`;
 }
 

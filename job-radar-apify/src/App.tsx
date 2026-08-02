@@ -98,11 +98,14 @@ function AppRoutes() {
           for every country — no /ve equivalent, so the sitemap/
           Indexing API pipeline (which only ever knows about
           /empleos/) never emits a URL this router wouldn't also
-          serve. Category/city landing pages are still
-          Colombia-only, left as a follow-up. */}
+          serve. Category pages are the one exception that DOES get
+          a /ve-prefixed route — but only for roles (city pages
+          never do, a city name alone is already unambiguous — see
+          job-seo.ts's ResolvedCategory comment). */}
       <Route path="/ve" element={<Landing />} />
       <Route path="/ve/dashboard" element={<Dashboard />} />
       <Route path="/empleos/:id/:slug?" element={<EmpleosRoute />} />
+      <Route path="/ve/empleos/:id" element={<EmpleosRoute />} />
       <Route path="/empresas" element={<CompaniesDirectory />} />
       <Route path="/empresas/:slug" element={<CompanyLanding />} />
       <Route path="/ve/empresas" element={<CompaniesDirectory />} />

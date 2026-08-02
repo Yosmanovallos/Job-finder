@@ -248,6 +248,7 @@ en combinaciones infinitas de la misma data que ya vive en `/empleos/`.
 | **3** | Integración con Google Indexing API (cuenta de servicio + hook en `saveJobs()`/`purgeOldJobs()`, ver sección 5.5) | Log de submits exitosos; una vacante nueva aparece en el reporte de cobertura en horas, no semanas | ✅ Hecho — verificado en producción (2026-07-30): 106/106 notificaciones reales enviadas en la primera corrida |
 | **4** | Páginas de categoría (`/empleos/<ciudad>`, `/empleos/<rol>`)                                                      | Igual que fase 1, sobre una categoría                                                              | ✅ Hecho                                        |
 | **5** | Manejo de vencimiento (410 / `validThrough`) atado al `DELETE` duro de `purgeOldJobs()`                           | Vacante purgada devuelve 410 en vez de 404 genérico; JSON-LD deja de emitirse                      | ✅ Hecho                                        |
+| **6** | Extensión a Venezuela: sitemap con `/ve`, páginas de categoría por país (ver sección 5.7)                        | `npm run test:seo` (79 URLs en `sitemap-categories.xml`) + verificación manual con datos reales     | ✅ Hecho                                        |
 
 ### 5.1 Resultado de la Fase 0 (corregido — ver nota abajo)
 
@@ -532,7 +533,98 @@ visto sigue en **404**; una vacante real y una página de categoría
 (`/empleos/bogota`) siguen en **200** sin cambios — cero regresión.
 
 Con esto, **las 6 fases del plan original de SEO están completas** (Fases
-0-5). Ver §8 para qué sigue, si algo.
+0-5). Ver §5.7 para la extensión de Venezuela (Fase 6, añadida después) y
+§8 para qué sigue.
+
+### 5.7 Resultado de la Fase 6 (extensión Venezuela)
+
+Contexto: la expansión a Venezuela (`backlog/venezuela-expansion.md`, país
+como dimensión de datos — ver AGENTS.md) construyó `/ve`, `/ve/dashboard`,
+`/ve/empresas` sin tocar nada de este documento. Auditado a pedido del
+usuario ("¿ya configuraste el SEO... que quede todo bien indexado sabiendo
+que son dos distintas?") y se encontraron 4 gaps reales — dos ya resueltos
+en esta sesión (sitemap + páginas de categoría), dos quedan como riesgo
+conocido, no bloqueante:
+
+**Ya funcionaba sin tocar nada** (porque las páginas de vacante son
+agnósticas de país por diseño desde la Fase 1):
+
+- `sitemap-jobs.xml` — ya incluía las vacantes de Venezuela automáticamente
+  (`buildJobsSitemapXml()` nunca filtró por país).
+- Google Indexing API — `saveJobs()` encola `URL_UPDATED` para cualquier
+  vacante nueva sin distinguir país; verificado en producción encolando
+  correctamente las 196 vacantes VE que entraron en la corrida manual del
+  2026-08-02.
+- `robots.txt` — `Allow: /` genérico ya cubre `/ve` sin bloquear nada.
+- Vencimiento (410) — `wasJobPurged()` no distingue país, aplica igual.
+
+**Gaps encontrados y resueltos en esta sesión:**
+
+1. **`/ve` y `/ve/dashboard` no estaban en el sitemap estático.**
+   Arreglado: agregadas a `static/sitemap.xml` con las mismas prioridades
+   que sus equivalentes de Colombia. `/empresas`/`/ve/empresas` se dejan
+   fuera a propósito, igual que `/empresas` de Colombia ya lo estaba (no es
+   una página de descubrimiento SEO, es navegación desde el dashboard).
+2. **Cero páginas de categoría (`/empleos/<ciudad>`, `/empleos/<rol>`) para
+   Venezuela.** `CITY_OPTIONS`/la taxonomía de `resolveCategorySlug()` solo
+   tenía ciudades colombianas, y las páginas de rol no filtraban por país en
+   absoluto (mezclaban CO+VE bajo una URL cuyo propio `<h1>` decía
+   "en Colombia" — un mismatch real, no solo un gap). Arreglado:
+   - **Ciudades**: `resolveCategorySlug()` ahora también matchea las
+     ciudades de `countries/index.ts`'s `COUNTRIES.VE.cities` (Caracas,
+     Maracaibo, Valencia...) — sin prefijo `/ve`, porque el nombre de la
+     ciudad ya es inequívoco (`/empleos/caracas` nunca podría ser Colombia).
+     Devuelve `{ kind: "ciudad", label, country }` con el país inherente a
+     la ciudad que matcheó, no al prefijo de la URL.
+   - **Roles**: como un rol ("Project Manager") no dice nada sobre el país,
+     SÍ se dividió en dos URLs distintas — `/empleos/<rol>` sigue siendo
+     Colombia (ahora con `country: "CO"` explícito en el filtro, cerrando
+     el mismatch de arriba) y la nueva `/ve/empleos/<rol>` es Venezuela
+     (`country: "VE"`). `resolveCategorySlug(slug, requestCountry)` recibe
+     el país pedido según el prefijo de la ruta.
+   - `buildCategoryMeta()` ahora arma el `<h1>`/título con el país real
+     (`en Venezuela` vs `en Colombia`) y no reclama fuentes sin adaptador
+     VE (Elempleo/Magneto/Workana) en la descripción — mismo criterio que
+     `SourcesAndProblem.tsx`'s `SOURCES_BY_COUNTRY`.
+   - `server.ts`: la rama `/empleos/` ahora también matchea
+     `/ve/empleos/`, con un guard explícito — un UUID bajo `/ve/empleos/`
+     es 404 real, nunca resuelve como vacante (las páginas de vacante
+     individual siguen siendo 100% agnósticas de país, sin excepción, para
+     no romper la Fase 3/5 de Indexing API).
+   - `sitemap-categories.xml` pasó de 41 URLs a **79** (9 ciudades CO + 6
+     ciudades VE + 32 roles CO + 32 roles VE).
+   - `tests/validate-seo-job-pages.ts` extendido con casos explícitos para
+     ambos países (ciudad VE sin prefijo, rol VE con prefijo, UUID bajo
+     `/ve/empleos/` → 404, conteo del sitemap de categorías).
+
+**Verificado en esta sesión** contra datos reales de producción:
+`/empleos/caracas` → 91 vacantes; `/empleos/project-manager` (Colombia) →
+335; `/ve/empleos/project-manager` (Venezuela, misma etiqueta, país y URL
+distintos) → 106 — tres números reales y distintos, nunca mezclados bajo
+una sola URL. `npm run build`, `npm run test:seo` (79 checks),
+`test:dashboard-filters` y `test:companies-search` en verde.
+
+**Riesgos conocidos, no resueltos en esta sesión — dejados explícitos para
+no confundir "en verde" con "sin pendientes":**
+
+1. **Contenido casi duplicado entre `/` y `/ve`**: ambas comparten
+   `ComparisonAndProcess`/`ProductFeaturesPricingFaq` sin cambios (solo
+   `HeroDemo`/`SourcesAndProblem` varían por país) — cada una tiene su
+   propio canonical (`use-page-meta.ts` usa el pathname real), pero Google
+   puede igual tratarlas como duplicadas por contenido pese al canonical
+   declarado. No hay `hreflang` tampoco (no aplica aquí en el sentido
+   estricto — no es el mismo contenido en dos idiomas, es contenido
+   parecido para dos audiencias regionales distintas — pero el riesgo de
+   consolidación de Google es real de todas formas). Mitigación futura si
+   esto se confirma en Search Console: diferenciar más el contenido
+   informativo compartido, no solo el hero.
+2. **`/` y `/ve` no tienen SSR** (a diferencia de `/dashboard`,
+   `/empleos/:id` y las páginas de categoría) — mismo límite documentado en
+   §5.3 para `/dashboard` antes de que se le agregara SSR, aplicado aquí a
+   la landing. No es una regresión nueva de esta sesión (la home nunca tuvo
+   SSR), pero ahora también cubre `/ve`. Si Google captura la página antes
+   de que el bundle de React cargue el contenido dinámico, puede indexarla
+   con menos señal de la real.
 
 ## 6. Riesgos y cómo se mitigan
 
@@ -652,16 +744,20 @@ aumento de cuota temprano en vez de esperar a necesitarlo.
 
 ## 8. Próximo paso
 
-Las 6 fases del plan original (0-5) están completas y verificadas en
-producción — no queda ningún ítem de código pendiente de este documento.
+Las 7 fases (0-6, la 6 siendo la extensión de Venezuela, §5.7) están
+completas y verificadas en producción — no queda ningún ítem de código
+pendiente de este documento.
 
 Lo que sigue de aquí en adelante es monitoreo, no construcción:
 
-1. **Search Console**: confirmar que `sitemap-categories.xml` (Fase 4) se
-   lee correctamente (Sitemaps → debería mostrar 41 URLs descubiertas), y
-   seguir revisando "Indexación → Páginas" hasta que empiecen a aparecer
-   vacantes y categorías indexadas (no solo `/` y `/dashboard`) — cuestión
-   de tiempo de rastreo en un dominio nuevo, no de código.
+1. **Search Console**: confirmar que `sitemap-categories.xml` (ahora 79
+   URLs, CO+VE) se lee correctamente, y seguir revisando
+   "Indexación → Páginas" hasta que empiecen a aparecer vacantes y
+   categorías indexadas de AMBOS países (no solo `/` y `/dashboard`) —
+   cuestión de tiempo de rastreo en un dominio nuevo/rutas nuevas, no de
+   código. Prestar atención particular a si `/ve` empieza a aparecer o si
+   Google la consolida con `/` por el riesgo de contenido casi duplicado
+   ya anotado en §5.7.
 2. **Descripciones reales por vacante**: limitación conocida desde la Fase 1
    (§5.2) — el `description` del JSON-LD sigue siendo plantilla, ningún
    adaptador captura descripción real de la fuente hoy. Evaluado y
@@ -670,7 +766,12 @@ Lo que sigue de aquí en adelante es monitoreo, no construcción:
    el riesgo de bloqueo justo donde ya hay fricción (Indeed/Glassdoor).
    Si se retoma, es su propia investigación fuente por fuente, no un ajuste
    rápido.
+3. **Contenido casi duplicado `/` vs `/ve`** (§5.7, riesgo 1): si Search
+   Console muestra que Google está consolidando ambas bajo una sola URL
+   canónica, la mitigación es diferenciar más el contenido informativo
+   compartido (`ComparisonAndProcess`/`ProductFeaturesPricingFaq`), no solo
+   el hero — su propio diagnóstico, no un ajuste de una sesión.
 
 Cualquier trabajo nuevo de SEO a partir de aquí (backlinks, contenido
-adicional, más fuentes) es exploratorio y necesitaría su propio
-diagnóstico — no hay una "Fase 6" ya definida en este documento.
+adicional, más fuentes, un tercer país) es exploratorio y necesitaría su
+propio diagnóstico — no hay una "Fase 7" ya definida en este documento.

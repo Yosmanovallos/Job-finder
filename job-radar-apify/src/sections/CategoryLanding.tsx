@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
 import { CategoryJobRow } from "../components/CategoryJobRow.js";
 import { usePageMeta } from "../lib/use-page-meta.js";
 import { resolveCategorySlug, buildCategoryMeta } from "../lib/job-seo.js";
+import { isVePrefixed } from "../lib/country-context.js";
 import { Button } from "../components/ui/button.js";
 import { Job } from "../sources/types.js";
 import { ArrowLeft } from "lucide-react";
@@ -11,16 +12,22 @@ type LoadState = "loading" | "found" | "not-found";
 
 const PAGE_LIMIT = 60;
 
-// Client-side counterpart of server.ts's /empleos/<slug> category branch —
-// what a real visitor sees after React hydrates (a crawler only ever sees
-// the server-rendered HTML, same split as JobLanding.tsx). Reached via
-// EmpleosRoute.tsx's isUuid() dispatch, so `id` here is always a non-UUID
-// category slug, never a jobId.
+// Client-side counterpart of server.ts's /empleos/<slug> (and
+// /ve/empleos/<slug> for roles) category branch — what a real visitor sees
+// after React hydrates (a crawler only ever sees the server-rendered HTML,
+// same split as JobLanding.tsx). Reached via EmpleosRoute.tsx's isUuid()
+// dispatch, so `id` here is always a non-UUID category slug, never a jobId.
 export default function CategoryLanding() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  // Only affects "rol" categories (a city match already carries its own
+  // country regardless of prefix — see job-seo.ts's ResolvedCategory) but
+  // cheap to compute unconditionally, same pattern as every other
+  // country-aware component in this app.
+  const requestCountry = isVePrefixed(location.pathname) ? "VE" : "CO";
 
-  const category = id ? resolveCategorySlug(id) : null;
+  const category = id ? resolveCategorySlug(id, requestCountry) : null;
 
   const [jobs, setJobs] = useState<Job[]>([]);
   const [total, setTotal] = useState(0);
@@ -34,6 +41,7 @@ export default function CategoryLanding() {
     setState("loading");
     const params = new URLSearchParams();
     params.set(category.kind === "ciudad" ? "cities" : "roles", category.label);
+    params.set("country", category.country);
     params.set("limit", String(PAGE_LIMIT));
 
     fetch(`/api/jobs?${params.toString()}`)
@@ -48,9 +56,9 @@ export default function CategoryLanding() {
         }
       })
       .catch(() => setState("not-found"));
-  }, [id]);
+  }, [id, requestCountry]);
 
-  const meta = category ? buildCategoryMeta(category.kind, category.label, total) : null;
+  const meta = category ? buildCategoryMeta(category, total) : null;
   usePageMeta({
     title: meta?.title ?? "Cargando vacantes... | BuscoTrabajo",
     description: meta?.description ?? "Cargando vacantes de esta categoría."
@@ -60,7 +68,7 @@ export default function CategoryLanding() {
     <section className="relative w-full min-h-screen" style={{ backgroundColor: "#fafafa" }}>
       <div className="relative max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-20">
         <Link
-          to="/dashboard"
+          to={requestCountry === "VE" ? "/ve/dashboard" : "/dashboard"}
           className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-6"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -72,7 +80,9 @@ export default function CategoryLanding() {
             <span className="text-3xl block mb-2">🔍</span>
             Esta categoría no existe.
             <div className="mt-4">
-              <Button onClick={() => navigate("/dashboard")}>Ver todas las vacantes</Button>
+              <Button onClick={() => navigate(requestCountry === "VE" ? "/ve/dashboard" : "/dashboard")}>
+                Ver todas las vacantes
+              </Button>
             </div>
           </div>
         )}

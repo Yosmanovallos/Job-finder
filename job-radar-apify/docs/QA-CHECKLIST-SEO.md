@@ -186,8 +186,9 @@ por ser o no un UUID, ver `isUuid()`/`resolveCategorySlug()`.
       dispatcher `EmpleosRoute.tsx` no debe cambiar su comportamiento).
 - [ ] `https://buscotrabajo.co/sitemap-categories.xml` abre, es un
       `<urlset>` válido, con tantas `<url>` como
-      `CITY_OPTIONS.length + DEFAULT_ROLES_200.length` (41 al momento de
-      escribir esto — 9 ciudades + 32 roles).
+      `CITY_OPTIONS.length + COUNTRIES.VE.cities.length + DEFAULT_ROLES_200.length * 2`
+      (79 al momento de escribir esto — 9 ciudades CO + 6 ciudades VE + 32
+      roles CO + 32 roles VE — ver sección 8, Fase 6).
 - [ ] `https://buscotrabajo.co/sitemap.xml` (índice) ahora lista 3 entradas:
       `sitemap-pages.xml`, `sitemap-jobs.xml`, `sitemap-categories.xml`. En
       Search Console → Sitemaps: no hace falta reenviar nada aparte (el
@@ -219,6 +220,38 @@ Repetir tras cualquier cambio en `wasJobPurged()`/`buildJobUrlPrefix()`
       como removida en el reporte de cobertura — esto tarda días, no es
       instantáneo, solo verificar que no quede "atascada" como indexada
       semanas después.
+
+## 8. Extensión Venezuela (Fase 6) — ver `docs/SEO-PLAN.md` §5.7
+
+Repetir tras cualquier cambio en `resolveCategorySlug`/`buildCategoryPath`/
+`buildCategoryMeta`/`buildCategoriesSitemapXml` (`src/lib/job-seo.ts`), la
+rama `/ve/empleos/` en `src/server.ts`, o `countries/index.ts`'s
+`COUNTRIES.VE.cities`.
+
+- [ ] `curl https://buscotrabajo.co/ve` y `.../ve/dashboard` responden 200
+      y ambas aparecen en `https://buscotrabajo.co/sitemap.xml`
+      (`sitemap-pages.xml`, no un sub-sitemap nuevo).
+- [ ] `curl .../empleos/caracas` (o cualquier ciudad de
+      `COUNTRIES.VE.cities`) responde 200, **sin** prefijo `/ve` en la URL,
+      y el conteo de vacantes en el `<meta name="description">` coincide
+      con `curl .../api/jobs?cities=Caracas&country=VE`.
+- [ ] `curl .../empleos/<un-rol-real>` (Colombia) y
+      `.../ve/empleos/<el-mismo-rol>` (Venezuela) responden 200 en dos URLs
+      DISTINTAS, con conteos distintos, y cada `<h1>` dice el país correcto
+      (nunca "en Colombia" en la página que en realidad lista Venezuela, o
+      viceversa).
+- [ ] `curl .../ve/empleos/<uuid-al-azar>` responde 404 real — las páginas
+      de vacante individual nunca llevan el prefijo `/ve` (ver
+      `buildJobPath` en `job-seo.ts`, sin cambios por esta fase).
+- [ ] `https://buscotrabajo.co/sitemap-categories.xml` lista tanto ciudades
+      venezolanas (sin prefijo) como roles venezolanos (con `/ve`) junto a
+      sus equivalentes de Colombia — 79 URLs en total al momento de
+      escribir esto.
+- [ ] En Search Console, después de que pase suficiente tiempo de rastreo:
+      revisar si `/ve` aparece indexada por separado de `/` o si Google la
+      está consolidando como duplicada (riesgo conocido, ver
+      `docs/SEO-PLAN.md` §5.7 — contenido informativo casi idéntico entre
+      ambas landing pages).
 
 ## Nota de seguridad sobre este checklist y los tests automatizados
 

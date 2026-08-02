@@ -24,6 +24,7 @@ import {
   getCompanyReviews
 } from "./db/company-reviews-repository.js";
 import { applyJobFilters, sortByPreferredRoles, JobFilterParams } from "./lib/job-filters.js";
+import { getCountryConfig } from "./countries/index.js";
 import {
   escapeHtml,
   escapeJsonForScriptTag,
@@ -757,9 +758,29 @@ const server = http.createServer(async (req, res) => {
   // as an anonymous visitor) can never see more than a real visitor would —
   // no separate cloaking-risk logic to keep in sync if PAYWALL_ENABLED is
   // ever turned back on.
-  if (pathname.startsWith("/empleos/") && method === "GET") {
-    const segments = pathname.slice("/empleos/".length).split("/").filter(Boolean);
+  // Handles both the Colombia (unprefixed) and Venezuela (/ve-prefixed)
+  // category pages under one branch — job DETAIL pages never get the /ve
+  // prefix (see the guard just below), only the city/role "hub" pages do,
+  // and only for roles (city pages have exactly one URL each, see
+  // ResolvedCategory's comment in job-seo.ts).
+  const isVeEmpleos = pathname.startsWith("/ve/empleos/");
+  if ((pathname.startsWith("/empleos/") || isVeEmpleos) && method === "GET") {
+    const basePath = isVeEmpleos ? pathname.slice(3) : pathname;
+    const segments = basePath.slice("/empleos/".length).split("/").filter(Boolean);
     const id = segments[0];
+
+    // A job's real URL is always the unprefixed /empleos/:id — there's no
+    // /ve/empleos/:id equivalent (see job-seo.ts's buildJobPath, unchanged
+    // by the Venezuela work). A UUID under the /ve prefix isn't a route
+    // this app ever generates a link to, so it's a real 404, not a
+    // fallthrough to the job-detail lookup below with an ambiguous id.
+    if (isVeEmpleos && isUuid(id || "")) {
+      res.writeHead(404, { "Content-Type": "text/html; charset=utf-8" });
+      res.end(
+        '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Página no encontrada | BuscoTrabajo</title><meta name="robots" content="noindex"></head><body><h1>Página no encontrada</h1><p><a href="/dashboard">Ver todas las vacantes</a></p></body></html>'
+      );
+      return;
+    }
 
     // 7b-cat. Category "hub" pages (SEO Fase 4, ver docs/SEO-PLAN.md §4.4).
     // A jobId is always a UUID (gen_random_uuid()) — a city/role slug never
@@ -769,7 +790,8 @@ const server = http.createServer(async (req, res) => {
     // specific content to gate, only the same maskLockedFields output any
     // anonymous visitor already gets.
     if (id && !isUuid(id)) {
-      const category = resolveCategorySlug(id);
+      const requestCountry = isVeEmpleos ? "VE" : "CO";
+      const category = resolveCategorySlug(id, requestCountry);
       if (!category) {
         res.writeHead(404, { "Content-Type": "text/html; charset=utf-8" });
         res.end(
@@ -780,8 +802,16 @@ const server = http.createServer(async (req, res) => {
 
       const jobs = await getJobsCached(50000);
       const visibleJobs = maskLockedFields(jobs, "free");
+      // country is always set here — for "ciudad" it's the matched city's
+      // own country (Bogotá/Caracas are never ambiguous), for "rol" it's
+      // requestCountry. Before this field existed, a role page had no
+      // country filter at all and would silently mix both countries' jobs
+      // under a URL whose own heading claimed just one — see
+      // ResolvedCategory's comment.
       const filterParams: JobFilterParams =
-        category.kind === "ciudad" ? { cities: [category.label] } : { roles: [category.label] };
+        category.kind === "ciudad"
+          ? { cities: [category.label], country: category.country }
+          : { roles: [category.label], country: category.country };
       // isPubliclyDescribable filters out any locked job the same way
       // buildJobsSitemapXml/the job-detail branch already do — a category
       // page must never list a job it can't also link a working page for.
@@ -798,7 +828,7 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
-      const meta = buildCategoryMeta(category.kind, category.label, total);
+      const meta = buildCategoryMeta(category, total);
 
       // Same "real links in the raw HTML" pattern /dashboard already uses
       // (see 7c below) — this page's whole SEO value is being a crawlable
@@ -809,7 +839,7 @@ const server = http.createServer(async (req, res) => {
           const href = buildJobPath(job);
           const title = escapeHtml(job.title);
           const company = escapeHtml(job.company || "Confidencial");
-          const location = escapeHtml(job.location || "Colombia");
+          const location = escapeHtml(job.location || getCountryConfig(job.country || category.country).name);
           const source = escapeHtml(job.source || "");
           return `<li><a href="${href}">${title}</a> — ${company} · ${location} · ${source}</li>`;
         })

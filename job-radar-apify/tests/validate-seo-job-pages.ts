@@ -25,6 +25,7 @@ import {
 } from "../src/lib/job-seo.js";
 import { CITY_OPTIONS } from "../src/lib/job-filters.js";
 import { DEFAULT_ROLES_200 } from "../src/queue/scheduler.js";
+import { COUNTRIES } from "../src/countries/index.js";
 import { buildJwtAssertion } from "../src/lib/google-indexing.js";
 import {
   enqueueIndexingNotifications,
@@ -229,18 +230,34 @@ function runPureFunctionTests() {
   const citySlug = slugify(realCity);
   const cityMatch = resolveCategorySlug(citySlug);
   check(
-    cityMatch?.kind === "ciudad" && cityMatch.label === realCity,
-    `resolveCategorySlug("${citySlug}") resuelve a la ciudad real "${realCity}".`,
+    cityMatch?.kind === "ciudad" && cityMatch.label === realCity && cityMatch.country === "CO",
+    `resolveCategorySlug("${citySlug}") resuelve a la ciudad real "${realCity}" (Colombia).`,
     `resolveCategorySlug("${citySlug}") no resolvió a la ciudad esperada: ${JSON.stringify(cityMatch)}`
+  );
+
+  const realVeCity = COUNTRIES.VE.cities[0];
+  const veCitySlug = slugify(realVeCity);
+  const veCityMatch = resolveCategorySlug(veCitySlug);
+  check(
+    veCityMatch?.kind === "ciudad" && veCityMatch.label === realVeCity && veCityMatch.country === "VE",
+    `resolveCategorySlug("${veCitySlug}") resuelve a la ciudad venezolana real "${realVeCity}" con country="VE", sin necesidad de prefijo.`,
+    `resolveCategorySlug("${veCitySlug}") no resolvió a la ciudad venezolana esperada: ${JSON.stringify(veCityMatch)}`
   );
 
   const realRole = DEFAULT_ROLES_200[0];
   const roleSlug = slugify(realRole);
-  const roleMatch = resolveCategorySlug(roleSlug);
+  const roleMatchCO = resolveCategorySlug(roleSlug);
   check(
-    roleMatch?.kind === "rol" && roleMatch.label === realRole,
-    `resolveCategorySlug("${roleSlug}") resuelve al rol real "${realRole}".`,
-    `resolveCategorySlug("${roleSlug}") no resolvió al rol esperado: ${JSON.stringify(roleMatch)}`
+    roleMatchCO?.kind === "rol" && roleMatchCO.label === realRole && roleMatchCO.country === "CO",
+    `resolveCategorySlug("${roleSlug}") sin requestCountry resuelve al rol real "${realRole}" con country="CO" por defecto.`,
+    `resolveCategorySlug("${roleSlug}") no resolvió al rol esperado: ${JSON.stringify(roleMatchCO)}`
+  );
+
+  const roleMatchVE = resolveCategorySlug(roleSlug, "VE");
+  check(
+    roleMatchVE?.kind === "rol" && roleMatchVE.label === realRole && roleMatchVE.country === "VE",
+    `resolveCategorySlug("${roleSlug}", "VE") resuelve el MISMO rol con country="VE" — misma etiqueta, país distinto, para dos páginas separadas (ver ResolvedCategory).`,
+    `resolveCategorySlug("${roleSlug}", "VE") no propagó el country solicitado: ${JSON.stringify(roleMatchVE)}`
   );
 
   check(
@@ -250,34 +267,53 @@ function runPureFunctionTests() {
   );
 
   check(
-    buildCategoryPath(realCity) === `/empleos/${citySlug}`,
-    "buildCategoryPath() genera la ruta plana /empleos/<slug> sin prefijo nuevo.",
-    `buildCategoryPath("${realCity}") produjo una ruta inesperada: ${buildCategoryPath(realCity)}`
+    buildCategoryPath(cityMatch!) === `/empleos/${citySlug}` && buildCategoryPath(veCityMatch!) === `/empleos/${veCitySlug}`,
+    "buildCategoryPath() genera la ruta plana /empleos/<slug> para CUALQUIER ciudad (CO o VE), sin prefijo — el nombre de la ciudad ya es inequívoco.",
+    `buildCategoryPath() produjo rutas inesperadas: CO=${buildCategoryPath(cityMatch!)}, VE=${buildCategoryPath(veCityMatch!)}`
   );
 
-  const cityMeta = buildCategoryMeta("ciudad", realCity, 42);
+  check(
+    buildCategoryPath(roleMatchCO!) === `/empleos/${roleSlug}` && buildCategoryPath(roleMatchVE!) === `/ve/empleos/${roleSlug}`,
+    "buildCategoryPath() SÍ prefija con /ve las páginas de ROL para Venezuela (mismo slug, país distinto → URLs distintas, para no mezclar bajo una sola).",
+    `buildCategoryPath() no distinguió las rutas de rol por país: CO=${buildCategoryPath(roleMatchCO!)}, VE=${buildCategoryPath(roleMatchVE!)}`
+  );
+
+  const cityMeta = buildCategoryMeta(cityMatch!, 42);
   check(
     cityMeta.title.includes(realCity) &&
       cityMeta.title.includes("42") &&
-      cityMeta.canonicalUrl.endsWith(buildCategoryPath(realCity)),
+      cityMeta.canonicalUrl.endsWith(buildCategoryPath(cityMatch!)),
     "buildCategoryMeta() para una ciudad incluye el nombre real, el conteo real y un canonical consistente.",
-    `buildCategoryMeta("ciudad", "${realCity}", 42) produjo metadata inconsistente: ${JSON.stringify(cityMeta)}`
+    `buildCategoryMeta(cityMatch, 42) produjo metadata inconsistente: ${JSON.stringify(cityMeta)}`
   );
 
-  const emptyRoleMeta = buildCategoryMeta("rol", realRole, 0);
+  const emptyRoleMeta = buildCategoryMeta(roleMatchCO!, 0);
   check(
-    emptyRoleMeta.description.includes("0 vacantes"),
-    "buildCategoryMeta() nunca infla el conteo — una categoría vacía dice '0 vacantes', no un número inventado.",
-    `buildCategoryMeta("rol", "${realRole}", 0) no reportó 0 vacantes: ${emptyRoleMeta.description}`
+    emptyRoleMeta.description.includes("0 vacantes") && emptyRoleMeta.heading.includes("Colombia"),
+    "buildCategoryMeta() nunca infla el conteo — una categoría vacía dice '0 vacantes', no un número inventado — y el heading de un rol dice el país real.",
+    `buildCategoryMeta(roleMatchCO, 0) no reportó 0 vacantes o el país esperado: ${emptyRoleMeta.description} / ${emptyRoleMeta.heading}`
+  );
+
+  const veRoleMeta = buildCategoryMeta(roleMatchVE!, 3);
+  check(
+    veRoleMeta.heading.includes("Venezuela") &&
+      !veRoleMeta.heading.includes("Colombia") &&
+      !veRoleMeta.description.includes("Elempleo"),
+    "buildCategoryMeta() para un rol en Venezuela dice 'en Venezuela' (no Colombia) y no reclama fuentes sin adaptador VE (Elempleo).",
+    `buildCategoryMeta(roleMatchVE, 3) produjo metadata incorrecta para Venezuela: ${JSON.stringify(veRoleMeta)}`
   );
 
   const categoriesSitemapXml = buildCategoriesSitemapXml();
   const categoryLocs = [...categoriesSitemapXml.matchAll(/<loc>(.*?)<\/loc>/g)];
+  const expectedCount = CITY_OPTIONS.length + COUNTRIES.VE.cities.length + DEFAULT_ROLES_200.length * 2;
   check(
-    categoryLocs.length === CITY_OPTIONS.length + DEFAULT_ROLES_200.length &&
-      categoriesSitemapXml.includes(buildCategoryPath(realCity)),
-    `buildCategoriesSitemapXml() lista exactamente ${CITY_OPTIONS.length + DEFAULT_ROLES_200.length} URLs (${CITY_OPTIONS.length} ciudades + ${DEFAULT_ROLES_200.length} roles).`,
-    `buildCategoriesSitemapXml() listó ${categoryLocs.length} URLs, se esperaban ${CITY_OPTIONS.length + DEFAULT_ROLES_200.length}.`
+    categoryLocs.length === expectedCount &&
+      categoriesSitemapXml.includes(buildCategoryPath(cityMatch!)) &&
+      categoriesSitemapXml.includes(buildCategoryPath(veCityMatch!)) &&
+      categoriesSitemapXml.includes(buildCategoryPath(roleMatchCO!)) &&
+      categoriesSitemapXml.includes(buildCategoryPath(roleMatchVE!)),
+    `buildCategoriesSitemapXml() lista exactamente ${expectedCount} URLs (${CITY_OPTIONS.length} ciudades CO + ${COUNTRIES.VE.cities.length} ciudades VE + ${DEFAULT_ROLES_200.length} roles CO + ${DEFAULT_ROLES_200.length} roles VE), incluyendo ambos países.`,
+    `buildCategoriesSitemapXml() listó ${categoryLocs.length} URLs, se esperaban ${expectedCount}.`
   );
 }
 
@@ -513,7 +549,8 @@ async function runHttpTests() {
     }
 
     // Category pages (Fase 4) — real city.
-    const cityPath = buildCategoryPath(CITY_OPTIONS[0]);
+    const cityCategory = resolveCategorySlug(slugify(CITY_OPTIONS[0]))!;
+    const cityPath = buildCategoryPath(cityCategory);
     const cityRes = await fetch(`${BASE_URL}${cityPath}`);
     const cityHtml = await cityRes.text();
     check(
@@ -533,13 +570,45 @@ async function runHttpTests() {
       `La página de categoría ${cityPath} no tiene ningún link /empleos/<uuid>/... en el HTML crudo.`
     );
 
-    // Category pages — real role.
-    const rolePath = buildCategoryPath(DEFAULT_ROLES_200[0]);
-    const roleRes = await fetch(`${BASE_URL}${rolePath}`);
+    // Category pages — real role (Colombia, unprefijado).
+    const roleCategoryCO = resolveCategorySlug(slugify(DEFAULT_ROLES_200[0]))!;
+    const rolePathCO = buildCategoryPath(roleCategoryCO);
+    const roleResCO = await fetch(`${BASE_URL}${rolePathCO}`);
     check(
-      roleRes.status === 200,
-      `GET ${rolePath} (categoría de rol real) responde 200.`,
-      `GET ${rolePath} respondió ${roleRes.status}.`
+      roleResCO.status === 200,
+      `GET ${rolePathCO} (categoría de rol real, Colombia) responde 200.`,
+      `GET ${rolePathCO} respondió ${roleResCO.status}.`
+    );
+
+    // Category pages — Venezuela: ciudad real SIN prefijo (el nombre ya es
+    // inequívoco) y rol real CON prefijo /ve (mismo slug que la versión CO,
+    // pero país y URL distintos — no deben mezclarse bajo una sola).
+    const veCityCategory = resolveCategorySlug(slugify(COUNTRIES.VE.cities[0]))!;
+    const veCityPath = buildCategoryPath(veCityCategory);
+    const veCityRes = await fetch(`${BASE_URL}${veCityPath}`);
+    check(
+      veCityRes.status === 200 && !veCityPath.startsWith("/ve"),
+      `GET ${veCityPath} (ciudad venezolana real, sin prefijo /ve) responde 200.`,
+      `GET ${veCityPath} respondió ${veCityRes.status} o quedó con un path inesperado.`
+    );
+
+    const roleCategoryVE = resolveCategorySlug(slugify(DEFAULT_ROLES_200[0]), "VE")!;
+    const rolePathVE = buildCategoryPath(roleCategoryVE);
+    const roleResVE = await fetch(`${BASE_URL}${rolePathVE}`);
+    const roleHtmlVE = await roleResVE.text();
+    check(
+      roleResVE.status === 200 && rolePathVE === `/ve${rolePathCO}` && roleHtmlVE.includes("Venezuela"),
+      `GET ${rolePathVE} (mismo rol, Venezuela) responde 200 en una URL DISTINTA a la de Colombia, y el heading dice Venezuela.`,
+      `GET ${rolePathVE} respondió ${roleResVE.status}, o la ruta/heading no distinguió el país correctamente.`
+    );
+
+    // Un UUID nunca vive bajo /ve/empleos/ — real 404, no un fallback al
+    // detalle de vacante con un id ambiguo.
+    const uuidUnderVeRes = await fetch(`${BASE_URL}/ve/empleos/${crypto.randomUUID()}`);
+    check(
+      uuidUnderVeRes.status === 404,
+      "Un jobId (UUID) bajo /ve/empleos/ responde 404 real — las páginas de vacante nunca llevan el prefijo /ve.",
+      `Un UUID bajo /ve/empleos/ respondió ${uuidUnderVeRes.status} en vez de 404.`
     );
 
     // Category pages — slug inventado debe 404 real, no la SPA con 200.
@@ -550,15 +619,19 @@ async function runHttpTests() {
       `Un slug de categoría inventado respondió ${badCategoryRes.status} en vez de 404.`
     );
 
-    // sitemap-categories.xml + índice actualizado (ahora 3 entradas).
+    // sitemap-categories.xml + índice actualizado — ahora incluye ambos
+    // países (CO+VE ciudades, y roles duplicados por país).
+    const expectedCategoryCount = CITY_OPTIONS.length + COUNTRIES.VE.cities.length + DEFAULT_ROLES_200.length * 2;
     const categoriesSitemapRes = await fetch(`${BASE_URL}/sitemap-categories.xml`);
     const categoriesSitemapXml = await categoriesSitemapRes.text();
     const categoryLocsHttp = [...categoriesSitemapXml.matchAll(/<loc>(.*?)<\/loc>/g)];
     check(
       categoriesSitemapRes.status === 200 &&
-        categoryLocsHttp.length === CITY_OPTIONS.length + DEFAULT_ROLES_200.length,
-      `/sitemap-categories.xml responde 200 con ${categoryLocsHttp.length} URLs (${CITY_OPTIONS.length} ciudades + ${DEFAULT_ROLES_200.length} roles).`,
-      `/sitemap-categories.xml respondió ${categoriesSitemapRes.status} o listó un número de URLs inesperado (${categoryLocsHttp.length}).`
+        categoryLocsHttp.length === expectedCategoryCount &&
+        categoriesSitemapXml.includes(veCityPath) &&
+        categoriesSitemapXml.includes(rolePathVE),
+      `/sitemap-categories.xml responde 200 con ${categoryLocsHttp.length} URLs (incluye ciudades y roles de ambos países).`,
+      `/sitemap-categories.xml respondió ${categoriesSitemapRes.status} o listó un número de URLs inesperado (${categoryLocsHttp.length}, se esperaban ${expectedCategoryCount}).`
     );
 
     const indexResV2 = await fetch(`${BASE_URL}/sitemap.xml`);
