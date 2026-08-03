@@ -16,13 +16,6 @@ on:
   schedule:
     - cron: "0 13 */2 * *"
   workflow_dispatch:
-  # TEMPORARY — workflow_dispatch needs the workflow file registered on the
-  # default branch first, which this isn't yet. Remove this push trigger
-  # once the branch is verified and about to merge (see feat branch's own
-  # verification history for the same pattern on scrape-jobs.yml debugging).
-  push:
-    branches:
-      - feat/browser-scraping-glassdoor-indeed
 
 concurrency:
   group: scrape-browser-tick
