@@ -1078,18 +1078,33 @@ export async function scrapeRemotive(): Promise<Job[]> {
 // Requires a free API key (JOOBLE_API_KEY) — optional integration, the
 // adapter no-ops (returns []) without one instead of failing the tick.
 //
-// Jooble's documented request schema marks `keywords` as required, but
-// doesn't say whether an empty string is accepted as "no keyword filter".
-// This sends `keywords: ""` deliberately, matching the RemoteOK/GetOnBoard/
-// WeRemoto pattern of one full-catalog fetch per window instead of one
-// request per role/keyword (see GLOBAL_SOURCE_CADENCE_MS). If Jooble
-// actually rejects the blank keyword, this fails closed (0 jobs, surfaced
-// by the tick's "posible bloqueo" warning) rather than silently — same
-// integration risk as any external API assumption not covered by fixtures.
-// `locationQuery` defaults to "Colombia" — the CLI main() below and
-// src/sources/jooble.ts keep today's exact behavior with zero changes;
-// src/sources/jooble-ve.ts is the only caller passing "Venezuela".
-export async function scrapeJooble(locationQuery: string = "Colombia"): Promise<Job[]> {
+// `keywords: ""` (blank) IS accepted as "no keyword filter" — confirmed
+// live (2026-08-03) with a real key, matching the RemoteOK/GetOnBoard/
+// WeRemoto pattern of one full-catalog fetch per window (see
+// GLOBAL_SOURCE_CADENCE_MS). That was never the bug.
+//
+// The actual root cause of "always 0 jobs" (also confirmed live, same
+// session): `location` needs an ISO country code ("co"), NOT the full
+// country name. `location: "Colombia"` returns `totalCount: 0` every
+// time; `location: "co"` returns `totalCount: 73462` with real, fresh
+// results (several same-day). Jooble's location parser silently no-ops on
+// an unrecognized value instead of erroring, which is why this looked
+// identical to "API works but nothing matches" rather than "wrong
+// parameter" — same failure shape either way from this code's point of
+// view (HTTP 200, valid empty `jobs` array), only distinguishable by
+// testing against the real API directly.
+//
+// Venezuela has no working equivalent: tried "Venezuela", "ve"/"VE",
+// "Caracas", "Maracaibo", "Venezuela, Caracas" — all return
+// `totalCount: 0`, unlike Colombia's "co". Reads as Jooble genuinely
+// having no Venezuela inventory under this API key, not a format issue
+// (a wrong-but-recognized location would still return SOME count, even
+// if 0 postings matched a real query — "co" proves the mechanism works
+// when Jooble has the country covered). src/sources/jooble-ve.ts is left
+// passing "Venezuela" — changing the string doesn't fix a coverage gap,
+// and future evidence otherwise is easy to test against the live API
+// again if Jooble ever adds Venezuela.
+export async function scrapeJooble(locationQuery: string = "co"): Promise<Job[]> {
   const apiKey = process.env.JOOBLE_API_KEY;
   if (!apiKey) {
     console.warn("[Jooble] JOOBLE_API_KEY no configurada — omitiendo (fuente opcional).");
@@ -1115,24 +1130,11 @@ export async function scrapeJooble(locationQuery: string = "Colombia"): Promise<
     const data = await response.json();
     if (!Array.isArray(data.jobs)) {
       console.warn(
-        `[Jooble] Response OK but "jobs" is not an array (totalCount=${data.totalCount}) — blank keyword may not be accepted as "match all". Raw keys: ${Object.keys(data).join(", ")}`
+        `[Jooble] Response OK but "jobs" is not an array (totalCount=${data.totalCount}). Raw keys: ${Object.keys(data).join(", ")}`
       );
       return [];
     }
-    // Diagnostic (2026-08-03): production logs show this returning 0 jobs
-    // every observed tick, but never a request-level error either — meaning
-    // data.jobs IS an array, just nothing survives the loop below. Can't
-    // reproduce locally (no JOOBLE_API_KEY outside CI), so logging exactly
-    // where results get dropped instead of guessing a fix blind. Remove
-    // once the real cause is confirmed from a live run.
-    if (data.jobs.length === 0) {
-      console.warn(`[Jooble] API returned 0 jobs outright for "${locationQuery}" (totalCount=${data.totalCount}) — likely the blank keyword, not the date filter.`);
-    } else {
-      const ages = data.jobs
-        .filter((j: any) => j.updated)
-        .map((j: any) => Math.round((now - new Date(j.updated).getTime()) / (1000 * 60 * 60 * 24)));
-      console.warn(`[Jooble] API returned ${data.jobs.length} jobs for "${locationQuery}" (totalCount=${data.totalCount}), ages in days: [${ages.slice(0, 10).join(", ")}] — date filter (>2d) is what's dropping them if this is non-empty.`);
-    }
+    console.log(`[Jooble] "${locationQuery}": totalCount=${data.totalCount}, page batch=${data.jobs.length}`);
 
     for (const item of data.jobs) {
       if (!item.id || !item.title || !item.updated) continue;
