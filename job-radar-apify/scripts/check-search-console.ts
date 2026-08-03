@@ -138,7 +138,8 @@ async function runInspectSample(readToken: string, siteUrl: string) {
 }
 
 async function main() {
-  const submit = process.argv.includes("--submit");
+  const submit =
+    process.argv.includes("--submit") || process.argv.some((a) => a.startsWith("--submit="));
   const inspect = process.argv.includes("--inspect");
 
   if (!process.env.GOOGLE_INDEXING_CLIENT_EMAIL || !process.env.GOOGLE_INDEXING_PRIVATE_KEY) {
