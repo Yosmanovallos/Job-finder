@@ -885,21 +885,31 @@ export async function scrapeWeRemoto(): Promise<Job[]> {
 }
 
 // Scrape GetOnBoard (LATAM tech job board) via its free public JSON API
+// Category slugs confirmed live against https://www.getonbrd.com/api/v0/categories
+// (2026-08-03) — "product-building-management" used to be one of these but
+// now 404s (GetOnBoard renamed/retired it at some point after this list was
+// written); replaced with "operations-management" and "innovation-agile" as
+// the closest current equivalents, plus "design-ux" and "customer-support"
+// added for broader coverage against this app's non-strictly-engineering
+// tracked roles (DEFAULT_ROLES_200 isn't purely software roles).
+const GETONBOARD_CATEGORIES = [
+  "machine-learning-ai",
+  "programming",
+  "sysadmin-devops-qa",
+  "operations-management",
+  "innovation-agile",
+  "data-science-analytics",
+  "design-ux",
+  "customer-support"
+];
+
 export async function scrapeGetOnBoard(): Promise<Job[]> {
-  console.log(
-    "[GetOnBoard] Fetching categories (programming, qa, ai, product-building-management, data-science)..."
-  );
+  console.log(`[GetOnBoard] Fetching categories (${GETONBOARD_CATEGORIES.join(", ")})...`);
   const jobs: Job[] = [];
   const now = Date.now();
 
   try {
-    for (const category of [
-      "machine-learning-ai",
-      "programming",
-      "sysadmin-devops-qa",
-      "product-building-management",
-      "data-science-analytics"
-    ]) {
+    for (const category of GETONBOARD_CATEGORIES) {
       const url = `https://www.getonbrd.com/api/v0/categories/${category}/jobs?per_page=100`;
       const response = await fetch(url, {
         headers: {
@@ -1001,47 +1011,61 @@ export async function scrapeRemoteOK(): Promise<Job[]> {
 }
 
 // Scrape Remotive via its official public JSON API
-// (https://remotive.com/api/remote-jobs?search=...). No auth required.
-export async function scrapeRemotive(searchTerms: string[]): Promise<Job[]> {
+// (https://remotive.com/api/remote-jobs). No auth required.
+//
+// Used to take a `searchTerms: string[]` param and loop one request per
+// term (called with one role's ~20 keyword variants, so ~20 requests/role
+// across every active role). Confirmed live (2026-08-03) that Remotive's
+// `search` query param no longer filters anything — `?search=<anything>`,
+// `?search=<nonsense string that matches nothing real>`, and no `search`
+// param at all all return the exact same fixed 31 jobs; `limit` is
+// similarly ignored (5/20/100/200 all return the same 31). Remotive's
+// public API now appears to just serve a small fixed/cached batch
+// regardless of query — likely a deliberate change on their end pushing
+// toward a paid API, not something fixable from this side. Since every
+// call already returns identical results, the ~20x-per-role fanout was
+// pure waste (same request repeated for zero differentiation) — this now
+// fetches once, matching RemoteOK/GetOnBoard's catalog-wide pattern (see
+// GLOBAL_SOURCE_CADENCE_MS in source-cadence.ts, which this must be moved
+// into alongside that fix).
+export async function scrapeRemotive(): Promise<Job[]> {
   console.log("[Remotive] Fetching postings...");
   const jobs: Job[] = [];
   const now = Date.now();
 
   try {
-    for (const term of searchTerms) {
-      const url = `https://remotive.com/api/remote-jobs?search=${encodeURIComponent(term)}&limit=50`;
-      const response = await fetch(url, {
-        headers: {
-          "User-Agent": pickUserAgent()
-        }
+    const url = `https://remotive.com/api/remote-jobs?limit=100`;
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent": pickUserAgent()
+      }
+    });
+
+    if (!response.ok) {
+      console.warn(`[Remotive] Failed: ${response.status} ${response.statusText}`);
+      return jobs;
+    }
+
+    const data = await response.json();
+    if (!Array.isArray(data.jobs)) return jobs;
+
+    for (const item of data.jobs) {
+      if (!item.id || !item.title || !item.publication_date) continue;
+
+      const publishedDate = new Date(item.publication_date);
+      const ageInDays = (now - publishedDate.getTime()) / (1000 * 60 * 60 * 24);
+      if (ageInDays > 2) continue;
+
+      jobs.push({
+        jobId: String(item.id),
+        title: htmlEntities(item.title),
+        company: htmlEntities(item.company_name || "Confidencial"),
+        location: htmlEntities(item.candidate_required_location || "Remote"),
+        url: item.url,
+        dateText: "Reciente",
+        source: "Remotive",
+        publishedAt: publishedDate.toISOString()
       });
-
-      if (!response.ok) {
-        console.warn(`[Remotive] Failed for "${term}": ${response.status} ${response.statusText}`);
-        continue;
-      }
-
-      const data = await response.json();
-      if (!Array.isArray(data.jobs)) continue;
-
-      for (const item of data.jobs) {
-        if (!item.id || !item.title || !item.publication_date) continue;
-
-        const publishedDate = new Date(item.publication_date);
-        const ageInDays = (now - publishedDate.getTime()) / (1000 * 60 * 60 * 24);
-        if (ageInDays > 2) continue;
-
-        jobs.push({
-          jobId: String(item.id),
-          title: htmlEntities(item.title),
-          company: htmlEntities(item.company_name || "Confidencial"),
-          location: htmlEntities(item.candidate_required_location || "Remote"),
-          url: item.url,
-          dateText: "Reciente",
-          source: "Remotive",
-          publishedAt: publishedDate.toISOString()
-        });
-      }
     }
   } catch (error) {
     console.error("[Remotive] Fetch error:", error);
@@ -1089,7 +1113,26 @@ export async function scrapeJooble(locationQuery: string = "Colombia"): Promise<
     }
 
     const data = await response.json();
-    if (!Array.isArray(data.jobs)) return [];
+    if (!Array.isArray(data.jobs)) {
+      console.warn(
+        `[Jooble] Response OK but "jobs" is not an array (totalCount=${data.totalCount}) — blank keyword may not be accepted as "match all". Raw keys: ${Object.keys(data).join(", ")}`
+      );
+      return [];
+    }
+    // Diagnostic (2026-08-03): production logs show this returning 0 jobs
+    // every observed tick, but never a request-level error either — meaning
+    // data.jobs IS an array, just nothing survives the loop below. Can't
+    // reproduce locally (no JOOBLE_API_KEY outside CI), so logging exactly
+    // where results get dropped instead of guessing a fix blind. Remove
+    // once the real cause is confirmed from a live run.
+    if (data.jobs.length === 0) {
+      console.warn(`[Jooble] API returned 0 jobs outright for "${locationQuery}" (totalCount=${data.totalCount}) — likely the blank keyword, not the date filter.`);
+    } else {
+      const ages = data.jobs
+        .filter((j: any) => j.updated)
+        .map((j: any) => Math.round((now - new Date(j.updated).getTime()) / (1000 * 60 * 60 * 24)));
+      console.warn(`[Jooble] API returned ${data.jobs.length} jobs for "${locationQuery}" (totalCount=${data.totalCount}), ages in days: [${ages.slice(0, 10).join(", ")}] — date filter (>2d) is what's dropping them if this is non-empty.`);
+    }
 
     for (const item of data.jobs) {
       if (!item.id || !item.title || !item.updated) continue;

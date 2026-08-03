@@ -18,7 +18,6 @@ export const SOURCE_CADENCE_MS: Record<string, number> = {
   Computrabajo: 6 * HOUR_MS,
   Elempleo: 6 * HOUR_MS,
   Magneto: 6 * HOUR_MS,
-  Remotive: 8 * HOUR_MS,
   // Indeed and Glassdoor started returning 403 Forbidden on every request
   // during testing (2026-07-25) — pushed out further than the other sources
   // on top of the fanout cap in their adapters, to cut total request volume
@@ -64,11 +63,19 @@ export const SOURCE_CADENCE_MS: Record<string, number> = {
 // re-fetches of already-seen postings across runs, same as every other
 // source here — tune only after watching real savedCount/duplicateCount
 // ratios (plan §4/§Fase 4), not by guessing.
+// Remotive moved here from SOURCE_CADENCE_MS (2026-08-03): confirmed live
+// that its `search` query param no longer filters results — every request
+// returns the same fixed ~31-job batch regardless of query, so the
+// previous per-role keyword fanout (~20 requests/role) was firing ~20
+// identical requests for zero differentiation. Now fetched once per
+// window like RemoteOK/GetOnBoard. 4h — no official rate limit published,
+// matches WeRemoto's conservative default for a source with no clear SLA.
 export const GLOBAL_SOURCE_CADENCE_MS: Record<string, number> = {
   RemoteOK: 1 * HOUR_MS,
   GetOnBoard: 1 * HOUR_MS,
   Jooble: 6 * HOUR_MS,
   WeRemoto: 4 * HOUR_MS,
+  Remotive: 4 * HOUR_MS,
   WorkanaV2: 3 * HOUR_MS
 };
 
