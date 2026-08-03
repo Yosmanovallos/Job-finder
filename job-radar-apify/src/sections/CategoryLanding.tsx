@@ -38,6 +38,29 @@ export default function CategoryLanding() {
       setState("not-found");
       return;
     }
+
+    // server.ts's category branch embeds this exact response (see its
+    // comment on window.__SSR_CATEGORY__) — a first anonymous visitor with
+    // untouched filters doesn't need the round trip at all, it's the same
+    // data. Matters for more than just performance: without this, a
+    // transient failure in the redundant client fetch below (rate limit,
+    // network hiccup, a crawler giving up waiting) replaced a perfectly
+    // real, populated page with a fake "esta categoría no existe" — this
+    // is what actually happened in production for /empleos/caracas, caught
+    // via Search Console's URL Inspection tool reporting a soft-404 on a
+    // page that server-rendered correctly. Checked against BOTH slug and
+    // country so a stale payload from a different category never gets
+    // reused (e.g. this component re-mounting for a different :id via
+    // client-side navigation, where there's no matching SSR data at all).
+    const ssrCategory = (window as any).__SSR_CATEGORY__;
+    if (ssrCategory && ssrCategory.slug === id && ssrCategory.country === category.country) {
+      delete (window as any).__SSR_CATEGORY__;
+      setJobs(Array.isArray(ssrCategory.jobs) ? ssrCategory.jobs : []);
+      setTotal(ssrCategory.total || 0);
+      setState("found");
+      return;
+    }
+
     setState("loading");
     const params = new URLSearchParams();
     params.set(category.kind === "ciudad" ? "cities" : "roles", category.label);

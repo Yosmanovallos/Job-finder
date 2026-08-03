@@ -848,6 +848,31 @@ const server = http.createServer(async (req, res) => {
       const ssrSnippet = `<h1>${escapeHtml(meta.heading)}</h1>\n${emptyNotice}<nav aria-label="Vacantes"><ul>\n${items}\n</ul></nav>`;
       indexHtml = indexHtml.replace('<div id="app"></div>', `<div id="app">${ssrSnippet}</div>`);
 
+      // Same fix /dashboard already had (Fase 1, §5.4) applied here too —
+      // CategoryLanding.tsx previously always re-fetched /api/jobs on
+      // mount even though this response already has the real data,
+      // discarding a perfectly good SSR page if that redundant client
+      // fetch failed for ANY reason (rate limit, a network hiccup, a slow
+      // response Google's crawler gave up waiting on). That's exactly how
+      // a real, populated category page turns into a false "esta
+      // categoría no existe" in front of a crawler that only ever sees
+      // the final DOM — confirmed happening in production
+      // (https://buscotrabajo.co/empleos/caracas showed "0 vacantes" +
+      // soft-404 in Search Console's URL Inspection while the SSR route
+      // itself was serving real data the whole time). Embedding it here
+      // removes the redundant fetch's failure mode entirely for the
+      // common case.
+      const ssrCategoryPayload = escapeJsonForScriptTag({
+        slug: id,
+        country: category.country,
+        jobs: page,
+        total
+      });
+      indexHtml = indexHtml.replace(
+        "</head>",
+        `  <script>window.__SSR_CATEGORY__=${ssrCategoryPayload};</script>\n</head>`
+      );
+
       indexHtml = indexHtml
         .replace(/<title>[\s\S]*?<\/title>/, `<title>${escapeHtml(meta.title)}</title>`)
         .replace(
