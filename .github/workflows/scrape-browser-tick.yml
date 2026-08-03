@@ -1,0 +1,57 @@
+name: Browser Scrape Tick (Glassdoor + Indeed)
+
+# Separate from scrape-jobs.yml on purpose (see src/engine/browser-fetch.ts
+# and scripts/run-browser-tick.ts): Glassdoor and Indeed are both blocked by
+# Cloudflare from GitHub Actions' Azure IPs unless routed through a real
+# headless browser + a residential proxy — much heavier per-request than
+# the fast tick's got-scraping/fetch adapters, so it gets its own cadence
+# and its own workflow/concurrency group instead of competing for the fast
+# tick's 3-minute global-catalog budget.
+#
+# Every 2 days (day-of-month parity, not a precise 48h clock) — matches the
+# low request volume this needs; there is no cost benefit to running more
+# often given both sources' `fromage=1`/`fromAge=1` freshness filter and
+# saveJobs' existing dedupe across runs.
+on:
+  schedule:
+    - cron: "0 13 */2 * *"
+  workflow_dispatch:
+
+concurrency:
+  group: scrape-browser-tick
+  cancel-in-progress: false
+
+jobs:
+  browser-scrape-tick:
+    runs-on: ubuntu-latest
+    # Headless browser page loads (several seconds each) across 18 queries
+    # (9 Glassdoor + 9 Indeed) plus Playwright/Chromium install — generous
+    # margin over the fast tick's 27min ceiling since this runs far less
+    # often and isn't competing with anything else.
+    timeout-minutes: 20
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Dependencies
+        run: |
+          cd job-radar-apify
+          npm ci || npm install
+
+      - name: Install Playwright Chromium
+        run: |
+          cd job-radar-apify
+          npx playwright install --with-deps chromium
+
+      - name: Run Browser Scrape Tick
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          WEBSHARE_PROXY_URL: ${{ secrets.WEBSHARE_PROXY_URL }}
+        run: |
+          cd job-radar-apify
+          npx tsx scripts/run-browser-tick.ts
