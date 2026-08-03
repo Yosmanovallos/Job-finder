@@ -17,23 +17,25 @@ export const SOURCE_CADENCE_MS: Record<string, number> = {
   Torre: 4 * HOUR_MS,
   Computrabajo: 6 * HOUR_MS,
   Elempleo: 6 * HOUR_MS,
-  Magneto: 6 * HOUR_MS,
-  Remotive: 8 * HOUR_MS,
-  // Indeed and Glassdoor started returning 403 Forbidden on every request
-  // during testing (2026-07-25) — pushed out further than the other sources
-  // on top of the fanout cap in their adapters, to cut total request volume
-  // against them while docs/source-catalog/*.md is researched for a
-  // compliant API/feed alternative.
-  Indeed: 24 * HOUR_MS,
-  Glassdoor: 24 * HOUR_MS
-  // Workana (the keyword-based adapter, src/sources/workana.ts) deliberately
-  // has NO entry here anymore — it still 403s on every request (see
-  // docs/source-catalog/workana.md), so leaving it "due" only burned up to
-  // 12 requests/role/window failing for zero results. Retired from the
-  // cadence, not deleted (docs/WORKANA-V2-PLAN.md §3.3, option (a) —
-  // reversible): its replacement, WorkanaV2 (GLOBAL_SOURCE_CADENCE_MS
-  // below), fetches the same source's global catalog via a TLS-fingerprint
-  // technique that gets past the same 403.
+  Magneto: 6 * HOUR_MS
+  // Workana, Glassdoor, and Indeed (the keyword-based adapters,
+  // src/sources/{workana,glassdoor,indeed}.ts) deliberately have NO entry
+  // here anymore — all three still 403 on every request (see
+  // docs/source-catalog/{workana,indeed}.md), so leaving them "due" only
+  // burned request volume for guaranteed zero results (up to 12
+  // requests/role/window each). Retired from the cadence, not deleted
+  // (docs/WORKANA-V2-PLAN.md §3.3, option (a) — reversible). Workana's
+  // replacement (WorkanaV2, GLOBAL_SOURCE_CADENCE_MS below) fetches the
+  // same source's global catalog via got-scraping's TLS fingerprint.
+  // Glassdoor's and Indeed's replacements are NOT in this file at all —
+  // got-scraping alone doesn't get past their block (confirmed: flat 403
+  // from Azure IPs even with zero keyword fanout), so they run from a
+  // completely separate path (Playwright + residential proxy) on its own
+  // 2-day cadence — see src/engine/browser-fetch.ts,
+  // scripts/run-browser-tick.ts, .github/workflows/scrape-browser-tick.yml.
+  // (This retirement was missed when that browser-based replacement first
+  // shipped, 2026-08-03 — the keyword adapters kept running here,
+  // guaranteed-403ing every 24h, until this fix caught it.)
 };
 
 /**
@@ -64,11 +66,19 @@ export const SOURCE_CADENCE_MS: Record<string, number> = {
 // re-fetches of already-seen postings across runs, same as every other
 // source here — tune only after watching real savedCount/duplicateCount
 // ratios (plan §4/§Fase 4), not by guessing.
+// Remotive moved here from SOURCE_CADENCE_MS (2026-08-03): confirmed live
+// that its `search` query param no longer filters results — every request
+// returns the same fixed ~31-job batch regardless of query, so the
+// previous per-role keyword fanout (~20 requests/role) was firing ~20
+// identical requests for zero differentiation. Now fetched once per
+// window like RemoteOK/GetOnBoard. 4h — no official rate limit published,
+// matches WeRemoto's conservative default for a source with no clear SLA.
 export const GLOBAL_SOURCE_CADENCE_MS: Record<string, number> = {
   RemoteOK: 1 * HOUR_MS,
   GetOnBoard: 1 * HOUR_MS,
   Jooble: 6 * HOUR_MS,
   WeRemoto: 4 * HOUR_MS,
+  Remotive: 4 * HOUR_MS,
   WorkanaV2: 3 * HOUR_MS
 };
 
