@@ -19,14 +19,21 @@ export const SOURCE_CADENCE_MS: Record<string, number> = {
   Elempleo: 6 * HOUR_MS,
   Magneto: 6 * HOUR_MS,
   Remotive: 8 * HOUR_MS,
-  // Indeed, Glassdoor, and Workana all started returning 403 Forbidden on
-  // every request during testing (2026-07-25) — pushed out further than the
-  // other sources on top of the fanout cap in their adapters, to cut total
-  // request volume against them while docs/source-catalog/*.md is
-  // researched for a compliant API/feed alternative.
+  // Indeed and Glassdoor started returning 403 Forbidden on every request
+  // during testing (2026-07-25) — pushed out further than the other sources
+  // on top of the fanout cap in their adapters, to cut total request volume
+  // against them while docs/source-catalog/*.md is researched for a
+  // compliant API/feed alternative.
   Indeed: 24 * HOUR_MS,
-  Glassdoor: 24 * HOUR_MS,
-  Workana: 48 * HOUR_MS
+  Glassdoor: 24 * HOUR_MS
+  // Workana (the keyword-based adapter, src/sources/workana.ts) deliberately
+  // has NO entry here anymore — it still 403s on every request (see
+  // docs/source-catalog/workana.md), so leaving it "due" only burned up to
+  // 12 requests/role/window failing for zero results. Retired from the
+  // cadence, not deleted (docs/WORKANA-V2-PLAN.md §3.3, option (a) —
+  // reversible): its replacement, WorkanaV2 (GLOBAL_SOURCE_CADENCE_MS
+  // below), fetches the same source's global catalog via a TLS-fingerprint
+  // technique that gets past the same 403.
 };
 
 /**
@@ -45,11 +52,24 @@ export const SOURCE_CADENCE_MS: Record<string, number> = {
  * cadence would burn through it in. Tighten this only after confirming with
  * Jooble that the 500 actually resets.
  */
+// WorkanaV2 (see docs/WORKANA-V2-PLAN.md): global-catalog re-implementation
+// of Workana using got-scraping's Chrome TLS/JA3 fingerprint to get past the
+// Cloudflare 403 that blocks the keyword-based `Workana` adapter (see its
+// entry's removal from SOURCE_CADENCE_MS below). Measured real volume is
+// ~900 postings/24h window, far above what a single run's 10-page fetch can
+// cover — 3h (not 4h, deliberately offset from WeRemoto's cadence) so it
+// rarely lands in the same tick as WeRemoto's own sequential HTML pagination
+// inside the shared GLOBAL_CATALOG_TIMEOUT_MS budget (scripts/run-scrape-tick.ts).
+// Coverage of the full daily catalog relies on saveJobs' dedupe absorbing
+// re-fetches of already-seen postings across runs, same as every other
+// source here — tune only after watching real savedCount/duplicateCount
+// ratios (plan §4/§Fase 4), not by guessing.
 export const GLOBAL_SOURCE_CADENCE_MS: Record<string, number> = {
   RemoteOK: 1 * HOUR_MS,
   GetOnBoard: 1 * HOUR_MS,
   Jooble: 6 * HOUR_MS,
-  WeRemoto: 4 * HOUR_MS
+  WeRemoto: 4 * HOUR_MS,
+  WorkanaV2: 3 * HOUR_MS
 };
 
 // --- Venezuela (backlog/venezuela-expansion.md, Día 1) ----------------------
