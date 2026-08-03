@@ -114,7 +114,20 @@ export function isRemoteLocation(location: string | undefined | null): boolean {
 // enough for isRemoteLocation to tell them apart — forcing them to always-
 // null here would mislabel their real Colombia/Venezuela postings as
 // remote-only.
-export const ALWAYS_REMOTE_SOURCES = new Set(["RemoteOK", "Remotive", "WeRemoto"]);
+//
+// Workana belongs here for the same reason as RemoteOK/Remotive: its
+// `location` field is the client's own country text (`item.country` in
+// workana-v2-scraper.ts) — "Argentina", "México", "España", "Estados
+// Unidos", etc. — almost never the literal string "remoto"/"remote", even
+// though the postings are freelance/remote work from every country. Without
+// this, every Workana job got hard-stamped with whichever tick fetched it
+// (always CO — WorkanaV2 only runs on the CO-tick's global-catalog step,
+// never VE's, to avoid double-fetching the same catalog), permanently
+// mislabeling e.g. an Argentina-based project as Colombia and hiding it
+// from /ve/dashboard entirely (confirmed empirically: 80/80 saved Workana
+// rows had country='CO' despite locations like "Argentina"/"México"/
+// "España" — see the one-time backfill in scripts/backfill-workana-country.ts).
+export const ALWAYS_REMOTE_SOURCES = new Set(["RemoteOK", "Remotive", "WeRemoto", "Workana"]);
 
 // Single source of truth for what country (if any) a freshly-fetched job
 // gets stamped with — used by both the per-role path (scrape-worker.ts) and
