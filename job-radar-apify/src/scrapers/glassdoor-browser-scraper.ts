@@ -1,5 +1,5 @@
 /**
- * Glassdoor — Browser-Based Global Catalog Scraper
+ * Glassdoor — Browser-Based Global Catalog Scraper (CO + VE)
  *
  * Same query strategy as the abandoned got-scraping GlassdoorV2 attempt
  * (country-wide + 8 cities, no keyword — see git branch
@@ -14,7 +14,13 @@
  * `fromAge=1` in the URL plus an `ageInDays > 1` filter enforce "published
  * within the last day" per the explicit requirement.
  *
- * Test:  WEBSHARE_PROXY_URL=... npx tsx src/scrapers/glassdoor-browser-scraper.ts
+ * Venezuela location ids discovered the same way as Colombia's (Glassdoor's
+ * findPopularLocationAjax.htm lookup, matched to the right department to
+ * avoid unrelated same-name places in other countries/departments — e.g.
+ * "Valencia" also matches Táchira/Zulia/Sucre/Bolívar entries, only
+ * Carabobo is the actual major city).
+ *
+ * Test:  WEBSHARE_PROXY_URL=... npx tsx src/scrapers/glassdoor-browser-scraper.ts [CO|VE]
  */
 
 import { browserFetch } from "../engine/browser-fetch.js";
@@ -31,21 +37,47 @@ export interface GlassdoorJob {
   publishedAt: string;
 }
 
-const GLASSDOOR_COLOMBIA_ID = 54;
+export type Country = "CO" | "VE";
 
-// Same 8 cities as job-filters.ts's CITY_OPTIONS — see the abandoned
-// got-scraping attempt's comment for how these ids were discovered
-// (Glassdoor's findPopularLocationAjax.htm lookup endpoint).
-const GLASSDOOR_CITIES: { slug: string; locationId: number }[] = [
-  { slug: "bogota", locationId: 2821607 },
-  { slug: "medellin", locationId: 2809960 },
-  { slug: "cali", locationId: 2740110 },
-  { slug: "barranquilla", locationId: 2771478 },
-  { slug: "cartagena", locationId: 2808022 },
-  { slug: "bucaramanga", locationId: 2816222 },
-  { slug: "pereira", locationId: 2792968 },
-  { slug: "manizales", locationId: 2768339 },
-];
+interface CountryConfig {
+  slug: string;
+  countryLocationId: number;
+  fallbackLocationName: string;
+  cities: { slug: string; locationId: number }[];
+}
+
+// City lists match countries/index.ts's per-country `cities` arrays
+// (job-filters.ts's CITY_OPTIONS for CO; the VE equivalent).
+const COUNTRY_CONFIG: Record<Country, CountryConfig> = {
+  CO: {
+    slug: "colombia",
+    countryLocationId: 54,
+    fallbackLocationName: "Colombia",
+    cities: [
+      { slug: "bogota", locationId: 2821607 },
+      { slug: "medellin", locationId: 2809960 },
+      { slug: "cali", locationId: 2740110 },
+      { slug: "barranquilla", locationId: 2771478 },
+      { slug: "cartagena", locationId: 2808022 },
+      { slug: "bucaramanga", locationId: 2816222 },
+      { slug: "pereira", locationId: 2792968 },
+      { slug: "manizales", locationId: 2768339 },
+    ],
+  },
+  VE: {
+    slug: "venezuela",
+    countryLocationId: 249,
+    fallbackLocationName: "Venezuela",
+    cities: [
+      { slug: "caracas", locationId: 3420636 },
+      { slug: "maracaibo", locationId: 3427899 },
+      { slug: "valencia", locationId: 3422342 },
+      { slug: "barquisimeto", locationId: 3420578 },
+      { slug: "maracay", locationId: 3428339 },
+      { slug: "ciudad-guayana", locationId: 3421833 },
+    ],
+  },
+};
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -67,7 +99,7 @@ const unescapeFlight = (s: string): string =>
     .replace(/\\\//g, "/")
     .replace(/\\"/g, '"');
 
-function parseJobviews(html: string, now: number): GlassdoorJob[] {
+function parseJobviews(html: string, now: number, fallbackLocationName: string): GlassdoorJob[] {
   const jobs: GlassdoorJob[] = [];
   const chunks = html.split('\\"jobview\\":');
   for (let i = 1; i < chunks.length; i++) {
@@ -77,7 +109,7 @@ function parseJobviews(html: string, now: number): GlassdoorJob[] {
     if (ageInDays === null || ageInDays > 1 || !title) continue;
 
     const company = field(chunk, "employerNameFromSearch") || "Confidencial";
-    const location = field(chunk, "locationName") || "Colombia";
+    const location = field(chunk, "locationName") || fallbackLocationName;
     const listingId = numField(chunk, "listingId");
     let link = field(chunk, "seoJobLink");
     link = link
@@ -101,44 +133,46 @@ function parseJobviews(html: string, now: number): GlassdoorJob[] {
   return jobs;
 }
 
-export async function scrapeGlassdoorBrowser(): Promise<GlassdoorJob[]> {
+export async function scrapeGlassdoorBrowser(country: Country = "CO"): Promise<GlassdoorJob[]> {
+  const config = COUNTRY_CONFIG[country];
   console.log(
-    `[GlassdoorBrowser] Starting multi-query fetch (fromAge=1): country-wide + ${GLASSDOOR_CITIES.length} cities...`
+    `[GlassdoorBrowser:${country}] Starting multi-query fetch (fromAge=1): country-wide + ${config.cities.length} cities...`
   );
   const jobs: GlassdoorJob[] = [];
   const now = Date.now();
 
-  const countryUrl = `https://www.glassdoor.com/Job/colombia-jobs-SRCH_IL.0,8_IN${GLASSDOOR_COLOMBIA_ID}.htm?fromAge=1`;
+  const countryUrl = `https://www.glassdoor.com/Job/${config.slug}-jobs-SRCH_IL.0,${config.slug.length}_IN${config.countryLocationId}.htm?fromAge=1`;
   try {
     const html = await browserFetch(countryUrl);
-    const countryJobs = parseJobviews(html, now);
+    const countryJobs = parseJobviews(html, now, config.fallbackLocationName);
     jobs.push(...countryJobs);
-    console.log(`[GlassdoorBrowser] Colombia (country-wide): ${countryJobs.length} jobs within 1 day.`);
+    console.log(`[GlassdoorBrowser:${country}] ${config.fallbackLocationName} (country-wide): ${countryJobs.length} jobs within 1 day.`);
   } catch (error: any) {
-    console.error(`[GlassdoorBrowser] Country-wide query failed: ${error.message}`);
+    console.error(`[GlassdoorBrowser:${country}] Country-wide query failed: ${error.message}`);
   }
 
-  for (const { slug, locationId } of GLASSDOOR_CITIES) {
+  for (const { slug, locationId } of config.cities) {
     await sleep(1500);
     const url = `https://www.glassdoor.com/Job/${slug}-jobs-SRCH_IL.0,${slug.length}_IC${locationId}.htm?fromAge=1`;
     try {
       const html = await browserFetch(url);
-      const cityJobs = parseJobviews(html, now);
+      const cityJobs = parseJobviews(html, now, config.fallbackLocationName);
       jobs.push(...cityJobs);
-      console.log(`[GlassdoorBrowser] ${slug}: ${cityJobs.length} jobs within 1 day (${jobs.length} total so far).`);
+      console.log(`[GlassdoorBrowser:${country}] ${slug}: ${cityJobs.length} jobs within 1 day (${jobs.length} total so far).`);
     } catch (error: any) {
-      console.warn(`[GlassdoorBrowser] ${slug} failed, skipping: ${error.message}`);
+      console.warn(`[GlassdoorBrowser:${country}] ${slug} failed, skipping: ${error.message}`);
     }
   }
 
-  console.log(`[GlassdoorBrowser] ✅ Fetch complete: ${jobs.length} jobs (published within 1 day) before dedup.`);
+  console.log(`[GlassdoorBrowser:${country}] ✅ Fetch complete: ${jobs.length} jobs (published within 1 day) before dedup.`);
   return jobs;
 }
 
 async function main() {
+  const country = (process.argv[2] as Country) || "CO";
   const { closeBrowser } = await import("../engine/browser-fetch.js");
   try {
-    const jobs = await scrapeGlassdoorBrowser();
+    const jobs = await scrapeGlassdoorBrowser(country);
     console.log(`\nRESULTS: ${jobs.length} jobs found (before dedup)\n`);
     for (const job of jobs.slice(0, 10)) {
       console.log(`  📌 ${job.title} — 🏢 ${job.company} — 📍 ${job.location}`);

@@ -1,20 +1,21 @@
 /**
- * Indeed — Browser-Based Global Catalog Scraper
+ * Indeed — Browser-Based Global Catalog Scraper (CO + VE)
  *
  * Unlike Glassdoor, this uses Indeed's normal dynamic search endpoint
- * (`co.indeed.com/jobs?l=<city>&fromage=1`, NO keyword) directly — no need
- * for the SEO-landing-page workaround explored earlier, because the real
- * blocker was never the endpoint shape, it was the request never reaching
- * past Cloudflare (see src/engine/browser-fetch.ts for the full trail:
- * datacenter IP -> flat 403, residential IP + plain HTTP -> JS challenge,
- * residential IP + real browser -> 200 with real data, confirmed directly
- * against this exact endpoint).
+ * (`<subdomain>.indeed.com/jobs?l=<city>&fromage=1`, NO keyword) directly —
+ * no need for the SEO-landing-page workaround explored earlier, because the
+ * real blocker was never the endpoint shape, it was the request never
+ * reaching past Cloudflare (see src/engine/browser-fetch.ts for the full
+ * trail: datacenter IP -> flat 403, residential IP + plain HTTP -> JS
+ * challenge, residential IP + real browser -> 200 with real data).
+ * `ve.indeed.com` confirmed to exist and work the same way as
+ * `co.indeed.com` (same got a real "Nuevos trabajos en Venezuela" page).
  *
  * Coverage comes from querying by city (same list as Glassdoor's, matching
- * job-filters.ts's CITY_OPTIONS) plus a country-wide catch-all — robots.txt
- * (see docs/source-catalog/indeed.md) disallows `/*&start=` (pagination),
- * so this does not paginate; city diversification is the substitute,
- * same approach as Glassdoor.
+ * countries/index.ts's per-country `cities`) plus a country-wide catch-all
+ * — robots.txt (see docs/source-catalog/indeed.md) disallows `/*&start=`
+ * (pagination), so this does not paginate; city diversification is the
+ * substitute, same approach as Glassdoor.
  *
  * `fromage=1` in the URL plus an `ageInDays > 1` filter (computed from
  * `pubDate`, epoch ms) enforce "published within the last day" per the
@@ -27,7 +28,7 @@
  * self-contained by the same convention (safe to delete without touching
  * index.ts).
  *
- * Test:  WEBSHARE_PROXY_URL=... npx tsx src/scrapers/indeed-browser-scraper.ts
+ * Test:  WEBSHARE_PROXY_URL=... npx tsx src/scrapers/indeed-browser-scraper.ts [CO|VE]
  */
 
 import { browserFetch } from "../engine/browser-fetch.js";
@@ -44,19 +45,27 @@ export interface IndeedJob {
   publishedAt: string;
 }
 
-// Same cities as glassdoor-browser-scraper.ts / job-filters.ts's
-// CITY_OPTIONS — Indeed's `l=` param takes a plain place name, no id
-// lookup needed (simpler than Glassdoor's locationId).
-const CITIES = [
-  "Bogotá",
-  "Medellín",
-  "Cali",
-  "Barranquilla",
-  "Cartagena",
-  "Bucaramanga",
-  "Pereira",
-  "Manizales",
-];
+export type Country = "CO" | "VE";
+
+interface CountryConfig {
+  subdomain: string;
+  countryName: string;
+  cities: string[];
+}
+
+// City lists match countries/index.ts's per-country `cities` arrays.
+const COUNTRY_CONFIG: Record<Country, CountryConfig> = {
+  CO: {
+    subdomain: "co",
+    countryName: "Colombia",
+    cities: ["Bogotá", "Medellín", "Cali", "Barranquilla", "Cartagena", "Bucaramanga", "Pereira", "Manizales"],
+  },
+  VE: {
+    subdomain: "ve",
+    countryName: "Venezuela",
+    cities: ["Caracas", "Maracaibo", "Valencia", "Barquisimeto", "Maracay", "Ciudad Guayana"],
+  },
+};
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -88,7 +97,7 @@ function extractBalancedObject(html: string, fromIdx: number): string | null {
   return null;
 }
 
-function parseJobcards(html: string, now: number): IndeedJob[] {
+function parseJobcards(html: string, now: number, subdomain: string, fallbackLocation: string): IndeedJob[] {
   const jobs: IndeedJob[] = [];
   const marker = 'window.mosaic.providerData["mosaic-provider-jobcards"]=';
   const markerIdx = html.indexOf(marker);
@@ -111,13 +120,13 @@ function parseJobcards(html: string, now: number): IndeedJob[] {
     const ageInDays = (now - r.pubDate) / (1000 * 60 * 60 * 24);
     if (ageInDays > 1) continue;
 
-    const location = r.remoteLocation ? "Remoto" : r.formattedLocation || "Colombia";
+    const location = r.remoteLocation ? "Remoto" : r.formattedLocation || fallbackLocation;
     jobs.push({
       jobId: r.jobkey,
       title: htmlEntities(r.title),
       company: htmlEntities(r.company || "Confidencial"),
       location: htmlEntities(location),
-      url: `https://co.indeed.com/viewjob?jk=${r.jobkey}`,
+      url: `https://${subdomain}.indeed.com/viewjob?jk=${r.jobkey}`,
       dateText: r.formattedRelativeTime || "Reciente",
       source: "Indeed",
       publishedAt: new Date(r.pubDate).toISOString(),
@@ -126,42 +135,46 @@ function parseJobcards(html: string, now: number): IndeedJob[] {
   return jobs;
 }
 
-export async function scrapeIndeedBrowser(): Promise<IndeedJob[]> {
-  console.log(`[IndeedBrowser] Starting multi-query fetch (fromage=1): country-wide + ${CITIES.length} cities...`);
+export async function scrapeIndeedBrowser(country: Country = "CO"): Promise<IndeedJob[]> {
+  const config = COUNTRY_CONFIG[country];
+  console.log(
+    `[IndeedBrowser:${country}] Starting multi-query fetch (fromage=1): country-wide + ${config.cities.length} cities...`
+  );
   const jobs: IndeedJob[] = [];
   const now = Date.now();
 
-  const countryUrl = `https://co.indeed.com/jobs?l=Colombia&fromage=1`;
+  const countryUrl = `https://${config.subdomain}.indeed.com/jobs?l=${encodeURIComponent(config.countryName)}&fromage=1`;
   try {
     const html = await browserFetch(countryUrl);
-    const countryJobs = parseJobcards(html, now);
+    const countryJobs = parseJobcards(html, now, config.subdomain, config.countryName);
     jobs.push(...countryJobs);
-    console.log(`[IndeedBrowser] Colombia (country-wide): ${countryJobs.length} jobs within 1 day.`);
+    console.log(`[IndeedBrowser:${country}] ${config.countryName} (country-wide): ${countryJobs.length} jobs within 1 day.`);
   } catch (error: any) {
-    console.error(`[IndeedBrowser] Country-wide query failed: ${error.message}`);
+    console.error(`[IndeedBrowser:${country}] Country-wide query failed: ${error.message}`);
   }
 
-  for (const city of CITIES) {
+  for (const city of config.cities) {
     await sleep(1500);
-    const url = `https://co.indeed.com/jobs?l=${encodeURIComponent(city)}&fromage=1`;
+    const url = `https://${config.subdomain}.indeed.com/jobs?l=${encodeURIComponent(city)}&fromage=1`;
     try {
       const html = await browserFetch(url);
-      const cityJobs = parseJobcards(html, now);
+      const cityJobs = parseJobcards(html, now, config.subdomain, config.countryName);
       jobs.push(...cityJobs);
-      console.log(`[IndeedBrowser] ${city}: ${cityJobs.length} jobs within 1 day (${jobs.length} total so far).`);
+      console.log(`[IndeedBrowser:${country}] ${city}: ${cityJobs.length} jobs within 1 day (${jobs.length} total so far).`);
     } catch (error: any) {
-      console.warn(`[IndeedBrowser] ${city} failed, skipping: ${error.message}`);
+      console.warn(`[IndeedBrowser:${country}] ${city} failed, skipping: ${error.message}`);
     }
   }
 
-  console.log(`[IndeedBrowser] ✅ Fetch complete: ${jobs.length} jobs (published within 1 day) before dedup.`);
+  console.log(`[IndeedBrowser:${country}] ✅ Fetch complete: ${jobs.length} jobs (published within 1 day) before dedup.`);
   return jobs;
 }
 
 async function main() {
+  const country = (process.argv[2] as Country) || "CO";
   const { closeBrowser } = await import("../engine/browser-fetch.js");
   try {
-    const jobs = await scrapeIndeedBrowser();
+    const jobs = await scrapeIndeedBrowser(country);
     console.log(`\nRESULTS: ${jobs.length} jobs found (before dedup)\n`);
     for (const job of jobs.slice(0, 10)) {
       console.log(`  📌 ${job.title} — 🏢 ${job.company} — 📍 ${job.location}`);

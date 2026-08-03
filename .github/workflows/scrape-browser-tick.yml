@@ -24,11 +24,11 @@ concurrency:
 jobs:
   browser-scrape-tick:
     runs-on: ubuntu-latest
-    # Headless browser page loads (several seconds each) across 18 queries
-    # (9 Glassdoor + 9 Indeed) plus Playwright/Chromium install — generous
-    # margin over the fast tick's 27min ceiling since this runs far less
-    # often and isn't competing with anything else.
-    timeout-minutes: 20
+    # Headless browser page loads (several seconds each) across ~32 queries
+    # (Glassdoor CO+VE, Indeed CO+VE) plus Playwright/Chromium install —
+    # generous margin since this runs far less often and isn't competing
+    # with anything else.
+    timeout-minutes: 30
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
