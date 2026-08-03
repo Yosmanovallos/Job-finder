@@ -5,6 +5,7 @@ import { elempleoAdapter } from "./elempleo.js";
 import { torreAdapter } from "./torre.js";
 import { magnetoAdapter } from "./magneto.js";
 import { workanaAdapter } from "./workana.js";
+import { workanaV2Adapter } from "./workana-v2.js";
 import { weremotoAdapter } from "./weremoto.js";
 import { getonboardAdapter } from "./getonboard.js";
 import { remoteokAdapter } from "./remoteok.js";
@@ -25,6 +26,7 @@ export const allAdapters: SourceAdapter[] = [
   torreAdapter,
   magnetoAdapter,
   workanaAdapter,
+  workanaV2Adapter,
   weremotoAdapter,
   getonboardAdapter,
   remoteokAdapter,
@@ -44,6 +46,7 @@ export {
   torreAdapter,
   magnetoAdapter,
   workanaAdapter,
+  workanaV2Adapter,
   weremotoAdapter,
   getonboardAdapter,
   remoteokAdapter,
