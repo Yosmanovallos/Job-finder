@@ -15,6 +15,10 @@ on:
         description: "Actually PUT the sitemap (default: read-only report)"
         type: boolean
         default: false
+      submit_urls:
+        description: "Comma-separated child sitemap URLs to resubmit instead of the index (only used when 'submit' is true)"
+        type: string
+        default: ""
       inspect:
         description: "Inspect a sample of URLs for indexing status instead (ignores 'submit')"
         type: boolean
@@ -46,6 +50,8 @@ jobs:
           cd job-radar-apify
           if [ "${{ inputs.inspect }}" = "true" ]; then
             npx tsx scripts/check-search-console.ts --inspect
+          elif [ "${{ inputs.submit }}" = "true" ] && [ -n "${{ inputs.submit_urls }}" ]; then
+            npx tsx scripts/check-search-console.ts "--submit=${{ inputs.submit_urls }}"
           elif [ "${{ inputs.submit }}" = "true" ]; then
             npx tsx scripts/check-search-console.ts --submit
           else

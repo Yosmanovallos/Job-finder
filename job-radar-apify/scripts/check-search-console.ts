@@ -231,23 +231,34 @@ async function main() {
   if (!submit) {
     console.log(
       `\n${ourSitemapKnown ? "✅ " + SITEMAP_URL + " is already known to Search Console." : "⚠️  " + SITEMAP_URL + " is not listed above."} ` +
-        "Dry-run (default) — re-run with --submit to actually PUT it."
+        "Dry-run (default) — re-run with --submit to actually PUT it, or --submit=<url1,url2> for specific child sitemaps."
     );
     return;
   }
 
-  console.log(`\n📤 [check-search-console] --submit passed — submitting ${SITEMAP_URL}...`);
+  // Bare --submit resubmits the sitemap index (unchanged default behavior).
+  // --submit=<url1,url2,...> resubmits specific child sitemaps instead —
+  // needed because a PUT on the index does NOT force Google to re-read
+  // child sitemaps it already knows about (see sm.path === SITEMAP_URL
+  // check above); Google re-reads a child sitemap on its own schedule
+  // unless explicitly re-pinged by its own URL.
+  const submitArg = process.argv.find((a) => a.startsWith("--submit="));
+  const targets = submitArg ? submitArg.slice("--submit=".length).split(",") : [SITEMAP_URL];
+
   const writeToken = await getAccessToken("https://www.googleapis.com/auth/webmasters");
-  const submitRes = await fetch(
-    `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(siteUrl)}/sitemaps/${encodeURIComponent(SITEMAP_URL)}`,
-    { method: "PUT", headers: { Authorization: `Bearer ${writeToken}` } }
-  );
-  if (submitRes.ok) {
-    console.log(
-      "✅ Submitted successfully (Search Console's sitemaps.submit returns no body on success)."
+  for (const target of targets) {
+    console.log(`\n📤 [check-search-console] --submit passed — submitting ${target}...`);
+    const submitRes = await fetch(
+      `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(siteUrl)}/sitemaps/${encodeURIComponent(target)}`,
+      { method: "PUT", headers: { Authorization: `Bearer ${writeToken}` } }
     );
-  } else {
-    console.error(`❌ Submit failed (${submitRes.status}): ${await submitRes.text()}`);
+    if (submitRes.ok) {
+      console.log(
+        "✅ Submitted successfully (Search Console's sitemaps.submit returns no body on success)."
+      );
+    } else {
+      console.error(`❌ Submit failed (${submitRes.status}): ${await submitRes.text()}`);
+    }
   }
 }
 
