@@ -131,8 +131,19 @@ export async function closeBrowser(): Promise<void> {
  * server-rendered HTML with an embedded JSON blob in a `<script>` tag,
  * which is what the browser's first response carries, same as a plain HTTP
  * fetch would (just able to actually get a 200 instead of a block).
+ *
+ * Retries once on failure (403/timeout/connection error). This is safe to
+ * do more freely than the fast tick's retry policy (gsFetch/executeWithResilience
+ * fail fast on 401/403, deliberately not retrying a "no") because a
+ * Rotating Residential proxy hands out a fresh exit IP per new browser
+ * context — a retry here is a genuinely different network identity to the
+ * target site, not hammering the same one that just said no. Confirmed
+ * empirically: real Actions runs see roughly half of individual city
+ * queries fail transiently (proxy-pool variance, not a systemic block —
+ * the surrounding queries in the same run routinely succeed), so a retry
+ * meaningfully improves coverage without increasing ban risk.
  */
-export async function browserFetch(url: string, timeoutMs = 30_000): Promise<string> {
+async function browserFetchOnce(url: string, timeoutMs: number): Promise<string> {
   const browser = await getBrowser();
   const context = await browser.newContext({
     userAgent:
@@ -153,5 +164,15 @@ export async function browserFetch(url: string, timeoutMs = 30_000): Promise<str
     return body;
   } finally {
     await context.close();
+  }
+}
+
+export async function browserFetch(url: string, timeoutMs = 30_000): Promise<string> {
+  try {
+    return await browserFetchOnce(url, timeoutMs);
+  } catch (firstError: any) {
+    console.warn(`[browser-fetch] First attempt failed for ${url}: ${firstError.message} — retrying once (fresh proxy IP)...`);
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    return await browserFetchOnce(url, timeoutMs);
   }
 }
