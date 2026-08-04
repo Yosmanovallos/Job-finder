@@ -117,17 +117,30 @@ function searchCompanies(
   if (q.length >= 2) {
     entries = entries.filter(([name]) => name.toLowerCase().includes(q));
   }
-  // Stable tiebreak (alphabetical) on equal counts — without it, ties order
-  // by Map insertion (corpus iteration order), which can reshuffle between
-  // two page requests if getJobsCached()'s TTL refreshes in between,
-  // silently duplicating or skipping a company across an infinite-scroll
-  // page boundary.
-  entries.sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+
+  // logoUrl has to be resolved before sorting (not after, like before this
+  // ordering rule existed) since it's now a sort key itself.
+  const results: CompanySearchResult[] = entries.map(([company, count]) => ({
+    company,
+    count,
+    logoUrl: getCompanyLogoUrl(company)
+  }));
+
+  // Companies with a real curated logo first, then everyone else — both
+  // groups independently ranked by vacancy count descending. Stable
+  // alphabetical tiebreak on equal counts within a group — without it,
+  // ties order by Map insertion (corpus iteration order), which can
+  // reshuffle between two page requests if getJobsCached()'s TTL refreshes
+  // in between, silently duplicating or skipping a company across an
+  // infinite-scroll page boundary.
+  results.sort((a, b) => {
+    if (!!a.logoUrl !== !!b.logoUrl) return a.logoUrl ? -1 : 1;
+    return b.count - a.count || a.company.localeCompare(b.company);
+  });
+
   return {
-    companies: entries
-      .slice(offset, offset + limit)
-      .map(([company, count]) => ({ company, count, logoUrl: getCompanyLogoUrl(company) })),
-    total: entries.length
+    companies: results.slice(offset, offset + limit),
+    total: results.length
   };
 }
 
