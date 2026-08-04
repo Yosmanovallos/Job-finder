@@ -189,6 +189,21 @@ export function buildJobMeta(job: SeoJob): JobMeta {
   };
 }
 
+// A `location` that's ONLY the remote marker ("Remoto"/"Remote", no city
+// attached) has nothing real to put in jobLocation.address.addressLocality
+// — schema.org's PostalAddress expects an actual place name, and Google's
+// JobPosting rich-result guidance (developers.google.com/search/docs/
+// appearance/structured-data/job-posting#job-location) says to use
+// jobLocationType: "TELECOMMUTE" instead for exactly this case. A location
+// that ALSO names a real city ("Remoto - Bogotá", "Híbrido - Medellín")
+// keeps the normal jobLocation branch below — that IS real, useful place
+// info, not a placeholder, so it's left alone.
+const BARE_REMOTE_RE = /^(remoto|remote)$/i;
+
+function isBareRemoteLocation(location: string | undefined | null): boolean {
+  return BARE_REMOTE_RE.test((location || "").trim());
+}
+
 // Returns null for locked/incomplete jobs — callers must not render
 // JobPosting structured data at all in that case (see
 // isPubliclyDescribable), rather than emitting one with null fields.
@@ -201,7 +216,7 @@ export function buildJobPosting(
   const publishedAt = job.publishedAt ? new Date(job.publishedAt) : new Date();
   const validThrough = new Date(publishedAt.getTime() + MAX_LISTING_AGE_DAYS * 24 * 60 * 60 * 1000);
 
-  return {
+  const posting: Record<string, unknown> = {
     "@context": "https://schema.org/",
     "@type": "JobPosting",
     title: job.title,
@@ -216,8 +231,21 @@ export function buildJobPosting(
     hiringOrganization: {
       "@type": "Organization",
       name: job.company
-    },
-    jobLocation: {
+    }
+  };
+
+  if (isBareRemoteLocation(job.location)) {
+    posting.jobLocationType = "TELECOMMUTE";
+    // job.country is null for remote postings (schema.sql's convention) —
+    // falls back to CO via getCountryConfig's own default, same assumption
+    // every other caller of getCountryConfig(job.country) already makes,
+    // not a new invention.
+    posting.applicantLocationRequirements = {
+      "@type": "Country",
+      name: getCountryConfig(job.country).name
+    };
+  } else {
+    posting.jobLocation = {
       "@type": "Place",
       address: {
         "@type": "PostalAddress",
@@ -228,8 +256,10 @@ export function buildJobPosting(
         // the country column existed, not a new invention.
         addressCountry: getCountryConfig(job.country).code
       }
-    }
-  };
+    };
+  }
+
+  return posting;
 }
 
 // --- Category pages (Fase 4) -------------------------------------------------

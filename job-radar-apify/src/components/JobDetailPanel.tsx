@@ -27,6 +27,13 @@ export interface JobDetailPanelProps {
   // Dashboard context ("CO"/"VE") — see JobCard.tsx's identical prop for why
   // this, not job.country, decides the company link's prefix.
   country?: string;
+  // This panel is shared between Dashboard.tsx (a side pane next to a list
+  // of other jobs — must never be an <h1>, or the page would have several)
+  // and JobLanding.tsx (the dedicated /empleos/:id page, where the job
+  // title IS the page's one real heading). Defaults to "h2" — the
+  // pre-existing tag, unchanged for the Dashboard case — so only
+  // JobLanding.tsx needs to opt in.
+  headingLevel?: "h1" | "h2";
 }
 
 const MODALITY_VARIANT: Record<string, "remote" | "hybrid" | "default"> = {
@@ -51,9 +58,11 @@ export const JobDetailPanel: React.FC<JobDetailPanelProps> = ({
   onSaveToggle,
   onAppliedToggle,
   onApplyClick,
-  country
+  country,
+  headingLevel = "h2"
 }) => {
   const { isAuthenticated } = useAuth();
+  const TitleTag = headingLevel;
 
   if (!job) {
     return (
@@ -92,9 +101,9 @@ export const JobDetailPanel: React.FC<JobDetailPanelProps> = ({
               {initialFor(job)}
             </div>
             <div className="min-w-0">
-              <h2 className="font-heading font-semibold text-lg text-foreground leading-snug">
+              <TitleTag className="font-heading font-semibold text-lg text-foreground leading-snug">
                 {job.title}
-              </h2>
+              </TitleTag>
               <p className="text-sm text-foreground/80">
                 {job.company ? (
                   // Every real company resolves — see JobCard.tsx's

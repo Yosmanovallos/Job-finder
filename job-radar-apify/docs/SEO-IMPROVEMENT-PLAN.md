@@ -17,8 +17,7 @@ fases (sección 3) con el resultado — mismo patrón que ya usa
 `docs/SEO-PLAN.md`.
 
 **Regla de seguridad, la razón de que "no dañar nada" sea posible de
-verificar y no solo una intención:** correr `/seo drift compare` (sección
-2) contra las URLs de baseline **antes y después** de cualquier cambio
+verificar y no solo una intención:** correr `/seo drift compare` (sección 2) contra las URLs de baseline **antes y después** de cualquier cambio
 que toque una página pública. Si `/seo drift compare` marca algo
 `CRITICAL` que el cambio no explica intencionalmente, parar y revisar
 antes de seguir — no asumir que "los tests pasan" es suficiente, `test:seo`
@@ -39,7 +38,7 @@ realmente lee (título, canonical, hreflang, schema, CWV).
    (`indexnow_submit.py`, `indexing_notify.py` escriben hacia afuera —
    confirmar antes de correrlos).
 3. **Migraciones de esquema, siempre aditivas** (`ALTER TABLE ... ADD
-   COLUMN IF NOT EXISTS`, mismo estilo que
+COLUMN IF NOT EXISTS`, mismo estilo que
    `scripts/migrate-last-seen-at.ts`/`scripts/migrate-indexing-queue.ts`)
    y corridas explícitamente, nunca automáticas.
 4. **Una fase por sesión**, verificable antes de seguir con la siguiente
@@ -48,7 +47,7 @@ realmente lee (título, canonical, hreflang, schema, CWV).
 5. **Verificación propia antes de decir "listo"**: `npx tsc --noEmit`,
    `npm run build`, `npm run test:seo` (+ `test:dashboard-filters` /
    `test:companies-search` si se tocó `server.ts`), y `/seo drift
-   compare` contra el baseline — nunca delegar esa verificación al
+compare` contra el baseline — nunca delegar esa verificación al
    usuario como si fuera un gate pendiente.
 6. **`/seo setup` para dependencias, nunca un `pip install` manual** — el
    plugin usa su propio venv aislado (`~/.claude/skills/seo/.venv/` o el
@@ -70,6 +69,138 @@ reales). Solo el usuario puede sacarlo (UI, sin equivalente en la API).
 Decide si la Fase 3 (crawl budget / autoridad) o la Fase 4 (calidad de
 contenido) importa más a partir de aquí — no bloquea empezar ninguna de
 las dos, pero sí decide en cuál invertir más tiempo primero.
+
+### 1.1 Batch ad hoc — H1 faltante + canonical/título de `/dashboard` (2026-08-04)
+
+Encontrado revisando el código fuente a partir de lo que el baseline de la
+Fase 2 mostró (`h1: null` en 4 de las 6 URLs de muestra, `/dashboard` con
+el `title`/`canonical` de la home). Implementado, no una fase numerada de
+la tabla — surgió directo de la evidencia del baseline, mismo criterio de
+"nunca inventar, siempre evidenciar primero":
+
+- **`/empleos/:id/:slug` (~22k páginas, el patrón de mayor volumen del
+  sitio):** el HTML crudo nunca tuvo contenido visible en `<div id="app">`
+  — solo `<head>` + JSON-LD. Un crawler que lee HTML sin ejecutar JS veía
+  una página titulada pero vacía, sin `<h1>`. Se agregó un `<h1>{título}</h1>`
+  + un `<p>` con el mismo `buildJobDescription()` que ya alimenta el
+  JobPosting JSON-LD (nunca un texto distinto o inventado).
+- **`/dashboard` y `/ve/dashboard`:** `/ve/dashboard` no tenía ninguna rama
+  SSR (cae al fallback estático) — su `<title>`/canonical crudos eran los
+  de Colombia. `/dashboard` sí tenía rama SSR pero solo para el listado, no
+  para `<head>` — su `<title>`/canonical crudos eran los de la home ("/").
+  Se agregó reescritura de `<head>` (title/description/canonical/og/twitter)
+  con los mismos datos reales que `Dashboard.tsx`'s `usePageMeta()` ya
+  calculaba client-side, más `<h1>Vacantes de Empleo en {país}</h1>`, más el
+  trío hreflang recíproco (`es-CO`/`es-VE`/`x-default`) que ya llevan `/` y
+  `/ve` — necesario porque, al darle a `/ve/dashboard` su propio canonical
+  por primera vez (antes canonicalizaba a `/`, así que nunca competía),
+  ahora sí es un near-duplicate real de `/dashboard` sin nada que los
+  declare regionales entre sí (mismo riesgo que §5.7 riesgo 1).
+  **Client-side:** `Dashboard.tsx` embebía `window.__SSR_JOBS__` con datos
+  reales de Venezuela para `/ve/dashboard`, pero el gate que lo consume
+  seguía hardcodeado a `country === "CO"` (así estaba desde que
+  `/ve/dashboard` no tenía SSR) — el payload real se generaba y se
+  descartaba sin usarse, el cliente seguía haciendo el fetch redundante.
+  Primer intento (`country === "CO" || country === "VE"`) fue corregido de
+  nuevo tras una segunda revisión: el pathname que sirvió el HTML no
+  garantiza el `country` con el que `Dashboard` termina montado (un
+  visitante con preferencia VE puede entrar por `/dashboard` puro — App.tsx
+  lo rebota a `/ve/dashboard` client-side, sin segundo round-trip HTTP — y
+  montar ahí con el payload de Colombia todavía en `window`), así que el
+  payload ahora se auto-describe: `server.ts` estampa `country` junto a
+  `jobs`/`total`/`hasMore`, y el gate compara `ssrJobs.country === country`
+  en vez de asumir nada por ruta. De paso, `og:locale` en esta rama pasó de
+  heredar siempre `es_CO` del shell estático a reflejar el país real (mismo
+  patrón que `/` y `/ve` ya tenían). Contenido crudo verificado con datos
+  reales de producción: `/ve/dashboard` trae 24 links reales a vacantes
+  venezolanas (Apure, Zulia, Nueva Esparta, Caracas), `country: "VE"` y
+  `total: 4280` en el payload, `/dashboard` con `country: "CO"` y `total:
+  21302` — capturado también en pantalla sin regresión visual.
+- **`/` y `/ve`:** sin `<h1>` en el HTML crudo (límite ya documentado en
+  `SEO-PLAN.md` §5.7 riesgo 2). No se intentó el SSR completo de la landing
+  que ese riesgo señala como pendiente — solo se agregó el mismo `<h1>` real
+  que `HeroDemo.tsx` ya renderiza client-side, verbatim.
+- **Cliente:** `JobDetailPanel.tsx` renderizaba el título de la vacante como
+  `<h2>` incluso en `/empleos/:id` (su único uso como página dedicada) — se
+  agregó un prop `headingLevel` (`"h1"` solo desde `JobLanding.tsx`, sigue
+  `"h2"` en el panel lateral del dashboard). `Dashboard.tsx` no tenía ningún
+  `<h1>` en el DOM ni antes ni después de hidratar — se agregó uno
+  `sr-only` con el mismo texto que la rama SSR.
+
+### 1.2 Batch ad hoc — JobPosting inválido para vacantes 100% remotas (2026-08-04)
+
+Encontrado durante Fase 6 (`seo-schema`) contra una vacante real
+(`analista-de-observabilidad-y-operaciones-ti-remoto`): cuando
+`job.location` es literalmente `"Remoto"` (sin ciudad), `buildJobPosting()`
+emitía `jobLocation.address.addressLocality: "Remoto"` — no es una
+localidad real, invalida el `PostalAddress` según la guía de Google para
+JobPosting remoto. Arreglado en `job-seo.ts`: `isBareRemoteLocation()`
+detecta el caso (`location` es exactamente "Remoto"/"Remote", no
+"Remoto - Bogotá" ni similar, esos casos SÍ tienen ciudad real y no
+cambian) y emite `jobLocationType: "TELECOMMUTE"` +
+`applicantLocationRequirements` (país real vía `getCountryConfig`) en vez
+de `jobLocation`. Verificado contra una vacante real de producción
+(`5021d6f6-...`, servida localmente contra el mismo `DATABASE_URL`).
+Confirmado por consulta directa a la tabla `jobs`: 2475 filas con
+`location='remoto'` + 20 con `'remote'` (afectadas, corregidas), 0 filas
+`'híbrido'`/`'hibrido'` bare (mismo bug potencial, no existe en los datos
+reales — no requiere el mismo fix). Casos agregados a
+`tests/validate-seo-job-pages.ts` (bare-remote → TELECOMMUTE,
+`"Remoto - Bogotá"` → jobLocation normal sin cambios).
+
+**Verificado (los tres batches, 1.1, 1.2 y 1.3):** `tsc --noEmit`, `build`,
+`test:seo` (incluye los 2 casos nuevos de TELECOMMUTE + los 7 de
+`/ve/dashboard`), `test:dashboard-filters`, `test:companies-search` en
+verde + captura de pantalla de `/dashboard`, `/ve/dashboard`, `/empleos/:id`
+y `/` sin regresión visual (el `sr-only` es invisible, el cambio `h2`→`h1`
+no cambia estilos).
+
+**No desplegado, ninguno de los tres batches:** producción corre en Render
+desde este repo de GitHub — el cambio existe solo local hasta que el
+usuario decida hacer commit/push. `/seo drift compare` contra el baseline
+de la Fase 2 (que es contra `buscotrabajo.co`, producción) no aplica
+todavía por la misma razón; se verificó equivalentemente contra un servidor
+local en `:3000` con `curl` + capturas. **Una sesión futura no debe asumir
+que esto ya está verificado en vivo** — re-confirmar `git log`/`git status`
+antes de dar cualquiera de los tres batches por aplicado en producción.
+
+### 1.3 Batch ad hoc — hreflang para páginas de rol CO↔VE (2026-08-04)
+
+Encontrado en la misma revisión: `/empleos/<rol>` y `/ve/empleos/<rol>`
+(32 roles × 2 = 64 URLs en `sitemap-categories.xml`) eran el mismo caso de
+canonical-sin-pareja ya arreglado dos veces arriba, pero preexistente desde
+Fase 6 (no introducido por este batch). Arreglado con el mismo trío
+recíproco (`es-CO`/`es-VE`/`x-default`), **gateado a `category.kind ===
+"rol"`** — las páginas de ciudad (`/empleos/bogota`, `/empleos/caracas`,
+etc.) no tienen URL hermana (`buildCategoryPath`: una ciudad nunca lleva
+prefijo `/ve`), así que emitirles hreflang habría sido un set unidireccional
+— exactamente lo que `seo-hreflang` marca como Critical. Verificado con
+`curl` local: `/empleos/project-manager` ↔ `/ve/empleos/project-manager`
+recíproco correcto; `/empleos/bogota` sigue con cero tags `hreflang`.
+
+Tests agregados a `tests/validate-seo-job-pages.ts` para `/ve/dashboard`
+(7 casos: 200, links reales, canonical propio, título propio, hreflang
+recíproco, `og:locale`, `window.__SSR_JOBS__.country === "VE"` — este
+último específicamente para blindar contra que el payload de Colombia se
+sirva por error en la ruta de Venezuela, el riesgo real que tuvo la
+primera versión del fix de `/dashboard` antes de estamparle `country`).
+
+**Diffs esperados en `/seo drift compare` una vez desplegado** (para no
+confundirlos con una regresión real):
+- `/` y `/ve`: `h1` aparece (antes null).
+- `/dashboard`: `title` cambia de "BuscoTrabajo — Vacantes de Empleo en
+  Colombia, Todas en un Solo Lugar" a "Vacantes de Empleo en Colombia |
+  BuscoTrabajo"; `canonical` cambia de `https://buscotrabajo.co/` a
+  `https://buscotrabajo.co/dashboard`; `h1` aparece; hreflang aparece.
+- `/empleos/:id/:slug` (no hay baseline individual, pero aplica a las
+  ~22k páginas del patrón): `h1` aparece; `html_hash` cambia (contenido
+  real agregado a `<div id="app">`); JobPosting de vacantes 100% remotas
+  gana `jobLocationType`/`applicantLocationRequirements` y pierde
+  `jobLocation` — solo para las ~2500 vacantes con `location` bare-remote.
+- No hay baseline capturado para `/ve/dashboard`, `/empleos/project-manager`
+  ni `/ve/empleos/project-manager` (no estaban en la muestra de la Fase 2)
+  — considerar agregarlos en una futura sesión de baseline si se quiere
+  drift-tracking sobre ellos también.
 
 ## 2. Primer paso al reiniciar sesión: baseline de `seo-drift`
 
@@ -95,18 +226,18 @@ cambio por terminado.**
 
 ## 3. Fases propuestas (una por sesión)
 
-| Fase | Qué hace | Skill/agente | Exit criteria | Estado |
-| --- | --- | --- | --- | --- |
-| 0 | Diagnóstico de causa raíz (bug de churn, thin content, hreflang) | (manual, pre-plugin) | Confirmado con evidencia en vivo | ✅ Hecho — `SEO-PLAN.md` §9 |
-| 1 | Fixes de mayor apalancamiento ya identificados | (manual) | `test:seo` + `tsc` + `build` en verde | ✅ Hecho — `SEO-PLAN.md` §10 |
-| 2 | Baseline de drift (sección 2 de este doc) | `seo-drift` | Baseline guardado para las 6 URLs de muestra | ⬜ Pendiente |
-| 3 | Confirmar causa raíz con datos reales de Google | `seo-google` (`gsc query`, `inspect`, `sitemaps`) | Requiere que el usuario traiga el desglose de Search Console, o las credenciales `GOOGLE_INDEXING_CLIENT_EMAIL`/`GOOGLE_INDEXING_PRIVATE_KEY` en el entorno local | ⬜ Bloqueado — depende del usuario |
-| 4 | Auditoría de contenido programático a escala | `seo-programmatic`, `seo-content` | Score de unicidad real sobre una muestra de páginas de vacante; decidir si la Fase 4 del plan viejo (descripciones reales por fuente) se vuelve necesaria | ⬜ Pendiente |
-| 5 | Auditoría técnica completa | `seo-technical`, `seo-sitemap` | 9 categorías revisadas contra el sitio real; confirmar que nada de lo nuevo (hreflang, `last_seen_at`) introdujo una regresión técnica | ⬜ Pendiente |
-| 6 | Schema.org — validación y oportunidades | `seo-schema` | JobPosting validado contra Rich Results; confirmar cero tipos deprecados | ⬜ Pendiente |
-| 7 | Core Web Vitals con datos de campo reales | `seo-google` (`pagespeed`, `crux`) | LCP/INP/CLS con CrUX real, no solo lab data | ⬜ Pendiente (necesita credenciales Google) |
-| 8 | GEO / AI Overviews — superficie sin tocar hoy | `seo-geo` | Reporte de citability score sobre una página de vacante y una de categoría | ⬜ Pendiente |
-| 9 | Investigación de keywords (solo si hay fuente de datos real) | `seo-google` (`keywords`, Tier 3) o extensión DataForSEO | **No arranca sin credenciales reales** — nunca un volumen inventado | ⬜ Bloqueado — depende de credenciales que el usuario decida conectar |
+| Fase | Qué hace                                                         | Skill/agente                                             | Exit criteria                                                                                                                                                     | Estado                                                                              |
+| ---- | ---------------------------------------------------------------- | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| 0    | Diagnóstico de causa raíz (bug de churn, thin content, hreflang) | (manual, pre-plugin)                                     | Confirmado con evidencia en vivo                                                                                                                                  | ✅ Hecho — `SEO-PLAN.md` §9                                                         |
+| 1    | Fixes de mayor apalancamiento ya identificados                   | (manual)                                                 | `test:seo` + `tsc` + `build` en verde                                                                                                                             | ✅ Hecho — `SEO-PLAN.md` §10                                                        |
+| 2    | Baseline de drift (sección 2 de este doc)                        | `seo-drift`                                              | Baseline guardado para las 6 URLs de muestra                                                                                                                      | ✅ Hecho — 2026-08-04, baseline IDs 1-6 en `~/.cache/claude-seo/drift/baselines.db` |
+| 3    | Confirmar causa raíz con datos reales de Google                  | `seo-google` (`gsc query`, `inspect`, `sitemaps`)        | Requiere que el usuario traiga el desglose de Search Console, o las credenciales `GOOGLE_INDEXING_CLIENT_EMAIL`/`GOOGLE_INDEXING_PRIVATE_KEY` en el entorno local | ⬜ Bloqueado — depende del usuario                                                  |
+| 4    | Auditoría de contenido programático a escala                     | `seo-programmatic`, `seo-content`                        | Score de unicidad real sobre una muestra de páginas de vacante; decidir si la Fase 4 del plan viejo (descripciones reales por fuente) se vuelve necesaria         | ⬜ Pendiente                                                                        |
+| 5    | Auditoría técnica completa                                       | `seo-technical`, `seo-sitemap`                           | 9 categorías revisadas contra el sitio real; confirmar que nada de lo nuevo (hreflang, `last_seen_at`) introdujo una regresión técnica                            | ⬜ Pendiente                                                                        |
+| 6    | Schema.org — validación y oportunidades                          | `seo-schema`                                             | JobPosting validado contra Rich Results; confirmar cero tipos deprecados                                                                                          | ⬜ Pendiente                                                                        |
+| 7    | Core Web Vitals con datos de campo reales                        | `seo-google` (`pagespeed`, `crux`)                       | LCP/INP/CLS con CrUX real, no solo lab data                                                                                                                       | ⬜ Pendiente (necesita credenciales Google)                                         |
+| 8    | GEO / AI Overviews — superficie sin tocar hoy                    | `seo-geo`                                                | Reporte de citability score sobre una página de vacante y una de categoría                                                                                        | ⬜ Pendiente                                                                        |
+| 9    | Investigación de keywords (solo si hay fuente de datos real)     | `seo-google` (`keywords`, Tier 3) o extensión DataForSEO | **No arranca sin credenciales reales** — nunca un volumen inventado                                                                                               | ⬜ Bloqueado — depende de credenciales que el usuario decida conectar               |
 
 No hay una fase "10" ya definida — cualquier trabajo más allá de esto
 (backlinks, contenido adicional, un tercer país) es exploratorio y

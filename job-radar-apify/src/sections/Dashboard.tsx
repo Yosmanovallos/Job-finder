@@ -153,18 +153,26 @@ export default function Dashboard() {
     // first. Deleted immediately after one use so neither a later filter
     // change nor that same auth-resolution re-run can reuse stale data.
     // window.__SSR_JOBS__ only ever comes from server.ts's exact-match
-    // "/dashboard" route (Colombia-only, see its comment) — there's no SSR
-    // branch for "/ve/dashboard" at all. A visitor whose stored country
-    // preference is Venezuela can still land here via a full navigation to
-    // bare "/dashboard" (App.tsx's redirect gate then bounces them to
-    // "/ve/dashboard" client-side, without a second HTTP round trip) — this
-    // component's very first mount is already at country="VE" in that case,
-    // so `country === "CO"` below is what stops the leftover Colombia
-    // payload from being trusted as if it were Venezuela's. Delete it
-    // either way so it can never be picked up by a later mount either.
+    // "/dashboard" or "/ve/dashboard" route (2026-08-04: extended to cover
+    // both, see that route's comment), stamped with the real country it was
+    // filtered by. Checked against this mount's own `country` — NOT just
+    // "is either CO or VE" — because the HTTP response that embedded this
+    // script tag isn't guaranteed to match the pathname Dashboard actually
+    // mounts at: a visitor whose stored country preference is VE can land
+    // on this component via a full navigation to bare "/dashboard" (App.tsx's
+    // redirect gate then bounces them to "/ve/dashboard" client-side,
+    // without a second HTTP round trip), so a payload tagged country="CO"
+    // must never be trusted for a country==="VE" mount, or vice versa.
+    // Delete it either way so it can never be picked up by a later mount
+    // (e.g. a filter change re-running this effect).
     const ssrJobs = (window as any).__SSR_JOBS__;
     delete (window as any).__SSR_JOBS__;
-    if (ssrJobs && country === "CO" && !accessToken && filterKey === JSON.stringify(EMPTY_FILTERS)) {
+    if (
+      ssrJobs &&
+      ssrJobs.country === country &&
+      !accessToken &&
+      filterKey === JSON.stringify(EMPTY_FILTERS)
+    ) {
       setJobs(Array.isArray(ssrJobs.jobs) ? ssrJobs.jobs : []);
       setTotal(ssrJobs.total || 0);
       setHasMore(!!ssrJobs.hasMore);
@@ -405,6 +413,12 @@ export default function Dashboard() {
   return (
     <section className="relative w-full min-h-screen" style={{ backgroundColor: "#fafafa" }}>
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-20">
+        {/* Visually hidden — the visible page identity is the filter bar +
+            hero copy above, but the DOM needs exactly one real <h1>. Text
+            mirrors server.ts's /dashboard SSR snippet verbatim (see its
+            2026-08-04 fix comment) so raw HTML and post-hydration DOM never
+            disagree. */}
+        <h1 className="sr-only">Vacantes de Empleo en {countryConfig.name}</h1>
         {checkoutBanner && (
           <div
             className={`mb-4 p-3 rounded-xl text-xs font-mono flex items-center gap-2 ${

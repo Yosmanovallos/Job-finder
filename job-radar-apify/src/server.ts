@@ -32,12 +32,14 @@ import {
   isPubliclyDescribable,
   buildJobMeta,
   buildJobPosting,
+  buildJobDescription,
   buildJobPath,
   buildJobsSitemapXml,
   buildSitemapIndexXml,
   isUuid,
   resolveCategorySlug,
   buildCategoryMeta,
+  buildCategoryPath,
   buildCategoriesSitemapXml,
   resolveCompanyNameFromJobs,
   SITE_URL
@@ -902,7 +904,31 @@ const server = http.createServer(async (req, res) => {
         .replace(
           /<link[^>]*rel=["']canonical["'][^>]*>/,
           `<link rel="canonical" href="${escapeHtml(meta.canonicalUrl)}" />`
-        )
+        );
+
+      // Hreflang: role pages only ("rol"), never city pages. A role label
+      // genuinely has two URLs — /empleos/<rol> (CO) and /ve/empleos/<rol>
+      // (VE), see ResolvedCategory's comment — so they're real regional
+      // alternates of each other, same situation as "/"/"/ve" (§5.7 riesgo
+      // 1) and the /dashboard pair fixed above. A city page has no sibling
+      // at all (buildCategoryPath's comment: "/empleos/caracas" is the only
+      // URL for Caracas) — emitting a self-only hreflang set there would be
+      // exactly what seo-hreflang flags as Critical (missing reciprocal),
+      // so this must stay gated on kind === "rol".
+      if (category.kind === "rol") {
+        const coRoleUrl = `${SITE_URL}${buildCategoryPath({ ...category, country: "CO" })}`;
+        const veRoleUrl = `${SITE_URL}${buildCategoryPath({ ...category, country: "VE" })}`;
+        const roleHreflangTags =
+          `    <link rel="alternate" hreflang="es-CO" href="${coRoleUrl}" />\n` +
+          `    <link rel="alternate" hreflang="es-VE" href="${veRoleUrl}" />\n` +
+          `    <link rel="alternate" hreflang="x-default" href="${coRoleUrl}" />`;
+        indexHtml = indexHtml.replace(
+          /<link[^>]*rel=["']canonical["'][^>]*>/,
+          (canonicalTag) => `${canonicalTag}\n${roleHreflangTags}`
+        );
+      }
+
+      indexHtml = indexHtml
         .replace(
           /<meta[^>]*property=["']og:title["'][^>]*>/,
           `<meta property="og:title" content="${escapeHtml(meta.title)}" />`
@@ -1000,6 +1026,19 @@ const server = http.createServer(async (req, res) => {
     const meta = buildJobMeta(visible);
     const jobPosting = buildJobPosting(visible, { companyActiveCount });
 
+    // SEO fix (2026-08-04): this branch only ever rewrote <head> tags —
+    // <div id="app"> stayed empty until React hydrated, so a crawler that
+    // reads raw HTML (Googlebot's first, non-JS pass) saw a titled page with
+    // zero body content and no <h1> at all, on the single highest-volume
+    // page pattern in the site (~22k job pages). Mirrors the same "real
+    // facts already computed above, embedded as plain HTML" pattern the
+    // category branch (7b-cat) and /dashboard (7c) already use — same
+    // buildJobDescription() call already used for the JobPosting JSON-LD
+    // above, so this can never say something different from the structured
+    // data next to it.
+    const jobDetailSnippet = `<h1>${escapeHtml(visible.title)}</h1>\n<p>${escapeHtml(buildJobDescription(visible, { companyActiveCount }))}</p>`;
+    indexHtml = indexHtml.replace('<div id="app"></div>', `<div id="app">${jobDetailSnippet}</div>`);
+
     indexHtml = indexHtml
       .replace(/<title>[\s\S]*?<\/title>/, `<title>${escapeHtml(meta.title)}</title>`)
       .replace(
@@ -1036,18 +1075,35 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // 7c. GET /dashboard — same SSR principle as /empleos/:id/:slug above,
-  // applied to the dashboard itself. Confirmed via Search Console (2026-07)
-  // that Google's own rendered snapshot of this page showed "0 de 0
-  // vacantes": the real listings only ever existed behind the browser's
-  // fetch() to /api/jobs, and whatever rendering budget Googlebot allotted
-  // ran out before that fetch resolved. This injects the same first page
-  // /api/jobs would return directly into the HTML, so a crawler sees real
-  // vacancies immediately regardless of JS/API timing. React still owns the
-  // interactive experience — createRoot().render() (not hydrateRoot)
-  // replaces this markup the instant the bundle executes, so a real visitor
-  // sees at most a brief flash of it, never a mismatch warning.
-  if (pathname === "/dashboard" && method === "GET") {
+  // 7c. GET /dashboard and /ve/dashboard — same SSR principle as
+  // /empleos/:id/:slug above, applied to the dashboard itself. Confirmed via
+  // Search Console (2026-07) that Google's own rendered snapshot of this
+  // page showed "0 de 0 vacantes": the real listings only ever existed
+  // behind the browser's fetch() to /api/jobs, and whatever rendering
+  // budget Googlebot allotted ran out before that fetch resolved. This
+  // injects the same first page /api/jobs would return directly into the
+  // HTML, so a crawler sees real vacancies immediately regardless of
+  // JS/API timing. React still owns the interactive experience —
+  // createRoot().render() (not hydrateRoot) replaces this markup the
+  // instant the bundle executes, so a real visitor sees at most a brief
+  // flash of it, never a mismatch warning.
+  const isVeDashboard = pathname === "/ve/dashboard";
+  if ((pathname === "/dashboard" || isVeDashboard) && method === "GET") {
+    // SEO fix (2026-08-04): this branch used to only ever handle the
+    // unprefixed "/dashboard" (Colombia) — "/ve/dashboard" fell through to
+    // the generic SPA static-file fallback further down, which serves
+    // index.html completely unmodified. That meant Googlebot's first,
+    // non-JS pass on /ve/dashboard saw Colombia's <title> and a
+    // canonical of "https://buscotrabajo.co/" — telling Google to treat
+    // Venezuela's own dashboard as a duplicate of the homepage instead of
+    // indexing it, until Dashboard.tsx's usePageMeta() effect corrected it
+    // client-side. Extending this branch (same head-tag-rewrite pattern
+    // job/category pages already use, filtered by the real country) closes
+    // that gap the same way it was already closed for /dashboard's job
+    // list content in the original session.
+    const country = isVeDashboard ? "VE" : "CO";
+    const countryConfig = getCountryConfig(country);
+
     // Note on tier: verifySession() reads the Authorization header, which a
     // plain page navigation never carries (only the client's own later
     // fetch() calls attach it) — so `tier` here is always "free" regardless
@@ -1062,15 +1118,12 @@ const server = http.createServer(async (req, res) => {
     const tier = session?.tier || "free";
     const jobs = await getJobsCached(50000);
     const visibleJobs = maskLockedFields(jobs, tier);
-    // This exact-match branch only ever serves the unprefixed "/dashboard"
-    // URL — Colombia by every other country-detection convention in this
-    // app (see country-context.ts) — never "/ve/dashboard" (no SSR branch
-    // exists for that path, see the comment above this route). Without this
-    // filter the embedded window.__SSR_JOBS__ payload mixed both countries,
-    // which Dashboard.tsx's SSR shortcut would then trust verbatim on first
-    // paint — exactly the CO/VE mixing this app's country separation exists
-    // to prevent.
-    const allFiltered = applyJobFilters(visibleJobs, { country: "CO" });
+    // Filtered by the real requested country — without this the embedded
+    // window.__SSR_JOBS__ payload would mix both countries, which
+    // Dashboard.tsx's SSR shortcut would then trust verbatim on first
+    // paint — exactly the CO/VE mixing this app's country separation
+    // exists to prevent.
+    const allFiltered = applyJobFilters(visibleJobs, { country });
     // Reputation attached here too (not just /api/jobs) so the very first
     // anonymous paint — which reads window.__SSR_JOBS__ below instead of
     // re-fetching /api/jobs, see Dashboard.tsx — can show it immediately
@@ -1100,21 +1153,92 @@ const server = http.createServer(async (req, res) => {
         const href = buildJobPath(job);
         const title = escapeHtml(job.title);
         const company = escapeHtml(job.company || "Confidencial");
-        const location = escapeHtml(job.location || "Colombia");
+        const location = escapeHtml(job.location || countryConfig.name);
         const source = escapeHtml(job.source || "");
         return `<li><a href="${href}">${title}</a> — ${company} · ${location} · ${source}</li>`;
       })
       .join("\n");
 
-    const ssrSnippet = `<nav aria-label="Vacantes recientes"><ul>\n${items}\n</ul></nav>`;
+    // <h1> added alongside the existing nav (2026-08-04 fix, see comment
+    // above) — the baseline drift capture (Fase 2) showed this page's raw
+    // HTML had zero heading elements. Real per-country text, mirrored
+    // verbatim by Dashboard.tsx's own sr-only <h1> so the DOM never
+    // disagrees with itself once React replaces this markup.
+    const dashboardHeading = `Vacantes de Empleo en ${countryConfig.name}`;
+    const ssrSnippet = `<h1>${escapeHtml(dashboardHeading)}</h1>\n<nav aria-label="Vacantes recientes"><ul>\n${items}\n</ul></nav>`;
     indexHtml = indexHtml.replace('<div id="app"></div>', `<div id="app">${ssrSnippet}</div>`);
+
+    // Head tags: same real facts Dashboard.tsx's usePageMeta() already
+    // computes and applies client-side post-hydration (src/lib/use-page-
+    // meta.ts) — this just makes them true in the raw HTML too, instead of
+    // only after JS runs.
+    const dashboardTitle = `Vacantes de Empleo en ${countryConfig.name} | BuscoTrabajo`;
+    const dashboardDescription = `Explora vacantes actualizadas de LinkedIn, Computrabajo${country === "CO" ? ", Elempleo" : ""} y más en ${countryConfig.name}, filtradas y sin duplicados. Gratis para vacantes con más de 48h publicadas.`;
+    const dashboardCanonical = `${SITE_URL}${pathname}`;
+    indexHtml = indexHtml
+      .replace(/<title>[\s\S]*?<\/title>/, `<title>${escapeHtml(dashboardTitle)}</title>`)
+      .replace(
+        /<meta[^>]*name=["']description["'][^>]*>/,
+        `<meta name="description" content="${escapeHtml(dashboardDescription)}" />`
+      )
+      .replace(
+        /<link[^>]*rel=["']canonical["'][^>]*>/,
+        `<link rel="canonical" href="${escapeHtml(dashboardCanonical)}" />`
+      );
+
+    // Self + reciprocal + x-default hreflang — same trio "/" and "/ve"
+    // already carry (§5.7 riesgo 1). Needed here specifically because this
+    // change just gave "/ve/dashboard" its own self-canonical for the first
+    // time (it used to canonicalize to "/", so it never competed with
+    // "/dashboard" for ranking); without this pair Google would see two
+    // near-duplicate, both-self-canonical pages with nothing declaring them
+    // as regional alternates of each other — trading the old duplicate-
+    // content problem for a new one instead of fixing it.
+    const dashboardHreflangTags =
+      `    <link rel="alternate" hreflang="es-CO" href="${SITE_URL}/dashboard" />\n` +
+      `    <link rel="alternate" hreflang="es-VE" href="${SITE_URL}/ve/dashboard" />\n` +
+      `    <link rel="alternate" hreflang="x-default" href="${SITE_URL}/dashboard" />`;
+    indexHtml = indexHtml.replace(
+      /<link[^>]*rel=["']canonical["'][^>]*>/,
+      (canonicalTag) => `${canonicalTag}\n${dashboardHreflangTags}`
+    );
+
+    indexHtml = indexHtml
+      .replace(
+        /<meta property="og:locale" content="[^"]*" \/>/,
+        `<meta property="og:locale" content="${country === "VE" ? "es_VE" : "es_CO"}" />`
+      )
+      .replace(
+        /<meta[^>]*property=["']og:title["'][^>]*>/,
+        `<meta property="og:title" content="${escapeHtml(dashboardTitle)}" />`
+      )
+      .replace(
+        /<meta[^>]*property=["']og:description["'][^>]*>/,
+        `<meta property="og:description" content="${escapeHtml(dashboardDescription)}" />`
+      )
+      .replace(
+        /<meta[^>]*name=["']twitter:title["'][^>]*>/,
+        `<meta name="twitter:title" content="${escapeHtml(dashboardTitle)}" />`
+      )
+      .replace(
+        /<meta[^>]*name=["']twitter:description["'][^>]*>/,
+        `<meta name="twitter:description" content="${escapeHtml(dashboardDescription)}" />`
+      );
 
     // Lets the client skip its own redundant first fetch to /api/jobs when
     // nothing (auth, filters) has changed what it would ask for — see the
     // safety notes above and in Dashboard.tsx. escapeJsonForScriptTag (not
     // plain JSON.stringify) matters here for the same reason it does on
     // the /empleos/ route: job titles are scraped, untrusted text.
-    const ssrJobsPayload = escapeJsonForScriptTag({ jobs: firstPage, total, hasMore });
+    // `country` stamped alongside the jobs so the client's gate
+    // (Dashboard.tsx) can check "is this payload for the country I'm
+    // actually mounted at" directly, instead of inferring it from which
+    // exact-match route served the response — a visitor whose stored
+    // country preference differs from the URL they first hit can still
+    // land on this component with a different `country` than the request
+    // that embedded this script tag (see Dashboard.tsx's comment), so the
+    // payload has to describe itself rather than be trusted by pathname.
+    const ssrJobsPayload = escapeJsonForScriptTag({ jobs: firstPage, total, hasMore, country });
     indexHtml = indexHtml.replace(
       "</head>",
       `  <script>window.__SSR_JOBS__=${ssrJobsPayload};</script>\n</head>`
@@ -1201,6 +1325,18 @@ const server = http.createServer(async (req, res) => {
       res.end("Server Error: build not found");
       return;
     }
+
+    // SEO fix (2026-08-04): this route only ever rewrote <head> tags (the
+    // §5.7 "no SSR for the landing" risk docs/SEO-PLAN.md already flags as
+    // known/deferred) — <div id="app"> stayed completely empty until
+    // HeroDemo.tsx mounted, so the baseline drift capture (Fase 2) showed
+    // zero heading elements on both "/" and "/ve". This does not attempt
+    // the full landing SSR that risk defers — only the same real <h1> text
+    // HeroDemo.tsx already renders client-side, verbatim, so raw HTML and
+    // post-hydration DOM never disagree.
+    const heroCountryConfig = getCountryConfig(isVe ? "VE" : "CO");
+    const heroHeading = `Encuentra todas las vacantes de ${heroCountryConfig.name} en un solo lugar`;
+    indexHtml = indexHtml.replace('<div id="app"></div>', `<div id="app"><h1>${escapeHtml(heroHeading)}</h1></div>`);
 
     const selfUrl = isVe ? `${SITE_URL}/ve` : `${SITE_URL}/`;
     indexHtml = indexHtml.replace(

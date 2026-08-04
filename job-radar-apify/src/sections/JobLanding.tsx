@@ -99,6 +99,7 @@ export default function JobLanding() {
               onSaveToggle={() => setIsSaved((v) => !v)}
               onAppliedToggle={() => setIsApplied((v) => !v)}
               onApplyClick={setApplyGateJob}
+              headingLevel="h1"
             />
           ))}
       </div>

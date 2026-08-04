@@ -189,6 +189,31 @@ function runPureFunctionTests() {
     "buildJobPosting() generó un JobPosting para una vacante bloqueada."
   );
 
+  // SEO fix (2026-08-04, seo-schema audit): a bare "Remoto"/"Remote"
+  // location has no real city for addressLocality — must use
+  // jobLocationType: "TELECOMMUTE" instead, never jobLocation with an
+  // invalid place name. "Remoto - Bogotá"-style locations (a real city
+  // still present) must keep the normal jobLocation branch unchanged.
+  const bareRemoteJob: SeoJob = { ...openJob, location: "Remoto", country: "VE" };
+  const bareRemotePosting = buildJobPosting(bareRemoteJob) as any;
+  check(
+    bareRemotePosting.jobLocationType === "TELECOMMUTE" &&
+      bareRemotePosting.applicantLocationRequirements?.["@type"] === "Country" &&
+      bareRemotePosting.applicantLocationRequirements?.name === "Venezuela" &&
+      !("jobLocation" in bareRemotePosting),
+    "Una vacante 100% remota (location='Remoto', sin ciudad) emite jobLocationType TELECOMMUTE + applicantLocationRequirements, no un jobLocation inválido.",
+    `JobPosting de una vacante bare-remote no tiene la forma esperada: ${JSON.stringify(bareRemotePosting)}`
+  );
+
+  const remoteWithCityJob: SeoJob = { ...openJob, location: "Remoto - Bogotá" };
+  const remoteWithCityPosting = buildJobPosting(remoteWithCityJob) as any;
+  check(
+    remoteWithCityPosting.jobLocation?.address?.addressLocality === "Remoto - Bogotá" &&
+      !("jobLocationType" in remoteWithCityPosting),
+    "Una vacante 'Remoto - Bogotá' (ciudad real presente) mantiene el jobLocation normal, no se trata como TELECOMMUTE.",
+    `JobPosting de una vacante remoto-con-ciudad no tiene la forma esperada: ${JSON.stringify(remoteWithCityPosting)}`
+  );
+
   const adversarialJob: SeoJob = { ...openJob, title: `</script><script>alert(1)</script>` };
   const adversarialPosting = buildJobPosting(adversarialJob);
   const serialized = escapeJsonForScriptTag(adversarialPosting);
@@ -501,6 +526,66 @@ async function runHttpTests() {
       } catch {
         check(false, "", "window.__SSR_JOBS__ no es JSON válido.");
       }
+    }
+
+    // /ve/dashboard (2026-08-04 fix): previously had NO SSR branch at all —
+    // fell through to the static index.html fallback, so its raw HTML
+    // carried Colombia's <title> and a canonical of SITE_URL (telling
+    // Google to treat it as a duplicate of the homepage). Mirrors every
+    // check /dashboard already has above, plus the country-specific ones
+    // (own canonical/title/hreflang/og:locale, and — the actual regression
+    // risk this fix could have introduced — the embedded payload really is
+    // Venezuela data, not a leftover Colombia one silently reused).
+    const veDashboardRes = await fetch(`${BASE_URL}/ve/dashboard`);
+    const veDashboardHtml = await veDashboardRes.text();
+    check(
+      veDashboardRes.status === 200,
+      "/ve/dashboard responde 200.",
+      `/ve/dashboard respondió ${veDashboardRes.status}.`
+    );
+    const veDashboardJobLinks = (veDashboardHtml.match(/href="\/empleos\//g) || []).length;
+    check(
+      veDashboardJobLinks > 0,
+      `/ve/dashboard incluye ${veDashboardJobLinks} links reales a /empleos/ en el HTML crudo.`,
+      "/ve/dashboard no tiene ningún link a /empleos/ en el HTML crudo."
+    );
+    check(
+      veDashboardHtml.includes(`<link rel="canonical" href="${SITE_URL}/ve/dashboard" />`),
+      "/ve/dashboard canonical se auto-referencia a /ve/dashboard (no a la home ni a /dashboard).",
+      "/ve/dashboard no tiene su propio canonical self-referencing."
+    );
+    check(
+      veDashboardHtml.includes("Vacantes de Empleo en Venezuela") &&
+        !veDashboardHtml.includes("<title>BuscoTrabajo — Vacantes de Empleo en Colombia"),
+      "/ve/dashboard tiene su propio <title> (Venezuela), no el de Colombia sin JS.",
+      "/ve/dashboard todavía sirve el <title>/canonical de Colombia en el HTML crudo."
+    );
+    check(
+      veDashboardHtml.includes(`hreflang="es-CO" href="${SITE_URL}/dashboard"`) &&
+        veDashboardHtml.includes(`hreflang="es-VE" href="${SITE_URL}/ve/dashboard"`) &&
+        veDashboardHtml.includes(`hreflang="x-default" href="${SITE_URL}/dashboard"`),
+      "/ve/dashboard lleva el par hreflang recíproco con /dashboard (es-CO, es-VE, x-default).",
+      "/ve/dashboard no tiene el hreflang recíproco esperado con /dashboard."
+    );
+    check(
+      veDashboardHtml.includes('<meta property="og:locale" content="es_VE" />'),
+      "/ve/dashboard tiene og:locale es_VE, no el es_CO heredado del shell estático.",
+      "/ve/dashboard todavía tiene og:locale es_CO en el HTML crudo."
+    );
+    const veSsrJobsMatch = veDashboardHtml.match(/window\.__SSR_JOBS__=(.*?);<\/script>/);
+    if (veSsrJobsMatch) {
+      try {
+        const veParsed = JSON.parse(veSsrJobsMatch[1]);
+        check(
+          veParsed.country === "VE" && Array.isArray(veParsed.jobs) && veParsed.jobs.length > 0,
+          `window.__SSR_JOBS__ en /ve/dashboard trae country="VE" y ${veParsed.jobs.length} vacantes reales — nunca el payload de Colombia.`,
+          `window.__SSR_JOBS__ en /ve/dashboard tiene country="${veParsed.country}" — el payload de Colombia se estaría sirviendo en la ruta de Venezuela.`
+        );
+      } catch {
+        check(false, "", "window.__SSR_JOBS__ en /ve/dashboard no es JSON válido.");
+      }
+    } else {
+      check(false, "", "/ve/dashboard no tiene el script de window.__SSR_JOBS__.");
     }
 
     // The real job page: exactly one of each head tag, valid JobPosting JSON-LD.
