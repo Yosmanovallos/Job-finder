@@ -202,6 +202,95 @@ confundirlos con una regresión real):
   — considerar agregarlos en una futura sesión de baseline si se quiere
   drift-tracking sobre ellos también.
 
+### 1.4 Deploy confirmado + drift compare post-deploy (2026-08-04)
+
+Commit `e487090` desplegado a Render (push a `main`), confirmado vivo con
+`curl` contra producción (`/dashboard` y `/ve/dashboard` sirven su propio
+title/canonical/h1). `/seo drift compare` corrido contra las 6 URLs de
+baseline de la Fase 2: **cero hallazgos CRITICAL sin explicar** — el único
+CRITICAL (`canonical_changed` en `/dashboard`) es exactamente el cambio
+intencional documentado en §1.1. Los demás triggered findings son o bien
+los cambios esperados (`content_hash_changed` INFO en las 4 páginas con H1
+nuevo, `title_changed`/`meta_description_changed` WARNING en `/dashboard`)
+o cambios reales de datos ajenos a esta sesión (`/ve/empleos/project-manager`
+pasó de 189 a 190 vacantes — el corpus se sigue actualizando en vivo).
+
+### 1.5 Investigación: "llevo 2 semanas sin indexar, favicon no aparece"
+
+El usuario reportó (2026-08-04) que Search Console → Indexación → Páginas
+lleva ~2 semanas atascado en "procesando datos" y que el favicon nunca
+apareció en resultados de Google. Investigación de solo lectura, sin tocar
+código:
+
+**Hipótesis inicial descartada con evidencia real:** el bug de churn de
+URL (§9.2 de `SEO-PLAN.md`, arreglado hoy en `7139378`) parecía el
+candidato obvio, pero una consulta directa a la tabla `jobs` en producción
+lo descarta como causa del síntoma actual: `created_at` más antiguo en la
+base es `2026-07-25`, ningún job supera los 30 días, y la consulta
+`created_at < 30 días AND last_seen_at >= 30 días` (los jobs que el bug
+viejo habría borrado-y-recreado hoy) devuelve **0 filas**. El primer commit
+de `server.ts` es del `2026-07-20`. El bug era real y el fix era necesario
+— la primera purga bajo el ciclo de 30 días cae ~2026-08-24 — pero no
+explica nada de lo que ya pasó, porque nunca llegó a dispararse.
+
+**Lo que sí confirma el patrón real:**
+- El sitio tiene entre 10 y 15 días de vida en producción real (no
+  semanas/meses) — coincide casi exactamente con "llevo 2 semanas" del
+  usuario: esas 2 semanas SON la vida entera del sitio, no un periodo de
+  sitio roto.
+- Search Console → Rendimiento (captura del usuario, últimos 3 meses):
+  solo 4 páginas generaron alguna impresión — `/`, `/dashboard`,
+  `/legal/cookies`, `/preguntas` — las 4 son páginas estáticas de
+  `sitemap-pages.xml` (12 URLs). **Cero impresiones de las 21,969 URLs de
+  vacantes/categorías** de `sitemap-jobs.xml`/`sitemap-categories.xml`.
+- `site:buscotrabajo.co` (vía WebSearch) no devuelve ni una sola URL real
+  del dominio — ni siquiera la home — consistente con indexación
+  prácticamente nula todavía, no con un bug puntual.
+- El favicon es técnicamente correcto: `/favicon.png` 64×64 PNG RGBA
+  válido, declarado con `<link rel="icon">`, no bloqueado por
+  `robots.txt`. `/favicon.ico` da 404, pero eso no es la causa — Google
+  usa el `<link>` declarado cuando existe. No se tocó nada aquí porque no
+  hay nada roto que arreglar: Google solo empieza a mostrar favicon
+  personalizado cuando ya estableció indexación estable de un dominio, y
+  eso todavía no pasó.
+- El estado "procesando datos" del reporte de Páginas es consistente con
+  una propiedad de ~10 días con ~8 días de datos reales (el gráfico de
+  Rendimiento del usuario arranca el 26/7) — no hay suficiente volumen
+  todavía para que el pipeline de clasificación de Google cierre el
+  reporte, es el comportamiento esperado a esta antigüedad, no una señal
+  de que algo esté roto.
+
+**Confirmado con 3 capturas adicionales del usuario (mismo día):**
+- **Acciones manuales: "No se ha detectado ningún problema"** — descarta
+  la única alternativa que habría invalidado todo el diagnóstico de abajo.
+- **Enlaces externos: Total 0** — cero backlinks reales todavía, confirma
+  independientemente la parte de "dominio sin autoridad" de la teoría.
+- **Ajustes → Acerca de: propiedad verificada el 27 de julio de 2026** —
+  confirma, desde el propio registro de Search Console (no solo inferido
+  de `created_at`/git), que el sitio tiene ~9 días en Search Console.
+- **Estadísticas de rastreo: 5.77 mil solicitudes en 90 días** (en la
+  práctica, en ~9 días reales — la propiedad no tiene más historia) — Google
+  SÍ está rastreando activamente y fuerte (~640 rastreos/día), lo cual
+  matiza la teoría: no es que Google esté ignorando el sitio por falta de
+  presupuesto de rastreo, sino que rastrea mucho y aun así decide no
+  indexar casi nada todavía — más consistente con cautela de dominio nuevo
+  sin autoridad + el riesgo de contenido casi-duplicado a escala (§9.3) que
+  con un problema de descubrimiento.
+
+**Conclusión (con la máxima certeza posible sin el desglose exacto de
+Indexación → Páginas, que sigue bloqueado por §9.4):** el patrón completo
+es el de una ronda de indexación normal para un dominio nuevo con ~22k
+páginas y cero backlinks — el peor caso posible de velocidad de indexación,
+pero no un caso de "algo está roto", y ya se descartó explícitamente que
+sea una penalización. Google rastrea activamente pero posterga la decisión
+de indexar el set caro (22k páginas programáticas) hasta ganar más
+confianza en el dominio; eso toma semanas a meses documentado por Google,
+no días. No se implementó ningún fix en respuesta a esto — no hay nada
+identificado que arreglar en código; lo que ayuda de verdad (backlinks
+reales, tiempo, o menos páginas más diferenciadas si se confirma que el
+contenido casi-duplicado es un factor) es una decisión de estrategia del
+usuario, no una tarea de código para esta sesión.
+
 ## 2. Primer paso al reiniciar sesión: baseline de `seo-drift`
 
 Antes de cualquier fase nueva de la tabla de abajo, capturar un baseline
@@ -230,7 +319,7 @@ cambio por terminado.**
 | ---- | ---------------------------------------------------------------- | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
 | 0    | Diagnóstico de causa raíz (bug de churn, thin content, hreflang) | (manual, pre-plugin)                                     | Confirmado con evidencia en vivo                                                                                                                                  | ✅ Hecho — `SEO-PLAN.md` §9                                                         |
 | 1    | Fixes de mayor apalancamiento ya identificados                   | (manual)                                                 | `test:seo` + `tsc` + `build` en verde                                                                                                                             | ✅ Hecho — `SEO-PLAN.md` §10                                                        |
-| 2    | Baseline de drift (sección 2 de este doc)                        | `seo-drift`                                              | Baseline guardado para las 6 URLs de muestra                                                                                                                      | ✅ Hecho — 2026-08-04, baseline IDs 1-6 en `~/.cache/claude-seo/drift/baselines.db` |
+| 2    | Baseline de drift (sección 2 de este doc)                        | `seo-drift`                                              | Baseline guardado para las 6 URLs de muestra                                                                                                                      | ✅ Hecho — 2026-08-04, baseline IDs 1-6. `/seo drift compare` corrido post-deploy de 1.1-1.3 contra las 6: único CRITICAL es `canonical_changed` en `/dashboard` (esperado, ver §1.1); todo lo demás coincide con los diffs pre-etiquetados o es cambio real de datos (conteo de vacantes) |
 | 3    | Confirmar causa raíz con datos reales de Google                  | `seo-google` (`gsc query`, `inspect`, `sitemaps`)        | Requiere que el usuario traiga el desglose de Search Console, o las credenciales `GOOGLE_INDEXING_CLIENT_EMAIL`/`GOOGLE_INDEXING_PRIVATE_KEY` en el entorno local | ⬜ Bloqueado — depende del usuario                                                  |
 | 4    | Auditoría de contenido programático a escala                     | `seo-programmatic`, `seo-content`                        | Score de unicidad real sobre una muestra de páginas de vacante; decidir si la Fase 4 del plan viejo (descripciones reales por fuente) se vuelve necesaria         | ⬜ Pendiente                                                                        |
 | 5    | Auditoría técnica completa                                       | `seo-technical`, `seo-sitemap`                           | 9 categorías revisadas contra el sitio real; confirmar que nada de lo nuevo (hreflang, `last_seen_at`) introdujo una regresión técnica                            | ⬜ Pendiente                                                                        |
