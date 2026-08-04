@@ -291,6 +291,47 @@ reales, tiempo, o menos páginas más diferenciadas si se confirma que el
 contenido casi-duplicado es un factor) es una decisión de estrategia del
 usuario, no una tarea de código para esta sesión.
 
+### 1.6 Fase 4 — Auditoría de contenido programático a escala (2026-08-04)
+
+Muestra real de 15 páginas de vacante (URLs aleatorias del sitemap en
+producción, post-deploy de 1.1-1.3). Dos mediciones independientes:
+
+**Unicidad por palabra** (definición de `seo-programmatic`: palabras no
+compartidas con el "vocabulario boilerplate" — las palabras presentes en
+las 15 descripciones a la vez): **61.3% promedio** (rango 52.0%-66.7%).
+Pasa cómodo el umbral WARNING (<40%) y el HARD STOP (<30%) que el skill
+define para riesgo de "scaled content abuse". El vocabulario boilerplate
+real detectado: `Aplica`, `Modalidad:`, `Vacante`, `agregada`, `de`,
+`directamente`, `en`, `la`, `página` — 9 palabras fijas de ~30-37 por
+página.
+
+**`content_quality.py` (QRG-aligned) sobre las mismas 15 páginas: 82/100
+promedio** (rango 74-90), cero `filler_score`/`ai_pattern_score` en todas.
+Consistente con — y mejor que — el 69→83 medido en una sola página tras el
+enriquecimiento de Fase 9 de `SEO-PLAN.md` (esa muestra ahora también se
+beneficia del `<h1>`+`<p>` agregado hoy en 1.1, que antes no existía en el
+HTML crudo que este script lee).
+
+**El hallazgo real no es unicidad, es longitud absoluta:** el contenido
+visible total en `<div id="app">` (HTML crudo, antes de hidratar) es de
+**37 palabras en promedio** (rango 29-45) — muy por debajo del umbral de
+aviso del skill (`<300 palabras → flag for review`). No es un bug: es un
+límite de datos real y ya documentado — `JobDetailPanel.tsx` deja explícito
+que esta app nunca scrapea la descripción completa de la vacante (solo
+título/empresa/ubicación/fuente/conteo), porque inventar una violaría la
+regla #5 de AGENTS.md. No hay más texto real que agregar sin scrapear más
+de cada fuente.
+
+**Esto es exactamente la decisión que la Fase 4 del plan viejo (`SEO-PLAN.md`
+§9.6) dejó pendiente, ahora con números reales para decidirla:** conseguir
+descripciones completas reales requeriría trabajo de scraping nuevo por
+fuente (Elempleo, LinkedIn, Computrabajo, etc. — cada uno con su propio
+ToS/estructura, un proyecto de adaptador nuevo, no un fix de esta sesión) o
+aceptar el modelo actual de agregador (título + hechos reales + JSON-LD,
+sin prosa larga) como lo que es — un compromiso deliberado, no un defecto
+accidental. No se implementó nada en código en respuesta a esto: es una
+decisión de producto/roadmap del usuario, no una corrección técnica.
+
 ## 2. Primer paso al reiniciar sesión: baseline de `seo-drift`
 
 Antes de cualquier fase nueva de la tabla de abajo, capturar un baseline
@@ -321,7 +362,7 @@ cambio por terminado.**
 | 1    | Fixes de mayor apalancamiento ya identificados                   | (manual)                                                 | `test:seo` + `tsc` + `build` en verde                                                                                                                             | ✅ Hecho — `SEO-PLAN.md` §10                                                        |
 | 2    | Baseline de drift (sección 2 de este doc)                        | `seo-drift`                                              | Baseline guardado para las 6 URLs de muestra                                                                                                                      | ✅ Hecho — 2026-08-04, baseline IDs 1-6. `/seo drift compare` corrido post-deploy de 1.1-1.3 contra las 6: único CRITICAL es `canonical_changed` en `/dashboard` (esperado, ver §1.1); todo lo demás coincide con los diffs pre-etiquetados o es cambio real de datos (conteo de vacantes) |
 | 3    | Confirmar causa raíz con datos reales de Google                  | `seo-google` (`gsc query`, `inspect`, `sitemaps`)        | Requiere que el usuario traiga el desglose de Search Console, o las credenciales `GOOGLE_INDEXING_CLIENT_EMAIL`/`GOOGLE_INDEXING_PRIVATE_KEY` en el entorno local | ⬜ Bloqueado — depende del usuario                                                  |
-| 4    | Auditoría de contenido programático a escala                     | `seo-programmatic`, `seo-content`                        | Score de unicidad real sobre una muestra de páginas de vacante; decidir si la Fase 4 del plan viejo (descripciones reales por fuente) se vuelve necesaria         | ⬜ Pendiente                                                                        |
+| 4    | Auditoría de contenido programático a escala                     | `seo-programmatic`, `seo-content`                        | Score de unicidad real sobre una muestra de páginas de vacante; decidir si la Fase 4 del plan viejo (descripciones reales por fuente) se vuelve necesaria         | ✅ Hecho — 2026-08-04, ver §1.6. Unicidad OK (61.3%), pero contenido absoluto muy corto (~37 palabras/página) — decisión pendiente del usuario, no bloqueante |
 | 5    | Auditoría técnica completa                                       | `seo-technical`, `seo-sitemap`                           | 9 categorías revisadas contra el sitio real; confirmar que nada de lo nuevo (hreflang, `last_seen_at`) introdujo una regresión técnica                            | ⬜ Pendiente                                                                        |
 | 6    | Schema.org — validación y oportunidades                          | `seo-schema`                                             | JobPosting validado contra Rich Results; confirmar cero tipos deprecados                                                                                          | ⬜ Pendiente                                                                        |
 | 7    | Core Web Vitals con datos de campo reales                        | `seo-google` (`pagespeed`, `crux`)                       | LCP/INP/CLS con CrUX real, no solo lab data                                                                                                                       | ⬜ Pendiente (necesita credenciales Google)                                         |
