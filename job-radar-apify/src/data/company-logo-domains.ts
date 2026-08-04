@@ -5,20 +5,30 @@
 // docs/COMPANY-REPUTATION-PLAN.md. This is NOT the same list/purpose as
 // those aliases — it exists only to resolve a real employer logo, never to
 // add reputation data — but it reuses their rigor: every domain below was
-// individually confirmed against the company's own official site this
-// session, the same "no fuzzy/guessed match" bar as the alias tables
-// (regla 5 de AGENTS.md — prefer omitted over an unsupported inference).
+// individually confirmed against the company's own official site, the same
+// "no fuzzy/guessed match" bar as the alias tables (regla 5 de AGENTS.md —
+// prefer omitted over an unsupported inference).
 //
-// Deliberately partial: several companies from those two seed files are
-// NOT here because their domain couldn't be confirmed with confidence in
-// one search pass (e.g. small BPOs/regional firms with ambiguous or
-// unverifiable web presence: DOXA Talent, NEXA BPO, Nextant, Compañía
-// Mundial de Seguros, Fundación Amanecer, SII Group Colombia, Centro
-// Comercial Santafé, Corredor Empresarial, Cámara de Comercio de
-// Bucaramanga, Grupo Bios, Alianza Team). Omitting them just means those
-// companies keep the plain-initial avatar — never guess a domain to fill
-// the gap (see JobCard.tsx's avatar comment for why that risks attaching
-// the wrong brand's logo to the wrong company).
+// Deliberately partial, for two independent reasons — both just leave a
+// company on the plain-initial avatar, never a guess:
+// 1. Domain itself couldn't be confirmed with confidence (small BPOs/
+//    regional firms with ambiguous web presence: DOXA Talent, NEXA BPO,
+//    Nextant, Compañía Mundial de Seguros, Fundación Amanecer, SII Group
+//    Colombia, Centro Comercial Santafé, Corredor Empresarial, Cámara de
+//    Comercio de Bucaramanga, Grupo Bios, Alianza Team).
+// 2. Domain is confirmed real but has no favicon our logo source (see
+//    getCompanyLogoUrl below) can resolve — verified by fetching every
+//    entry's icon and diffing against DuckDuckGo's own generic-fallback
+//    image (md5 ab1fb25b83d4b333ea661a84bd298b2e), which several confirmed
+//    domains returned instead of a real icon: amarilo.com.co,
+//    bancodebogota.com, bancodeoccidente.com.co, belcorp.com,
+//    casaluker.com, clinicadelcountry.com, colmedica.com, compensar.com,
+//    conconcreto.com, cuerosvelez.com, davibank.com, fsfb.org.co,
+//    grupocoomeva.com, quala.com.co, sacyr.com, skandia.co, solla.com,
+//    tecnoquimicas.com. Re-check with the same diff before ever re-adding
+//    one of these — a generic fallback icon rendered as this company's
+//    "logo" is worse than no logo (this is exactly what caused the
+//    all-companies-blank bug this list once shipped with, see git log).
 //
 // Keys match `company_reputation_alias.raw_company_name` byte-for-byte,
 // including its messy free-text quirks (trailing space on "TERPEL ",
@@ -39,34 +49,26 @@ export const COMPANY_LOGO_DOMAINS: Record<string, string> = {
   "POSTOBON S.A": "postobon.com",
   "POSTOBON S.A.": "postobon.com",
   "Grupo Éxito": "grupoexito.com.co",
-  Compensar: "compensar.com",
   Google: "google.com",
   Alquería: "alqueria.com.co",
   Comfama: "comfama.com",
-  "BANCO DE BOGOTA": "bancodebogota.com",
-  "Banco de Bogotá": "bancodebogota.com",
   COLSUBSIDIO: "colsubsidio.com",
   "TERPEL ": "terpel.com",
   Protección: "proteccion.com",
   "HOSPITAL PABLO TOBÓN URIBE": "hptu.org.co",
   "Nu Colombia": "nu.com.co",
   BBVA: "bbva.com.co",
-  "TECNOQUIMICAS S.A.S": "tecnoquimicas.com",
   "Claro Colombia": "claro.com.co",
   "CLARO COLOMBIA": "claro.com.co",
   "Fundación Valle del Lili": "valledellili.org",
-  "Banco de Occidente": "bancodeoccidente.com.co",
   Falabella: "falabella.com.co",
-  DAVIbank: "davibank.com",
   Rappi: "rappi.com",
-  AMARILO: "amarilo.com.co",
   CAFAM: "cafam.com.co",
   "CONSTRUCTORA BOLIVAR S.A.": "constructorabolivar.com",
   "Constructora Bolívar S.A.": "constructorabolivar.com",
   "Grupo Vanti": "grupovanti.com",
   "Allianz Colombia": "allianz.co",
   IBM: "ibm.com",
-  BELCORP: "belcorp.com",
   "Smurfit Westrock": "smurfitwestrock.com",
   Diageo: "diageo.com",
   PepsiCo: "pepsico.com",
@@ -74,10 +76,7 @@ export const COMPANY_LOGO_DOMAINS: Record<string, string> = {
   Cemex: "cemex.com",
   "Cine Colombia S.A.S": "cinecolombia.com",
   "Enel Colombia": "enel.com.co",
-  "Fundacion Santa Fe de Bogota": "fsfb.org.co",
-  "Fundación Santa Fe de Bogotá": "fsfb.org.co",
   "D1 S.A.S": "tiendasd1.com",
-  "Clínica del Country": "clinicadelcountry.com",
   "FRISBY S.A": "frisby.com.co",
   Cencosud: "cencosud.com",
   Roche: "roche.com",
@@ -85,34 +84,25 @@ export const COMPANY_LOGO_DOMAINS: Record<string, string> = {
   adidas: "adidas.com",
   Netflix: "netflix.com",
   "L'Oréal": "loreal.com",
-  "Cueros Vélez": "cuerosvelez.com",
   Oracle: "oracle.com",
-  CONCONCRETO: "conconcreto.com",
   SAP: "sap.com",
   "Samsung Electronics": "samsung.com",
   Pfizer: "pfizer.com",
   "Holcim Colombia": "holcim.com.co",
-  Skandia: "skandia.co",
-  "Skandia Colombia": "skandia.co",
   Globant: "globant.com",
   Mastercard: "mastercard.com",
-  "Casa Luker": "casaluker.com",
   "Clínica Imbanaco": "imbanaco.com",
-  Quala: "quala.com.co",
-  "Solla S.A.": "solla.com",
   "FARMATODO COLOMBIA S.A": "farmatodo.com.co",
   Accenture: "accenture.com",
   "Accenture Colombia": "accenture.com",
   "Accenture Ltda": "accenture.com",
   "Accenture LTDA": "accenture.com",
   Siemens: "siemens.com",
-  "Grupo Coomeva": "grupocoomeva.com",
   Sanofi: "sanofi.com",
-  Colmédica: "colmedica.com",
   "MARVAL S.A.": "marval.com.co",
   Deloitte: "deloitte.com",
 
-  // scripts/seed-gptw-aliases.ts (Accenture/Deloitte/Compensar already above)
+  // scripts/seed-gptw-aliases.ts (Accenture/Deloitte already above)
   TP: "tp.com",
   "GFT Technologies": "gft.com",
   Capgemini: "capgemini.com",
@@ -122,7 +112,6 @@ export const COMPANY_LOGO_DOMAINS: Record<string, string> = {
   Intellias: "intellias.com",
   Cisco: "cisco.com",
   Cognizant: "cognizant.com",
-  SACYR: "sacyr.com",
   Amadeus: "amadeus.com",
   "Banco Santander Colombia": "santander.com.co",
   "BANCO SANTANDER COLOMBIA SA": "santander.com.co",
@@ -133,16 +122,24 @@ export const COMPANY_LOGO_DOMAINS: Record<string, string> = {
   "Kuehne+Nagel": "kuehne-nagel.com"
 };
 
-// Google's favicon service: no auth, no cost, no stored copy on our side —
-// deliberately NOT downloading/caching these into public/ (a stored copy of
-// a third-party mark is the version of this that raises a trademark
+// DuckDuckGo's icon service — a single direct hop (no redirect chain), no
+// auth, no cost, no stored copy on our side. Switched from Google's
+// `s2/favicons` (used at first) after it turned out to 301-redirect to a
+// sharded `t0-t3.gstatic.com` host that was unreliable under this page's
+// concurrent-logo-grid load AND silently serves a generic placeholder
+// instead of failing for domains it has no icon for — both produced
+// blank-looking cards with no error the client could react to. Deliberately
+// NOT downloading/caching these into public/ (a stored copy of a
+// third-party mark is the version of this that raises a trademark
 // question; hotlinking the employer's own domain to fetch their own public
 // favicon does not, see docs/COMPANY-REPUTATION-PLAN.md's logo reasoning).
 // Callers MUST still render their existing initial-avatar as a fallback
-// (onError / no-match) — never assume this URL resolves to a real image.
+// (onError / no-match) — this only guarantees a request for a domain KNOWN
+// to have a real icon as of this file's last verification, not a live
+// guarantee.
 export function getCompanyLogoUrl(rawCompanyName: string | null | undefined): string | null {
   if (!rawCompanyName) return null;
   const domain = COMPANY_LOGO_DOMAINS[rawCompanyName];
   if (!domain) return null;
-  return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=128`;
+  return `https://icons.duckduckgo.com/ip3/${encodeURIComponent(domain)}.ico`;
 }
