@@ -19,6 +19,13 @@ CREATE TABLE IF NOT EXISTS jobs (
     date_text     VARCHAR(100),
     published_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    -- Bumped on every re-scrape that still finds this URL (ON CONFLICT in
+    -- saveJobs()). created_at never changes after first insert, so it can't
+    -- tell "still live" from "first seen 29 days ago" — purgeOldJobs() uses
+    -- this column instead, so a job that's still genuinely posted doesn't
+    -- get deleted-and-reinserted-with-a-new-id every 30 days (see
+    -- docs/SEO-PLAN.md §9.2 for the URL-churn bug this fixes).
+    last_seen_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     role_origin   VARCHAR(255),                     -- Rol que la encontró (ej. "analista de datos")
     is_active     BOOLEAN DEFAULT TRUE
 );

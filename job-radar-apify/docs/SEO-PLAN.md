@@ -775,3 +775,267 @@ Lo que sigue de aquí en adelante es monitoreo, no construcción:
 Cualquier trabajo nuevo de SEO a partir de aquí (backlinks, contenido
 adicional, más fuentes, un tercer país) es exploratorio y necesitaría su
 propio diagnóstico — no hay una "Fase 7" ya definida en este documento.
+
+## 9. Diagnóstico 2026-08-04 — "sigo sin ver páginas indexadas"
+
+Motivado por el usuario reportando que, pese a haber solicitado indexación
+manual de la mayoría de las vacantes en Search Console, la plataforma
+sigue sin tener páginas indexadas de forma sostenida. Este diagnóstico es
+**de solo lectura** (nada de código tocado) y se hizo en dos partes:
+verificación técnica en vivo contra `buscotrabajo.co`, y comparación con
+lo que ofrece [claude-seo](https://github.com/AgriciDaniel/claude-seo)
+(skill de auditoría SEO para Claude Code) para ver qué señales faltan
+cubrir.
+
+### 9.1 Lo que se confirmó SANO en producción (no es la causa)
+
+Verificado en vivo con `curl`/`WebFetch` como Googlebot, no solo leyendo
+el código:
+
+- `robots.txt` correcto, `sitemap.xml` es un `sitemapindex` válido con 3
+  sub-sitemaps.
+- `sitemap-jobs.xml` tiene **22,096 URLs** hoy (creció desde las ~10,170
+  de la Fase 2).
+- `/dashboard` sirve SSR real (25 vacantes en el HTML crudo, sin el bug
+  de "0 de 0" de §5.3).
+- Una vacante real (`/empleos/<id>/<slug>`) trae `<title>`, `<meta
+  description>`, `<link rel="canonical">` y 3 bloques JSON-LD correctos.
+- **Canonical no tiene el bug de auto-referencia**: pegar un slug
+  inventado sobre un id real (`/empleos/<id>/slug-inventado`) sigue
+  devolviendo el canonical correcto de esa vacante, no el slug inventado.
+  Esto descarta duplicación por canonical.
+- Muestra aleatoria de 25 URLs del sitemap en vivo → **25/25 responden
+  200** (no hay un porcentaje visible de 404/410 hoy en el sitemap).
+
+### 9.2 Hallazgo raíz confirmado en código: las vacantes de larga duración
+### pierden su URL cada 30 días
+
+Este es el hallazgo más importante de la sesión, y explica el patrón
+específico que describe el usuario ("ya indexé, y aun así no queda nada
+indexado") mejor que una teoría genérica de "contenido delgado":
+
+- `purgeOldJobs()` (`src/db/scheduler-repository.ts:134-138`) borra
+  cualquier fila con `created_at < NOW() - INTERVAL '30 days'`.
+- `created_at` es `TIMESTAMPTZ NOT NULL DEFAULT NOW()` (`schema.sql:21`),
+  fijado **una sola vez**, en el primer `INSERT`.
+- El re-descubrimiento de una vacante que sigue viva pasa por
+  `ON CONFLICT (url_hash) DO UPDATE SET sources = ...`
+  (`src/db/job-repository.ts:106-135`) — esa cláusula **solo actualiza
+  `sources`**. `created_at` nunca se toca en un conflicto.
+- Consecuencia: una vacante que el scraper sigue viendo activa cada 15
+  minutos, sin excepción, se purga exactamente 30 días después de su
+  primera aparición — como si hubiera expirado, aunque siga publicada en
+  la fuente original. El siguiente tick de scraping la reinserta como
+  fila **nueva** (`gen_random_uuid()` nuevo, porque la fila vieja ya no
+  existe para que el `ON CONFLICT` la encuentre) → URL nueva.
+- El pipeline de Indexing API (Fase 3) hace exactamente lo que se le pidió
+  con ese evento: encola `URL_DELETED` para la URL vieja y `URL_UPDATED`
+  para la nueva. Correcto a nivel de mecanismo, pero el efecto neto es que
+  **ninguna vacante de larga duración puede acumular más de ~30 días de
+  señal de confianza en una misma URL** — justo las vacantes con más
+  probabilidad de ganar autoridad (las que más tiempo llevan publicadas)
+  son las que Google ve reiniciarse una y otra vez. `docs/SEO-PLAN.md §7.4`
+  ya documentaba este comportamiento, pero solo como "costo de cuota"
+  (2 unidades en vez de 0) — no como el mecanismo que puede estar
+  impidiendo que cualquier URL individual llegue a indexarse de forma
+  estable.
+- **No se pudo medir el tamaño real del impacto hoy**: el dominio lleva
+  poco tiempo con este pipeline corriendo (el `lastmod` más viejo visto en
+  el sitemap en vivo es de hace 23 días), así que el ciclo de 30 días
+  apenas está empezando a cumplirse a escala. La muestra de 25/25 URLs en
+  200 (§9.1) es consistente con "el churn todavía no generó una ola
+  grande de 410s", no con "el churn no es un problema" — es un riesgo que
+  va a crecer, no uno que ya se haya demostrado agotado.
+
+**Fix propuesto (no aplicado — requiere aprobación explícita antes de
+tocar código, ver AGENTS.md #2):** distinguir "primera vez visto" de
+"última vez visto". Requiere una columna nueva (`last_seen_at
+TIMESTAMPTZ NOT NULL DEFAULT NOW()`, migración aditiva estilo `ALTER
+TABLE ... ADD COLUMN IF NOT EXISTS`, mismo patrón que ya usa
+`scripts/migrate-indexing-queue.ts`), actualizarla en la cláusula
+`ON CONFLICT` de `saveJobs()` (que hoy solo toca `sources`), y cambiar
+`purgeOldJobs()` para filtrar por `last_seen_at`, no por `created_at` —
+así una vacante solo se purga cuando de verdad deja de aparecer en el
+scraping (su URL real se está muriendo), no por cumplir 30 días desde que
+se vio la primera vez. Archivos a tocar: `schema.sql`,
+`src/db/job-repository.ts` (`saveJobs`), `src/db/scheduler-repository.ts`
+(`purgeOldJobs`), y su test correspondiente en
+`tests/validate-db-dedupe.ts`. Esto es trabajo de código real — no se
+hizo en esta sesión de diagnóstico.
+
+### 9.3 Riesgos ya documentados que siguen sin resolver (contribuyen, no son
+### la causa principal)
+
+- **Contenido casi duplicado a escala** (§5.2, ya conocido): confirmado
+  de nuevo hoy contra vacantes reales — la `description` del JSON-LD es
+  literalmente la misma plantilla ("`<Título> en <Empresa>, <Ubicación>.
+  Modalidad: <X>. Vacante agregada de <Fuente>. La descripción completa y
+  el formulario de aplicación están en la página de <Fuente> —
+  BuscoTrabajo no aloja el proceso de aplicación.`") en 22,096 páginas,
+  cambiando solo los valores. La última frase, además, le dice
+  explícitamente a Google que el contenido real vive en otro sitio — la
+  señal textual más directa posible de "agregador de bajo valor añadido"
+  para los sistemas de calidad de contenido de Google (Panda / Helpful
+  Content, integrados al core ranking desde 2024). No es solo un
+  problema de forma, es contenido que se autodescribe como no
+  autosuficiente.
+- **Sin `hreflang` entre `/` y `/ve`** (§5.7, riesgo 1, ya conocido):
+  confirmado de nuevo — cero `<link rel="alternate" hreflang="...">` en
+  la home. Contenido informativo casi idéntico entre ambas landing pages
+  sigue siendo riesgo de consolidación/duplicado.
+
+### 9.4 Lo que no se pudo confirmar desde aquí (bloqueado, depende del
+### usuario)
+
+El único dato que puede confirmar con certeza cuál de las causas de
+arriba domina hoy es **Search Console → Indexación → Páginas** — el
+desglose de motivos de exclusión y sus conteos reales:
+
+| Motivo en Search Console | Qué implica | Cuál fix aplica |
+| --- | --- | --- |
+| "Detectada, actualmente sin indexar" | Google conoce la URL pero no le ha dado prioridad de rastreo (crawl budget/autoridad de dominio, a esta escala de 22k) | Reducir el volumen de páginas de bajo valor o aumentar autoridad (backlinks) |
+| "Rastreada, actualmente sin indexar" | Google la rastreó y decidió no indexarla — juicio de calidad | §9.3 (contenido casi duplicado) es la causa más probable |
+| "Duplicada, Google eligió otro canonical distinto al declarado" | Problema de canonical/slug | Ya descartado en §9.1 para el caso simple probado, pero vale revisar en el reporte real |
+| Vencidas / eliminadas en el reporte | Coincide con el churn de URL (§9.2) | El fix de `last_seen_at` propuesto arriba |
+
+`npm run seo:check-search-console` (con `--inspect`) puede confirmar el
+estado puntual de una muestra fija de URLs, pero **el desglose agregado
+de motivos por categoría solo existe en la UI de Search Console, sin
+equivalente en su API** (ya documentado en el header del script). Además,
+el `.env` local de esta sesión no tiene
+`GOOGLE_INDEXING_CLIENT_EMAIL`/`GOOGLE_INDEXING_PRIVATE_KEY` configuradas
+(las credenciales viven en Render/GitHub Actions, no en este checkout),
+así que ni siquiera el chequeo de solo lectura se pudo correr desde aquí
+en esta sesión — se necesita que el usuario comparta ese reporte (captura
+de pantalla o resumen) para cerrar el diagnóstico con certeza.
+
+### 9.5 Sobre `claude-seo` (github.com/AgriciDaniel/claude-seo)
+
+Es un plugin de Claude Code (marketplace install +
+entorno Python) — MIT, gratuito, corre localmente. Es un auditor de
+propósito general (25 sub-skills / 18 agentes: técnico, contenido/E-E-A-T,
+schema, local, internacional, AI-search/GEO), no algo específico de
+boards de empleo. Comparado con lo que este proyecto ya construyó a mano
+(Fases 0-6): no puede reemplazar el diagnóstico de Search Console de
+arriba (ninguna herramienta externa puede — esa API no expone el
+desglose agregado). Lo que sí aportaría genuinamente **encima** de lo ya
+construido:
+
+- **Core Web Vitals con datos de campo** (PageSpeed Insights/GA4) — hoy
+  no hay ninguna medición de rendimiento real de usuarios en este
+  proyecto.
+- **AI Search / GEO** (visibilidad en AI Overviews, ChatGPT, Perplejidad)
+  — superficie completamente sin tocar hoy, y cada vez más relevante para
+  tráfico de búsqueda de empleo.
+- **Generación de `hreflang`** — resolvería directamente el gap
+  confirmado en §9.3/§5.7.
+- Auditorías recurrentes automatizadas (una `/seo audit` por sesión) como
+  capa de monitoreo continuo, complementaria a `test:seo` (que valida
+  forma/regresión, no calidad percibida por Google).
+
+Recomendación: útil como **segunda capa de auditoría periódica**, no como
+sustituto del diagnóstico de causa raíz — eso depende del reporte de
+Search Console (§9.4).
+
+### 9.6 Próximo paso recomendado
+
+1. **Usuario**: compartir el desglose real de Search Console →
+   Indexación → Páginas (conteos por motivo de exclusión). Esto decide
+   cuál de §9.2/§9.3 pesa más y evita construir el fix equivocado primero.
+2. En paralelo, sin esperar el paso 1 (es una corrección real
+   independientemente de lo que diga Search Console — hoy se purgan
+   vacantes que siguen vivas, lo cual está mal más allá del SEO): decidir
+   si se implementa el fix de `last_seen_at` de §9.2 como su propia sesión
+   de código.
+3. Si el reporte de Search Console confirma "Rastreada, sin indexar" como
+   el motivo dominante: la siguiente inversión de mayor retorno es
+   diferenciar contenido real por vacante (§9.3), no más infraestructura
+   técnica — la arquitectura técnica ya está, en su mayoría, verificada
+   sana.
+
+## 10. Sesión 2026-08-04 (parte 2) — aplicado (no solo diagnosticado)
+
+Motivado por el usuario pidiendo aplicar directamente lo aprendido del
+repo [claude-seo](https://github.com/AgriciDaniel/claude-seo) al proyecto.
+El plugin se instaló localmente (`claude plugin marketplace add
+AgriciDaniel/claude-seo --scope local` + `claude plugin install
+claude-seo@agricidaniel-claude-seo --scope local`) — queda disponible
+como `/seo <comando>` después de reiniciar la sesión de Claude Code, no
+comprometido al repo (scope `local`, no `project`). Investigación de
+keywords/volumen de búsqueda quedó **fuera de esta sesión a propósito**:
+no hay GSC ni DataForSEO conectados aquí, y un número de volumen de
+búsqueda inventado viola AGENTS.md #5 igual que un salario inventado.
+
+Tres cambios de código, los tres verificados con `npx tsc --noEmit`,
+`npm run build`, `npm run test:seo` (79→84 checks), `test:dashboard-filters`
+y `test:companies-search`, todos en verde:
+
+### 10.1 Fix del bug de churn de URL (§9.2) — `last_seen_at`
+
+- `schema.sql`: columna `jobs.last_seen_at`.
+- `scripts/migrate-last-seen-at.ts`: migración aditiva, **ya corrida contra
+  la BD real** (backfill `last_seen_at = created_at` para las 24,745 filas
+  existentes — decisión deliberada, no `= NOW()`, ver comentario en el
+  script — preserva el tiempo real restante de cada fila en vez de regalar
+  30 días gratis a vacantes ya inactivas).
+- `src/db/job-repository.ts`: el `ON CONFLICT (url_hash)` de `saveJobs()`
+  ahora sí actualiza `last_seen_at = NOW()` (antes solo tocaba `sources`).
+- `src/db/scheduler-repository.ts`: `purgeOldJobs()` filtra por
+  `last_seen_at`, no `created_at`.
+- `tests/validate-db-dedupe.ts`: nueva verificación de que un re-scrape
+  actualiza `last_seen_at` sin tocar `created_at`.
+
+### 10.2 hreflang + canonical real para `/` y `/ve` (§5.7 riesgo 1)
+
+- `src/server.ts`: nueva rama para `GET /` y `GET /ve` — hasta ahora
+  ambas servían el mismo `index.html` estático sin ninguna inyección de
+  `<head>`, y el canonical estaba hardcodeado a `/` **incluso en `/ve`**
+  (le decía a Google que consolidara `/ve` dentro de `/`, el problema real
+  detrás del riesgo ya anotado). Ahora cada ruta se auto-referencia, y
+  ambas llevan el par recíproco `hreflang` (`es-CO`/`es-VE`/`x-default`
+  apuntando a `/`).
+- `/ve` también gana su propio `<title>`/meta description/OG en el HTML
+  crudo (antes decía literalmente "Colombia" hasta que React montaba) —
+  con las fuentes reales de `SOURCES_BY_COUNTRY.VE` (7 fuentes, sin
+  Elempleo/Magneto/Workana), nunca una copia find-replace de las de
+  Colombia.
+- No incluye SSR completo del contenido de la landing (§5.7 riesgo 2 sigue
+  abierto) — esto es solo `<head>`.
+- `src/lib/job-seo.ts`: `SITE_URL` ahora exportado (antes privado del
+  módulo) para reusar el mismo valor en `server.ts`.
+- `tests/validate-seo-job-pages.ts`: nuevos checks HTTP reales para
+  canonical self-referencing y el trío de hreflang en ambas rutas.
+
+### 10.3 Descripción del JobPosting enriquecida (§5.2/§9.3)
+
+- `src/lib/job-seo.ts`: `buildJobDescription()` ahora acepta un
+  `JobDescriptionContext` opcional con `companyActiveCount`. Cuando está
+  presente, añade una frase real y variable ("`{Empresa}` tiene N vacantes
+  más activas en BuscoTrabajo") en vez del texto fijo de siempre. También
+  se quitó la frase autodescriptiva "BuscoTrabajo no aloja el proceso de
+  aplicación" — mismo hecho real (dónde aplicar), sin el framing que
+  `content_quality.py` de claude-seo y la política de scaled-content-abuse
+  de Google leen como señal de agregador de bajo valor.
+- `src/server.ts`: `companyActiveCount` se calcula con un `.filter()` en
+  memoria sobre la misma lista de `getJobsCached()` ya cargada para
+  resolver el id — **cero queries nuevas a Postgres**.
+- Medido con `content_quality.py` (script stdlib del plugin, sin
+  dependencias) sobre una vacante real (Líder de gestión humana / Grupo
+  Vulcano): `overall_quality` 69→83, `information_density` 0.179→0.732,
+  la señal `low-density` desaparece. `thin-content` se mantiene (es
+  esperado — sigue siendo una descripción corta por diseño, sin datos
+  inventados; el arreglo durable de fondo sigue siendo capturar
+  descripción real por fuente, sin resolver, ver §8).
+- `tests/validate-seo-job-pages.ts`: nuevos checks de la frase eliminada,
+  de que sin `companyActiveCount` no se inventa un conteo, y de
+  singular/plural correcto.
+
+### 10.4 Seguimiento
+
+Sigue pendiente el mismo bloqueante de siempre: el desglose real de
+Search Console → Indexación → Páginas (§9.4) — ninguno de estos tres
+cambios lo reemplaza, todos son defendibles por mérito propio
+independientemente de lo que diga ese reporte. Después de reiniciar la
+sesión de Claude Code, `/seo audit https://buscotrabajo.co` y
+`/seo hreflang https://buscotrabajo.co` quedan disponibles para auditar
+en vivo con los 18 agentes del plugin en paralelo.

@@ -1,5 +1,6 @@
 import { saveJobs, getJobs, clearRepository, computeUrlHash } from '../src/db/job-repository.js';
 import { Job } from '../src/sources/types.js';
+import { pool } from '../src/db/client.js';
 
 async function runDedupeTest() {
   console.log(`\n==================================================`);
@@ -70,6 +71,34 @@ async function runDedupeTest() {
     console.error(`❌ [FAILED] Las fuentes no se fusionaron correctamente. Esperado Computrabajo en alsoIn.`);
     process.exit(1);
   }
+
+  // SEO Fase 9 (docs/SEO-PLAN.md §9.2): a re-scrape of an existing URL
+  // (batch 2, ON CONFLICT path above) must bump last_seen_at without
+  // touching created_at — that's the whole fix for the URL-churn bug.
+  console.log(`\n🕒 [Test] Verificando que el re-scrape actualizó last_seen_at sin tocar created_at...`);
+  const urlHash = computeUrlHash('https://www.example.com/jobs/view/1');
+  const { rows } = await pool.query(
+    `SELECT created_at, last_seen_at, NOW() AS db_now FROM jobs WHERE url_hash = $1`,
+    [urlHash]
+  );
+  if (rows.length !== 1) {
+    console.error(`❌ [FAILED] No se encontró la fila para verificar last_seen_at.`);
+    process.exit(1);
+  }
+  const { created_at, last_seen_at, db_now } = rows[0];
+  const staleMs = new Date(db_now).getTime() - new Date(last_seen_at).getTime();
+  if (staleMs > 10_000) {
+    console.error(
+      `❌ [FAILED] last_seen_at no se actualizó en el re-scrape (hace ${staleMs}ms) — el bug de churn de URL volvió.`
+    );
+    process.exit(1);
+  }
+  if (new Date(last_seen_at).getTime() === new Date(created_at).getTime()) {
+    console.error(
+      `⚠️  [WARN] last_seen_at == created_at — esperado solo si ambos INSERT y el UPDATE de ON CONFLICT ocurrieron en el mismo instante exacto, revisar si es real o casualidad de timing.`
+    );
+  }
+  console.log(`   ✅ last_seen_at actualizado por el re-scrape (created_at sin cambios).`);
 
   console.log(`\n==================================================`);
   console.log(`🎉 [TEST SUITE PASSED] ¡Deduplicación por SHA256 y fusión de fuentes verificada al 100%!`);

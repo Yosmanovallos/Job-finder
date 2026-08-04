@@ -21,7 +21,8 @@ import {
   buildCategoryPath,
   buildCategoriesSitemapXml,
   buildJobUrlPrefix,
-  SeoJob
+  SeoJob,
+  SITE_URL
 } from "../src/lib/job-seo.js";
 import { CITY_OPTIONS } from "../src/lib/job-filters.js";
 import { DEFAULT_ROLES_200 } from "../src/queue/scheduler.js";
@@ -136,6 +137,37 @@ function runPureFunctionTests() {
       "validThrough no es posterior a datePosted — el listado nacería ya expirado."
     );
   }
+
+  // SEO Fase 9 (docs/SEO-PLAN.md §9.3): the JobPosting description must not
+  // read as a low-value-aggregator signal, and must vary with real data
+  // when the caller has it (companyActiveCount, from the in-memory job
+  // list — never a new query, see server.ts).
+  const noContextPosting = buildJobPosting(openJob) as any;
+  check(
+    !String(noContextPosting.description).includes("no aloja el proceso"),
+    "La descripción del JobPosting ya no incluye la frase autodescriptiva de bajo valor ('BuscoTrabajo no aloja el proceso de aplicación').",
+    "La descripción del JobPosting todavía contiene la frase de bajo valor — content_quality.py de claude-seo la marca como señal de agregador."
+  );
+  check(
+    !String(noContextPosting.description).includes("vacantes más activas"),
+    "Sin companyActiveCount, la descripción no inventa un conteo de otras vacantes de la empresa.",
+    "La descripción mencionó un conteo de vacantes de la empresa sin que el caller lo haya provisto — dato inventado."
+  );
+
+  const withContextPosting = buildJobPosting(openJob, { companyActiveCount: 4 }) as any;
+  check(
+    String(withContextPosting.description).includes("PepsiCo tiene 3 vacantes más activas en BuscoTrabajo"),
+    "Con companyActiveCount=4 (incluyendo esta vacante), la descripción menciona las otras 3 reales.",
+    `companyActiveCount no se reflejó como se esperaba en: "${withContextPosting.description}"`
+  );
+
+  const singleOtherPosting = buildJobPosting(openJob, { companyActiveCount: 2 }) as any;
+  check(
+    String(singleOtherPosting.description).includes("1 vacante más activa en BuscoTrabajo") &&
+      !String(singleOtherPosting.description).includes("1 vacante más activas"),
+    "Singular/plural correcto cuando solo hay 1 otra vacante de la misma empresa.",
+    `Singular/plural incorrecto en: "${singleOtherPosting.description}"`
+  );
 
   // Locked (masked) job — same shape maskLockedFields() produces for a
   // <48h job when PAYWALL_ENABLED is true: company/location/url nulled out.
@@ -394,6 +426,38 @@ async function runHttpTests() {
         `${route} respondió ${res.status} — regresión.`
       );
     }
+
+    // SEO Fase 9 (docs/SEO-PLAN.md §9.3/§5.7 risk 1): "/" and "/ve" must
+    // each self-reference their own canonical (not both pointing at "/",
+    // which told Google to consolidate "/ve" away) and carry the same
+    // reciprocal hreflang pair + x-default.
+    const homeHtml = await (await fetch(`${BASE_URL}/`)).text();
+    const veHtml = await (await fetch(`${BASE_URL}/ve`)).text();
+    check(
+      homeHtml.includes(`<link rel="canonical" href="${SITE_URL}/" />`),
+      "/ canonical se auto-referencia a la home.",
+      "/ no tiene el canonical self-referencing esperado."
+    );
+    check(
+      veHtml.includes(`<link rel="canonical" href="${SITE_URL}/ve" />`),
+      "/ve canonical se auto-referencia a /ve (ya no apunta a la home de Colombia).",
+      "/ve todavía no tiene canonical self-referencing — sigue apuntando a la home, el bug de consolidación de docs/SEO-PLAN.md §5.7."
+    );
+    for (const html of [homeHtml, veHtml]) {
+      const hasCo = html.includes(`hreflang="es-CO" href="${SITE_URL}/"`);
+      const hasVe = html.includes(`hreflang="es-VE" href="${SITE_URL}/ve"`);
+      const hasDefault = html.includes(`hreflang="x-default" href="${SITE_URL}/"`);
+      check(
+        hasCo && hasVe && hasDefault,
+        "El par hreflang recíproco (es-CO, es-VE, x-default) está presente.",
+        `Falta algún hreflang esperado (es-CO=${hasCo}, es-VE=${hasVe}, x-default=${hasDefault}).`
+      );
+    }
+    check(
+      veHtml.includes("Vacantes de Empleo en Venezuela") && !veHtml.includes("<title>BuscoTrabajo — Vacantes de Empleo en Colombia"),
+      "/ve tiene su propio <title> (Venezuela), no el de Colombia sin JS.",
+      "/ve todavía sirve el <title> de Colombia en el HTML crudo — lo que ve un crawler antes de ejecutar JS."
+    );
 
     // /dashboard must ship real vacancy links in its raw HTML, not rely on
     // the browser's fetch() to /api/jobs. Confirmed via Search Console

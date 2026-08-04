@@ -39,7 +39,8 @@ import {
   resolveCategorySlug,
   buildCategoryMeta,
   buildCategoriesSitemapXml,
-  resolveCompanyNameFromJobs
+  resolveCompanyNameFromJobs,
+  SITE_URL
 } from "./lib/job-seo.js";
 import { verifySession } from "./auth/verify-session.js";
 import { startPaymentCheckout } from "./payments/checkout.js";
@@ -962,6 +963,13 @@ const server = http.createServer(async (req, res) => {
     }
 
     const [visible] = maskLockedFields([job], tier);
+    // Free uniqueness signal for the JobPosting description (SEO Fase 9,
+    // docs/SEO-PLAN.md §9.3): `jobs` is the same up-to-50,000-row list
+    // already loaded above for the id lookup, so counting same-company rows
+    // is an in-memory filter, not a new Postgres query.
+    const companyActiveCount = job.company
+      ? jobs.filter((j: any) => j.company === job.company).length
+      : undefined;
 
     let indexHtml: string;
     try {
@@ -990,7 +998,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     const meta = buildJobMeta(visible);
-    const jobPosting = buildJobPosting(visible);
+    const jobPosting = buildJobPosting(visible, { companyActiveCount });
 
     indexHtml = indexHtml
       .replace(/<title>[\s\S]*?<\/title>/, `<title>${escapeHtml(meta.title)}</title>`)
@@ -1172,6 +1180,77 @@ const server = http.createServer(async (req, res) => {
     const xml = buildCategoriesSitemapXml();
     res.writeHead(200, { "Content-Type": "application/xml; charset=utf-8" });
     res.end(xml);
+    return;
+  }
+
+  // 5b. Home ("/" and "/ve") — SEO Fase 9 (docs/SEO-PLAN.md §9.3/§5.7 risk 1).
+  // Neither route had server-side head injection before this: both served
+  // the exact same static index.html, which (a) hardcoded the Colombia
+  // canonical on "/ve" too — telling Google "/ve" is a duplicate to
+  // consolidate into "/", the opposite of what's wanted — and (b) had no
+  // hreflang linking the two regional variants at all. This only rewrites
+  // <head> tags (title/description/og/canonical/hreflang); it does not
+  // attempt full SSR of the landing content (§5.7 risk 2, still open).
+  if ((pathname === "/" || pathname === "/ve") && method === "GET") {
+    const isVe = pathname === "/ve";
+    let indexHtml: string;
+    try {
+      indexHtml = fs.readFileSync(path.join(PUBLIC_DIR, "index.html"), "utf-8");
+    } catch {
+      res.writeHead(500, { "Content-Type": "text/plain" });
+      res.end("Server Error: build not found");
+      return;
+    }
+
+    const selfUrl = isVe ? `${SITE_URL}/ve` : `${SITE_URL}/`;
+    indexHtml = indexHtml.replace(
+      /<link[^>]*rel=["']canonical["'][^>]*>/,
+      `<link rel="canonical" href="${escapeHtml(selfUrl)}" />`
+    );
+
+    // Self + reciprocal + x-default — the three checks seo-hreflang (the
+    // claude-seo skill this session cross-referenced) flags first: a
+    // missing self-referencing tag or a one-directional pair (A→B without
+    // B→A) are both "Critical" there. x-default points at "/" (Colombia)
+    // since it's this site's original/primary market, not a country guess.
+    const hreflangTags =
+      `    <link rel="alternate" hreflang="es-CO" href="${SITE_URL}/" />\n` +
+      `    <link rel="alternate" hreflang="es-VE" href="${SITE_URL}/ve" />\n` +
+      `    <link rel="alternate" hreflang="x-default" href="${SITE_URL}/" />`;
+    indexHtml = indexHtml.replace(
+      /<link[^>]*rel=["']canonical["'][^>]*>/,
+      (canonicalTag) => `${canonicalTag}\n${hreflangTags}`
+    );
+
+    if (isVe) {
+      // Real, already-established facts only (AGENTS.md #5): VE's own
+      // source list (SOURCES_BY_COUNTRY.VE — 7 sources, not CO's 10; no
+      // Elempleo/Magneto/Workana coverage for Venezuela today), never a
+      // find-and-replace of the Colombia copy. Without this, Googlebot's
+      // first (non-JS) look at "/ve" saw a title/description that literally
+      // said "Colombia" — a content-parity problem, not just a linking one.
+      const veTitle = "BuscoTrabajo — Vacantes de Empleo en Venezuela, Todas en un Solo Lugar";
+      const veDescription =
+        "Encuentra vacantes de empleo en Venezuela de LinkedIn, Computrabajo, Torre, GetOnBoard y otros portales, deduplicadas y verificadas en un solo dashboard. Gratis para vacantes con más de 48h publicadas.";
+      indexHtml = indexHtml
+        .replace(/<title>[\s\S]*?<\/title>/, `<title>${escapeHtml(veTitle)}</title>`)
+        .replace(
+          /<meta\s+name=["']description["'][^>]*\/>/,
+          `<meta name="description" content="${escapeHtml(veDescription)}" />`
+        )
+        .replace(/<meta property="og:locale" content="[^"]*" \/>/, `<meta property="og:locale" content="es_VE" />`)
+        .replace(
+          /<meta property="og:title" content="[^"]*" \/>/,
+          `<meta property="og:title" content="${escapeHtml(veTitle)}" />`
+        )
+        .replace(
+          /<meta\s+property=["']og:description["'][^>]*\/>/,
+          `<meta property="og:description" content="${escapeHtml(veDescription)}" />`
+        );
+    }
+
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+    res.end(indexHtml);
     return;
   }
 

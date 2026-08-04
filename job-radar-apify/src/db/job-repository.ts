@@ -93,11 +93,17 @@ export async function saveJobs(
       // Duplicate by content: merge source into the existing record
       const existing = existingByFingerprint.rows[0];
       const sources: string[] = Array.isArray(existing.sources) ? existing.sources : [];
+      // last_seen_at bumped unconditionally (not just when sources[] grows)
+      // — the whole point is "this job was rediscovered just now," which is
+      // true on every match here, source-array change or not. See
+      // docs/SEO-PLAN.md §9.2 / migrate-last-seen-at.ts.
       if (!sources.includes(job.source)) {
-        await pool.query(`UPDATE jobs SET sources = sources || to_jsonb($2::text) WHERE id = $1`, [
-          existing.id,
-          job.source
-        ]);
+        await pool.query(
+          `UPDATE jobs SET sources = sources || to_jsonb($2::text), last_seen_at = NOW() WHERE id = $1`,
+          [existing.id, job.source]
+        );
+      } else {
+        await pool.query(`UPDATE jobs SET last_seen_at = NOW() WHERE id = $1`, [existing.id]);
       }
       duplicateCount++;
       continue;
@@ -110,7 +116,16 @@ export async function saveJobs(
          sources = CASE
            WHEN jobs.sources @> to_jsonb(EXCLUDED.source::text) THEN jobs.sources
            ELSE jobs.sources || to_jsonb(EXCLUDED.source::text)
-         END
+         END,
+         -- The fix for the URL-churn bug (docs/SEO-PLAN.md §9.2): this was
+         -- the missing line. Without it, a job re-scraped every 15 minutes
+         -- for months still looked "first seen 30+ days ago" to
+         -- purgeOldJobs(), got hard-deleted, and came back with a brand-new
+         -- id/URL on the very next tick — resetting any indexing signal
+         -- Google had accumulated on the old URL. created_at intentionally
+         -- stays untouched (it answers "when was this job first posted,"
+         -- not "is it still live").
+         last_seen_at = NOW()
        RETURNING id, (xmax = 0) AS inserted`,
       [
         hash,

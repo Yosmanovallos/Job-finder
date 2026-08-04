@@ -27,6 +27,7 @@
     "test:companies-search": "tsx tests/validate-companies-search.ts",
     "test:rate-limiting": "tsx tests/validate-rate-limiting.ts",
     "indexing:migrate": "tsx scripts/migrate-indexing-queue.ts",
+    "db:migrate-last-seen-at": "tsx scripts/migrate-last-seen-at.ts",
     "indexing:backfill": "tsx scripts/backfill-indexing-queue.ts",
     "indexing:tick": "tsx scripts/run-indexing-tick.ts",
     "seo:check-search-console": "tsx scripts/check-search-console.ts",

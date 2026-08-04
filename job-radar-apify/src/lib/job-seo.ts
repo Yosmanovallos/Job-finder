@@ -3,7 +3,7 @@ import { getModalityLabel, CITY_OPTIONS } from "./job-filters.js";
 import { DEFAULT_ROLES_200 } from "../queue/scheduler.js";
 import { getCountryConfig, DEFAULT_COUNTRY } from "../countries/index.js";
 
-const SITE_URL = "https://buscotrabajo.co";
+export const SITE_URL = "https://buscotrabajo.co";
 // jobs older than this are purged from the DB (see job-repository.ts's
 // getJobs() comment) — a real, system-derived upper bound on how long this
 // listing can possibly still be active here, used for JobPosting's required
@@ -125,7 +125,19 @@ export function isPubliclyDescribable(job: SeoJob): boolean {
 // Real, variable facts only — never invented prose. Draws on the same
 // fields the UI already shows (JobDetailPanel/JobCard), so a crawler never
 // sees a claim a real visitor wouldn't also see.
-export function buildJobDescription(job: SeoJob): string {
+export interface JobDescriptionContext {
+  // Count of other active jobs at the same company, computed by the caller
+  // from the same getJobsCached() list already loaded for this request (no
+  // new query — see server.ts). Real, per-company, varies naturally across
+  // the corpus instead of every page sharing one template — the enrichment
+  // docs/SEO-PLAN.md §5.2/§9.3 flagged as the durable fix for thin/near-
+  // duplicate JobPosting descriptions at this scale. Omitted (not 0) for
+  // callers without that context (e.g. isolated unit tests) — 0 would
+  // falsely claim "no other jobs here" for a company we simply didn't check.
+  companyActiveCount?: number;
+}
+
+export function buildJobDescription(job: SeoJob, context: JobDescriptionContext = {}): string {
   const parts: string[] = [];
   const fallbackLocation = getCountryConfig(job.country).name;
   parts.push(
@@ -135,6 +147,14 @@ export function buildJobDescription(job: SeoJob): string {
   const modality = getModalityLabel(job.location);
   if (modality) parts.push(`Modalidad: ${modality}.`);
 
+  // "- 1" excludes this job itself from its own count.
+  const otherAtCompany = (context.companyActiveCount ?? 0) - 1;
+  if (job.company && otherAtCompany > 0) {
+    parts.push(
+      `${job.company} tiene ${otherAtCompany} vacante${otherAtCompany === 1 ? "" : "s"} más activa${otherAtCompany === 1 ? "" : "s"} en BuscoTrabajo.`
+    );
+  }
+
   const otherSources = (job.alsoIn || (job.sources || []).filter((s) => s !== job.source)).filter(
     Boolean
   );
@@ -142,9 +162,12 @@ export function buildJobDescription(job: SeoJob): string {
     parts.push(`También publicada en: ${otherSources.join(", ")}.`);
   }
 
-  parts.push(
-    `Vacante agregada de ${job.source}. La descripción completa y el formulario de aplicación están en la página de ${job.source} — BuscoTrabajo no aloja el proceso de aplicación.`
-  );
+  // Factual (where to apply), not self-deprecating — states the same real
+  // fact as before (BuscoTrabajo aggregates, doesn't host applications)
+  // without the "we add no value" framing that content_quality.py (claude-seo)
+  // and Google's scaled-content-abuse policy both read as a low-value-
+  // aggregator signal. See docs/SEO-PLAN.md §9.3.
+  parts.push(`Vacante agregada de ${job.source}. Aplica directamente en la página de ${job.source}.`);
 
   return parts.join(" ");
 }
@@ -169,7 +192,10 @@ export function buildJobMeta(job: SeoJob): JobMeta {
 // Returns null for locked/incomplete jobs — callers must not render
 // JobPosting structured data at all in that case (see
 // isPubliclyDescribable), rather than emitting one with null fields.
-export function buildJobPosting(job: SeoJob): Record<string, unknown> | null {
+export function buildJobPosting(
+  job: SeoJob,
+  context: JobDescriptionContext = {}
+): Record<string, unknown> | null {
   if (!isPubliclyDescribable(job)) return null;
 
   const publishedAt = job.publishedAt ? new Date(job.publishedAt) : new Date();
@@ -179,7 +205,7 @@ export function buildJobPosting(job: SeoJob): Record<string, unknown> | null {
     "@context": "https://schema.org/",
     "@type": "JobPosting",
     title: job.title,
-    description: buildJobDescription(job),
+    description: buildJobDescription(job, context),
     identifier: {
       "@type": "PropertyValue",
       name: job.source,

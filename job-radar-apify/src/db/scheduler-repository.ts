@@ -121,7 +121,18 @@ export async function markGlobalSourceRun(sourceName: string): Promise<void> {
   await markRoleSourceRun(GLOBAL_ROLE_SENTINEL, sourceName);
 }
 
-/** Cron C — keeps the corpus bounded to the last 30 days. */
+/**
+ * Cron C — keeps the corpus bounded to jobs actually still live.
+ *
+ * Filters on `last_seen_at`, not `created_at` (SEO Fase 9 fix, see
+ * docs/SEO-PLAN.md §9.2). `created_at` is stamped once and never updated —
+ * a job still being re-scraped every 15 minutes for months looked identical
+ * to one posted 30 days ago and never seen since. `last_seen_at` is bumped
+ * by the ON CONFLICT hooks in saveJobs() every time a job is rediscovered,
+ * so this now only deletes jobs that have genuinely stopped appearing in
+ * scraping results for 30 days — a real expiration signal instead of a
+ * fixed age cutoff that churned every long-lived posting's URL forever.
+ */
 // RETURNING the deleted rows (not a separate SELECT-then-DELETE) so this
 // stays atomic — a two-step version could lose rows to a concurrent insert/
 // delete between the two statements. Once a row is gone, its title/location
@@ -133,7 +144,7 @@ export async function markGlobalSourceRun(sourceName: string): Promise<void> {
 // only) expiration signal in this codebase.
 export async function purgeOldJobs(): Promise<number> {
   const result = await pool.query(
-    `DELETE FROM jobs WHERE created_at < NOW() - INTERVAL '30 days'
+    `DELETE FROM jobs WHERE last_seen_at < NOW() - INTERVAL '30 days'
      RETURNING id, title, company, location, url, source, published_at`
   );
 
