@@ -332,6 +332,63 @@ sin prosa larga) como lo que es — un compromiso deliberado, no un defecto
 accidental. No se implementó nada en código en respuesta a esto: es una
 decisión de producto/roadmap del usuario, no una corrección técnica.
 
+### 1.7 Fase 5 — Auditoría técnica completa, 9 categorías (2026-08-04)
+
+Verificado en vivo contra producción, categoría por categoría del checklist
+de `seo-technical`. **Cero hallazgos CRITICAL.**
+
+- **Crawlability**: `robots.txt` válido (confirmado también por la propia
+  Search Console del usuario: "Todos los archivos son válidos");
+  `sitemap.xml` es un `sitemapindex` válido, 3 sub-sitemaps, los 3
+  "Correcto" en Search Console. Profundidad de rastreo: home → dashboard →
+  vacante = 2 clics, dentro del límite de 3.
+- **Indexability**: canonical self-referencing confirmado en las 6 URLs de
+  baseline + roles + `/dashboard`/`/ve/dashboard` (fixes de esta sesión);
+  `<meta name="robots">` ausente (indexable) en `/`, `/dashboard`,
+  `/empleos/bogota` y una vacante real — presente únicamente donde debe
+  (categoría vacía, vacante bloqueada, 404, 410), verificado con
+  `test:seo`.
+- **Seguridad**: HTTPS forzado end-to-end — `http://` → `https://` en 1
+  salto, `www.` → apex en 1 salto, cero contenido mixto en la home. **Ya
+  anotado en sesión anterior y sigue sin implementarse a propósito**:
+  headers de seguridad ausentes (HSTS, CSP, X-Frame-Options,
+  X-Content-Type-Options, Referrer-Policy) — no es factor de ranking
+  confirmado y una CSP mal puesta puede romper GTM/fuentes; queda como
+  hallazgo para que el usuario decida, no una corrección de esta fase.
+- **Estructura de URL**: limpias, con guiones, sin query params para
+  contenido primario, muy por debajo de 100 caracteres, trailing slash
+  consistente.
+- **Mobile**: `<meta name="viewport">` presente; sin interstitials
+  intrusivos observados.
+- **Core Web Vitals**: **sigue bloqueado**, mismo motivo que la sesión
+  anterior (cuota compartida de PSI agotada, Unlighthouse no puede lanzar
+  Chrome en este entorno WSL) — no reintentado porque es un límite de
+  infraestructura persistente, no algo puntual.
+- **Datos estructurados**: JobPosting/Organization/WebSite válidos, cero
+  tipos deprecados, fix de TELECOMMUTE de 1.2 confirmado en vivo. **Hallazgo
+  nuevo, Low/Medium, no implementado:** las páginas de categoría
+  (`/empleos/<ciudad>`, `/empleos/<rol>`) no llevan ningún schema propio de
+  listado (`ItemList`/`CollectionPage`/`BreadcrumbList`) — solo heredan el
+  `Organization`+`WebSite` genérico del shell estático. Oportunidad real,
+  cruzada con Fase 6 si se profundiza en schema.
+- **Renderizado JS**: los 6 tipos de página reales ahora tienen SSR
+  consistente entre HTML crudo y DOM post-hidratación (fixes 1.1-1.3) — la
+  guía de Google de diciembre 2025 sobre "canonical/título deben coincidir
+  entre servidor y JS" ya no tiene ningún caso conocido de discrepancia en
+  este sitio.
+- **Paginación**: **hallazgo Low, deliberadamente no corregido.** Las
+  páginas de categoría cortan en 60 vacantes (`PAGE_LIMIT` en
+  `CategoryLanding.tsx`/`server.ts`) sin `rel="next"/"prev"` ni "cargar
+  más" — Bogotá con 7,901 vacantes reales solo enlaza 60 desde su propia
+  página de categoría. No se corrige ahora a propósito: las 22k páginas de
+  vacante ya están 100% cubiertas por `sitemap-jobs.xml` (la categoría no
+  es el mecanismo de descubrimiento), y agregar más URLs indexables
+  (`?page=2`, etc.) iría en contra directa del riesgo de bloat/thin-content
+  a escala que 1.6 ya identificó como el problema más urgente ahora mismo
+  — mismo dominio nuevo, mismo presupuesto de confianza limitado.
+- **IndexNow**: no implementado — sin `indexnow.txt`/key file. Oportunidad
+  menor (Bing/Yandex, no afecta a Google), no implementada esta sesión.
+
 ## 2. Primer paso al reiniciar sesión: baseline de `seo-drift`
 
 Antes de cualquier fase nueva de la tabla de abajo, capturar un baseline
@@ -363,7 +420,7 @@ cambio por terminado.**
 | 2    | Baseline de drift (sección 2 de este doc)                        | `seo-drift`                                              | Baseline guardado para las 6 URLs de muestra                                                                                                                      | ✅ Hecho — 2026-08-04, baseline IDs 1-6. `/seo drift compare` corrido post-deploy de 1.1-1.3 contra las 6: único CRITICAL es `canonical_changed` en `/dashboard` (esperado, ver §1.1); todo lo demás coincide con los diffs pre-etiquetados o es cambio real de datos (conteo de vacantes) |
 | 3    | Confirmar causa raíz con datos reales de Google                  | `seo-google` (`gsc query`, `inspect`, `sitemaps`)        | Requiere que el usuario traiga el desglose de Search Console, o las credenciales `GOOGLE_INDEXING_CLIENT_EMAIL`/`GOOGLE_INDEXING_PRIVATE_KEY` en el entorno local | ⬜ Bloqueado — depende del usuario                                                  |
 | 4    | Auditoría de contenido programático a escala                     | `seo-programmatic`, `seo-content`                        | Score de unicidad real sobre una muestra de páginas de vacante; decidir si la Fase 4 del plan viejo (descripciones reales por fuente) se vuelve necesaria         | ✅ Hecho — 2026-08-04, ver §1.6. Unicidad OK (61.3%), pero contenido absoluto muy corto (~37 palabras/página) — decisión pendiente del usuario, no bloqueante |
-| 5    | Auditoría técnica completa                                       | `seo-technical`, `seo-sitemap`                           | 9 categorías revisadas contra el sitio real; confirmar que nada de lo nuevo (hreflang, `last_seen_at`) introdujo una regresión técnica                            | ⬜ Pendiente                                                                        |
+| 5    | Auditoría técnica completa                                       | `seo-technical`, `seo-sitemap`                           | 9 categorías revisadas contra el sitio real; confirmar que nada de lo nuevo (hreflang, `last_seen_at`) introdujo una regresión técnica                            | ✅ Hecho — 2026-08-04, ver §1.7. Cero CRITICAL; 3 oportunidades Low/Medium anotadas, ninguna implementada (justificación en §1.7) |
 | 6    | Schema.org — validación y oportunidades                          | `seo-schema`                                             | JobPosting validado contra Rich Results; confirmar cero tipos deprecados                                                                                          | ⬜ Pendiente                                                                        |
 | 7    | Core Web Vitals con datos de campo reales                        | `seo-google` (`pagespeed`, `crux`)                       | LCP/INP/CLS con CrUX real, no solo lab data                                                                                                                       | ⬜ Pendiente (necesita credenciales Google)                                         |
 | 8    | GEO / AI Overviews — superficie sin tocar hoy                    | `seo-geo`                                                | Reporte de citability score sobre una página de vacante y una de categoría                                                                                        | ⬜ Pendiente                                                                        |
