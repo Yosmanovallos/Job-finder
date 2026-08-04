@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
 import { ReputationBadges, ReputationEntryProps } from "../components/ReputationBadges.js";
+import { CompanyAvatar } from "../components/CompanyAvatar.js";
 import { CategoryJobRow } from "../components/CategoryJobRow.js";
 import { CompanyReviewForm } from "../components/CompanyReviewForm.js";
 import { CompanyReviewsList, CompanyReviewsDataProps } from "../components/CompanyReviewsList.js";
@@ -35,6 +36,7 @@ export default function CompanyLanding() {
   const { accessToken, loading: authLoading } = useAuth();
 
   const [companyName, setCompanyName] = useState<string | null>(null);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [reputation, setReputation] = useState<ReputationEntryProps[]>([]);
   const [userReviews, setUserReviews] = useState<CompanyReviewsDataProps>(EMPTY_REVIEWS);
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -58,6 +60,7 @@ export default function CompanyLanding() {
       .then((data) => {
         if (data) {
           setCompanyName(data.companyName);
+          setLogoUrl(data.logoUrl || null);
           setReputation(data.reputation || []);
           setUserReviews(data.userReviews || EMPTY_REVIEWS);
           setJobs(data.jobs || []);
@@ -76,8 +79,6 @@ export default function CompanyLanding() {
       ? `Reputación y vacantes activas de ${companyName} en BuscoTrabajo.`
       : "Cargando información de la empresa."
   });
-
-  const initial = (companyName || "?").trim().charAt(0).toUpperCase() || "?";
 
   return (
     <section className="relative w-full min-h-screen bg-background">
@@ -112,9 +113,7 @@ export default function CompanyLanding() {
         {state === "found" && companyName && (
           <>
             <div className="hud-corners flex items-center gap-4 rounded-xl border border-border bg-card p-5 sm:p-6 mb-6">
-              <div className="shrink-0 w-14 h-14 rounded-lg bg-gradient-to-br from-gold-1 to-gold-2 text-gold-ink font-heading font-semibold text-2xl flex items-center justify-center">
-                {initial}
-              </div>
+              <CompanyAvatar name={companyName} logoUrl={logoUrl} className="w-14 h-14 text-2xl" />
               <div className="min-w-0">
                 <h1 className="font-heading font-semibold text-2xl text-foreground leading-snug break-words">
                   {companyName}

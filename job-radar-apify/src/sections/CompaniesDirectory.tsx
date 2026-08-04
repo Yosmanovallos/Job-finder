@@ -3,6 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { Search } from "lucide-react";
 import { MonoLabel } from "../components/MonoLabel.js";
 import { Input } from "../components/ui/input.js";
+import { CompanyAvatar } from "../components/CompanyAvatar.js";
 import { usePageMeta } from "../lib/use-page-meta.js";
 import { buildCompanyPath } from "../lib/job-seo.js";
 import { getCountryConfig } from "../countries/index.js";
@@ -10,14 +11,11 @@ import { getCountryConfig } from "../countries/index.js";
 interface CompanyResult {
   company: string;
   count: number;
+  logoUrl: string | null;
 }
 
 const PAGE_SIZE = 48;
 const SEARCH_DEBOUNCE_MS = 350;
-
-function initialFor(name: string): string {
-  return name.trim().charAt(0).toUpperCase() || "?";
-}
 
 // /empresas — a directory over all 5,525+ distinct companies in the corpus
 // (see FilterBar.tsx's "Empresa" section, which searches the same
@@ -180,9 +178,7 @@ export default function CompaniesDirectory() {
                 to={buildCompanyPath(c.company, country)}
                 className="hud-corners flex items-center gap-3 rounded-lg border border-border bg-card p-4 hover:border-border-strong transition-colors"
               >
-                <div className="shrink-0 w-11 h-11 rounded-lg bg-gradient-to-br from-gold-1 to-gold-2 text-gold-ink font-heading font-semibold text-lg flex items-center justify-center">
-                  {initialFor(c.company)}
-                </div>
+                <CompanyAvatar name={c.company} logoUrl={c.logoUrl} className="w-11 h-11 text-lg" />
                 <div className="min-w-0 flex-1">
                   <p className="font-heading font-semibold text-sm text-foreground truncate">
                     {c.company}

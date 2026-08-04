@@ -24,6 +24,7 @@ import {
   getCompanyReviews
 } from "./db/company-reviews-repository.js";
 import { applyJobFilters, sortByPreferredRoles, JobFilterParams } from "./lib/job-filters.js";
+import { getCompanyLogoUrl } from "./data/company-logo-domains.js";
 import { getCountryConfig } from "./countries/index.js";
 import {
   escapeHtml,
@@ -80,6 +81,10 @@ const COMPANY_SEARCH_EXCLUDED = new Set(["Confidencial", "Empresa confidencial"]
 export interface CompanySearchResult {
   company: string;
   count: number;
+  // Only set for the small hand-verified subset in company-logo-domains.ts
+  // (see its header comment) — null for every other company, which keeps
+  // rendering its plain-initial avatar.
+  logoUrl: string | null;
 }
 
 export interface CompanySearchPage {
@@ -121,7 +126,7 @@ function searchCompanies(
   return {
     companies: entries
       .slice(offset, offset + limit)
-      .map(([company, count]) => ({ company, count })),
+      .map(([company, count]) => ({ company, count, logoUrl: getCompanyLogoUrl(company) })),
     total: entries.length
   };
 }
@@ -415,6 +420,7 @@ const server = http.createServer(async (req, res) => {
     res.end(
       JSON.stringify({
         companyName,
+        logoUrl: getCompanyLogoUrl(companyName),
         reputation: reputationMap.get(companyName) || [],
         userReviews,
         jobs: page,
