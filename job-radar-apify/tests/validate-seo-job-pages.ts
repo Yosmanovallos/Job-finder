@@ -17,6 +17,7 @@ import {
   buildSitemapIndexXml,
   isUuid,
   resolveCategorySlug,
+  RETIRED_ROLE_SLUGS,
   buildCategoryMeta,
   buildCategoryPath,
   buildCategoriesSitemapXml,
@@ -802,6 +803,30 @@ async function runHttpTests() {
       badCategoryRes.status === 404,
       "Un slug de categoría inventado responde 404 real.",
       `Un slug de categoría inventado respondió ${badCategoryRes.status} en vez de 404.`
+    );
+
+    // Category pages — un slug de rol retirado de DEFAULT_ROLES_200 (§1.10)
+    // debe responder 410, no 404 — ya estaba en sitemap-categories.xml y
+    // fue rastreado por Google antes del swap, así que "nunca existió" sería
+    // falso. Mismo criterio que wasJobPurged() ya aplica a vacantes retiradas.
+    const retiredSlug = [...RETIRED_ROLE_SLUGS][0];
+    const retiredCategoryRes = await fetch(`${BASE_URL}/empleos/${retiredSlug}`);
+    const retiredCategoryHtml = await retiredCategoryRes.text();
+    check(
+      retiredCategoryRes.status === 410,
+      `Un slug de rol retirado (/empleos/${retiredSlug}) responde 410, no 404 — estaba en el sitemap antes del swap.`,
+      `Un slug de rol retirado (/empleos/${retiredSlug}) respondió ${retiredCategoryRes.status} en vez de 410.`
+    );
+    check(
+      retiredCategoryHtml.includes('noindex') && !retiredCategoryHtml.includes("application/ld+json"),
+      `La página 410 de /empleos/${retiredSlug} trae noindex y ningún JSON-LD.`,
+      `La página 410 de /empleos/${retiredSlug} no trae noindex o incluye JSON-LD que Google no debería seguir.`
+    );
+    const retiredCategoryVeRes = await fetch(`${BASE_URL}/ve/empleos/${retiredSlug}`);
+    check(
+      retiredCategoryVeRes.status === 410,
+      `Un slug de rol retirado también responde 410 bajo /ve (/ve/empleos/${retiredSlug}).`,
+      `/ve/empleos/${retiredSlug} respondió ${retiredCategoryVeRes.status} en vez de 410.`
     );
 
     // sitemap-categories.xml + índice actualizado — ahora incluye ambos

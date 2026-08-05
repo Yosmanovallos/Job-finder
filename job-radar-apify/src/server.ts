@@ -38,6 +38,7 @@ import {
   buildSitemapIndexXml,
   isUuid,
   resolveCategorySlug,
+  RETIRED_ROLE_SLUGS,
   buildCategoryMeta,
   buildCategoryPath,
   buildCategoryBreadcrumbList,
@@ -817,6 +818,17 @@ const server = http.createServer(async (req, res) => {
       const requestCountry = isVeEmpleos ? "VE" : "CO";
       const category = resolveCategorySlug(id, requestCountry);
       if (!category) {
+        // A role slug that used to resolve (crawled/sitemapped before a
+        // taxonomy swap, see job-seo.ts's RETIRED_ROLE_SLUGS comment) is a
+        // real "no longer here", not the same as a slug that never existed
+        // — same distinction wasJobPurged() already makes for job URLs.
+        if (RETIRED_ROLE_SLUGS.has(id.toLowerCase())) {
+          res.writeHead(410, { "Content-Type": "text/html; charset=utf-8" });
+          res.end(
+            '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Categoría ya no disponible | BuscoTrabajo</title><meta name="robots" content="noindex"></head><body><h1>Esta categoría ya no está disponible</h1><p>El rol fue retirado de la lista de búsqueda activa.</p><p><a href="/dashboard">Ver todas las vacantes</a></p></body></html>'
+          );
+          return;
+        }
         res.writeHead(404, { "Content-Type": "text/html; charset=utf-8" });
         res.end(
           '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Categoría no encontrada | BuscoTrabajo</title><meta name="robots" content="noindex"></head><body><h1>Categoría no encontrada</h1><p><a href="/dashboard">Ver todas las vacantes</a></p></body></html>'

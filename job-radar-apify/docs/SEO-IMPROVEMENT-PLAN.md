@@ -532,6 +532,42 @@ Verificado en verde tras el swap: `tsc --noEmit`, `npm run build`,
 `test:seo` (79 URLs de categoría sin cambios), `test:dashboard-filters`,
 `test:companies-search`, `test:role-matching`.
 
+**Corrección post-swap, misma sesión (2026-08-04): 404 real detectado en
+lugar de 410.** Antes de dar el swap por terminado se confirmó que quitar 3
+roles de `DEFAULT_ROLES_200` significaba que `resolveCategorySlug()` ya no
+reconoce `data-analyst`/`data-engineer`/`rpa-developer` — las 6 URLs
+(`/empleos/<slug>` + `/ve/empleos/<slug>`) que Search Console ya había
+rastreado (los 3 sub-sitemaps reportan "Correcto") empezaron a caer en la
+misma rama 404 genérica que un slug inventado. La aserción de `test:seo`
+sobre las 79 URLs no lo detecta porque cuenta URLs, no identidad — un swap
+3-por-3 deja el conteo invariante.
+
+Se corrigió antes de considerar la fase cerrada: `RETIRED_ROLE_SLUGS`
+(`job-seo.ts`) marca explícitamente los 3 slugs retirados, y la rama de
+categoría en `server.ts` responde 410 (con `noindex`, sin JSON-LD) para
+esos slugs específicos en vez de 404 — mismo tratamiento que
+`wasJobPurged()` ya le da a una vacante retirada: una señal real de "ya no
+está" en vez de "nunca existió". `sitemap-categories.xml` ya no las lista
+(se genera a partir del `DEFAULT_ROLES_200` actual), así que Google las irá
+soltando de su cola de rastreo con la señal correcta, sin haber pasado por
+un 404 falso primero. Cobertura nueva en `test:seo` (3 checks: 410 en
+`/empleos/<retirado>`, `noindex`+sin JSON-LD, y 410 también bajo `/ve`).
+Re-verificado en verde: `tsc --noEmit`, `npm run build`, `test:seo`,
+`test:dashboard-filters`, `test:companies-search`, `test:role-matching`.
+
+**Nota para el drift compare post-deploy (tarea pendiente, ver checklist de
+sesión)**: `/empleos/bogota` es una de las 6 URLs de baseline y Fase 6
+(§1.11) le agregó BreadcrumbList+ItemList — el próximo `/seo drift compare`
+va a marcar `schema_hash` como cambiado ahí. Es el cambio esperado de
+§1.11, no una regresión.
+
+**Aún pendiente, no bloqueante**: el checklist manual de
+`docs/QA-CHECKLIST-SEO.md` (Rich Results Test) no se ha corrido contra los
+tipos `BreadcrumbList`/`ItemList` nuevos de §1.11 — la validación de código
+(JSON válido, campos reales, verificado con `curl` directo) está hecha; la
+validación del lado de Google sigue pendiente de que el usuario la corra o
+la autorice.
+
 ### 1.11 Fase 6 — Schema.org: BreadcrumbList + ItemList en páginas de categoría (2026-08-04)
 
 `§1.7` (Fase 5) ya había confirmado JobPosting/Organization/WebSite válidos

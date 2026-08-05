@@ -296,6 +296,19 @@ export interface ResolvedCategory {
   country: string;
 }
 
+// Role slugs removed from DEFAULT_ROLES_200 in a taxonomy swap (see
+// SEO-IMPROVEMENT-PLAN.md §1.10) — these URLs were already in
+// sitemap-categories.xml and crawled by Google before the swap, so once
+// resolveCategorySlug() stops recognizing them they must not silently fall
+// through to a generic "never existed" 404. Mirrors the same 410 treatment
+// wasJobPurged() already gives a retired job URL: a real, deliberate
+// "no longer here" signal, not the same code path as a slug that never
+// existed. Append to this, never remove an entry, when a future swap
+// retires more role slugs.
+export const RETIRED_ROLE_SLUGS: ReadonlySet<string> = new Set(
+  ["Data Analyst", "Data Engineer", "RPA Developer"].map(slugify)
+);
+
 // Looks a non-UUID `/empleos/` segment up against the same taxonomy the
 // dashboard's filters already use (CITY_OPTIONS + Venezuela's own city list,
 // DEFAULT_ROLES_200) — no new list to maintain beyond what countries/

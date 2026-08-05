@@ -73,6 +73,14 @@ exactamente lo que Googlebot lee antes de ejecutar JavaScript.
 - [ ] Un id que no existe (`/empleos/00000000-0000-0000-0000-000000000000/x`)
       responde 404 real (ver el código de estado, no solo el mensaje en
       pantalla).
+- [ ] **Pendiente desde SEO-IMPROVEMENT-PLAN.md §1.11 (2026-08-04)**: en una
+      página de categoría real (`/empleos/bogota` o `/empleos/<un rol>`),
+      copiar los dos bloques `<script type="application/ld+json">` nuevos
+      (`"@type": "BreadcrumbList"` y `"@type": "ItemList"`) y pegarlos en
+      [Google Rich Results Test](https://search.google.com/test/rich-results)
+      — deben validar sin errores. Solo se verificó en código (JSON válido,
+      URLs/títulos reales vía `curl` directo) — la validación del lado de
+      Google todavía no se corrió.
 
 ## 2. Página individual — vista de usuario real (después de que carga JS)
 
