@@ -734,6 +734,17 @@ directamente (deny-list del proyecto) — solo verificó el formato del
 private key fuera del repo, sin guardarlo en disco, antes de indicarle al
 usuario qué pegar.
 
+**⚠️ Nota de seguridad para cualquier sesión futura**: el private key de
+`indexing-bot@job-finder-503421` se pegó en texto plano en el chat de esta
+sesión (2026-08-04) para poder diagnosticar el problema de comillas. El
+usuario fue instruido a rotar esa clave (Google Cloud Console → IAM y
+administración → Cuentas de servicio → `indexing-bot@job-finder-503421` →
+Claves → agregar clave nueva → actualizar `.env` → **borrar la clave
+vieja**). Si una sesión futura ve `GOOGLE_INDEXING_PRIVATE_KEY` funcionando
+en `.env`, no asumir que es la misma que aparece en el historial de esta
+conversación — debería haber sido rotada. Si algo con esa credencial falla
+de forma extraña, esto es lo primero a verificar.
+
 `scripts/check-search-console.ts` (solo lectura, ya existente):
 
 - **`sitemaps.list`** (conteos agregados): `sitemap-pages.xml` 12
@@ -818,7 +829,7 @@ cambio por terminado.**
 | 4    | Auditoría de contenido programático a escala                     | `seo-programmatic`, `seo-content`                        | Score de unicidad real sobre una muestra de páginas de vacante; decidir si la Fase 4 del plan viejo (descripciones reales por fuente) se vuelve necesaria         | ✅ Hecho — 2026-08-04, ver §1.6. Unicidad OK (61.3%), pero contenido absoluto muy corto (~37 palabras/página) — decisión pendiente del usuario, no bloqueante |
 | 5    | Auditoría técnica completa                                       | `seo-technical`, `seo-sitemap`                           | 9 categorías revisadas contra el sitio real; confirmar que nada de lo nuevo (hreflang, `last_seen_at`) introdujo una regresión técnica                            | ✅ Hecho — 2026-08-04, ver §1.7. Cero CRITICAL; 3 oportunidades Low/Medium anotadas, ninguna implementada (justificación en §1.7) |
 | 6    | Schema.org — validación y oportunidades                          | `seo-schema`                                             | JobPosting validado contra Rich Results; confirmar cero tipos deprecados                                                                                          | ✅ Hecho — 2026-08-04, ver §1.11. JobPosting/Organization/WebSite ya validados en §1.7; oportunidad de §1.7 (BreadcrumbList/ItemList en categorías) implementada |
-| 7    | Core Web Vitals con datos de campo reales                        | `seo-google` (`pagespeed`, `crux`)                       | LCP/INP/CLS con CrUX real, no solo lab data                                                                                                                       | ✅ Hecho — 2026-08-04, ver §1.14. API key real conectada; CrUX confirma (no asume) que aún no hay datos de campo — dominio demasiado nuevo/bajo tráfico para el umbral de 28 días |
+| 7    | Core Web Vitals con datos de campo reales                        | `seo-google` (`pagespeed`, `crux`)                       | LCP/INP/CLS con CrUX real, no solo lab data                                                                                                                       | ⬜ Bloqueado por falta de datos de campo (no por credenciales) — API key real conectada y funcionando (ver §1.14), pero CrUX confirma que el dato aún no existe (dominio con ~9-15 días, umbral real de 28). Reintentar en 2-3 semanas cuando CrUX empiece a publicar |
 | 8    | GEO / AI Overviews — superficie sin tocar hoy                    | `seo-geo`                                                | Reporte de citability score sobre una página de vacante y una de categoría                                                                                        | ✅ Hecho — 2026-08-04, ver §1.12. Fecha de publicación real agregada al texto visible; contenido corto sigue siendo el mismo límite ya documentado en §1.6 |
 | 9    | Investigación de keywords (solo si hay fuente de datos real)     | `seo-google` (`keywords`, Tier 3) o extensión DataForSEO | **No arranca sin credenciales reales** — nunca un volumen inventado                                                                                               | ⬜ Bloqueado (volumen real) — parcialmente sustituido con alternativa gratuita, ver §1.8/§1.10. Sigue sin credenciales Ads/DataForSEO |
 
