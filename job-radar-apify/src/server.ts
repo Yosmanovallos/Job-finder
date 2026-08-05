@@ -45,6 +45,11 @@ import {
   buildCategoryItemList,
   buildCategoriesSitemapXml,
   resolveCompanyNameFromJobs,
+  buildCompanyPath,
+  buildCompanyUrl,
+  buildCompanyMeta,
+  buildCompanyOrganizationSchema,
+  buildCompaniesItemList,
   SITE_URL
 } from "./lib/job-seo.js";
 import { verifySession } from "./auth/verify-session.js";
@@ -83,6 +88,17 @@ async function attachReputation<T extends { company: string }>(
 // company_reputation_alias's exact-string convention applies here too — no
 // fuzzy merge of near-duplicate names (regla 5 de AGENTS.md).
 const COMPANY_SEARCH_EXCLUDED = new Set(["Confidencial", "Empresa confidencial"]);
+
+// Mirrors ReputationBadges.tsx's SOURCE_LABELS exactly (that file's own
+// comment: "Text attribution only, never a source's logo" — none of these
+// sources license logo reuse). Duplicated here, not imported, because the
+// canonical copy lives in a .tsx client component this server module has
+// no reason to depend on for one 3-entry map.
+const REPUTATION_SOURCE_LABELS: Record<string, string> = {
+  merco: "Merco Talento",
+  gptw: "Great Place to Work",
+  computrabajo: "Computrabajo"
+};
 
 export interface CompanySearchResult {
   company: string;
@@ -1095,6 +1111,235 @@ const server = http.createServer(async (req, res) => {
       .replace(
         "</head>",
         `  <script type="application/ld+json">${escapeJsonForScriptTag(jobPosting)}</script>\n</head>`
+      );
+
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+    res.end(indexHtml);
+    return;
+  }
+
+  // 7b-bis. GET /empresas, /ve/empresas (directory) and
+  // /empresas/:slug, /ve/empresas/:slug (individual company) — same SSR
+  // principle as /empleos/:id/:slug and the category branch above, applied
+  // to a page type that was deliberately left CSR-only when it first
+  // shipped (see docs/COMPANY-REPUTATION-PLAN.md §8: "sin SSR todavía —
+  // es navegación de dashboard, no una fase SEO"). Confirmed live via the
+  // real Search Console API (SEO-IMPROVEMENT-PLAN.md §1.15) that
+  // `/empresas` was "unknown to Google" — this closes that gap the same
+  // way §1.1 closed it for /dashboard.
+  const isVeEmpresas = pathname === "/ve/empresas" || pathname.startsWith("/ve/empresas/");
+  if ((pathname === "/empresas" || pathname.startsWith("/empresas/") || isVeEmpresas) && method === "GET") {
+    const basePath = isVeEmpresas ? pathname.slice(3) : pathname;
+    const slug = basePath === "/empresas" ? null : basePath.slice("/empresas/".length).split("/")[0] || null;
+    const requestCountry = isVeEmpresas ? "VE" : "CO";
+    const countryConfig = getCountryConfig(requestCountry);
+
+    const jobs = await getJobsCached(50000);
+    // Always the public (tier: "free") view, same reasoning as the
+    // category branch: this is what an anonymous crawler/visitor sees,
+    // never session-specific content.
+    const visibleJobs = maskLockedFields(jobs, "free");
+    const countryJobs = applyJobFilters(visibleJobs, { country: requestCountry });
+
+    let indexHtml: string;
+    try {
+      indexHtml = fs.readFileSync(path.join(PUBLIC_DIR, "index.html"), "utf-8");
+    } catch {
+      res.writeHead(500, { "Content-Type": "text/plain" });
+      res.end("Server Error: build not found");
+      return;
+    }
+
+    if (!slug) {
+      // Directory hub — same PAGE_SIZE the client's first paint already
+      // uses (CompaniesDirectory.tsx), so the SSR payload matches what
+      // the client would have fetched anyway instead of a different page.
+      const { companies, total } = searchCompanies(countryJobs, "", 48, 0);
+      const heading = `Empresas en ${countryConfig.name}`;
+      const meta = {
+        title: `${heading} | BuscoTrabajo`,
+        description: `Explora empresas con vacantes activas en ${countryConfig.name} en BuscoTrabajo — su reputación, reseñas y ofertas.`,
+        canonicalUrl: `${SITE_URL}${isVeEmpresas ? "/ve" : ""}/empresas`
+      };
+
+      const items = companies
+        .map((c) => {
+          const href = buildCompanyPath(c.company, requestCountry);
+          return `<li><a href="${href}">${escapeHtml(c.company)}</a> — ${c.count} vacante${c.count === 1 ? "" : "s"}</li>`;
+        })
+        .join("\n");
+      const ssrSnippet = `<h1>${escapeHtml(heading)}</h1>\n<nav aria-label="Empresas"><ul>\n${items}\n</ul></nav>`;
+      indexHtml = indexHtml.replace('<div id="app"></div>', `<div id="app">${ssrSnippet}</div>`);
+
+      const ssrCompaniesPayload = escapeJsonForScriptTag({
+        companies,
+        total,
+        hasMore: 48 < total,
+        country: requestCountry
+      });
+      indexHtml = indexHtml.replace(
+        "</head>",
+        `  <script>window.__SSR_COMPANIES__=${ssrCompaniesPayload};</script>\n</head>`
+      );
+
+      const companiesItemList = buildCompaniesItemList(heading, companies, requestCountry);
+      indexHtml = indexHtml.replace(
+        "</head>",
+        `  <script type="application/ld+json">${escapeJsonForScriptTag(companiesItemList)}</script>\n</head>`
+      );
+
+      indexHtml = indexHtml
+        .replace(/<title>[\s\S]*?<\/title>/, `<title>${escapeHtml(meta.title)}</title>`)
+        .replace(
+          /<meta[^>]*name=["']description["'][^>]*>/,
+          `<meta name="description" content="${escapeHtml(meta.description)}" />`
+        )
+        .replace(
+          /<link[^>]*rel=["']canonical["'][^>]*>/,
+          `<link rel="canonical" href="${escapeHtml(meta.canonicalUrl)}" />`
+        );
+
+      // Reciprocal hreflang — /empresas and /ve/empresas are two real,
+      // genuinely different directories (each country's own companies),
+      // same reasoning as /dashboard/ /ve/dashboard's pair.
+      const coEmpresasUrl = `${SITE_URL}/empresas`;
+      const veEmpresasUrl = `${SITE_URL}/ve/empresas`;
+      const empresasHreflangTags =
+        `    <link rel="alternate" hreflang="es-CO" href="${coEmpresasUrl}" />\n` +
+        `    <link rel="alternate" hreflang="es-VE" href="${veEmpresasUrl}" />\n` +
+        `    <link rel="alternate" hreflang="x-default" href="${coEmpresasUrl}" />`;
+      indexHtml = indexHtml.replace(
+        /<link[^>]*rel=["']canonical["'][^>]*>/,
+        (canonicalTag) => `${canonicalTag}\n${empresasHreflangTags}`
+      );
+
+      indexHtml = indexHtml
+        .replace(
+          /<meta[^>]*property=["']og:title["'][^>]*>/,
+          `<meta property="og:title" content="${escapeHtml(meta.title)}" />`
+        )
+        .replace(
+          /<meta[^>]*property=["']og:description["'][^>]*>/,
+          `<meta property="og:description" content="${escapeHtml(meta.description)}" />`
+        )
+        .replace(
+          /<meta[^>]*name=["']twitter:title["'][^>]*>/,
+          `<meta name="twitter:title" content="${escapeHtml(meta.title)}" />`
+        )
+        .replace(
+          /<meta[^>]*name=["']twitter:description["'][^>]*>/,
+          `<meta name="twitter:description" content="${escapeHtml(meta.description)}" />`
+        );
+
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+      res.end(indexHtml);
+      return;
+    }
+
+    // Individual company page — exact same two-step resolution and
+    // country-scoping rules as GET /api/companies/:slug (server.ts's own
+    // API handler below), so SSR never disagrees with what the client
+    // fetch would have shown.
+    const companyName = (await resolveCompanyBySlug(slug)) || resolveCompanyNameFromJobs(slug, countryJobs);
+    if (!companyName) {
+      res.writeHead(404, { "Content-Type": "text/html; charset=utf-8" });
+      res.end(
+        '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Empresa no encontrada | BuscoTrabajo</title><meta name="robots" content="noindex"></head><body><h1>Empresa no encontrada</h1><p><a href="/dashboard">Ver todas las vacantes</a></p></body></html>'
+      );
+      return;
+    }
+
+    const matched = applyJobFilters(countryJobs, { company: companyName });
+    // A curated (resolveCompanyBySlug) company can resolve to a real name
+    // that simply has no jobs in this country's scoped view — treated as
+    // "not found here", never an empty-but-200 page, same rule the API
+    // enforces (server.ts's /api/companies/:slug handler).
+    if (matched.length === 0) {
+      res.writeHead(404, { "Content-Type": "text/html; charset=utf-8" });
+      res.end(
+        '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Empresa no encontrada | BuscoTrabajo</title><meta name="robots" content="noindex"></head><body><h1>Empresa no encontrada</h1><p><a href="/dashboard">Ver todas las vacantes</a></p></body></html>'
+      );
+      return;
+    }
+    // Never link a job in the visible SSR list that wouldn't also render
+    // for the same anonymous visitor — same filter the sitemap/category
+    // branches already apply.
+    const publicMatched = matched.filter(isPubliclyDescribable);
+    const page = publicMatched.slice(0, 60);
+
+    const reputationMap = await getReputationForCompanies([companyName]);
+    const reputation = reputationMap.get(companyName) || [];
+    const meta = buildCompanyMeta(companyName, matched.length, requestCountry);
+
+    const reputationItems = reputation
+      .map((r) => {
+        // Same source-label map and "score null -> Certificación" rule as
+        // ReputationBadges.tsx (the client component rendering this same
+        // data) — kept in sync manually since that map lives in a .tsx
+        // file this server module doesn't import from.
+        const label = REPUTATION_SOURCE_LABELS[r.source] || r.source;
+        const scoreText = r.score !== null ? `${r.score} (${r.scoreScale})` : "Certificación";
+        const reviewText = r.reviewCount !== null ? ` · ${r.reviewCount} reseñas` : "";
+        return `<li>${escapeHtml(label)}: ${escapeHtml(scoreText)}${reviewText}</li>`;
+      })
+      .join("\n");
+    const jobItems = page
+      .map((job: any) => {
+        const href = buildJobPath(job);
+        return `<li><a href="${href}">${escapeHtml(job.title)}</a> — ${escapeHtml(job.location || countryConfig.name)}</li>`;
+      })
+      .join("\n");
+    const ssrSnippet =
+      `<h1>${escapeHtml(companyName)}</h1>\n` +
+      (reputationItems ? `<ul aria-label="Reputación">\n${reputationItems}\n</ul>` : "") +
+      `<nav aria-label="Vacantes"><ul>\n${jobItems}\n</ul></nav>`;
+    indexHtml = indexHtml.replace('<div id="app"></div>', `<div id="app">${ssrSnippet}</div>`);
+
+    const ssrCompanyPayload = escapeJsonForScriptTag({
+      slug,
+      country: requestCountry,
+      companyName,
+      logoUrl: getCompanyLogoUrl(companyName),
+      reputation,
+      jobs: page,
+      total: matched.length
+    });
+    indexHtml = indexHtml.replace(
+      "</head>",
+      `  <script>window.__SSR_COMPANY__=${ssrCompanyPayload};</script>\n</head>`
+    );
+
+    const organizationSchema = buildCompanyOrganizationSchema(companyName, meta, reputation);
+    indexHtml = indexHtml.replace(
+      "</head>",
+      `  <script type="application/ld+json">${escapeJsonForScriptTag(organizationSchema)}</script>\n</head>`
+    );
+
+    indexHtml = indexHtml
+      .replace(/<title>[\s\S]*?<\/title>/, `<title>${escapeHtml(meta.title)}</title>`)
+      .replace(
+        /<meta[^>]*name=["']description["'][^>]*>/,
+        `<meta name="description" content="${escapeHtml(meta.description)}" />`
+      )
+      .replace(
+        /<link[^>]*rel=["']canonical["'][^>]*>/,
+        `<link rel="canonical" href="${escapeHtml(meta.canonicalUrl)}" />`
+      )
+      .replace(
+        /<meta[^>]*property=["']og:title["'][^>]*>/,
+        `<meta property="og:title" content="${escapeHtml(meta.title)}" />`
+      )
+      .replace(
+        /<meta[^>]*property=["']og:description["'][^>]*>/,
+        `<meta property="og:description" content="${escapeHtml(meta.description)}" />`
+      )
+      .replace(
+        /<meta[^>]*name=["']twitter:title["'][^>]*>/,
+        `<meta name="twitter:title" content="${escapeHtml(meta.title)}" />`
+      )
+      .replace(
+        /<meta[^>]*name=["']twitter:description["'][^>]*>/,
+        `<meta name="twitter:description" content="${escapeHtml(meta.description)}" />`
       );
 
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });

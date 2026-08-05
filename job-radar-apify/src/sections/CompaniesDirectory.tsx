@@ -68,6 +68,24 @@ export default function CompaniesDirectory() {
   // Reset + fetch the first page whenever the (debounced) search changes.
   useEffect(() => {
     const myRequestId = ++requestIdRef.current;
+
+    // server.ts's /empresas (and /ve/empresas) route embeds this exact
+    // first-page response directly in the HTML — same shortcut
+    // Dashboard.tsx/CompanyLanding.tsx already use for their own SSR
+    // payloads. Only trusted for the untouched, first-load case (no
+    // search typed yet, country matches this mount) — any real search
+    // query or country mismatch falls through to the normal fetch below.
+    // Deleted immediately after one read.
+    const ssrCompanies = (window as any).__SSR_COMPANIES__;
+    delete (window as any).__SSR_COMPANIES__;
+    if (ssrCompanies && ssrCompanies.country === country && debouncedSearch.trim() === "") {
+      setCompanies(Array.isArray(ssrCompanies.companies) ? ssrCompanies.companies : []);
+      setTotal(ssrCompanies.total || 0);
+      setHasMore(!!ssrCompanies.hasMore);
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     setCompanies([]);
 

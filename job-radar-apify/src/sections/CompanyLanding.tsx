@@ -17,12 +17,10 @@ const EMPTY_REVIEWS: CompanyReviewsDataProps = { average: null, count: 0, entrie
 type LoadState = "loading" | "found" | "not-found";
 
 // Reached from JobDetailPanel/JobCard's company-name link
-// (buildCompanyPath(job.company)) — dashboard navigation, not an
-// SEO-driven page like JobLanding/CategoryLanding (see the "empresas"
-// note in docs/COMPANY-REPUTATION-PLAN.md). No SSR yet: a direct load or
-// refresh already falls through to the generic SPA fallback in server.ts
-// (any extensionless path serves index.html), same as /dashboard did
-// before it got its own SSR.
+// (buildCompanyPath(job.company)) — and, since SEO-IMPROVEMENT-PLAN.md
+// §1.16, also a real SSR-backed landing page in its own right
+// (server.ts's /empresas/:slug branch), same pattern as
+// JobLanding/CategoryLanding/Dashboard.
 export default function CompanyLanding() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
@@ -53,6 +51,30 @@ export default function CompanyLanding() {
     // session resolves, and the second run's setState("loading") drops an
     // already-rendered page back to the skeleton for every logged-in visitor.
     if (authLoading) return;
+
+    // server.ts's /empresas/:slug (and /ve/empresas/:slug) route embeds
+    // this exact response (minus session-specific userReviews, which the
+    // SSR render can't know) directly in the HTML — same shortcut
+    // Dashboard.tsx already uses for window.__SSR_JOBS__. Only trusted
+    // when BOTH slug and country match this mount (never just "one of the
+    // two countries", same reasoning as Dashboard's ssrJobs.country
+    // check) and only when anonymous (!accessToken) — a signed-in visitor
+    // still needs the real fetch below to get their own myReview, which
+    // this payload never includes. Deleted immediately after one read so
+    // a later slug/filter change can never reuse stale data.
+    const ssrCompany = (window as any).__SSR_COMPANY__;
+    delete (window as any).__SSR_COMPANY__;
+    if (ssrCompany && ssrCompany.slug === slug && ssrCompany.country === country && !accessToken) {
+      setCompanyName(ssrCompany.companyName);
+      setLogoUrl(ssrCompany.logoUrl || null);
+      setReputation(ssrCompany.reputation || []);
+      setUserReviews(EMPTY_REVIEWS);
+      setJobs(ssrCompany.jobs || []);
+      setTotal(ssrCompany.total || 0);
+      setState("found");
+      return;
+    }
+
     setState("loading");
     const headers: HeadersInit = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
     fetch(`/api/companies/${encodeURIComponent(slug)}?country=${country}`, { headers })

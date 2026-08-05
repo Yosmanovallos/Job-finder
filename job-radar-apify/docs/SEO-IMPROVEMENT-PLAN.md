@@ -796,6 +796,65 @@ apuro a esta sesión. Queda anotado para una fase futura dedicada.
 Verificado: `npm run build`, `test:seo` en verde tras agregar las 2 URLs
 al sitemap estático.
 
+### 1.16 SSR real para `/empresas` y `/empresas/:slug` (2026-08-04)
+
+Hallazgo de §1.15 llevado a implementación: `/empresas` (directorio) y
+`/empresas/:slug` (empresa individual) nunca tuvieron rama SSR en
+`server.ts` — decisión deliberada documentada en
+`docs/COMPANY-REPUTATION-PLAN.md` §8 cuando la feature era solo
+navegación de dashboard, nunca revisada después de que `/empresas`
+empezara a importar para SEO. Cierra la misma clase de gap que §1.1 ya
+cerró para `/dashboard`.
+
+**`src/lib/job-seo.ts`**: `buildCompanyMeta()`, `buildCompanyOrganizationSchema()`
+(schema `Organization` — deliberadamente SIN `aggregateRating`: Merco,
+GPTW y Computrabajo puntúan en escalas distintas (`scoreScale`), promediar
+inventaría un dato que no existe; `sameAs` solo cita URLs reales ya
+obtenidas por fuente) y `buildCompaniesItemList()` (mismo patrón que
+`buildCategoryItemList` de §1.11).
+
+**`src/server.ts`**: nueva rama `/empresas`, `/ve/empresas` (directorio,
+reusa `searchCompanies()` ya existente) y `/empresas/:slug`,
+`/ve/empresas/:slug` (empresa individual, misma resolución de dos pasos
+que ya usa `GET /api/companies/:slug` —
+`resolveCompanyBySlug() || resolveCompanyNameFromJobs()` — y la misma
+regla de país: una empresa curada sin vacantes en el país scoped
+responde 404, nunca una página vacía). Vacantes en el snippet SSR
+filtradas por `isPubliclyDescribable()`, mismo criterio que la categoría.
+Hreflang recíproco `/empresas`↔`/ve/empresas` (mismo criterio que
+`/dashboard`↔`/ve/dashboard`: son dos directorios genuinamente distintos,
+no city pages sin par). Reputación como texto visible usa el mismo mapa
+de labels (`Merco Talento`/`Great Place to Work`/`Computrabajo`) y la
+misma regla "score null → Certificación" que `ReputationBadges.tsx` — no
+se dejó el `source`/`scoreScale` crudo de la base de datos.
+
+**Cliente** (`CompanyLanding.tsx`, `CompaniesDirectory.tsx`): consumen
+`window.__SSR_COMPANY__`/`window.__SSR_COMPANIES__` con el mismo patrón
+de `Dashboard.tsx` para `window.__SSR_JOBS__` — gateado por los campos
+propios del payload (`slug`+`country`, no solo el pathname, mismo error
+que ya se evitó una vez esta sesión) y solo cuando `!accessToken`, para
+que un visitante autenticado siga yendo por el fetch real (necesario
+para `userReviews.myReview`, que el SSR anónimo nunca puede traer).
+
+**Verificado**: `tsc --noEmit`, `npm run build`, `test:seo` (7 checks
+nuevos: empresa real 200 + link real + nombre real en HTML crudo +
+Organization JSON-LD válido + sin aggregateRating fabricado, slug
+inventado 404, directorio 200 + ItemList válido), `test:dashboard-filters`,
+`test:companies-search`, `test:role-matching`, `test:reputation` (cubre
+`resolveCompanyBySlug()`/el fallback del que depende esta rama). Además,
+smoke test real con Playwright (`driver.mjs screenshot`) contra
+`/empresas` y `/empresas/accenture-colombia` — cero errores de consola,
+capturas confirman datos reales (reputación, vacantes, conteos) — no solo
+el test automatizado.
+
+**Decisión del usuario, no implementada**: NO se agregaron las ~7,255
+páginas de `/empresas/:slug` a ningún sitemap todavía — mismo riesgo de
+índice-bloat/thin-content en un dominio que ya tiene páginas de rol
+atascadas en "Discovered - currently not indexed" (§1.15). Las páginas
+siguen siendo válidas y alcanzables por link interno (el directorio
+`/empresas` ya las enlaza), solo no se empujan activamente. Revisar en
+unas semanas si el patrón de indexación mejora.
+
 ## 2. Primer paso al reiniciar sesión: baseline de `seo-drift`
 
 Antes de cualquier fase nueva de la tabla de abajo, capturar un baseline

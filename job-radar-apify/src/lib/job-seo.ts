@@ -402,6 +402,82 @@ export function resolveCompanyNameFromJobs(slug: string, jobs: Job[]): string | 
   return null;
 }
 
+export interface CompanyMeta {
+  title: string;
+  heading: string;
+  description: string;
+  canonicalUrl: string;
+}
+
+// totalCount is always the real, already-country/job-corpus-filtered match
+// count — same "never claim more/fewer than truly exist right now" rule as
+// buildCategoryMeta above.
+export function buildCompanyMeta(
+  companyName: string,
+  totalCount: number,
+  country?: string | null
+): CompanyMeta {
+  const countryName = getCountryConfig(country || DEFAULT_COUNTRY).name;
+  const countLabel = totalCount === 1 ? "1 vacante activa" : `${totalCount} vacantes activas`;
+  return {
+    title: `${companyName} | BuscoTrabajo`,
+    heading: companyName,
+    description: `${companyName}: ${countLabel} en BuscoTrabajo — reputación y reseñas reales en ${countryName}.`,
+    canonicalUrl: buildCompanyUrl(companyName, country)
+  };
+}
+
+// Minimal shape (not the full ReputationEntry from
+// company-reputation-repository.ts, a server/DB-only module this
+// client-shared file never imports from) — only the field this actually
+// needs: a real, verifiable profile URL for that source's page on this
+// company, safe to cite as `sameAs`.
+export interface CompanyReputationSourceRef {
+  sourceUrl: string;
+}
+
+// Organization schema for a company page — deliberately NOT
+// AggregateRating: Merco/GPTW/Computrabajo each score on their own
+// `scoreScale` (see ReputationEntry), so averaging them into one number
+// would state a fact that doesn't exist. `sameAs` only cites real,
+// already-fetched source URLs — never invented.
+export function buildCompanyOrganizationSchema(
+  companyName: string,
+  meta: CompanyMeta,
+  reputation: CompanyReputationSourceRef[]
+): object {
+  const schema: Record<string, unknown> = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: companyName,
+    url: meta.canonicalUrl
+  };
+  const sameAs = reputation.map((r) => r.sourceUrl).filter(Boolean);
+  if (sameAs.length > 0) schema.sameAs = sameAs;
+  return schema;
+}
+
+// ItemList for the /empresas directory hub, same pattern as
+// buildCategoryItemList — each entry a real company already rendered in
+// the page's visible list, nothing added beyond what's on the page.
+export function buildCompaniesItemList(
+  heading: string,
+  companies: { company: string }[],
+  country?: string | null
+): object {
+  return {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    name: heading,
+    itemListElement: companies.map((c, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      name: c.company,
+      url: buildCompanyUrl(c.company, country)
+    }))
+  };
+}
+
 export interface CategoryMeta {
   title: string;
   // Plain page heading (no " | BuscoTrabajo" suffix, no count) — kept

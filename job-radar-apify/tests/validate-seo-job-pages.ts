@@ -829,6 +829,98 @@ async function runHttpTests() {
       `/ve/empleos/${retiredSlug} respondió ${retiredCategoryVeRes.status} en vez de 410.`
     );
 
+    // Company pages (Fase 3 follow-up, SEO-IMPROVEMENT-PLAN.md §1.16) —
+    // /empresas (directorio) y /empresas/:slug (empresa individual), antes
+    // CSR-only. Slug real obtenido en vivo (mismo patrón que el UUID real
+    // sacado del sitemap arriba) — nunca hardcodeado, para no quebrar si
+    // cambia qué empresa tiene más vacantes.
+    const companiesSearchRes = await fetch(`${BASE_URL}/api/companies/search?limit=1`);
+    const companiesSearchData = await companiesSearchRes.json();
+    const realCompany = companiesSearchData.companies?.[0]?.company as string | undefined;
+    check(
+      Boolean(realCompany),
+      "GET /api/companies/search devuelve al menos una empresa real para usar como muestra.",
+      "GET /api/companies/search no devolvió ninguna empresa — no se puede probar /empresas/:slug."
+    );
+
+    if (realCompany) {
+      const companySlug = slugify(realCompany);
+      const companyRes = await fetch(`${BASE_URL}/empresas/${companySlug}`);
+      const companyHtml = await companyRes.text();
+      check(
+        companyRes.status === 200,
+        `GET /empresas/${companySlug} (empresa real) responde 200.`,
+        `GET /empresas/${companySlug} respondió ${companyRes.status}.`
+      );
+      check(
+        /href="\/empleos\/[0-9a-f-]{36}\//.test(companyHtml),
+        `/empresas/${companySlug} incluye al menos un link real a una vacante en el HTML crudo.`,
+        `/empresas/${companySlug} no tiene ningún link /empleos/<uuid>/... en el HTML crudo.`
+      );
+      check(
+        companyHtml.includes(escapeHtml(realCompany)),
+        `/empresas/${companySlug} tiene el nombre real de la empresa en el HTML crudo (no un shell genérico).`,
+        `/empresas/${companySlug} no muestra el nombre real de la empresa en el HTML crudo — sigue sirviendo el shell genérico.`
+      );
+
+      const companyLdBlocks = [
+        ...companyHtml.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)
+      ];
+      let organizationSchema: any = null;
+      for (const block of companyLdBlocks) {
+        try {
+          const parsed = JSON.parse(block[1]);
+          if (parsed["@type"] === "Organization") organizationSchema = parsed;
+        } catch {
+          check(false, "", `Un bloque JSON-LD en /empresas/${companySlug} no es JSON válido: ${block[1].slice(0, 200)}`);
+        }
+      }
+      check(
+        organizationSchema !== null && organizationSchema.name === realCompany,
+        `/empresas/${companySlug} incluye un JSON-LD Organization válido con el nombre real de la empresa.`,
+        `No se encontró un JSON-LD Organization válido (o con el nombre correcto) en /empresas/${companySlug}.`
+      );
+      check(
+        organizationSchema && !("aggregateRating" in organizationSchema),
+        `/empresas/${companySlug} nunca inventa un aggregateRating (fuentes con escalas distintas, nunca promediadas).`,
+        `/empresas/${companySlug} incluye un aggregateRating fabricado — Merco/GPTW/Computrabajo usan escalas distintas, promediarlas inventa un dato.`
+      );
+    }
+
+    // Un slug de empresa inventado responde 404 real.
+    const badCompanyRes = await fetch(`${BASE_URL}/empresas/esto-no-es-una-empresa-real`);
+    check(
+      badCompanyRes.status === 404,
+      "Un slug de empresa inventado responde 404 real.",
+      `Un slug de empresa inventado respondió ${badCompanyRes.status} en vez de 404.`
+    );
+
+    // Directorio /empresas — links reales + ItemList JSON-LD.
+    const empresasRes = await fetch(`${BASE_URL}/empresas`);
+    const empresasHtml = await empresasRes.text();
+    check(
+      empresasRes.status === 200 && /href="\/empresas\/[^"]+"/.test(empresasHtml),
+      "GET /empresas responde 200 con al menos un link real a una página de empresa.",
+      `GET /empresas respondió ${empresasRes.status} o no tiene ningún link /empresas/<slug> en el HTML crudo.`
+    );
+    const empresasLdBlocks = [
+      ...empresasHtml.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)
+    ];
+    const empresasItemList = empresasLdBlocks
+      .map((b) => {
+        try {
+          return JSON.parse(b[1]);
+        } catch {
+          return null;
+        }
+      })
+      .find((parsed) => parsed?.["@type"] === "ItemList");
+    check(
+      empresasItemList !== undefined && Array.isArray(empresasItemList.itemListElement) && empresasItemList.itemListElement.length > 0,
+      "/empresas incluye un ItemList JSON-LD válido con empresas reales.",
+      "No se encontró un ItemList JSON-LD válido (o sin items) en /empresas."
+    );
+
     // sitemap-categories.xml + índice actualizado — ahora incluye ambos
     // países (CO+VE ciudades, y roles duplicados por país).
     const expectedCategoryCount = CITY_OPTIONS.length + COUNTRIES.VE.cities.length + DEFAULT_ROLES_200.length * 2;
