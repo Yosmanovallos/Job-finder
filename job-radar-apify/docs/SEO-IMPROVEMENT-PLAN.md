@@ -469,6 +469,69 @@ y los 3 canarios de frontera de palabra). Verificado en verde: `tsc
 --noEmit`, `npm run build`, `test:seo`, `test:dashboard-filters`,
 `test:companies-search`, `test:role-matching`.
 
+### 1.10 Swap 1:1 de menor riesgo en `DEFAULT_ROLES_200` (2026-08-04)
+
+Con los conteos ya confiables (1.9), se ejecutó el swap autorizado por el
+usuario: mismo tamaño de lista (32 roles, para no aumentar el número de
+páginas de categoría por rol — `sitemap-categories.xml` sigue en 79 URLs,
+verificado con `test:seo`), reemplazando los 3 roles tech más redundantes
+y de menor demanda real por 3 roles de sectores reales identificados en
+1.8 y que no tenían ninguna representación en la lista.
+
+**Fuera** (redundantes dentro del clúster de 8+ roles "Desarrollador
+X"/"Ingeniero X"/"AI Engineer"/"Arquitecto de Software" ya presentes, y con
+la demanda real más baja de las 32):
+- Data Engineer (0 matches reales)
+- Data Analyst (1 match real)
+- RPA Developer (24 matches reales, nicho de automatización ya cubierto
+  conceptualmente por Ingeniero DevOps/los roles de desarrollador)
+
+**Dentro** (sectores con demanda real confirmada en 1.8 y cero
+representación previa):
+- Ingeniero Industrial (sector manufactura/operaciones) — 125 matches reales
+- Analista de Logística (sector logística) — 62 matches reales
+- Analista Jurídico (sector derecho) — 61 matches reales
+
+**Nota de proceso**: el primer intento usó "Coordinador de Logística", que
+resultó en 1,257 matches — pero la mayoría eran falsos positivos nuevos
+("Real Estate Lead Manager", "Lead Product Manager", "Technical Lead
+(Python)"), causados por `coordinador: ["coordinator", "lead",
+"supervisor"]` en `TRANSLATION_MAP` — "lead" es frecuencia 1 dentro de la
+lista de 32 roles (por tanto "distintivo" según `ROLE_WORD_FREQUENCY`) pero
+extremadamente genérico en el corpus real (aparece en título tras título de
+seniority ajeno a logística). Se verificó con muestras de títulos reales
+(no solo el conteo) antes de aceptar el swap, se detectó el problema, y se
+cambió a "Analista de Logística" (62 matches, todos genuinamente de
+logística). Mismo patrón de riesgo se descartó también para "Jefe de
+Logística" (`jefe: [..., "lead", ...]`, mismo problema). Esto confirma que
+el fix de 1.9 (frontera de palabra) resuelve la clase de bug de substring
+crudo, pero **no** resuelve por sí solo el riesgo de una palabra distintiva
+dentro de la lista de 32 roles que igual es genérica en el corpus real —
+cualquier rol nuevo debe verificarse con muestras de títulos reales, no
+solo con el conteo, antes de aceptarse.
+
+Se corrió un barrido adicional sobre las 69 palabras "gatillo" (distintivas
+u obligatorias) de los 32 roles finales contra el corpus completo — la más
+frecuente es "comercial" (12.7%, esperado y correcto: es real la categoría
+más común en Colombia/Venezuela, confirmado por muestra de títulos), nada
+en el resto se acerca al patrón de "ti"/"ia"/"lead" ya corregido.
+
+**Deliberadamente no implementado en este swap** (mayor alcance, mayor
+riesgo, fuera de "swap 1:1 de menor riesgo"): Venezuela sigue usando la
+misma lista de 32 roles que Colombia pese a tener un mercado real distinto
+(comercio, salud, hotelería/turismo, distribución, alimentos y bebidas,
+servicios financieros, según 1.8) — separar la lista por país es un cambio
+de arquitectura (`DEFAULT_ROLES_200` pasaría de ser una constante global a
+depender del país en `scheduler.ts`, con impacto en el scraper, no solo en
+SEO) que merece su propia sesión y diagnóstico, no un swap de 3 roles.
+Tampoco se agregó una categoría "Híbrido" pese a que 1.8 encontró que la
+modalidad real (~21%) supera a "Remoto" (~7.6%) — mismo criterio, cambio
+de mayor alcance que el swap.
+
+Verificado en verde tras el swap: `tsc --noEmit`, `npm run build`,
+`test:seo` (79 URLs de categoría sin cambios), `test:dashboard-filters`,
+`test:companies-search`, `test:role-matching`.
+
 ## 2. Primer paso al reiniciar sesión: baseline de `seo-drift`
 
 Antes de cualquier fase nueva de la tabla de abajo, capturar un baseline
@@ -504,7 +567,7 @@ cambio por terminado.**
 | 6    | Schema.org — validación y oportunidades                          | `seo-schema`                                             | JobPosting validado contra Rich Results; confirmar cero tipos deprecados                                                                                          | ⬜ Pendiente                                                                        |
 | 7    | Core Web Vitals con datos de campo reales                        | `seo-google` (`pagespeed`, `crux`)                       | LCP/INP/CLS con CrUX real, no solo lab data                                                                                                                       | ⬜ Pendiente (necesita credenciales Google)                                         |
 | 8    | GEO / AI Overviews — superficie sin tocar hoy                    | `seo-geo`                                                | Reporte de citability score sobre una página de vacante y una de categoría                                                                                        | ⬜ Pendiente                                                                        |
-| 9    | Investigación de keywords (solo si hay fuente de datos real)     | `seo-google` (`keywords`, Tier 3) o extensión DataForSEO | **No arranca sin credenciales reales** — nunca un volumen inventado                                                                                               | ⬜ Bloqueado — depende de credenciales que el usuario decida conectar               |
+| 9    | Investigación de keywords (solo si hay fuente de datos real)     | `seo-google` (`keywords`, Tier 3) o extensión DataForSEO | **No arranca sin credenciales reales** — nunca un volumen inventado                                                                                               | ⬜ Bloqueado (volumen real) — parcialmente sustituido con alternativa gratuita, ver §1.8/§1.10. Sigue sin credenciales Ads/DataForSEO |
 
 No hay una fase "10" ya definida — cualquier trabajo más allá de esto
 (backlinks, contenido adicional, un tercer país) es exploratorio y

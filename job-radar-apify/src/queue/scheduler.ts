@@ -1,8 +1,5 @@
 export const DEFAULT_ROLES_200: string[] = [
   "Project Manager",
-  "Data Analyst",
-  "Data Engineer",
-  "RPA Developer",
   "QA Engineer",
   "AI Engineer",
   "Cuidadora de Adultos Mayores",
@@ -20,6 +17,7 @@ export const DEFAULT_ROLES_200: string[] = [
   "Ingeniero DevOps",
   "Ingeniero Civil",
   "Ingeniero Ambiental",
+  "Ingeniero Industrial",
   "Arquitecto de Software",
   "Scrum Master",
   "Product Owner",
@@ -29,6 +27,8 @@ export const DEFAULT_ROLES_200: string[] = [
   "Especialista en Marketing Digital",
   "Contador Público",
   "Auxiliar Administrativo",
+  "Analista de Logística",
+  "Analista Jurídico",
   "Ejecutivo de Ventas",
   "Asesor Comercial"
 ];
