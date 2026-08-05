@@ -58,12 +58,35 @@ for (const role of DEFAULT_ROLES_200) {
   }
 }
 
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// Short synonym tokens (ti/it/ia/ai/qa/vp/hr, from TRANSLATION_MAP entries
+// like software->["ti","it"] or ai<->ia) match as a raw substring inside
+// completely unrelated words — "ia" alone sits inside 37% of all real job
+// titles ("gerencia", "experiencia", "historia"...), so plain
+// `.includes()` made "AI Engineer" and "Arquitecto de Software" match
+// thousands of irrelevant titles like "Ejecutivo comercial". Matching on a
+// word boundary instead is a strict subset of substring matching (anything
+// `\bword\b` matches, `.includes(word)` also matches) so this can only
+// ever remove false positives, never introduce new ones.
+const wordBoundaryCache = new Map<string, RegExp>();
+function titleContainsWord(title: string, word: string): boolean {
+  let re = wordBoundaryCache.get(word);
+  if (!re) {
+    re = new RegExp(`\\b${escapeRegExp(word)}\\b`);
+    wordBoundaryCache.set(word, re);
+  }
+  return re.test(title);
+}
+
 export function jobMatchesRole(role: string, job: any): boolean {
   const title = (job.title || "").toLowerCase();
   const words = expandRoleWords(role);
   const distinctive = words.filter((w) => (ROLE_WORD_FREQUENCY[w] || 0) < 2);
-  if (distinctive.length > 0) return distinctive.some((w) => title.includes(w));
-  return words.every((w) => title.includes(w));
+  if (distinctive.length > 0) return distinctive.some((w) => titleContainsWord(title, w));
+  return words.every((w) => titleContainsWord(title, w));
 }
 
 // Same detection the modality filter uses, exposed separately so the job

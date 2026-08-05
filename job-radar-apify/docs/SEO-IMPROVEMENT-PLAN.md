@@ -389,6 +389,86 @@ de `seo-technical`. **Cero hallazgos CRITICAL.**
 - **IndexNow**: no implementado — sin `indexnow.txt`/key file. Oportunidad
   menor (Bing/Yandex, no afecta a Google), no implementada esta sesión.
 
+### 1.8 Keyword research sin credenciales — alternativa gratuita (2026-08-04)
+
+El usuario preguntó si el "keyword research" del sitio está bien montado. No
+hay credenciales de Google Ads ni DataForSEO en el entorno — sin eso, ninguna
+herramienta da volumen de búsqueda real, y `AGENTS.md` #5 prohíbe inventar
+ese número. En vez de simular datos, se usaron dos fuentes verificables sin
+credenciales:
+
+- **Comparación de superficie con un competidor real** (Elempleo, robots.txt
+  público): ~336 páginas de ciudad indexadas en su sitemap, contra las 27
+  ciudades + 32 roles × 2 países de este sitio — confirma que el hueco no es
+  de volumen de páginas, sino de qué roles/sectores cubre `DEFAULT_ROLES_200`
+  (ver 1.9 abajo).
+- **WebSearch contra fuentes de noticias/medios reales** sobre demanda laboral
+  2026 en Colombia y Venezuela (nunca un número de volumen de búsqueda,
+  solo qué sectores están contratando más): para Colombia, sectores con
+  demanda real no cubierta por la lista actual — logística, salud,
+  administración, derecho, ingeniería industrial, psicología; para
+  Venezuela, un mercado genuinamente distinto al de Colombia — comercio,
+  salud, hotelería/turismo, distribución, alimentos y bebidas, servicios
+  financieros (la lista actual es la misma para ambos países). También se
+  confirmó que la proporción real presencial/híbrido/remoto (~71.4%/21%/7.6%)
+  no coincide con el peso que el sitio le da a "Remoto" (única modalidad con
+  categoría propia, sin "Híbrido").
+- **No se implementó nada en código en este punto** — esta investigación
+  alimenta directamente la decisión de la Fase 9-bis (swap 1:1, ver 1.9/1.10)
+  en vez de sustituirla.
+- La Fase 9 de la tabla (§3) sigue formalmente bloqueada — esto no es
+  volumen de búsqueda real, es señal cualitativa de sector, y se documenta
+  como tal, no como "Fase 9 completada".
+
+### 1.9 Bug de falsos positivos en `jobMatchesRole()` — fix de word-boundary (2026-08-04)
+
+Antes de ejecutar el swap 1:1 de roles (autorizado por el usuario:
+*"haz el swap 1:1 de menor riesgo primero, implementa todas las phases no
+pares hasta completar todo"*), se necesitaban conteos reales confiables por
+rol. Al calcularlos se encontró un bug real en `jobMatchesRole()`
+(`src/lib/job-filters.ts`): usaba `.includes()` (substring crudo) para
+matchear las palabras expandidas de un rol contra el título de cada
+vacante. Algunos sinónimos de `TRANSLATION_MAP` (`ai-role-agent.ts`) son de
+1-2 caracteres (`ti`/`it` desde `software`/`sistemas`; `ia`/`ai` desde el
+par recíproco `ai↔ia`) — como substring crudo, esos tokens aparecen dentro
+de miles de palabras españolas sin relación alguna (`"ia"` está presente en
+el 37% de los 22,760 títulos reales del corpus — "gerencia", "experiencia",
+"historia"...; `"ti"` en el 30%).
+
+Confirmado empíricamente contra el corpus real: "AI Engineer" matcheaba
+9,013 vacantes (mayoría "Ejecutivo comercial", "Historiador"...) y
+"Arquitecto de Software" 8,876 (mismo patrón) — números inflados por el bug,
+no demanda real.
+
+**Fix**: `jobMatchesRole()` ahora exige coincidencia en frontera de palabra
+(`\bpalabra\b` vía regex, con los tokens escapados para caracteres como el
+punto de "node.js") en vez de substring crudo. Es un subconjunto estricto de
+`.includes()` — cualquier título que matchea con frontera de palabra también
+matchea con substring, nunca al revés — así que el fix solo puede *eliminar*
+falsos positivos, nunca introducir uno nuevo.
+
+Conteos reales después del fix (antes → después):
+- AI Engineer: 9,013 → 584
+- Arquitecto de Software: 8,876 → 1,211
+- Canarios verificados sin regresión: Auxiliar de Enfermería (530→542, plano
+  dentro del margen de crecimiento del corpus), Diseñador Gráfico (235→220,
+  ídem), Desarrollador Node.js (34→35, confirma que el escape del punto
+  literal sigue funcionando).
+
+Este cambio afecta `jobMatchesRole()` compartido por `/api/jobs`
+(`applyJobFilters`) y las páginas de categoría por rol — no es solo un fix
+de SEO, también cambia qué vacantes ve un usuario real al filtrar por rol
+en el dashboard. Es el comportamiento correcto (los falsos positivos ya
+existían ahí también), pero es un cambio de comportamiento visible más allá
+de SEO.
+
+Regresión cubierta con una suite nueva y dedicada, `npm run
+test:role-matching` (`tests/validate-role-matching.ts`, 12 casos: los 2
+falsos positivos confirmados, matches reales que deben seguir funcionando,
+y los 3 canarios de frontera de palabra). Verificado en verde: `tsc
+--noEmit`, `npm run build`, `test:seo`, `test:dashboard-filters`,
+`test:companies-search`, `test:role-matching`.
+
 ## 2. Primer paso al reiniciar sesión: baseline de `seo-drift`
 
 Antes de cualquier fase nueva de la tabla de abajo, capturar un baseline

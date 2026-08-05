@@ -20,6 +20,7 @@
     "test:password-reset": "tsx tests/validate-password-reset.ts",
     "test:payment-flow": "tsx tests/validate-payment-flow.ts",
     "test:dashboard-filters": "tsx tests/validate-dashboard-filters.ts",
+    "test:role-matching": "tsx tests/validate-role-matching.ts",
     "test:seo": "tsx tests/validate-seo-job-pages.ts",
     "test:social-publisher": "tsx tests/validate-social-publisher.ts",
     "test:reputation": "tsx tests/validate-reputation-tick.ts",
