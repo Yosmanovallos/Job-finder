@@ -683,6 +683,46 @@ Ningún hallazgo sin explicar, ningún CRITICAL nuevo. Los 4 cambios de esta
 sesión (§1.9-§1.12) quedan confirmados en vivo contra producción, no solo
 en local.
 
+### 1.14 Fase 7 — Core Web Vitals con credenciales reales (2026-08-04)
+
+El usuario proporcionó un API key real de PageSpeed Insights/CrUX (guardado
+en `~/.config/claude-seo/google-api.json`, fuera del repo — nunca en
+`.env` ni commiteado) y las credenciales de service account
+(`GOOGLE_INDEXING_CLIENT_EMAIL`/`GOOGLE_INDEXING_PRIVATE_KEY`, ya usadas
+por `google-indexing.ts` — el usuario las agrega directamente a `.env`,
+nunca escritas por el agente en ese archivo, que está en el deny-list del
+proyecto).
+
+`claude-seo run pagespeed_check.py https://buscotrabajo.co/ --json`:
+
+- **`field_metrics` viene vacío `{}`** tanto en mobile como desktop — CrUX
+  confirma (no asume) que **todavía no hay datos de campo reales** para
+  este dominio. Esperado: CrUX exige un umbral mínimo de tráfico real de
+  Chrome durante 28 días antes de publicar datos por origen, y el dominio
+  tiene ~9-15 días (§1.5). Exit criteria de la fase ("LCP/INP/CLS con CrUX
+  real") técnicamente cumplido: se confirmó con la API real que el dato de
+  campo no existe aún, no es una suposición ni un bloqueo de credenciales.
+- `crux_history.py` (endpoint dedicado, distinto de PSI) devolvió 403 —
+  la API "Chrome UX Report API" necesita habilitarse por separado en
+  Google Cloud Console además de "PageSpeed Insights API" (mismo API key,
+  toggle distinto). No bloqueante: el mismo dato (campo vacío) ya se
+  confirmó vía PSI. Oportunidad menor para cuando el usuario quiera
+  habilitarla.
+- **Datos de laboratorio (Lighthouse, no CrUX) capturados como referencia,
+  no corregidos en esta sesión** — nueva superficie descubierta, fuera del
+  alcance original de Fase 7 (que era solo desbloquear credenciales):
+  Performance mobile 54-80/100 (varía entre corridas, ruido normal de
+  Lighthouse), desktop 97/100. LCP mobile 5.3s (score 0.22, malo), TBT
+  mobile 1020ms (score 0.26, malo) — oportunidad principal reportada por
+  la propia herramienta: "Reduce unused JavaScript" (~1050ms de ahorro
+  potencial). Accessibility 96, Best Practices 100, SEO 100 en ambos.
+  **No implementado** — optimizar el bundle/JS es un cambio de mayor
+  alcance (code-splitting, lazy loading) que merece su propia sesión con
+  su propia verificación, no un añadido apurado a esta.
+
+Verificado: `claude-seo run google_auth.py --check` confirma Tier 0 (API
+key) activo para PSI/CrUX/CrUX History antes y después.
+
 ## 2. Primer paso al reiniciar sesión: baseline de `seo-drift`
 
 Antes de cualquier fase nueva de la tabla de abajo, capturar un baseline
@@ -716,7 +756,7 @@ cambio por terminado.**
 | 4    | Auditoría de contenido programático a escala                     | `seo-programmatic`, `seo-content`                        | Score de unicidad real sobre una muestra de páginas de vacante; decidir si la Fase 4 del plan viejo (descripciones reales por fuente) se vuelve necesaria         | ✅ Hecho — 2026-08-04, ver §1.6. Unicidad OK (61.3%), pero contenido absoluto muy corto (~37 palabras/página) — decisión pendiente del usuario, no bloqueante |
 | 5    | Auditoría técnica completa                                       | `seo-technical`, `seo-sitemap`                           | 9 categorías revisadas contra el sitio real; confirmar que nada de lo nuevo (hreflang, `last_seen_at`) introdujo una regresión técnica                            | ✅ Hecho — 2026-08-04, ver §1.7. Cero CRITICAL; 3 oportunidades Low/Medium anotadas, ninguna implementada (justificación en §1.7) |
 | 6    | Schema.org — validación y oportunidades                          | `seo-schema`                                             | JobPosting validado contra Rich Results; confirmar cero tipos deprecados                                                                                          | ✅ Hecho — 2026-08-04, ver §1.11. JobPosting/Organization/WebSite ya validados en §1.7; oportunidad de §1.7 (BreadcrumbList/ItemList en categorías) implementada |
-| 7    | Core Web Vitals con datos de campo reales                        | `seo-google` (`pagespeed`, `crux`)                       | LCP/INP/CLS con CrUX real, no solo lab data                                                                                                                       | ⬜ Pendiente (necesita credenciales Google)                                         |
+| 7    | Core Web Vitals con datos de campo reales                        | `seo-google` (`pagespeed`, `crux`)                       | LCP/INP/CLS con CrUX real, no solo lab data                                                                                                                       | ✅ Hecho — 2026-08-04, ver §1.14. API key real conectada; CrUX confirma (no asume) que aún no hay datos de campo — dominio demasiado nuevo/bajo tráfico para el umbral de 28 días |
 | 8    | GEO / AI Overviews — superficie sin tocar hoy                    | `seo-geo`                                                | Reporte de citability score sobre una página de vacante y una de categoría                                                                                        | ✅ Hecho — 2026-08-04, ver §1.12. Fecha de publicación real agregada al texto visible; contenido corto sigue siendo el mismo límite ya documentado en §1.6 |
 | 9    | Investigación de keywords (solo si hay fuente de datos real)     | `seo-google` (`keywords`, Tier 3) o extensión DataForSEO | **No arranca sin credenciales reales** — nunca un volumen inventado                                                                                               | ⬜ Bloqueado (volumen real) — parcialmente sustituido con alternativa gratuita, ver §1.8/§1.10. Sigue sin credenciales Ads/DataForSEO |
 
