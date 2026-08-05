@@ -897,6 +897,45 @@ No hay una fase "10" ya definida — cualquier trabajo más allá de esto
 necesita su propio diagnóstico antes de entrar a esta tabla, mismo
 criterio que ya usa `docs/SEO-PLAN.md` §8.
 
+### 3.1 Pendientes abiertos (resumen, actualizado 2026-08-04)
+
+Todo lo demás de la tabla de arriba (Fases 0-6, 8) está hecho e
+implementado en producción. Esto es lo que queda, para no tener que
+releer las 16 subsecciones de §1:
+
+**Bloqueado por datos, no por trabajo pendiente del agente:**
+- **Fase 7** (Core Web Vitals reales): el dominio no tiene los 28 días de
+  tráfico real que CrUX exige (tiene ~9-15). Reintentar en 2-3 semanas —
+  las credenciales ya están conectadas, ver §1.14.
+- **Fase 9** (volumen real de keywords): necesita credenciales
+  Ads/DataForSEO que el usuario decida traer. La alternativa gratuita
+  (§1.8) ya se corrió y alimentó el swap de roles de §1.10, pero no
+  sustituye un volumen de búsqueda real.
+
+**Decisiones del usuario, ya tomadas (documentadas, no re-abrir sin razón nueva):**
+- Sitemap de las ~7,255 páginas de `/empresas/:slug`: **no enviarlas por
+  ahora** (§1.16) — mismo riesgo de índice-bloat que ya se evitó en
+  §1.10. Revisar en unas semanas si mejora el patrón de indexación.
+- Lista de roles específica para Venezuela y categoría "Híbrido": reales,
+  documentadas en §1.10, deliberadamente fuera de alcance de un swap de
+  bajo riesgo — necesitan su propia sesión.
+
+**Necesitan una acción manual del usuario, no código:**
+- **Rotar la clave de servicio** `indexing-bot@job-finder-503421` — se
+  pegó en texto plano en el chat de esta sesión (§1.15). Google Cloud
+  Console → IAM y administración → Cuentas de servicio → esa cuenta →
+  Claves → agregar nueva → actualizar `.env` → borrar la vieja.
+- **Rich Results Test manual** sobre `BreadcrumbList`/`ItemList`
+  (categorías, §1.11) y `Organization` (empresas, §1.16) — la validación
+  de código ya está hecha; falta el pase por la herramienta real de
+  Google. Está en `docs/QA-CHECKLIST-SEO.md`.
+
+**Requiere una decisión de producto, no de SEO técnico:**
+- Contenido corto en páginas de vacante (~37 palabras, §1.6/§1.12): la
+  única forma honesta de mejorarlo es con descripciones reales por
+  fuente (un tema de scraping/licencia de datos, no de generar prosa) —
+  decisión pendiente del usuario, no bloqueante.
+
 ## 4. Qué NO hacer
 
 - No correr `/seo audit` (el orquestador de 15 subagentes en paralelo)
