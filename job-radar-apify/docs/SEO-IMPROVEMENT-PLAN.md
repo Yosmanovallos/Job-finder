@@ -893,9 +893,23 @@ de 79 a 91 URLs (`test:seo` ya lo verifica dinámicamente contra
 
 Verificado: `tsc --noEmit`, `npm run build`, `test:seo`,
 `test:dashboard-filters`, `test:companies-search`, `test:role-matching`,
-más una verificación en vivo contra `GET /api/jobs?cities=Cúcuta` (vacantes
-reales devueltas) y Playwright contra `/dashboard` (cero errores de
-consola).
+más una verificación en vivo contra `GET /api/jobs?cities=Cúcuta` y
+`GET /api/jobs?cities=Santa%20Marta` (única ciudad de dos palabras de la
+lista — confirmado que sobrevive el round-trip por URL) y Playwright
+contra `/dashboard` (cero errores de consola).
+
+**Cobertura restante, no resuelta aquí**: 2,694 vacantes reales traen
+`location: "Colombia"` (sin ciudad) — el bucket sin cubrir más grande de
+todos, más grande que las 12 ciudades agregadas juntas. Ningún filtro de
+ciudad puede alcanzarlas porque no hay ciudad en el texto; agregar más
+ciudades no lo resuelve. Cobertura total después de este fix: ~78% (antes
+70%), el resto son estas 2,694 más ubicaciones genuinamente extranjeras
+(Argentina, España, México — remoto internacional, correctamente fuera
+del alcance de un filtro de ciudad colombiana). Si se quiere cerrar esto,
+es una decisión de producto (¿una opción "Sin ciudad especificada"? ¿usar
+`country` como fallback visible?), no un bug de lista incompleta — se
+deja anotado para que una sesión futura no vuelva a correr la misma
+consulta pensando que la lista de ciudades sigue siendo el problema.
 
 ## 2. Primer paso al reiniciar sesión: baseline de `seo-drift`
 
