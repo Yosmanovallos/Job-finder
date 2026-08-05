@@ -654,6 +654,35 @@ punto correcto de la oración (después de modalidad, antes del conteo de
 otras vacantes de la empresa). Verificado en verde: `tsc --noEmit`,
 `npm run build`, `test:seo`, `test:dashboard-filters`, `test:companies-search`.
 
+### 1.13 Drift compare post-deploy — confirmación de las 6 URLs de baseline (2026-08-04)
+
+Con las 4 correcciones de esta sesión ya desplegadas en producción
+(swap de roles, fix de 410, schema de categoría, fecha de publicación),
+se corrió `/seo drift compare` contra las 6 URLs de baseline (sección 2).
+**Cero hallazgos CRITICAL nuevos** en las 6:
+
+- `/` y `/ve`: 1 INFO cada una (hash de contenido cambiado — vacantes
+  nuevas del día), sin más.
+- `/dashboard`: 1 CRITICAL (`canonical_changed`, `/` → `/dashboard`) — el
+  mismo ya documentado y esperado desde §1.1/§1.4, de la sesión anterior,
+  no algo nuevo de hoy.
+- `/empleos/bogota`: 3 WARNING (conteo de vacantes 7901→8018,
+  `schema_modified`) + 1 INFO — el `schema_modified` es exactamente lo
+  anticipado en §1.10/§1.11 (BreadcrumbList+ItemList nuevos).
+- `/ve/empleos/project-manager`: 3 WARNING (conteo 189→177, dentro del
+  ruido normal de expiración/ingesta diaria — Project Manager no fue
+  tocado por el swap; `ROLE_WORD_FREQUENCY` sí se recalculó globalmente
+  al cambiar la lista, lo que puede desplazar levemente qué títulos
+  cuentan como "distintivos") + `schema_modified` (mismo motivo que
+  Bogotá) + 1 INFO.
+- Página de vacante real (`desarrollador-php-bogota-bogota`): 1 WARNING
+  (`schema_modified`, esperado por la fecha de publicación agregada en
+  §1.12 al campo `description` del JobPosting) + 1 INFO.
+
+Ningún hallazgo sin explicar, ningún CRITICAL nuevo. Los 4 cambios de esta
+sesión (§1.9-§1.12) quedan confirmados en vivo contra producción, no solo
+en local.
+
 ## 2. Primer paso al reiniciar sesión: baseline de `seo-drift`
 
 Antes de cualquier fase nueva de la tabla de abajo, capturar un baseline
