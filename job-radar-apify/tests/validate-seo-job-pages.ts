@@ -719,6 +719,42 @@ async function runHttpTests() {
       `La página de categoría ${cityPath} no tiene ningún link /empleos/<uuid>/... en el HTML crudo.`
     );
 
+    // Category pages (Fase 6) — BreadcrumbList + ItemList JSON-LD.
+    const cityLdJsonBlocks = [
+      ...cityHtml.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)
+    ];
+    let cityBreadcrumb: any = null;
+    let cityItemList: any = null;
+    for (const block of cityLdJsonBlocks) {
+      try {
+        const parsed = JSON.parse(block[1]);
+        if (parsed["@type"] === "BreadcrumbList") cityBreadcrumb = parsed;
+        if (parsed["@type"] === "ItemList") cityItemList = parsed;
+      } catch {
+        check(
+          false,
+          "",
+          `Un bloque JSON-LD en la página de categoría ${cityPath} no es JSON válido: ${block[1].slice(0, 200)}`
+        );
+      }
+    }
+    check(
+      cityBreadcrumb !== null &&
+        cityBreadcrumb.itemListElement?.length === 2 &&
+        cityBreadcrumb.itemListElement[1].item.endsWith(cityPath),
+      `La página de categoría ${cityPath} incluye un BreadcrumbList JSON-LD válido con 2 niveles (Inicio → categoría).`,
+      `No se encontró un BreadcrumbList JSON-LD válido en la página de categoría ${cityPath}.`
+    );
+    check(
+      cityItemList !== null &&
+        Array.isArray(cityItemList.itemListElement) &&
+        cityItemList.itemListElement.length > 0 &&
+        typeof cityItemList.itemListElement[0].url === "string" &&
+        cityItemList.itemListElement[0].url.includes("/empleos/"),
+      `La página de categoría ${cityPath} incluye un ItemList JSON-LD válido con URLs reales de vacantes.`,
+      `No se encontró un ItemList JSON-LD válido (o sin items reales) en la página de categoría ${cityPath}.`
+    );
+
     // Category pages — real role (Colombia, unprefijado).
     const roleCategoryCO = resolveCategorySlug(slugify(DEFAULT_ROLES_200[0]))!;
     const rolePathCO = buildCategoryPath(roleCategoryCO);

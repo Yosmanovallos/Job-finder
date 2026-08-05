@@ -40,6 +40,8 @@ import {
   resolveCategorySlug,
   buildCategoryMeta,
   buildCategoryPath,
+  buildCategoryBreadcrumbList,
+  buildCategoryItemList,
   buildCategoriesSitemapXml,
   resolveCompanyNameFromJobs,
   SITE_URL
@@ -893,6 +895,19 @@ const server = http.createServer(async (req, res) => {
       indexHtml = indexHtml.replace(
         "</head>",
         `  <script>window.__SSR_CATEGORY__=${ssrCategoryPayload};</script>\n</head>`
+      );
+
+      // BreadcrumbList + ItemList (SEO Fase 6, seo-technical §1.7's flagged
+      // gap: category pages carried no listing schema of their own). Built
+      // from the exact same `meta`/`page` this branch already renders into
+      // the visible <nav> above — no separate query, nothing that could
+      // drift from what a visitor/crawler actually sees on the page.
+      const categoryBreadcrumb = buildCategoryBreadcrumbList(meta);
+      const categoryItemList = buildCategoryItemList(meta, page);
+      indexHtml = indexHtml.replace(
+        "</head>",
+        `  <script type="application/ld+json">${escapeJsonForScriptTag(categoryBreadcrumb)}</script>\n` +
+          `  <script type="application/ld+json">${escapeJsonForScriptTag(categoryItemList)}</script>\n</head>`
       );
 
       indexHtml = indexHtml

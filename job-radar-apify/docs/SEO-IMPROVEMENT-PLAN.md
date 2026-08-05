@@ -532,6 +532,43 @@ Verificado en verde tras el swap: `tsc --noEmit`, `npm run build`,
 `test:seo` (79 URLs de categoría sin cambios), `test:dashboard-filters`,
 `test:companies-search`, `test:role-matching`.
 
+### 1.11 Fase 6 — Schema.org: BreadcrumbList + ItemList en páginas de categoría (2026-08-04)
+
+`§1.7` (Fase 5) ya había confirmado JobPosting/Organization/WebSite válidos
+contra Rich Results y cero tipos deprecados, y había dejado anotado (sin
+implementar) que las páginas de categoría (`/empleos/<ciudad>`,
+`/empleos/<rol>`) no llevaban ningún schema propio de listado. Esta sesión
+cierra ese hallazgo:
+
+- **`buildCategoryBreadcrumbList()`** (`src/lib/job-seo.ts`): `BreadcrumbList`
+  de 2 niveles reales (Inicio → la categoría actual) — no se inventó un nivel
+  intermedio "Empleos" porque no existe una página hub en `/empleos` a la que
+  apuntar; un breadcrumb con un nodo que no resuelve sería peor que no tener
+  breadcrumb.
+- **`buildCategoryItemList()`** (`src/lib/job-seo.ts`): `ItemList` con un
+  `ListItem` por cada vacante ya renderizada en el `<nav>` visible de la
+  página (mismo array `page`, nunca una consulta aparte) — título y URL
+  reales, nada agregado que no esté ya en el HTML visible. No duplica el
+  `JobPosting` de cada vacante individual (eso vive en su propia página); es
+  el patrón seguro documentado para páginas hub que enlazan a contenido con
+  su propio markup completo.
+- Inyectado en `server.ts` justo después del payload `window.__SSR_CATEGORY__`,
+  mismo punto donde el resto de esta rama ya arma el `<head>`.
+- Página de categoría vacía (`total === 0`, ya noindexada por diseño):
+  `ItemList` queda con `itemListElement: []` — refleja la realidad (0
+  vacantes), no se ocultó ni se inventó contenido, y de todos modos no se
+  indexa.
+- Verificado con `curl` directo contra el servidor local (no solo el test):
+  el JSON-LD de `/empleos/bogota` en producción-local coincide 1:1 con los
+  60 links que ya se ven en el `<nav>` de la página — mismos títulos, mismas
+  URLs, mismo orden.
+- Cobertura nueva en `test:seo`: valida que ambos bloques existen, son JSON
+  válido, el `BreadcrumbList` tiene 2 niveles y el segundo apunta a la URL
+  canónica real de la categoría, y el `ItemList` tiene al menos un item con
+  una URL real `/empleos/...`.
+- Verificado en verde: `tsc --noEmit`, `npm run build`, `test:seo`,
+  `test:dashboard-filters`, `test:companies-search`.
+
 ## 2. Primer paso al reiniciar sesión: baseline de `seo-drift`
 
 Antes de cualquier fase nueva de la tabla de abajo, capturar un baseline
@@ -564,7 +601,7 @@ cambio por terminado.**
 | 3    | Confirmar causa raíz con datos reales de Google                  | `seo-google` (`gsc query`, `inspect`, `sitemaps`)        | Requiere que el usuario traiga el desglose de Search Console, o las credenciales `GOOGLE_INDEXING_CLIENT_EMAIL`/`GOOGLE_INDEXING_PRIVATE_KEY` en el entorno local | ⬜ Bloqueado — depende del usuario                                                  |
 | 4    | Auditoría de contenido programático a escala                     | `seo-programmatic`, `seo-content`                        | Score de unicidad real sobre una muestra de páginas de vacante; decidir si la Fase 4 del plan viejo (descripciones reales por fuente) se vuelve necesaria         | ✅ Hecho — 2026-08-04, ver §1.6. Unicidad OK (61.3%), pero contenido absoluto muy corto (~37 palabras/página) — decisión pendiente del usuario, no bloqueante |
 | 5    | Auditoría técnica completa                                       | `seo-technical`, `seo-sitemap`                           | 9 categorías revisadas contra el sitio real; confirmar que nada de lo nuevo (hreflang, `last_seen_at`) introdujo una regresión técnica                            | ✅ Hecho — 2026-08-04, ver §1.7. Cero CRITICAL; 3 oportunidades Low/Medium anotadas, ninguna implementada (justificación en §1.7) |
-| 6    | Schema.org — validación y oportunidades                          | `seo-schema`                                             | JobPosting validado contra Rich Results; confirmar cero tipos deprecados                                                                                          | ⬜ Pendiente                                                                        |
+| 6    | Schema.org — validación y oportunidades                          | `seo-schema`                                             | JobPosting validado contra Rich Results; confirmar cero tipos deprecados                                                                                          | ✅ Hecho — 2026-08-04, ver §1.11. JobPosting/Organization/WebSite ya validados en §1.7; oportunidad de §1.7 (BreadcrumbList/ItemList en categorías) implementada |
 | 7    | Core Web Vitals con datos de campo reales                        | `seo-google` (`pagespeed`, `crux`)                       | LCP/INP/CLS con CrUX real, no solo lab data                                                                                                                       | ⬜ Pendiente (necesita credenciales Google)                                         |
 | 8    | GEO / AI Overviews — superficie sin tocar hoy                    | `seo-geo`                                                | Reporte de citability score sobre una página de vacante y una de categoría                                                                                        | ⬜ Pendiente                                                                        |
 | 9    | Investigación de keywords (solo si hay fuente de datos real)     | `seo-google` (`keywords`, Tier 3) o extensión DataForSEO | **No arranca sin credenciales reales** — nunca un volumen inventado                                                                                               | ⬜ Bloqueado (volumen real) — parcialmente sustituido con alternativa gratuita, ver §1.8/§1.10. Sigue sin credenciales Ads/DataForSEO |

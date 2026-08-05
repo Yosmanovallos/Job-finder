@@ -415,6 +415,45 @@ export function buildCategoryMeta(category: ResolvedCategory, totalCount: number
   };
 }
 
+// BreadcrumbList for a category page (SEO Fase 6 — seo-technical/§1.7 flagged
+// category pages as carrying no listing schema of their own, only the
+// generic Organization+WebSite from the static shell). Only two real levels
+// exist to link — there is no bare `/empleos` hub page, so inventing a
+// middle breadcrumb node pointing at a URL that doesn't resolve would be
+// exactly the kind of fabricated navigation AGENTS.md #5 rules out.
+export function buildCategoryBreadcrumbList(meta: CategoryMeta): object {
+  return {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Inicio", item: SITE_URL },
+      { "@type": "ListItem", position: 2, name: meta.heading, item: meta.canonicalUrl }
+    ]
+  };
+}
+
+// ItemList for a category page's own listing of job links — each entry is
+// a plain ListItem pointing at a job detail page that carries its own full
+// JobPosting markup; this does not duplicate/replace that (Google's
+// guidance against markup for job-listing *previews* is about repeating
+// JobPosting fields per row, not about a plain ItemList of links). Every
+// field here (title, url) is the same real job data already rendered in
+// the page's visible <nav>/<ul> — nothing invented, nothing beyond what
+// `page` (the same capped slice server.ts renders) already contains.
+export function buildCategoryItemList(meta: CategoryMeta, jobs: SeoJob[]): object {
+  return {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    name: meta.heading,
+    itemListElement: jobs.map((job, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      name: job.title,
+      url: buildJobUrl(job)
+    }))
+  };
+}
+
 // One flat sitemap covers all categories comfortably (CO+VE cities + two
 // countries' worth of DEFAULT_ROLES_200 — well under the 50k/file limit
 // buildJobsSitemapXml's comment already covers), no lastmod: unlike a job
