@@ -107,6 +107,17 @@ export function getModalityLabel(location: string | undefined | null): string | 
 // the raw field. Lives here (not FilterBar.tsx) so server.ts can import it
 // without pulling in React/Radix — this file is already the shared
 // server+client home for filtering/taxonomy logic.
+// Expanded 2026-08-05: real corpus check showed the original 8 cities
+// covered only 70% of Colombia job postings by location — 6,670 jobs sat
+// in cities a user could never select in the filter (confirmed via a live
+// query, not guessed), including real department-capital-tier cities with
+// meaningful volume (Cúcuta 105, Villavicencio 124, Ibagué 107...). Added
+// the cities with real, substantial volume; deliberately left out Bogotá/
+// Medellín satellite towns (Chía, Funza, Mosquera, Cota, Rionegro,
+// Envigado, Itagüí, Bello, Soacha, Floridablanca) — those would read as
+// near-duplicate category-page content next to their parent metro's page
+// (seo-programmatic's thin-content risk), and most job-seekers already
+// treat "Bogotá"/"Medellín" as covering their metro area.
 export const CITY_OPTIONS = [
   "Bogotá",
   "Medellín",
@@ -116,6 +127,18 @@ export const CITY_OPTIONS = [
   "Bucaramanga",
   "Pereira",
   "Manizales",
+  "Villavicencio",
+  "Ibagué",
+  "Cúcuta",
+  "Armenia",
+  "Neiva",
+  "Santa Marta",
+  "Pasto",
+  "Montería",
+  "Popayán",
+  "Valledupar",
+  "Tunja",
+  "Palmira",
   "Remoto"
 ];
 

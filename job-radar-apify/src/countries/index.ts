@@ -21,6 +21,10 @@ export const COUNTRIES: Record<string, CountryConfig> = {
   CO: {
     code: "CO",
     name: "Colombia",
+    // Kept in sync with job-filters.ts's CITY_OPTIONS (same 2026-08-05
+    // real-corpus expansion — see that file's comment) — this is the
+    // country-keyed equivalent, minus the literal "Remoto" entry
+    // getCityOptionsForCountry appends separately.
     cities: [
       "Bogotá",
       "Medellín",
@@ -29,7 +33,19 @@ export const COUNTRIES: Record<string, CountryConfig> = {
       "Cartagena",
       "Bucaramanga",
       "Pereira",
-      "Manizales"
+      "Manizales",
+      "Villavicencio",
+      "Ibagué",
+      "Cúcuta",
+      "Armenia",
+      "Neiva",
+      "Santa Marta",
+      "Pasto",
+      "Montería",
+      "Popayán",
+      "Valledupar",
+      "Tunja",
+      "Palmira"
     ]
   },
   VE: {

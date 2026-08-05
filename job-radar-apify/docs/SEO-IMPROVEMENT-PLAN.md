@@ -855,6 +855,48 @@ siguen siendo válidas y alcanzables por link interno (el directorio
 `/empresas` ya las enlaza), solo no se empujan activamente. Revisar en
 unas semanas si el patrón de indexación mejora.
 
+### 1.17 Bug reportado por el usuario: filtro de ciudad incompleto — 12 ciudades reales agregadas (2026-08-05)
+
+El usuario reportó que vacantes de "Cúcuta y otras ciudades" no aparecen
+al filtrar por ciudad. Confirmado con una consulta real contra el corpus:
+`CITY_OPTIONS`/`COUNTRIES.CO.cities` (8 ciudades, sin cambios desde antes
+de este plan) solo cubrían el 70% de las 22,199 vacantes de Colombia —
+6,670 vacantes en ciudades reales sin ninguna opción de filtro
+(Villavicencio 124, Ibagué 107, Cúcuta 105, Armenia 89, Neiva 70, Santa
+Marta 67-72, Palmira 63-68, Pasto 62-64, Montería 61, Popayán 41-42,
+Valledupar 40-42, Tunja 43-50 — conteos con rango porque `normalizeText()`
+recoge algunas variantes de acento que el conteo simple no).
+
+**Agregadas** (`src/lib/job-filters.ts`'s `CITY_OPTIONS` y
+`src/countries/index.ts`'s `COUNTRIES.CO.cities`, mismas 12 en ambos
+lugares): Villavicencio, Ibagué, Cúcuta, Armenia, Neiva, Santa Marta,
+Pasto, Montería, Popayán, Valledupar, Tunja, Palmira. Cada una verificada
+contra ubicaciones reales del corpus antes de aceptarla (sin colisión
+falsa, p. ej. "Armenia" el país nunca apareció en las muestras).
+
+**Deliberadamente NO agregadas**: los municipios satélite de Bogotá/
+Medellín/Bucaramanga con volumen real pero indistinguibles de su área
+metropolitana para un category page (Chía, Funza, Mosquera, Cota,
+Rionegro, Envigado, Itagüí, Bello, Soacha, Floridablanca) — habrían sido
+contenido casi duplicado junto a `/empleos/bogota`/`/empleos/medellin`
+(mismo riesgo de `seo-programmatic` que ya se evitó en otras decisiones
+de esta sesión), y la mayoría de quien busca empleo ya trata esas zonas
+como parte de la metrópolis principal.
+
+**Efecto secundario en SEO** (mismo dato, dos consumidores — el filtro
+del dashboard y las category pages comparten `CITY_OPTIONS`): 12 páginas
+`/empleos/<ciudad>` nuevas. Verificado que el total de páginas de
+ubicación (CO+VE, incluyendo "Remoto") queda en 27 — sigue por debajo del
+umbral WARNING de 30 de `seo-programmatic`. `sitemap-categories.xml` pasa
+de 79 a 91 URLs (`test:seo` ya lo verifica dinámicamente contra
+`CITY_OPTIONS.length`, no un número hardcodeado).
+
+Verificado: `tsc --noEmit`, `npm run build`, `test:seo`,
+`test:dashboard-filters`, `test:companies-search`, `test:role-matching`,
+más una verificación en vivo contra `GET /api/jobs?cities=Cúcuta` (vacantes
+reales devueltas) y Playwright contra `/dashboard` (cero errores de
+consola).
+
 ## 2. Primer paso al reiniciar sesión: baseline de `seo-drift`
 
 Antes de cualquier fase nueva de la tabla de abajo, capturar un baseline
