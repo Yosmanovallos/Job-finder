@@ -605,6 +605,55 @@ cierra ese hallazgo:
 - Verificado en verde: `tsc --noEmit`, `npm run build`, `test:seo`,
   `test:dashboard-filters`, `test:companies-search`.
 
+### 1.12 Fase 8 — GEO / AI Overviews: citability sobre una vacante y una categoría (2026-08-04)
+
+`seo-geo` corrido contra
+`/empleos/928d3923-.../analista-senior-planeacion-financiera-cali` (vacante)
+y `/empleos/bogota` (categoría). Google publicó en 2026 que "optimizar para
+IA generativa sigue siendo SEO" — mismos fundamentos, no una disciplina
+aparte — así que la mayoría de lo evaluado aquí ya estaba cubierto o
+deliberadamente diferido en fases anteriores:
+
+- **Acceso de crawlers de IA**: `robots.txt` es `User-agent: * / Allow: /`
+  sin reglas específicas — GPTBot, ClaudeBot, PerplexityBot, OAI-SearchBot,
+  Google-Extended entran todos sin bloqueo. Pass, sin acción.
+- **Renderizado (SSR)**: el contenido real (título, descripción, JSON-LD)
+  ya está en el HTML crudo, no depende de JS — confirmado con `curl`
+  directo, mismo hallazgo ya validado en §1.7 ("Renderizado JS"). Pass.
+- **Datos estructurados**: JobPosting ya validado (§1.7); BreadcrumbList +
+  ItemList en categorías agregado esta misma sesión (§1.11).
+- **Citabilidad/estructura (pasajes de 134-167 palabras, encabezados tipo
+  pregunta, listas)**: la página de vacante tiene ~37 palabras de contenido
+  visible — el mismo límite absoluto de contenido que §1.6 ya identificó y
+  dejó como decisión pendiente del usuario (no se resuelve inventando
+  prosa). La página de categoría es una lista de 60 links reales, no
+  prosa — estructuralmente correcta para lo que es (un hub), no una pieza
+  citable en sí misma.
+- **`llms.txt`**: ausente (404). Google confirma explícitamente que no lo
+  usa como señal de ranking/citación para Search — "no ayuda ni perjudica".
+  Solo sería relevante para crawlers de IA no-Google, beneficio marginal y
+  sin evidencia fuerte — queda anotado como oportunidad Low, no
+  implementado, mismo criterio que IndexNow en §1.7.
+- **Recencia/frescura (implementado)**: el único hallazgo con una mejora
+  real y de bajo riesgo — `buildJobDescription()` (`src/lib/job-seo.ts`)
+  ahora agrega "Publicado el `<fecha real>`" al texto visible de cada
+  vacante, usando el mismo `job.publishedAt` que ya alimentaba
+  `datePosted` en el JobPosting JSON-LD (dato real ya existente, nunca
+  inventado). Recencia es una señal documentada tanto para GEO (contenido
+  de <3 meses ~3x más citable en respuestas de IA) como para E-E-A-T
+  tradicional. No toca `buildJobMeta()` (el `<meta name="description">`
+  para el snippet de SERP sigue igual) — solo el texto visible + JSON-LD
+  `description`.
+- **Autoría/marca**: no aplica un byline de autor (una vacante agregada no
+  es contenido editorial con autor) — se deja sin acción, forzar uno sería
+  inventar una atribución falsa.
+
+Verificado con `curl` directo contra el servidor local: la vacante real
+ahora muestra "Publicado el 4 de agosto de 2026" en el HTML crudo, en el
+punto correcto de la oración (después de modalidad, antes del conteo de
+otras vacantes de la empresa). Verificado en verde: `tsc --noEmit`,
+`npm run build`, `test:seo`, `test:dashboard-filters`, `test:companies-search`.
+
 ## 2. Primer paso al reiniciar sesión: baseline de `seo-drift`
 
 Antes de cualquier fase nueva de la tabla de abajo, capturar un baseline
@@ -639,7 +688,7 @@ cambio por terminado.**
 | 5    | Auditoría técnica completa                                       | `seo-technical`, `seo-sitemap`                           | 9 categorías revisadas contra el sitio real; confirmar que nada de lo nuevo (hreflang, `last_seen_at`) introdujo una regresión técnica                            | ✅ Hecho — 2026-08-04, ver §1.7. Cero CRITICAL; 3 oportunidades Low/Medium anotadas, ninguna implementada (justificación en §1.7) |
 | 6    | Schema.org — validación y oportunidades                          | `seo-schema`                                             | JobPosting validado contra Rich Results; confirmar cero tipos deprecados                                                                                          | ✅ Hecho — 2026-08-04, ver §1.11. JobPosting/Organization/WebSite ya validados en §1.7; oportunidad de §1.7 (BreadcrumbList/ItemList en categorías) implementada |
 | 7    | Core Web Vitals con datos de campo reales                        | `seo-google` (`pagespeed`, `crux`)                       | LCP/INP/CLS con CrUX real, no solo lab data                                                                                                                       | ⬜ Pendiente (necesita credenciales Google)                                         |
-| 8    | GEO / AI Overviews — superficie sin tocar hoy                    | `seo-geo`                                                | Reporte de citability score sobre una página de vacante y una de categoría                                                                                        | ⬜ Pendiente                                                                        |
+| 8    | GEO / AI Overviews — superficie sin tocar hoy                    | `seo-geo`                                                | Reporte de citability score sobre una página de vacante y una de categoría                                                                                        | ✅ Hecho — 2026-08-04, ver §1.12. Fecha de publicación real agregada al texto visible; contenido corto sigue siendo el mismo límite ya documentado en §1.6 |
 | 9    | Investigación de keywords (solo si hay fuente de datos real)     | `seo-google` (`keywords`, Tier 3) o extensión DataForSEO | **No arranca sin credenciales reales** — nunca un volumen inventado                                                                                               | ⬜ Bloqueado (volumen real) — parcialmente sustituido con alternativa gratuita, ver §1.8/§1.10. Sigue sin credenciales Ads/DataForSEO |
 
 No hay una fase "10" ya definida — cualquier trabajo más allá de esto

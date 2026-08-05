@@ -147,6 +147,21 @@ export function buildJobDescription(job: SeoJob, context: JobDescriptionContext 
   const modality = getModalityLabel(job.location);
   if (modality) parts.push(`Modalidad: ${modality}.`);
 
+  // Same real timestamp already used for JobPosting's datePosted below —
+  // stated here as visible text too, not just buried in JSON-LD. A real
+  // publish date in the visible content is a documented recency/freshness
+  // signal for both traditional E-E-A-T and AI-citation eligibility
+  // (SEO-IMPROVEMENT-PLAN.md §1.12) — never a fabricated "last updated"
+  // claim, just this job's own already-known `publishedAt`.
+  if (job.publishedAt) {
+    const publishedLabel = new Date(job.publishedAt).toLocaleDateString("es-CO", {
+      day: "numeric",
+      month: "long",
+      year: "numeric"
+    });
+    parts.push(`Publicado el ${publishedLabel}.`);
+  }
+
   // "- 1" excludes this job itself from its own count.
   const otherAtCompany = (context.companyActiveCount ?? 0) - 1;
   if (job.company && otherAtCompany > 0) {
