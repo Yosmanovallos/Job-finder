@@ -723,6 +723,68 @@ proyecto).
 Verificado: `claude-seo run google_auth.py --check` confirma Tier 0 (API
 key) activo para PSI/CrUX/CrUX History antes y después.
 
+### 1.15 Fase 3 — causa raíz confirmada con datos reales de Search Console API (2026-08-04)
+
+El usuario proporcionó `GOOGLE_INDEXING_CLIENT_EMAIL`/`GOOGLE_INDEXING_PRIVATE_KEY`
+en `.env` (nota de proceso: el primer pegado tenía comillas tipográficas —
+`"..."` en vez de `"..."` rectas, probablemente de la app desde donde se
+copió, lo que hacía que `dotenv` no cargara las variables; corregido
+retecleándolas con comillas rectas). El agente nunca escribió en `.env`
+directamente (deny-list del proyecto) — solo verificó el formato del
+private key fuera del repo, sin guardarlo en disco, antes de indicarle al
+usuario qué pegar.
+
+`scripts/check-search-console.ts` (solo lectura, ya existente):
+
+- **`sitemaps.list`** (conteos agregados): `sitemap-pages.xml` 12
+  enviadas/0 indexadas, `sitemap-categories.xml` 79/0, `sitemap.xml`
+  (índice) 21969/0. El conteo agregado de "indexadas" en este endpoint
+  parece rezagado/poco fiable comparado con la inspección por URL (ver
+  abajo) — se reporta como dato crudo, no como conclusión.
+- **`urlInspection.index.inspect`** (verdad por URL, más confiable) sobre
+  9 URLs representativas — **esto SÍ confirma la causa raíz con evidencia
+  directa de Google, cerrando la Fase 3**:
+  - `/`, `/ve`, `/dashboard`, `/ve/dashboard`: **"Submitted and indexed"**
+    (`verdict=PASS`) — las páginas top-of-funnel sí están indexadas.
+  - `/empleos/caracas` (ciudad): **"Submitted and indexed"** — al menos
+    una página de categoría de ciudad ya indexó.
+  - `/empleos/bogota`, `/empleos/project-manager`,
+    `/ve/empleos/project-manager` (rol): **"Discovered - currently not
+    indexed"** (`verdict=NEUTRAL`) — Google las conoce, las tiene en cola,
+    pero decide no indexarlas todavía. Esto confirma con evidencia directa
+    (no inferencia) el patrón que §1.5 ya había planteado como hipótesis
+    más probable: dominio nuevo, cero backlinks, presupuesto de confianza
+    limitado — no un bloqueo técnico (si lo fuera, `robotsTxtState`
+    reportaría `DISALLOWED` o `pageFetchState` un error; en cambio vienen
+    `UNSPECIFIED` porque Google ni siquiera llegó a esa etapa del pipeline
+    para una URL que decidió no indexar todavía).
+  - `/empresas`: **"URL is unknown to Google"** — hallazgo nuevo, real,
+    no relacionado con el patrón anterior: la página **nunca se envió**.
+    Confirmado: `/empresas` es una ruta real y funcional (`CompaniesDirectory`
+    en `App.tsx`, responde 200) pero nunca estuvo en `static/sitemap.xml`
+    — a diferencia de `/dashboard`/`/como-funciona`/etc., que sí están.
+    **Corregido**: se agregaron `/empresas` y `/ve/empresas` a
+    `static/sitemap.xml` (`changefreq: daily`, `priority: 0.7`, entre el
+    hub principal y las páginas de marketing estáticas).
+
+**Hallazgo nuevo, NO corregido esta sesión (mayor alcance)**: al verificar
+`/empresas` se confirmó que **ni `/empresas` ni `/empresas/:slug` tienen
+ninguna rama SSR en `server.ts`** — a diferencia de home/dashboard/
+categoría/vacante, sirven el shell estático genérico sin reescribir
+título/meta/canonical/JSON-LD. El `<title>` crudo que ve un crawler en
+`/empresas` es el mismo de la home, no algo específico de la página. Esto
+no formaba parte de la muestra de "6 URLs de baseline" que las Fases 5/6/8
+ya auditaron, así que no se había detectado antes. Con `/empresas/:slug`
+ya existiendo con datos reales de reputación por empresa
+(`docs/COMPANY-REPUTATION-PLAN.md`), esto es una oportunidad real de SEO
+programático (título/meta real por empresa, posible schema
+`Organization`) — pero es un alcance nuevo y considerable (nueva rama de
+servidor, nuevos tests, su propia verificación), no algo para añadir de
+apuro a esta sesión. Queda anotado para una fase futura dedicada.
+
+Verificado: `npm run build`, `test:seo` en verde tras agregar las 2 URLs
+al sitemap estático.
+
 ## 2. Primer paso al reiniciar sesión: baseline de `seo-drift`
 
 Antes de cualquier fase nueva de la tabla de abajo, capturar un baseline
@@ -752,7 +814,7 @@ cambio por terminado.**
 | 0    | Diagnóstico de causa raíz (bug de churn, thin content, hreflang) | (manual, pre-plugin)                                     | Confirmado con evidencia en vivo                                                                                                                                  | ✅ Hecho — `SEO-PLAN.md` §9                                                         |
 | 1    | Fixes de mayor apalancamiento ya identificados                   | (manual)                                                 | `test:seo` + `tsc` + `build` en verde                                                                                                                             | ✅ Hecho — `SEO-PLAN.md` §10                                                        |
 | 2    | Baseline de drift (sección 2 de este doc)                        | `seo-drift`                                              | Baseline guardado para las 6 URLs de muestra                                                                                                                      | ✅ Hecho — 2026-08-04, baseline IDs 1-6. `/seo drift compare` corrido post-deploy de 1.1-1.3 contra las 6: único CRITICAL es `canonical_changed` en `/dashboard` (esperado, ver §1.1); todo lo demás coincide con los diffs pre-etiquetados o es cambio real de datos (conteo de vacantes) |
-| 3    | Confirmar causa raíz con datos reales de Google                  | `seo-google` (`gsc query`, `inspect`, `sitemaps`)        | Requiere que el usuario traiga el desglose de Search Console, o las credenciales `GOOGLE_INDEXING_CLIENT_EMAIL`/`GOOGLE_INDEXING_PRIVATE_KEY` en el entorno local | ⬜ Bloqueado — depende del usuario                                                  |
+| 3    | Confirmar causa raíz con datos reales de Google                  | `seo-google` (`gsc query`, `inspect`, `sitemaps`)        | Requiere que el usuario traiga el desglose de Search Console, o las credenciales `GOOGLE_INDEXING_CLIENT_EMAIL`/`GOOGLE_INDEXING_PRIVATE_KEY` en el entorno local | ✅ Hecho — 2026-08-04, ver §1.15. Confirmado con la API real: `/`, `/dashboard`, city pages sí indexan; role pages en "Discovered - currently not indexed" (coincide con §1.5); `/empresas` nunca se había enviado, corregido |
 | 4    | Auditoría de contenido programático a escala                     | `seo-programmatic`, `seo-content`                        | Score de unicidad real sobre una muestra de páginas de vacante; decidir si la Fase 4 del plan viejo (descripciones reales por fuente) se vuelve necesaria         | ✅ Hecho — 2026-08-04, ver §1.6. Unicidad OK (61.3%), pero contenido absoluto muy corto (~37 palabras/página) — decisión pendiente del usuario, no bloqueante |
 | 5    | Auditoría técnica completa                                       | `seo-technical`, `seo-sitemap`                           | 9 categorías revisadas contra el sitio real; confirmar que nada de lo nuevo (hreflang, `last_seen_at`) introdujo una regresión técnica                            | ✅ Hecho — 2026-08-04, ver §1.7. Cero CRITICAL; 3 oportunidades Low/Medium anotadas, ninguna implementada (justificación en §1.7) |
 | 6    | Schema.org — validación y oportunidades                          | `seo-schema`                                             | JobPosting validado contra Rich Results; confirmar cero tipos deprecados                                                                                          | ✅ Hecho — 2026-08-04, ver §1.11. JobPosting/Organization/WebSite ya validados en §1.7; oportunidad de §1.7 (BreadcrumbList/ItemList en categorías) implementada |

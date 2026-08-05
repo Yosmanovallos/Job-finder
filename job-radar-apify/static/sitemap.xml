@@ -21,6 +21,16 @@
     <priority>0.9</priority>
   </url>
   <url>
+    <loc>https://buscotrabajo.co/empresas</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://buscotrabajo.co/ve/empresas</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
     <loc>https://buscotrabajo.co/como-funciona</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
