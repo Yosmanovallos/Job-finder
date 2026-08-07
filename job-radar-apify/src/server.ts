@@ -18,11 +18,6 @@ import {
   resolveCompanyBySlug,
   ReputationEntry
 } from "./db/company-reputation-repository.js";
-import {
-  upsertCompanyReview,
-  deleteCompanyReview,
-  getCompanyReviews
-} from "./db/company-reviews-repository.js";
 import { applyJobFilters, sortByPreferredRoles, JobFilterParams } from "./lib/job-filters.js";
 import { getCompanyLogoUrl } from "./data/company-logo-domains.js";
 import { getCountryConfig } from "./countries/index.js";
@@ -193,8 +188,8 @@ function respondToUnexpectedError(
 // tighter and checked separately inside those routes.
 const GENERAL_API_RATE_LIMIT = 120;
 const GENERAL_API_RATE_WINDOW_MS = 60 * 1000;
-// For endpoints that write data or cost real money/quota to call (reviews,
-// checkout, triggering a scrape) — a much lower bar than the general read cap.
+// For endpoints that write data or cost real money/quota to call (checkout,
+// triggering a scrape) — a much lower bar than the general read cap.
 const SENSITIVE_RATE_LIMIT = 10;
 const SENSITIVE_RATE_WINDOW_MS = 60 * 1000;
 
@@ -441,15 +436,7 @@ const server = http.createServer(async (req, res) => {
       return;
     }
     const page = matched.slice(0, 60);
-    // Independent of each other (both only need companyName, already
-    // resolved above) — run concurrently instead of one full DB round trip
-    // after another. Added getCompanyReviews here in Fase E2 as a third
-    // sequential await, which measurably slowed this endpoint; this
-    // parallelizes it back down to one round trip's worth of latency.
-    const [reputationMap, userReviews] = await Promise.all([
-      getReputationForCompanies([companyName]),
-      getCompanyReviews(companyName, session?.id || null)
-    ]);
+    const reputationMap = await getReputationForCompanies([companyName]);
 
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(
@@ -457,98 +444,10 @@ const server = http.createServer(async (req, res) => {
         companyName,
         logoUrl: getCompanyLogoUrl(companyName),
         reputation: reputationMap.get(companyName) || [],
-        userReviews,
         jobs: page,
         total: matched.length
       })
     );
-    return;
-  }
-
-  // 4a-ter. POST/DELETE /api/companies/:slug/reviews — native BuscoTrabajo
-  // reviews (Fase E2, distinto de la reputación externa agregada arriba).
-  // Requiere sesión real (isAuthenticated basta, sin depender de onboarding
-  // completado) — nunca un id ni un companyName de confianza ciega del
-  // cliente más allá del slug de la URL, que se resuelve con la misma
-  // regla de dos pasos que el GET (alias curado → corpus de vacantes real).
-  // Un slug que no resuelve a ninguna empresa real es 404: no se puede
-  // reseñar algo que no existe en el sistema.
-  if (
-    pathname.startsWith("/api/companies/") &&
-    pathname.endsWith("/reviews") &&
-    (method === "POST" || method === "DELETE")
-  ) {
-    const slug = pathname.slice("/api/companies/".length, -"/reviews".length);
-
-    const session = await verifySession(req);
-    if (!session) {
-      res.writeHead(401, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ error: "No autenticado" }));
-      return;
-    }
-    if (!checkSensitiveRateLimit(clientIp, res, "POST/DELETE /reviews")) return;
-
-    const jobs = await getJobsCached(50000);
-    const visibleJobs = maskLockedFields(jobs, session.tier);
-    const companyName =
-      (await resolveCompanyBySlug(slug)) || resolveCompanyNameFromJobs(slug, visibleJobs);
-    if (!companyName) {
-      res.writeHead(404, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ error: "Empresa no encontrada" }));
-      return;
-    }
-
-    if (method === "DELETE") {
-      await deleteCompanyReview(session.id, companyName);
-      const userReviews = await getCompanyReviews(companyName, session.id);
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ userReviews }));
-      return;
-    }
-
-    let bodyText = "";
-    req.on("data", (chunk) => {
-      bodyText += chunk.toString();
-    });
-    req.on("end", async () => {
-      try {
-        const parsed = JSON.parse(bodyText || "{}");
-        const rating = parsed.rating;
-        if (typeof rating !== "number" || !Number.isInteger(rating) || rating < 1 || rating > 5) {
-          res.writeHead(400, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ error: "rating debe ser un entero entre 1 y 5" }));
-          return;
-        }
-
-        let comment: string | null = null;
-        if (parsed.comment !== undefined && parsed.comment !== null) {
-          if (typeof parsed.comment !== "string") {
-            res.writeHead(400, { "Content-Type": "application/json" });
-            res.end(JSON.stringify({ error: "comment debe ser texto" }));
-            return;
-          }
-          const trimmed = parsed.comment.trim();
-          if (trimmed.length > 1000) {
-            res.writeHead(400, { "Content-Type": "application/json" });
-            res.end(JSON.stringify({ error: "comment no puede superar 1000 caracteres" }));
-            return;
-          }
-          comment = trimmed.length > 0 ? trimmed : null;
-        }
-
-        await upsertCompanyReview({ userId: session.id, companyName, rating, comment });
-        const userReviews = await getCompanyReviews(companyName, session.id);
-        res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ userReviews }));
-      } catch (e: any) {
-        respondToUnexpectedError(
-          res,
-          e,
-          "POST /api/companies/:slug/reviews",
-          "No se pudo guardar la reseña."
-        );
-      }
-    });
     return;
   }
 
@@ -1158,7 +1057,7 @@ const server = http.createServer(async (req, res) => {
       const heading = `Empresas en ${countryConfig.name}`;
       const meta = {
         title: `${heading} | BuscoTrabajo`,
-        description: `Explora empresas con vacantes activas en ${countryConfig.name} en BuscoTrabajo — su reputación, reseñas y ofertas.`,
+        description: `Explora empresas con vacantes activas en ${countryConfig.name} en BuscoTrabajo — su reputación y ofertas.`,
         canonicalUrl: `${SITE_URL}${isVeEmpresas ? "/ve" : ""}/empresas`
       };
 

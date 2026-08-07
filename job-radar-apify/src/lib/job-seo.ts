@@ -422,7 +422,7 @@ export function buildCompanyMeta(
   return {
     title: `${companyName} | BuscoTrabajo`,
     heading: companyName,
-    description: `${companyName}: ${countLabel} en BuscoTrabajo — reputación y reseñas reales en ${countryName}.`,
+    description: `${companyName}: ${countLabel} en BuscoTrabajo — reputación real en ${countryName}.`,
     canonicalUrl: buildCompanyUrl(companyName, country)
   };
 }

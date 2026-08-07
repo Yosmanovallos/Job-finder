@@ -23,8 +23,8 @@ const SEARCH_DEBOUNCE_MS = 350;
 // this is the "explorar todas las empresas" browsing surface, reusing that
 // endpoint's offset/limit paging instead of its own copy). Each card is
 // just name + count; clicking goes to the existing /empresas/:slug page
-// (CompanyLanding.tsx), which already renders that company's reputation,
-// native reviews and job list — nothing here duplicates that.
+// (CompanyLanding.tsx), which already renders that company's reputation
+// and job list — nothing here duplicates that.
 export default function CompaniesDirectory() {
   // /empresas (Colombia, default) vs /ve/empresas (Venezuela) — same
   // path-prefix pattern as Dashboard.tsx/Landing.
@@ -34,7 +34,7 @@ export default function CompaniesDirectory() {
 
   usePageMeta({
     title: `Empresas en ${countryName} | BuscoTrabajo`,
-    description: `Explora empresas con vacantes activas en ${countryName} en BuscoTrabajo — su reputación, reseñas y ofertas.`
+    description: `Explora empresas con vacantes activas en ${countryName} en BuscoTrabajo — su reputación y ofertas.`
   });
 
   const [search, setSearch] = useState("");
@@ -157,7 +157,7 @@ export default function CompaniesDirectory() {
           {total > 0
             ? `${total.toLocaleString("es-CO")} empresas con vacantes activas ahora mismo.`
             : "Busca cualquier empresa por nombre."}{" "}
-          Haz clic en una para ver su reputación, reseñas y vacantes.
+          Haz clic en una para ver su reputación y vacantes.
         </p>
 
         <div className="relative mt-6 mb-8 max-w-md">

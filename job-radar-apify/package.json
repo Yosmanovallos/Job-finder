@@ -24,7 +24,6 @@
     "test:seo": "tsx tests/validate-seo-job-pages.ts",
     "test:social-publisher": "tsx tests/validate-social-publisher.ts",
     "test:reputation": "tsx tests/validate-reputation-tick.ts",
-    "test:company-reviews": "tsx tests/validate-company-reviews.ts",
     "test:companies-search": "tsx tests/validate-companies-search.ts",
     "test:rate-limiting": "tsx tests/validate-rate-limiting.ts",
     "indexing:migrate": "tsx scripts/migrate-indexing-queue.ts",

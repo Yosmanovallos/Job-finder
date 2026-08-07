@@ -3,16 +3,11 @@ import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
 import { ReputationBadges, ReputationEntryProps } from "../components/ReputationBadges.js";
 import { CompanyAvatar } from "../components/CompanyAvatar.js";
 import { CategoryJobRow } from "../components/CategoryJobRow.js";
-import { CompanyReviewForm } from "../components/CompanyReviewForm.js";
-import { CompanyReviewsList, CompanyReviewsDataProps } from "../components/CompanyReviewsList.js";
-import { MonoLabel } from "../components/MonoLabel.js";
 import { useAuth } from "../auth/auth-provider.js";
 import { usePageMeta } from "../lib/use-page-meta.js";
 import { Button } from "../components/ui/button.js";
 import { Job } from "../sources/types.js";
 import { ArrowLeft } from "lucide-react";
-
-const EMPTY_REVIEWS: CompanyReviewsDataProps = { average: null, count: 0, entries: [], myReview: null };
 
 type LoadState = "loading" | "found" | "not-found";
 
@@ -36,7 +31,6 @@ export default function CompanyLanding() {
   const [companyName, setCompanyName] = useState<string | null>(null);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [reputation, setReputation] = useState<ReputationEntryProps[]>([]);
-  const [userReviews, setUserReviews] = useState<CompanyReviewsDataProps>(EMPTY_REVIEWS);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [total, setTotal] = useState(0);
   const [state, setState] = useState<LoadState>("loading");
@@ -52,23 +46,21 @@ export default function CompanyLanding() {
     // already-rendered page back to the skeleton for every logged-in visitor.
     if (authLoading) return;
 
-    // server.ts's /empresas/:slug (and /ve/empresas/:slug) route embeds
-    // this exact response (minus session-specific userReviews, which the
-    // SSR render can't know) directly in the HTML — same shortcut
-    // Dashboard.tsx already uses for window.__SSR_JOBS__. Only trusted
-    // when BOTH slug and country match this mount (never just "one of the
-    // two countries", same reasoning as Dashboard's ssrJobs.country
-    // check) and only when anonymous (!accessToken) — a signed-in visitor
-    // still needs the real fetch below to get their own myReview, which
-    // this payload never includes. Deleted immediately after one read so
-    // a later slug/filter change can never reuse stale data.
+    // server.ts's /empresas/:slug (and /ve/empresas/:slug) route embeds this
+    // exact response directly in the HTML — same shortcut Dashboard.tsx
+    // already uses for window.__SSR_JOBS__. Only trusted when BOTH slug and
+    // country match this mount (never just "one of the two countries", same
+    // reasoning as Dashboard's ssrJobs.country check) and only when
+    // anonymous (!accessToken) — SSR always renders the tier:"free" masked
+    // view, so a signed-in visitor still needs the real fetch below to get
+    // their own unmasked tier. Deleted immediately after one read so a later
+    // slug/filter change can never reuse stale data.
     const ssrCompany = (window as any).__SSR_COMPANY__;
     delete (window as any).__SSR_COMPANY__;
     if (ssrCompany && ssrCompany.slug === slug && ssrCompany.country === country && !accessToken) {
       setCompanyName(ssrCompany.companyName);
       setLogoUrl(ssrCompany.logoUrl || null);
       setReputation(ssrCompany.reputation || []);
-      setUserReviews(EMPTY_REVIEWS);
       setJobs(ssrCompany.jobs || []);
       setTotal(ssrCompany.total || 0);
       setState("found");
@@ -84,7 +76,6 @@ export default function CompanyLanding() {
           setCompanyName(data.companyName);
           setLogoUrl(data.logoUrl || null);
           setReputation(data.reputation || []);
-          setUserReviews(data.userReviews || EMPTY_REVIEWS);
           setJobs(data.jobs || []);
           setTotal(data.total || 0);
           setState("found");
@@ -152,24 +143,6 @@ export default function CompanyLanding() {
                 <ReputationBadges entries={reputation} />
               </div>
             )}
-
-            {/* Native BuscoTrabajo reviews — a visually separate block from
-                ReputationBadges above (external, aggregated sources) so the
-                two are never read as one merged number (same "never
-                normalize across sources" principle already applied to
-                Merco/GPTW/Computrabajo). */}
-            <div className="mb-6">
-              <MonoLabel>RESEÑAS DE BUSCOTRABAJO</MonoLabel>
-              <div className="mt-3 rounded-lg border border-border bg-card p-4 space-y-4">
-                <CompanyReviewForm
-                  slug={slug!}
-                  myReview={userReviews.myReview}
-                  onUpdate={setUserReviews}
-                />
-                <div className="h-px bg-border" />
-                <CompanyReviewsList data={userReviews} />
-              </div>
-            </div>
 
             {jobs.length === 0 ? (
               <p className="text-sm text-muted-foreground">
