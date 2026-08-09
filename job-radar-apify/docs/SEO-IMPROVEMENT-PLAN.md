@@ -1011,6 +1011,68 @@ Sin indexar (27 mil, 5 motivos): "Descubierta, sin indexar" 26,000,
   anotado para una sesión futura con acceso a la BD, no se especula más
   sin evidencia (AGENTS.md #5).
 
+### 1.19 Bug real (pequeño) de `indexing_queue` + reconciliación recurrente (2026-08-10)
+
+Continuación de §1.18: se investigó con acceso a la BD real por qué
+`indexing_queue` tenía menos filas `URL_UPDATED` (34,577) que filas en
+`jobs` (36,335). **Corrección importante sobre el tamaño real del
+problema** — la primera lectura (comparar contra la tabla `jobs` cruda)
+sobreestimó el bug:
+
+- Un diagnóstico contra la tabla `jobs` **cruda** (sin `DISTINCT ON` ni
+  `is_active = TRUE`) encontró 2,658 filas con datos completos
+  (company/location/url) y cero historial en `indexing_queue` — 94% de
+  una sola fuente (Elempleo), agrupadas en ráfagas del mismo timestamp de
+  scrape (consistente con un fallo puntual de todo un batch, no con datos
+  faltantes por diseño).
+- **Pero `/empleos/:id` y el sitemap nunca leen la tabla cruda** — leen
+  `getJobs()`/`getJobsCached()`, que aplica `WHERE is_active = TRUE` +
+  `DISTINCT ON (title, company, location)` (`job-repository.ts:222-234`).
+  Correr `scripts/backfill-indexing-queue.ts` (que sí usa `getJobs()`,
+  la vista canónica) confirmó que de esas 2,658, solo **28** eran páginas
+  reales, activas y actualmente resolubles vía `/empleos/:id` — las
+  ~2,630 restantes son filas duplicadas/inactivas que `DISTINCT ON`
+  o `is_active = FALSE` ya excluyen de toda superficie pública; nunca
+  fueron páginas indexables en primer lugar, así que su ausencia en la
+  cola siempre fue correcta, no un bug.
+
+**El bug real, confirmado y corregido**: `saveJobs()`
+(`job-repository.ts:163-173`) encola las notificaciones de un tick entero
+en **una sola** llamada batched a `enqueueIndexingNotifications()`,
+envuelta en `try/catch` a propósito ("nunca dejar que un fallo de cola
+tumbe el guardado real" — las filas de `jobs` ya están confirmadas). Si
+esa única llamada falla por cualquier razón transitoria (hipótesis
+líder, no confirmada: contención del pool de conexiones — `client.ts`
+cap a `POOL_MAX = 5`, compartido entre los crons de scraping CO y VE que
+ya corren en paralelo), las URLs de **todo ese batch** se pierden en
+silencio, sin ningún reintento — de ahí las 28 páginas reales
+encontradas sin cola.
+
+**Fix — reconciliación recurrente, no un intento de prevenir la causa
+transitoria exacta** (no se pudo confirmar sin logs de GitHub Actions,
+a los que este checkout no tiene acceso):
+
+- `scripts/backfill-indexing-queue.ts` — mismo script que ya existía
+  como backfill único (para jobs previos al sistema de `indexing_queue`,
+  Fase 3), reutilizado sin cambios de lógica — ya era idempotente y
+  seguro de re-correr (usa la vista canónica `getJobs()`, filtra por
+  `isPubliclyDescribable()`, y salta cualquier URL ya presente en la
+  cola). Solo se actualizó el comentario de cabecera para documentar su
+  nuevo rol recurrente.
+- `.github/workflows/indexing-tick.yml` — nuevo paso "Reconcile queue"
+  antes del paso "Drain indexing queue" existente, corriendo en el mismo
+  cron horario. Solo necesita `DATABASE_URL` (nunca las credenciales de
+  Google — no llama a la API externa, solo encola filas `pending` que el
+  paso de drenado ya existente recoge respetando la cuota diaria de 200,
+  sin cambios ahí). Autosanador independientemente de la causa exacta del
+  fallo transitorio: no importa por qué se perdió un batch, solo que la
+  próxima corrida (máximo 1 hora después) lo detecta y lo encola.
+
+**Corrido una vez en esta sesión** contra producción para cerrar el gap
+actual: `28 URL(s)` encoladas (`Enqueued 28 URL(s)`). Verificado:
+`tsc --noEmit` y `test:seo` (Parte 3b, funciones de `indexing_queue`) en
+verde; `git status` confirma que ningún otro archivo cambió.
+
 ## 2. Primer paso al reiniciar sesión: baseline de `seo-drift`
 
 Antes de cualquier fase nueva de la tabla de abajo, capturar un baseline
@@ -1074,6 +1136,11 @@ releer las 16 subsecciones de §1:
   todavía a propósito (esa rama también tiene trabajo de CV en curso sin
   terminar, ver `docs/CV-GENERATION-PLAN.md` — el fix de SEO vive aislado
   vía `git stash` del código de CV, listo para mergear solo.)
+- **Gap de `indexing_queue`** (§1.19, 2026-08-10): 28 páginas reales sin
+  cola ya encoladas en producción (escritura directa a `indexing_queue`,
+  no requiere deploy). El código del self-heal (`indexing-tick.yml` +
+  comentario actualizado en `backfill-indexing-queue.ts`) sí vive en
+  `seo-fixes` sin mergear, igual que el fix de arriba.
 
 **Necesita acceso a la BD real para confirmar antes de tocar código
 (no especulado, ver §1.18):**
