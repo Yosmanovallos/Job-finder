@@ -29,6 +29,13 @@ jobs:
           cd job-radar-apify
           npm ci || npm install
 
+      - name: Reconcile queue (catch jobs saveJobs() failed to enqueue)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          cd job-radar-apify
+          npx tsx scripts/backfill-indexing-queue.ts
+
       - name: Drain indexing queue
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}

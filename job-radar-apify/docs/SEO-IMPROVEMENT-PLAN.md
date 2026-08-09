@@ -911,6 +911,168 @@ es una decisión de producto (¿una opción "Sin ciudad especificada"? ¿usar
 deja anotado para que una sesión futura no vuelva a correr la misma
 consulta pensando que la lista de ciudades sigue siendo el problema.
 
+### 1.18 Diagnóstico con desglose real de Search Console + fix del bug "Confidencial" (2026-08-09)
+
+El usuario compartió capturas reales de Search Console → Indexación →
+Páginas (el bloqueante de §1.15/§9.4, cerrado por fin con datos reales,
+no solo `urlInspection` sobre una muestra de 9 URLs). Sesión hecha en su
+propia rama (`seo-fixes`, creada desde `main`), **con el trabajo en curso
+de generación de CV guardado aparte vía `git stash`** (no relacionado a
+SEO, no listo para producción — ver `docs/CV-GENERATION-PLAN.md`) para
+que esta rama sea una copia limpia de lo que corre hoy en producción y
+ningún cambio de CV se filtre a un commit de SEO.
+
+**Desglose real (2026-08-09):** 17 páginas indexadas de ~27,017 conocidas.
+Sin indexar (27 mil, 5 motivos): "Descubierta, sin indexar" 26,000,
+"Rastreada, sin indexar" 976, Soft 404 49, "Bloqueada por robots.txt" 1,
+"Página con redirección" 1.
+
+- **26,000 + 976 confirman exactamente la teoría ya documentada en §1.5**
+  (dominio de ~13 días, cero backlinks, corpus programático grande) — no
+  es un hallazgo nuevo, es la confirmación con el desglose que antes
+  faltaba.
+- **"Bloqueada por robots.txt" (la URL de ejemplo era
+  `/login?return_to=/empleos/...`) y "Página con redirección" (`http://`
+  sin `https://`) no son bugs** — ambas son el comportamiento esperado
+  (`robots.txt` ya bloquea `/login` explícitamente; el redirect http→https
+  nunca debe indexarse a sí mismo). Sin acción.
+- **Soft 404 (49 páginas) — hallazgo nuevo, investigado contra el sitio
+  en vivo, no solo contra el reporte:** de 4 URLs de ejemplo verificadas
+  con `curl` en producción, 2 ya no existen (404 real — ver nota abajo) y
+  **2 siguen siendo vacantes reales y vigentes que Google igual clasifica
+  como Soft 404.** Una de ellas (`e64ca2fe-.../analista-senior-de-sistema-
+  gestion-de-inocuidad-buga-valle-del-cauca`) reveló la causa: su
+  `company` es `"Confidencial"` (el placeholder que varias fuentes,
+  Computrabajo entre ellas, usan para "empleador no revelado" —
+  `COMPANY_SEARCH_EXCLUDED` en `server.ts:85` ya lo trata como tal para
+  `/api/companies/search`, pero `companyActiveCount` en la ruta
+  `/empleos/:id` nunca aplicaba la misma exclusión). El bug:
+
+  ```ts
+  // src/server.ts:938 (antes)
+  const companyActiveCount = job.company
+    ? jobs.filter((j) => j.company === job.company).length
+    : undefined;
+  ```
+
+  Para `job.company === "Confidencial"` esto cuenta **todas** las
+  vacantes de empleadores anónimos del corpus como si fueran una sola
+  empresa — el texto visible y el `description` del JSON-LD afirmaban
+  literalmente *"Confidencial tiene 2366 vacantes más activas en
+  BuscoTrabajo"*, un dato fabricado (viola AGENTS.md #5: "Confidencial"
+  no es una empresa, son miles de empleadores distintos que no revelaron
+  su nombre). Esto también explica por qué páginas con contenido real y
+  no genuinamente delgado (~40 palabras, título/empresa/ubicación reales)
+  igual se leen como plantilla casi-duplicada a esta escala: potencialmente
+  miles de páginas comparten el mismo `hiringOrganization`+conteo
+  gigante e idéntico.
+
+  **Fix**: excluir `COMPANY_SEARCH_EXCLUDED` (mismo set ya usado en
+  `/api/companies/search`) del cálculo de `companyActiveCount`.
+  `buildJobDescription()` (`job-seo.ts:166`) ya trataba
+  `companyActiveCount === undefined` como "omitir la frase" (no como "0
+  vacantes") desde que se escribió, así que no requirió cambios — solo
+  `server.ts` se tocó.
+
+  ```ts
+  // src/server.ts:938 (después)
+  const companyActiveCount =
+    job.company && !COMPANY_SEARCH_EXCLUDED.has(job.company)
+      ? jobs.filter((j) => j.company === job.company).length
+      : undefined;
+  ```
+
+  Verificado: `tsc --noEmit`, `npm run build`, `test:seo` (contra la BD
+  real de solo lectura), `test:dashboard-filters`, `test:companies-search`
+  (escribe y limpia sus propias filas `zztest`, no afecta `jobs` reales)
+  en verde. Confirmado además con `curl` contra un servidor local
+  (`.claude/skills/run-job-radar-apify/driver.mjs serve`, detenido
+  limpiamente después): la vacante de "Confidencial" ya no lleva la frase
+  fabricada ni en el `<p>` visible ni en el JSON-LD `description`; una
+  vacante de una empresa real (`Corporacion Fibex Telecom C.A.`, 29
+  vacantes) sigue mostrando su conteo real sin cambios — el fix no toca
+  el caso normal.
+
+  **No desplegado** — existe solo en la rama `seo-fixes` hasta que el
+  usuario decida hacer merge/push. `/seo drift compare` no aplica todavía
+  por la misma razón que §1.4 ya documentó (corre contra producción).
+
+- **Pendiente, no resuelto en esta sesión — necesita una consulta a la BD
+  real que este checkout no tiene credenciales para correr:** las 2 URLs
+  de Soft 404 que sí devolvieron 404 real hoy (no 410) implican que esos
+  `jobId` fueron removidos de `jobs` **sin** pasar por `purgeOldJobs()`
+  (que sí encola `URL_DELETED` en `indexing_queue`, lo que habría dado
+  410 vía `wasJobPurged()` — confirmado leyendo `server.ts:911-930`, la
+  rama ya existe y funciona, `test:seo` la cubre). O fueron purgados antes
+  de que el fix de `last_seen_at` (§10.1 de `SEO-PLAN.md`) o el propio
+  sistema de `indexing_queue` (Fase 3) existieran, o se removieron por
+  otra vía (dedupe merge, `scripts/migrate-dedupe.ts`). No se puede
+  confirmar cuál sin `SELECT` contra `jobs`/`indexing_queue` — se deja
+  anotado para una sesión futura con acceso a la BD, no se especula más
+  sin evidencia (AGENTS.md #5).
+
+### 1.19 Bug real (pequeño) de `indexing_queue` + reconciliación recurrente (2026-08-10)
+
+Continuación de §1.18: se investigó con acceso a la BD real por qué
+`indexing_queue` tenía menos filas `URL_UPDATED` (34,577) que filas en
+`jobs` (36,335). **Corrección importante sobre el tamaño real del
+problema** — la primera lectura (comparar contra la tabla `jobs` cruda)
+sobreestimó el bug:
+
+- Un diagnóstico contra la tabla `jobs` **cruda** (sin `DISTINCT ON` ni
+  `is_active = TRUE`) encontró 2,658 filas con datos completos
+  (company/location/url) y cero historial en `indexing_queue` — 94% de
+  una sola fuente (Elempleo), agrupadas en ráfagas del mismo timestamp de
+  scrape (consistente con un fallo puntual de todo un batch, no con datos
+  faltantes por diseño).
+- **Pero `/empleos/:id` y el sitemap nunca leen la tabla cruda** — leen
+  `getJobs()`/`getJobsCached()`, que aplica `WHERE is_active = TRUE` +
+  `DISTINCT ON (title, company, location)` (`job-repository.ts:222-234`).
+  Correr `scripts/backfill-indexing-queue.ts` (que sí usa `getJobs()`,
+  la vista canónica) confirmó que de esas 2,658, solo **28** eran páginas
+  reales, activas y actualmente resolubles vía `/empleos/:id` — las
+  ~2,630 restantes son filas duplicadas/inactivas que `DISTINCT ON`
+  o `is_active = FALSE` ya excluyen de toda superficie pública; nunca
+  fueron páginas indexables en primer lugar, así que su ausencia en la
+  cola siempre fue correcta, no un bug.
+
+**El bug real, confirmado y corregido**: `saveJobs()`
+(`job-repository.ts:163-173`) encola las notificaciones de un tick entero
+en **una sola** llamada batched a `enqueueIndexingNotifications()`,
+envuelta en `try/catch` a propósito ("nunca dejar que un fallo de cola
+tumbe el guardado real" — las filas de `jobs` ya están confirmadas). Si
+esa única llamada falla por cualquier razón transitoria (hipótesis
+líder, no confirmada: contención del pool de conexiones — `client.ts`
+cap a `POOL_MAX = 5`, compartido entre los crons de scraping CO y VE que
+ya corren en paralelo), las URLs de **todo ese batch** se pierden en
+silencio, sin ningún reintento — de ahí las 28 páginas reales
+encontradas sin cola.
+
+**Fix — reconciliación recurrente, no un intento de prevenir la causa
+transitoria exacta** (no se pudo confirmar sin logs de GitHub Actions,
+a los que este checkout no tiene acceso):
+
+- `scripts/backfill-indexing-queue.ts` — mismo script que ya existía
+  como backfill único (para jobs previos al sistema de `indexing_queue`,
+  Fase 3), reutilizado sin cambios de lógica — ya era idempotente y
+  seguro de re-correr (usa la vista canónica `getJobs()`, filtra por
+  `isPubliclyDescribable()`, y salta cualquier URL ya presente en la
+  cola). Solo se actualizó el comentario de cabecera para documentar su
+  nuevo rol recurrente.
+- `.github/workflows/indexing-tick.yml` — nuevo paso "Reconcile queue"
+  antes del paso "Drain indexing queue" existente, corriendo en el mismo
+  cron horario. Solo necesita `DATABASE_URL` (nunca las credenciales de
+  Google — no llama a la API externa, solo encola filas `pending` que el
+  paso de drenado ya existente recoge respetando la cuota diaria de 200,
+  sin cambios ahí). Autosanador independientemente de la causa exacta del
+  fallo transitorio: no importa por qué se perdió un batch, solo que la
+  próxima corrida (máximo 1 hora después) lo detecta y lo encola.
+
+**Corrido una vez en esta sesión** contra producción para cerrar el gap
+actual: `28 URL(s)` encoladas (`Enqueued 28 URL(s)`). Verificado:
+`tsc --noEmit` y `test:seo` (Parte 3b, funciones de `indexing_queue`) en
+verde; `git status` confirma que ningún otro archivo cambió.
+
 ## 2. Primer paso al reiniciar sesión: baseline de `seo-drift`
 
 Antes de cualquier fase nueva de la tabla de abajo, capturar un baseline
@@ -967,6 +1129,25 @@ releer las 16 subsecciones de §1:
   Ads/DataForSEO que el usuario decida traer. La alternativa gratuita
   (§1.8) ya se corrió y alimentó el swap de roles de §1.10, pero no
   sustituye un volumen de búsqueda real.
+
+**Implementado, esperando decisión de merge/deploy del usuario:**
+- **Bug "Confidencial" en `companyActiveCount`** (§1.18, 2026-08-09): fix
+  ya hecho y verificado en la rama `seo-fixes`, no mergeado a `main`
+  todavía a propósito (esa rama también tiene trabajo de CV en curso sin
+  terminar, ver `docs/CV-GENERATION-PLAN.md` — el fix de SEO vive aislado
+  vía `git stash` del código de CV, listo para mergear solo.)
+- **Gap de `indexing_queue`** (§1.19, 2026-08-10): 28 páginas reales sin
+  cola ya encoladas en producción (escritura directa a `indexing_queue`,
+  no requiere deploy). El código del self-heal (`indexing-tick.yml` +
+  comentario actualizado en `backfill-indexing-queue.ts`) sí vive en
+  `seo-fixes` sin mergear, igual que el fix de arriba.
+
+**Necesita acceso a la BD real para confirmar antes de tocar código
+(no especulado, ver §1.18):**
+- 2 de 49 URLs de Soft 404 verificadas hoy ya no existen (404 real, no
+  410) — sugiere que salieron de `jobs` sin pasar por `purgeOldJobs()`/
+  `indexing_queue`. Necesita un `SELECT` real para confirmar la causa
+  antes de proponer un fix.
 
 **Decisiones del usuario, ya tomadas (documentadas, no re-abrir sin razón nueva):**
 - Sitemap de las ~7,255 páginas de `/empresas/:slug`: **no enviarlas por
