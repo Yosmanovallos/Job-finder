@@ -935,9 +935,17 @@ const server = http.createServer(async (req, res) => {
     // docs/SEO-PLAN.md §9.3): `jobs` is the same up-to-50,000-row list
     // already loaded above for the id lookup, so counting same-company rows
     // is an in-memory filter, not a new Postgres query.
-    const companyActiveCount = job.company
-      ? jobs.filter((j: any) => j.company === job.company).length
-      : undefined;
+    // Never for "Confidencial"/"Empresa confidencial" (COMPANY_SEARCH_EXCLUDED,
+    // §78 above): those are undisclosed-employer placeholders shared by
+    // thousands of unrelated postings, not one company — counting them would
+    // fabricate a claim like "Confidencial tiene 2366 vacantes más activas"
+    // (confirmed live via Search Console's Soft 404 report, 2026-08-09: this
+    // exact pattern is what made real, non-thin job pages read as templated
+    // near-duplicates to Google).
+    const companyActiveCount =
+      job.company && !COMPANY_SEARCH_EXCLUDED.has(job.company)
+        ? jobs.filter((j: any) => j.company === job.company).length
+        : undefined;
 
     let indexHtml: string;
     try {
