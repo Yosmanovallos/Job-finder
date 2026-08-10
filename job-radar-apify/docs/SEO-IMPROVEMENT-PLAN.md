@@ -1073,6 +1073,48 @@ actual: `28 URL(s)` encoladas (`Enqueued 28 URL(s)`). Verificado:
 `tsc --noEmit` y `test:seo` (Parte 3b, funciones de `indexing_queue`) en
 verde; `git status` confirma que ningún otro archivo cambió.
 
+### 1.20 `getPendingIndexingBatch()` pasó de LIFO a FIFO real (2026-08-10)
+
+Motivado por pedir "Solicitar indexación" para 3 URLs reales identificadas
+en §1.18 (dos de ellas ya tenían una fila en `indexing_queue` desde antes,
+2026-07-31 y 2026-08-02 respectivamente). Después de encolarlas, no
+salieron en ninguna corrida del cron durante ~17 horas pese a que el drain
+corría cada hora sin errores.
+
+**Causa raíz confirmada contra producción**: `getPendingIndexingBatch()`
+ordenaba `ORDER BY created_at DESC` (más nuevo primero). Con
+`indexing_queue` sosteniendo 33,000+ filas `pending` y nuevas vacantes
+encolándose cada ~15 minutos (cada tick de scraping), cualquier entrada
+vieja puede quedar enterrada indefinidamente — el flujo constante de
+llegadas nuevas nunca le da su turno a lo que ya esperaba. Confirmado
+empíricamente: las 2 URLs con fila previa (31 jul / 2 ago) llevaban más
+de una semana `pending` sin haberse enviado nunca, pese a que el drain
+corre cada hora sin fallar.
+
+**Fix**: cambiar el `ORDER BY` a `ASC` (FIFO real, más viejo primero) en
+`src/db/indexing-repository.ts`. Verificado con una consulta directa
+contra la BD real (`ORDER BY created_at ASC LIMIT 5`) antes de aplicar el
+cambio: confirma que el siguiente batch a drenar serían filas de
+2026-07-30 — más viejas todavía que las 2 URLs del hallazgo original,
+mismo patrón de starvation a mayor escala. Efecto colateral deseable: la
+cuota diaria ahora se gasta en los avisos que más tiempo llevan esperando,
+no siempre en la vacante más reciente.
+
+**No afecta el orden que ve un usuario real** — `getJobs()`
+(`job-repository.ts`, usada por `/dashboard`, `/api/jobs`, el sitemap)
+sigue ordenando `published_at DESC` sin cambios; `indexing_queue` es una
+tabla interna de bookkeeping para la Indexing API, invisible para
+cualquier visitante.
+
+Verificado: `tsc --noEmit`, `npm run build` en verde (worktree aislado,
+sin `.env` — verificación funcional del cambio de orden hecha con una
+consulta de solo lectura contra la BD real desde otro checkout con
+credenciales, sin tocar ningún archivo). No se corrió `test:seo` en este
+worktree por falta de `DATABASE_URL` local; la suite existente no afirma
+nada sobre el orden de `getPendingIndexingBatch()` de todas formas, así
+que la consulta directa es la verificación más específica disponible para
+este cambio puntual.
+
 ## 2. Primer paso al reiniciar sesión: baseline de `seo-drift`
 
 Antes de cualquier fase nueva de la tabla de abajo, capturar un baseline
