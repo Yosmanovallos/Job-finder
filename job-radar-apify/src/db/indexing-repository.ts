@@ -62,10 +62,19 @@ export interface PendingIndexingRow {
 // discoverable via sitemap-jobs.xml regardless of when this table sends them.
 export async function getPendingIndexingBatch(limit: number): Promise<PendingIndexingRow[]> {
   if (limit <= 0) return [];
+  // FIFO (oldest first), not LIFO. Confirmed empirically 2026-08-10 against
+  // production: with the queue holding 30k+ pending rows and new jobs
+  // enqueuing continuously (a scrape tick every 15 min), a newest-first
+  // order lets a fast-enough stream of new arrivals permanently starve
+  // anything already waiting — two real, still-live job pages sat pending
+  // since 2026-07-31 and 2026-08-02 respectively, never once reaching the
+  // front. Oldest-first guarantees every entry eventually gets its turn,
+  // and spends the daily quota on the notifications that have been waiting
+  // longest rather than always the newest arrival.
   const result = await pool.query(
     `SELECT id, url, notification_type FROM indexing_queue
      WHERE status = 'pending'
-     ORDER BY created_at DESC
+     ORDER BY created_at ASC
      LIMIT $1`,
     [limit]
   );
