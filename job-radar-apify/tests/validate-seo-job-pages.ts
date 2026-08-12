@@ -12,6 +12,7 @@ import {
   buildJobPath,
   buildJobUrl,
   buildJobPosting,
+  buildJobDescription,
   buildJobMeta,
   buildJobsSitemapXml,
   buildSitemapIndexXml,
@@ -168,6 +169,43 @@ function runPureFunctionTests() {
       !String(singleOtherPosting.description).includes("1 vacante más activas"),
     "Singular/plural correcto cuando solo hay 1 otra vacante de la misma empresa.",
     `Singular/plural incorrecto en: "${singleOtherPosting.description}"`
+  );
+
+  // Fase 2 del plan de descripciones (2026-08-12): una vacante con
+  // description/requirements/technologies/employmentType reales (lo que
+  // job-repository.ts's getJobs() ya devuelve para las fuentes
+  // enriquecidas) debe reflejarse en el JobPosting real, no solo en la
+  // plantilla genérica. El fixture openJob de arriba nunca tuvo estos
+  // campos, así que ningún test anterior ejercitaba este camino.
+  const enrichedJob: SeoJob = {
+    ...openJob,
+    description: "Buscamos un/a Analista de Datos para el equipo de BI.",
+    requirements: ["Manejo de SQL avanzado", "Experiencia con Power BI"],
+    technologies: ["SQL", "Power BI"],
+    employmentType: "Tiempo completo"
+  };
+  const enrichedDescription = buildJobDescription(enrichedJob);
+  check(
+    enrichedDescription.includes("Buscamos un/a Analista de Datos para el equipo de BI.") &&
+      enrichedDescription.includes("Requisitos: Manejo de SQL avanzado; Experiencia con Power BI."),
+    "buildJobDescription() incluye la descripción real y los requisitos reales cuando existen.",
+    `buildJobDescription() no reflejó los campos reales: "${enrichedDescription}"`
+  );
+
+  const enrichedPosting = buildJobPosting(enrichedJob) as any;
+  check(
+    enrichedPosting?.skills === "SQL, Power BI" &&
+      enrichedPosting?.qualifications === "Manejo de SQL avanzado; Experiencia con Power BI" &&
+      enrichedPosting?.employmentType === "FULL_TIME",
+    "El JobPosting real emite skills/qualifications/employmentType (token schema.org, no la etiqueta en español) cuando la vacante los tiene.",
+    `JobPosting no emitió los campos enriquecidos esperados: skills="${enrichedPosting?.skills}" qualifications="${enrichedPosting?.qualifications}" employmentType="${enrichedPosting?.employmentType}"`
+  );
+
+  const plainPosting = buildJobPosting(openJob) as any;
+  check(
+    !("skills" in plainPosting) && !("qualifications" in plainPosting) && !("employmentType" in plainPosting),
+    "Sin description/requirements/technologies/employmentType reales, el JobPosting no emite esos campos (nunca inventa un valor).",
+    `JobPosting emitió un campo enriquecido sin dato real: skills="${plainPosting?.skills}" qualifications="${plainPosting?.qualifications}" employmentType="${plainPosting?.employmentType}"`
   );
 
   // Locked (masked) job — same shape maskLockedFields() produces for a

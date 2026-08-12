@@ -2,6 +2,7 @@ import { Job } from "../sources/types.js";
 import { getModalityLabel, CITY_OPTIONS } from "./job-filters.js";
 import { DEFAULT_ROLES_200 } from "../queue/scheduler.js";
 import { getCountryConfig, DEFAULT_COUNTRY } from "../countries/index.js";
+import { extractTechnologies } from "./extract-technologies.js";
 
 export const SITE_URL = "https://buscotrabajo.co";
 // jobs older than this are purged from the DB (see job-repository.ts's
@@ -147,6 +148,21 @@ export function buildJobDescription(job: SeoJob, context: JobDescriptionContext 
   const modality = getModalityLabel(job.location);
   if (modality) parts.push(`Modalidad: ${modality}.`);
 
+  // Real scraped description/requirements — only a fraction of jobs have
+  // these today (job-repository.ts's detail-enrichment, capped per source
+  // per tick), so this stays a fallback-safe conditional exactly like every
+  // other block here: present, use it; absent, the rest of this function
+  // still produces the same generic-but-truthful sentence it always did.
+  // Multi-line job.description is pushed as-is — this string ends up both
+  // inside a plain (non-`pre`) <p> in server.ts's SSR snippet, where a
+  // browser collapses \n to whitespace on render, and as JobPosting's
+  // `description` (schema.org Text — internal newlines are harmless there
+  // too), so no line-break handling is needed here.
+  if (job.description) parts.push(job.description);
+  if (job.requirements && job.requirements.length > 0) {
+    parts.push(`Requisitos: ${job.requirements.join("; ")}.`);
+  }
+
   // Same real timestamp already used for JobPosting's datePosted below —
   // stated here as visible text too, not just buried in JSON-LD. A real
   // publish date in the visible content is a documented recency/freshness
@@ -215,6 +231,21 @@ export function buildJobMeta(job: SeoJob): JobMeta {
 // info, not a placeholder, so it's left alone.
 const BARE_REMOTE_RE = /^(remoto|remote)$/i;
 
+// Reverse of job-posting-jsonld.ts's SCHEMA_EMPLOYMENT_TYPE_LABELS (Spanish
+// display label -> schema.org's own enum token). Kept as its own small,
+// fixed table here rather than importing the other module's — one 7-entry
+// map isn't worth a cross-module dependency for a single lookup, and this
+// direction (label -> token) is only ever needed here, for JSON-LD output.
+const EMPLOYMENT_TYPE_LABEL_TO_SCHEMA: Record<string, string> = {
+  "Tiempo completo": "FULL_TIME",
+  "Medio tiempo": "PART_TIME",
+  Contrato: "CONTRACTOR",
+  Temporal: "TEMPORARY",
+  Prácticas: "INTERN",
+  Voluntariado: "VOLUNTEER",
+  "Por día": "PER_DIEM"
+};
+
 function isBareRemoteLocation(location: string | undefined | null): boolean {
   return BARE_REMOTE_RE.test((location || "").trim());
 }
@@ -248,6 +279,38 @@ export function buildJobPosting(
       name: job.company
     }
   };
+
+  // skills/qualifications are schema.org Text fields (a string, not an
+  // array) — only added when real data exists, same "present, use it;
+  // absent, omit" rule as the rest of this function.
+  //
+  // Same precedence fix as JobDetailPanel.tsx (2026-08-12): job.technologies
+  // is each source's own raw `skills` field, which for some sources
+  // (confirmed live: Magneto) turned out to be generic category labels
+  // ("Desarrollo de software", "Arquitectura de software") with no relation
+  // to the technologies the posting's own text actually names. extractTechnologies()
+  // only returns catalog names literally present in description/requirements,
+  // so by construction it always matches what the posting really says —
+  // used first, falling back to the source's raw field only when extraction
+  // finds nothing there to work with.
+  const extractedSkills = extractTechnologies(
+    [job.description, ...(job.requirements || [])].filter(Boolean).join("\n")
+  );
+  const skills = extractedSkills.length > 0 ? extractedSkills : job.technologies || [];
+  if (skills.length > 0) posting.skills = skills.join(", ");
+  if (job.requirements && job.requirements.length > 0) {
+    posting.qualifications = job.requirements.join("; ");
+  }
+  // job.employmentType already holds the Spanish display label
+  // (JobDetailPanel's badge — set by job-posting-jsonld.ts's
+  // SCHEMA_EMPLOYMENT_TYPE_LABELS) — schema.org's own employmentType
+  // expects the enum token back ("FULL_TIME", not "Tiempo completo"), so
+  // this reverses that same map rather than emitting the Spanish text into
+  // a field Google's parser expects to be one of a fixed set of values.
+  const employmentTypeToken = job.employmentType
+    ? EMPLOYMENT_TYPE_LABEL_TO_SCHEMA[job.employmentType]
+    : undefined;
+  if (employmentTypeToken) posting.employmentType = employmentTypeToken;
 
   if (isBareRemoteLocation(job.location)) {
     posting.jobLocationType = "TELECOMMUTE";
