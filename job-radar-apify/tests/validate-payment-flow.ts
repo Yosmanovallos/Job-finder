@@ -8,9 +8,13 @@
 import crypto from "crypto";
 import dotenv from "dotenv";
 import { pool } from "../src/db/client.js";
-import { getOrCreateUser, createPendingTransaction, getUserTier } from "../src/db/job-repository.js";
+import {
+  getOrCreateUser,
+  createPendingTransaction,
+  getUserTier
+} from "../src/db/job-repository.js";
 import { handleWompiWebhook, WompiEventPayload } from "../src/payments/webhook.js";
-import { PRO_MONTHLY_PRICE_COP_CENTS } from "../src/config.js";
+import { PRO_MONTHLY_PRICE_COP_CENTS, PRO_MAX_MONTHLY_PRICE_COP_CENTS } from "../src/config.js";
 
 dotenv.config();
 
@@ -39,7 +43,9 @@ function buildPayload(
 
   return {
     event: "transaction.updated",
-    data: { transaction: { id: wompiTransactionId, status, reference, amount_in_cents: amountInCents } },
+    data: {
+      transaction: { id: wompiTransactionId, status, reference, amount_in_cents: amountInCents }
+    },
     signature: { properties: PROPERTIES, checksum },
     timestamp,
     environment: "test"
@@ -68,33 +74,99 @@ async function main() {
     const initialTier = await getUserTier(testUserId);
     report("Usuario de prueba nace en tier 'free'", initialTier === "free", `tier=${initialTier}`);
 
-    await createPendingTransaction({ userId: testUserId, reference, amountInCents, currency: "COP" });
+    await createPendingTransaction({
+      userId: testUserId,
+      reference,
+      amountInCents,
+      currency: "COP"
+    });
 
     // 1. Firma alterada — debe rechazarse y NO tocar el tier.
     const tampered = buildPayload(wompiTransactionId, reference, "APPROVED", amountInCents, {
       tamperChecksum: true
     });
     const tamperedResult = await handleWompiWebhook(tampered);
-    report("Payload con firma alterada es rechazado (verified: false)", tamperedResult.verified === false);
+    report(
+      "Payload con firma alterada es rechazado (verified: false)",
+      tamperedResult.verified === false
+    );
     const tierAfterTamper = await getUserTier(testUserId);
-    report("Tier NO cambia tras una firma inválida", tierAfterTamper === "free", `tier=${tierAfterTamper}`);
+    report(
+      "Tier NO cambia tras una firma inválida",
+      tierAfterTamper === "free",
+      `tier=${tierAfterTamper}`
+    );
 
     // 2. Firma correcta, transacción APPROVED — debe subir el tier a pro.
     const valid = buildPayload(wompiTransactionId, reference, "APPROVED", amountInCents);
     const validResult = await handleWompiWebhook(valid);
-    report("Payload con firma correcta es aceptado (verified: true)", validResult.verified === true);
+    report(
+      "Payload con firma correcta es aceptado (verified: true)",
+      validResult.verified === true
+    );
     const tierAfterApproval = await getUserTier(testUserId);
-    report("Tier sube a 'pro' tras el pago aprobado", tierAfterApproval === "pro", `tier=${tierAfterApproval}`);
+    report(
+      "Tier sube a 'pro' tras el pago aprobado",
+      tierAfterApproval === "pro",
+      `tier=${tierAfterApproval}`
+    );
 
     // 3. Reenvío del mismo evento (Wompi reintenta hasta 3x) — debe ser un no-op idempotente.
     const retryResult = await handleWompiWebhook(valid);
     report("Reenviar el mismo evento no falla (idempotente)", retryResult.verified === true);
     const tierAfterRetry = await getUserTier(testUserId);
-    report("Tier se mantiene 'pro' tras el reintento", tierAfterRetry === "pro", `tier=${tierAfterRetry}`);
+    report(
+      "Tier se mantiene 'pro' tras el reintento",
+      tierAfterRetry === "pro",
+      `tier=${tierAfterRetry}`
+    );
   } finally {
     // Cleanup — solo las filas de este usuario de prueba, nunca datos reales.
     await pool.query("DELETE FROM transactions WHERE user_id = $1", [testUserId]);
     await pool.query("DELETE FROM users WHERE id = $1", [testUserId]);
+  }
+
+  // Fase 10 (docs/CV-GENERATION-PLAN.md §10): mismo camino, pero con
+  // plan: "pro_max" — prueba real de que el webhook lee el plan de la
+  // transacción en vez de subir siempre a "pro" a secas (el bug real que
+  // el asesor encontró en handleWompiWebhook antes de este fix).
+  console.log("\n🔍 Segundo escenario — Pro Max (mismo webhook, plan distinto)...");
+  const proMaxUserId = crypto.randomUUID();
+  const proMaxEmail = `e2e_webhook_promax_${Date.now()}@mailinator.com`;
+  const proMaxReference = `e2e_test_promax_${Date.now()}`;
+  const proMaxWompiTransactionId = `wompi_test_promax_${Date.now()}`;
+  const proMaxAmountInCents = PRO_MAX_MONTHLY_PRICE_COP_CENTS;
+
+  try {
+    await getOrCreateUser(proMaxUserId, proMaxEmail);
+    await createPendingTransaction({
+      userId: proMaxUserId,
+      reference: proMaxReference,
+      amountInCents: proMaxAmountInCents,
+      currency: "COP",
+      plan: "pro_max"
+    });
+
+    const proMaxPayload = buildPayload(
+      proMaxWompiTransactionId,
+      proMaxReference,
+      "APPROVED",
+      proMaxAmountInCents
+    );
+    const proMaxResult = await handleWompiWebhook(proMaxPayload);
+    report(
+      "Pro Max: payload con firma correcta es aceptado (verified: true)",
+      proMaxResult.verified === true
+    );
+    const proMaxTier = await getUserTier(proMaxUserId);
+    report(
+      "Pro Max: tier sube a 'pro_max', NUNCA a 'pro' a secas",
+      proMaxTier === "pro_max",
+      `tier=${proMaxTier}`
+    );
+  } finally {
+    await pool.query("DELETE FROM transactions WHERE user_id = $1", [proMaxUserId]);
+    await pool.query("DELETE FROM users WHERE id = $1", [proMaxUserId]);
   }
 
   console.log("\n==================================================");

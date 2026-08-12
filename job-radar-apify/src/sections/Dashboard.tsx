@@ -4,6 +4,8 @@ import { PRO_MONTHLY_PRICE_COP, formatCOP, PAYWALL_ENABLED } from "../config.js"
 import { JobCard } from "../components/JobCard.js";
 import { PaywallCard } from "../components/PaywallCard.js";
 import { ApplyGateModal } from "../components/ApplyGateModal.js";
+import { CvAdjustOverlay } from "../components/CvAdjustOverlay.js";
+import { ResumeStudio } from "../components/ResumeStudio/ResumeStudio.js";
 import { JobListItem } from "../components/JobListItem.js";
 import { JobDetailPanel } from "../components/JobDetailPanel.js";
 import { FilterBar, FilterState, EMPTY_FILTERS } from "../components/FilterBar.js";
@@ -41,7 +43,7 @@ export default function Dashboard() {
     description: `Explora vacantes actualizadas de LinkedIn, Computrabajo${country === "CO" ? ", Elempleo" : ""} y más en ${countryConfig.name}, filtradas y sin duplicados. Gratis para vacantes con más de 48h publicadas.`
   });
 
-  const { tier, isAuthenticated, accessToken, user, refreshTier } = useAuth();
+  const { tier, isAuthenticated, accessToken, user, refreshTier, resumeStudioActive } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -70,6 +72,9 @@ export default function Dashboard() {
   // between the mobile JobCard list and the desktop detail panel so both
   // trigger the exact same modal instead of each owning a copy.
   const [applyGateJob, setApplyGateJob] = useState<any | null>(null);
+  // Job the CV-adjust overlay is currently open for (Fase 6, §9.2) — same
+  // shape as applyGateJob, only reachable from the desktop JobDetailPanel.
+  const [cvAdjustJob, setCvAdjustJob] = useState<any | null>(null);
   // Set once the apply_job=<id> effect (below) resolves — renders a banner
   // with a real, user-clicked link to the job the visitor registered to
   // apply for, since auto-opening it isn't reliable (see that effect).
@@ -276,7 +281,7 @@ export default function Dashboard() {
       { replace: true }
     );
 
-    if (tier === "pro") {
+    if (tier === "pro" || tier === "pro_max") {
       setCheckoutBanner("success");
       return;
     }
@@ -297,7 +302,7 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
-    if (checkoutBanner === "confirming" && tier === "pro") {
+    if (checkoutBanner === "confirming" && (tier === "pro" || tier === "pro_max")) {
       setCheckoutBanner("success");
     }
   }, [tier, checkoutBanner]);
@@ -716,8 +721,21 @@ export default function Dashboard() {
                         Anything less than that here and the search bar's
                         opaque z-40 background paints over the top of this
                         card while scrolled, wiping out its color strip —
-                        this leaves a clean 20px gap below it instead. */}
-                  <div className="sticky top-40">
+                        this leaves a clean 20px gap below it instead.
+                        max-h + overflow-y-auto (added once real
+                        descriptions started arriving, 2026-08-12): a
+                        `position: sticky` element taller than the
+                        viewport scrolls its OWN top out from under the
+                        page's scroll before the bottom is ever reachable
+                        — there's no way to see the rest of it by
+                        scrolling the page. Capping this wrapper to the
+                        space actually available below top-40 and letting
+                        it scroll internally keeps the header/CTA/buttons
+                        in view while just the long content (Descripción)
+                        scrolls — same fix does nothing for the old
+                        short-content case (nothing to scroll, no visual
+                        change). */}
+                  <div className="sticky top-40 max-h-[calc(100vh-11rem)] overflow-y-auto">
                     {selectedJob?.isLocked ? (
                       <div className="rounded-lg border border-border bg-card p-8 text-center">
                         <p className="text-sm text-muted-foreground mb-4">
@@ -742,6 +760,7 @@ export default function Dashboard() {
                         onSaveToggle={handleSaveToggle}
                         onAppliedToggle={handleAppliedToggle}
                         onApplyClick={setApplyGateJob}
+                        onCvAdjustClick={setCvAdjustJob}
                         country={country}
                       />
                     )}
@@ -800,6 +819,12 @@ export default function Dashboard() {
       </div>
 
       {applyGateJob && <ApplyGateModal job={applyGateJob} onClose={() => setApplyGateJob(null)} />}
+      {cvAdjustJob &&
+        (resumeStudioActive ? (
+          <ResumeStudio job={cvAdjustJob} onClose={() => setCvAdjustJob(null)} />
+        ) : (
+          <CvAdjustOverlay job={cvAdjustJob} onClose={() => setCvAdjustJob(null)} />
+        ))}
     </section>
   );
 }

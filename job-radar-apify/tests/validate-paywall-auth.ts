@@ -12,7 +12,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TEST_PORT = 3979;
 const BASE_URL = `http://localhost:${TEST_PORT}`;
 
-async function waitForServer(maxAttempts = 40, delayMs = 250): Promise<void> {
+// maxAttempts bumped 40->80 (2026-08-12): same cold-tsx-startup fix as
+// validate-seo-job-pages.ts — see that file's comment for the measurement.
+async function waitForServer(maxAttempts = 80, delayMs = 250): Promise<void> {
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
       const res = await fetch(`${BASE_URL}/api/health`);

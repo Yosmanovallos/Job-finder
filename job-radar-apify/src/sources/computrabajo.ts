@@ -1,5 +1,5 @@
-import { SourceAdapter, Job, deduplicateJobs } from './types.js';
-import { scrapeComputrabajo } from '../index.js';
+import { SourceAdapter, Job, JobDetail, deduplicateJobs } from './types.js';
+import { scrapeComputrabajo, fetchComputrabajoDetail } from '../index.js';
 import { executeWithResilience } from '../engine/resilient-fetch.js';
 import { jitterDelay } from '../engine/jitter-delay.js';
 
@@ -13,5 +13,8 @@ export const computrabajoAdapter: SourceAdapter = {
       allJobs.push(...results);
     }
     return deduplicateJobs(allJobs);
+  },
+  fetchDetail(url: string): Promise<Partial<JobDetail> | null> {
+    return fetchComputrabajoDetail(url);
   }
 };

@@ -1,16 +1,21 @@
 import crypto from "crypto";
 import dotenv from "dotenv";
 import { createPendingTransaction } from "../db/job-repository.js";
-import { PRO_MONTHLY_PRICE_COP_CENTS } from "../config.js";
+import { PRO_MONTHLY_PRICE_COP_CENTS, PRO_MAX_MONTHLY_PRICE_COP_CENTS } from "../config.js";
 
 dotenv.config();
 
 const WOMPI_PUBLIC_KEY = process.env.WOMPI_PUBLIC_KEY;
 const WOMPI_INTEGRITY_SECRET = process.env.WOMPI_INTEGRITY_SECRET;
 
+export type CheckoutPlan = "pro" | "pro_max";
+
 export interface StartCheckoutInput {
   userId: string;
   userEmail: string;
+  /** Fase 10 (docs/CV-GENERATION-PLAN.md §10) — default 'pro' preserves
+   * every caller from before this existed. */
+  plan?: CheckoutPlan;
 }
 
 export interface StartCheckoutResult {
@@ -44,25 +49,34 @@ function buildIntegritySignature(
 }
 
 /**
- * Starts a Wompi Web Checkout session for the BuscoTrabajo Pro monthly plan.
- * Persists a 'pending' transaction row keyed by the reference so the webhook
- * can later confirm it idempotently.
+ * Starts a Wompi Web Checkout session for a BuscoTrabajo monthly plan
+ * (Pro or Pro Max, Fase 10). Persists a 'pending' transaction row keyed by
+ * the reference — carrying which plan it's for — so the webhook can later
+ * confirm it idempotently AND upgrade to the right tier, never a hardcoded one.
  */
 export async function startPaymentCheckout(
   input: StartCheckoutInput
 ): Promise<StartCheckoutResult> {
   assertWompiConfigured();
 
-  const reference = `jobradar_pro_${input.userId}_${Date.now()}`;
-  const amountInCents = PRO_MONTHLY_PRICE_COP_CENTS;
+  const plan: CheckoutPlan = input.plan ?? "pro";
+  const reference = `jobradar_${plan}_${input.userId}_${Date.now()}`;
+  const amountInCents =
+    plan === "pro_max" ? PRO_MAX_MONTHLY_PRICE_COP_CENTS : PRO_MONTHLY_PRICE_COP_CENTS;
   const currency = "COP" as const;
 
-  await createPendingTransaction({ userId: input.userId, reference, amountInCents, currency });
+  await createPendingTransaction({
+    userId: input.userId,
+    reference,
+    amountInCents,
+    currency,
+    plan
+  });
 
   const signatureIntegrity = buildIntegritySignature(reference, amountInCents, currency);
 
   console.log(
-    `💳 [Checkout] Sesión Wompi creada para ${input.userEmail} — referencia ${reference}`
+    `💳 [Checkout] Sesión Wompi creada para ${input.userEmail} (plan: ${plan}) — referencia ${reference}`
   );
 
   return {

@@ -240,15 +240,15 @@ en combinaciones infinitas de la misma data que ya vive en `/empleos/`.
 
 ## 5. Fases sugeridas (una por sesión, cada una con criterio de salida)
 
-| Fase  | Qué entrega                                                                                                       | Cómo se verifica                                                                                   | Estado                                          |
-| ----- | ----------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
-| **0** | Auditoría: robots.txt/sitemap sanos, sin `noindex`, confirmar qué tiene Google indexado hoy                       | Ver sección 5.1                                                                                    | ✅ Hecho                                        |
-| **1** | Ruta `/empleos/:id/:slug` con SSR + JSON-LD `JobPosting` + meta tags, página cliente equivalente                  | `npm run test:seo` + `docs/QA-CHECKLIST-SEO.md`                                                    | ✅ Hecho                                        |
-| **2** | Sitemap dinámico (índice + jobs) + robots.txt actualizado                                                         | `curl` al sitemap, validación XML, envío manual una vez en Search Console                          | ✅ Hecho                                        |
+| Fase  | Qué entrega                                                                                                       | Cómo se verifica                                                                                   | Estado                                                                                                         |
+| ----- | ----------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| **0** | Auditoría: robots.txt/sitemap sanos, sin `noindex`, confirmar qué tiene Google indexado hoy                       | Ver sección 5.1                                                                                    | ✅ Hecho                                                                                                       |
+| **1** | Ruta `/empleos/:id/:slug` con SSR + JSON-LD `JobPosting` + meta tags, página cliente equivalente                  | `npm run test:seo` + `docs/QA-CHECKLIST-SEO.md`                                                    | ✅ Hecho                                                                                                       |
+| **2** | Sitemap dinámico (índice + jobs) + robots.txt actualizado                                                         | `curl` al sitemap, validación XML, envío manual una vez en Search Console                          | ✅ Hecho                                                                                                       |
 | **3** | Integración con Google Indexing API (cuenta de servicio + hook en `saveJobs()`/`purgeOldJobs()`, ver sección 5.5) | Log de submits exitosos; una vacante nueva aparece en el reporte de cobertura en horas, no semanas | ✅ Hecho — verificado en producción (2026-07-30): 106/106 notificaciones reales enviadas en la primera corrida |
-| **4** | Páginas de categoría (`/empleos/<ciudad>`, `/empleos/<rol>`)                                                      | Igual que fase 1, sobre una categoría                                                              | ✅ Hecho                                        |
-| **5** | Manejo de vencimiento (410 / `validThrough`) atado al `DELETE` duro de `purgeOldJobs()`                           | Vacante purgada devuelve 410 en vez de 404 genérico; JSON-LD deja de emitirse                      | ✅ Hecho                                        |
-| **6** | Extensión a Venezuela: sitemap con `/ve`, páginas de categoría por país (ver sección 5.7)                        | `npm run test:seo` (79 URLs en `sitemap-categories.xml`) + verificación manual con datos reales     | ✅ Hecho                                        |
+| **4** | Páginas de categoría (`/empleos/<ciudad>`, `/empleos/<rol>`)                                                      | Igual que fase 1, sobre una categoría                                                              | ✅ Hecho                                                                                                       |
+| **5** | Manejo de vencimiento (410 / `validThrough`) atado al `DELETE` duro de `purgeOldJobs()`                           | Vacante purgada devuelve 410 en vez de 404 genérico; JSON-LD deja de emitirse                      | ✅ Hecho                                                                                                       |
+| **6** | Extensión a Venezuela: sitemap con `/ve`, páginas de categoría por país (ver sección 5.7)                         | `npm run test:seo` (79 URLs en `sitemap-categories.xml`) + verificación manual con datos reales    | ✅ Hecho                                                                                                       |
 
 ### 5.1 Resultado de la Fase 0 (corregido — ver nota abajo)
 
@@ -504,7 +504,7 @@ Construido:
   (`.../empleos/<jobId>/`) que sobrevive aunque el slug (derivado del
   título) se pierda con la fila.
 - `src/db/indexing-repository.ts` — `wasJobPurged(jobId)`, `SELECT 1 ...
-  WHERE notification_type = 'URL_DELETED' AND url LIKE $1` (match de
+WHERE notification_type = 'URL_DELETED' AND url LIKE $1` (match de
   prefijo, no de substring, para poder usar índice).
 - `scripts/migrate-indexing-queue.ts` — nuevo `idx_indexing_queue_url_prefix`
   (`text_pattern_ops`, el operator class que Postgres necesita para que un
@@ -799,7 +799,7 @@ el código:
 - `/dashboard` sirve SSR real (25 vacantes en el HTML crudo, sin el bug
   de "0 de 0" de §5.3).
 - Una vacante real (`/empleos/<id>/<slug>`) trae `<title>`, `<meta
-  description>`, `<link rel="canonical">` y 3 bloques JSON-LD correctos.
+description>`, `<link rel="canonical">` y 3 bloques JSON-LD correctos.
 - **Canonical no tiene el bug de auto-referencia**: pegar un slug
   inventado sobre un id real (`/empleos/<id>/slug-inventado`) sigue
   devolviendo el canonical correcto de esa vacante, no el slug inventado.
@@ -808,6 +808,7 @@ el código:
   200** (no hay un porcentaje visible de 404/410 hoy en el sitemap).
 
 ### 9.2 Hallazgo raíz confirmado en código: las vacantes de larga duración
+
 ### pierden su URL cada 30 días
 
 Este es el hallazgo más importante de la sesión, y explica el patrón
@@ -864,14 +865,15 @@ se vio la primera vez. Archivos a tocar: `schema.sql`,
 hizo en esta sesión de diagnóstico.
 
 ### 9.3 Riesgos ya documentados que siguen sin resolver (contribuyen, no son
+
 ### la causa principal)
 
 - **Contenido casi duplicado a escala** (§5.2, ya conocido): confirmado
   de nuevo hoy contra vacantes reales — la `description` del JSON-LD es
   literalmente la misma plantilla ("`<Título> en <Empresa>, <Ubicación>.
-  Modalidad: <X>. Vacante agregada de <Fuente>. La descripción completa y
-  el formulario de aplicación están en la página de <Fuente> —
-  BuscoTrabajo no aloja el proceso de aplicación.`") en 22,096 páginas,
+Modalidad: <X>. Vacante agregada de <Fuente>. La descripción completa y
+el formulario de aplicación están en la página de <Fuente> —
+BuscoTrabajo no aloja el proceso de aplicación.`") en 22,096 páginas,
   cambiando solo los valores. La última frase, además, le dice
   explícitamente a Google que el contenido real vive en otro sitio — la
   señal textual más directa posible de "agregador de bajo valor añadido"
@@ -885,18 +887,19 @@ hizo en esta sesión de diagnóstico.
   sigue siendo riesgo de consolidación/duplicado.
 
 ### 9.4 Lo que no se pudo confirmar desde aquí (bloqueado, depende del
+
 ### usuario)
 
 El único dato que puede confirmar con certeza cuál de las causas de
 arriba domina hoy es **Search Console → Indexación → Páginas** — el
 desglose de motivos de exclusión y sus conteos reales:
 
-| Motivo en Search Console | Qué implica | Cuál fix aplica |
-| --- | --- | --- |
-| "Detectada, actualmente sin indexar" | Google conoce la URL pero no le ha dado prioridad de rastreo (crawl budget/autoridad de dominio, a esta escala de 22k) | Reducir el volumen de páginas de bajo valor o aumentar autoridad (backlinks) |
-| "Rastreada, actualmente sin indexar" | Google la rastreó y decidió no indexarla — juicio de calidad | §9.3 (contenido casi duplicado) es la causa más probable |
-| "Duplicada, Google eligió otro canonical distinto al declarado" | Problema de canonical/slug | Ya descartado en §9.1 para el caso simple probado, pero vale revisar en el reporte real |
-| Vencidas / eliminadas en el reporte | Coincide con el churn de URL (§9.2) | El fix de `last_seen_at` propuesto arriba |
+| Motivo en Search Console                                        | Qué implica                                                                                                            | Cuál fix aplica                                                                         |
+| --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| "Detectada, actualmente sin indexar"                            | Google conoce la URL pero no le ha dado prioridad de rastreo (crawl budget/autoridad de dominio, a esta escala de 22k) | Reducir el volumen de páginas de bajo valor o aumentar autoridad (backlinks)            |
+| "Rastreada, actualmente sin indexar"                            | Google la rastreó y decidió no indexarla — juicio de calidad                                                           | §9.3 (contenido casi duplicado) es la causa más probable                                |
+| "Duplicada, Google eligió otro canonical distinto al declarado" | Problema de canonical/slug                                                                                             | Ya descartado en §9.1 para el caso simple probado, pero vale revisar en el reporte real |
+| Vencidas / eliminadas en el reporte                             | Coincide con el churn de URL (§9.2)                                                                                    | El fix de `last_seen_at` propuesto arriba                                               |
 
 `npm run seo:check-search-console` (con `--inspect`) puede confirmar el
 estado puntual de una muestra fija de URLs, pero **el desglose agregado
@@ -1039,3 +1042,62 @@ independientemente de lo que diga ese reporte. Después de reiniciar la
 sesión de Claude Code, `/seo audit https://buscotrabajo.co` y
 `/seo hreflang https://buscotrabajo.co` quedan disponibles para auditar
 en vivo con los 18 agentes del plugin en paralelo.
+
+## 11. Sesión 2026-08-11 — el desglose de §9.4 llegó, diagnóstico cerrado
+
+El usuario compartió capturas reales de Search Console → Indexación →
+Páginas. Desglose (1 página afectada por redirección, 976 "Rastreada: sin
+indexar", 49 Soft 404, 1 bloqueada por robots.txt, **26,000 "Descubierta:
+sin indexar"**), cruzado con `npm run seo:check-search-console` (sin
+`--submit`, solo lectura) corrido en esta sesión contra las credenciales
+reales que ya viven en `.env`:
+
+- **Los tres sitemaps muestran `indexed=0`** vía `sitemaps.list`
+  (`sitemap-pages.xml`: 14 submitted, `sitemap-categories.xml`: 91
+  submitted, `sitemap.xml`: 36,089 submitted agregados) — confirma que el
+  problema es de escala/prioridad de rastreo, no un bloqueo puntual.
+- `--inspect` sobre la muestra fija de 9 URLs (`SAMPLE_URLS` en
+  `scripts/check-search-console.ts`) confirma que **no es un fallo
+  binario**: `/`, `/ve`, `/dashboard`, `/ve/dashboard` y
+  `/empleos/caracas` sí están `"Submitted and indexed"`; pero
+  `/empleos/bogota`, `/empleos/project-manager`,
+  `/ve/empleos/project-manager` y `/empresas` están `"Discovered -
+currently not indexed"` o `"URL is unknown to Google"` — páginas del
+  mismo tipo (categoría), mismo nivel jerárquico, tratadas distinto. Esto
+  descarta un problema de código/routing (ya lo habían confirmado sano las
+  sesiones anteriores) y apunta directo a **presupuesto de rastreo
+  insuficiente para el volumen de URLs** (36k+), exactamente la fila
+  "Detectada, actualmente sin indexar" de la tabla de §9.4.
+- **"Página con redirección" (1 página, `http://buscotrabajo.co/`)**: no
+  es un bug. `curl -IL` confirma un único salto 301 limpio
+  `http://` → `https://` (y por separado `www` → sin `www`), y
+  `--inspect` confirma que `https://buscotrabajo.co/` (el destino) sí está
+  `"Submitted and indexed"`. Search Console solo está registrando que
+  encontró la URL `http://` (probablemente de un backlink o referencia
+  vieja) y siguió el redirect — no bloquea nada, no vale la pena
+  perseguirlo.
+- **26,000 "Descubierta: sin indexar" + 976 "Rastreada: sin indexar" +
+  49 Soft 404** confirman, en ese orden de magnitud, exactamente las dos
+  causas ya identificadas en §9.2/§9.3 y ya parcialmente atacadas en §10:
+  autoridad de dominio insuficiente para el volumen de páginas (causa
+  dominante, 26k) y contenido casi duplicado en las que sí se rastrean
+  (976). Los tres fixes de §10 (`last_seen_at`, hreflang, descripción
+  enriquecida) llevan **una semana** en producción — insuficiente para
+  que Google re-rastree y reclasifique a esta escala; esperado ver
+  movimiento recién en las próximas semanas, no días.
+
+**No se tocó código en esta sesión** (diagnóstico + lectura, mismo
+criterio de §9). Conclusión: **no hay una causa técnica nueva que
+arreglar** — la arquitectura (SSR, sitemaps, JSON-LD, indexing API) sigue
+verificada sana. Lo que queda es lo que §9.6 ya preveía si el reporte
+confirmaba "Detectada, sin indexar" como dominante: la palanca de mayor
+retorno ya no es más código, es **autoridad de dominio (backlinks)** y
+**tiempo** para que los fixes de contenido de §10 se reflejen — no hay una
+"Fase 7" de código que resuelva un problema de esta naturaleza.
+
+**Nota de seguridad de esta sesión**: el usuario pegó
+`GOOGLE_INDEXING_CLIENT_EMAIL`/`GOOGLE_INDEXING_PRIVATE_KEY` en texto
+plano en el chat (de nuevo — ver la advertencia ya existente en §7.2).
+Se le indicó rotar esa clave en IAM inmediatamente; el chequeo de esta
+sesión (`seo:check-search-console`) se corrió contra el valor que ya
+vivía en `.env`, no contra el valor pegado en el chat.

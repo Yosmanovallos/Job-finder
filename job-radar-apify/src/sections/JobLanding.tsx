@@ -3,6 +3,8 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import { JobDetailPanel } from "../components/JobDetailPanel.js";
 import { PaywallCard } from "../components/PaywallCard.js";
 import { ApplyGateModal } from "../components/ApplyGateModal.js";
+import { CvAdjustOverlay } from "../components/CvAdjustOverlay.js";
+import { ResumeStudio } from "../components/ResumeStudio/ResumeStudio.js";
 import { useAuth } from "../auth/auth-provider.js";
 import { usePageMeta } from "../lib/use-page-meta.js";
 import { buildJobMeta } from "../lib/job-seo.js";
@@ -19,7 +21,7 @@ type LoadState = "loading" | "found" | "not-found";
 // sent, and Googlebot's rendering pass reads the DOM after JS runs.
 export default function JobLanding() {
   const { id } = useParams<{ id: string }>();
-  const { accessToken, isAuthenticated } = useAuth();
+  const { accessToken, isAuthenticated, resumeStudioActive } = useAuth();
   const navigate = useNavigate();
 
   const [job, setJob] = useState<any | null>(null);
@@ -27,6 +29,7 @@ export default function JobLanding() {
   const [isSaved, setIsSaved] = useState(false);
   const [isApplied, setIsApplied] = useState(false);
   const [applyGateJob, setApplyGateJob] = useState<any | null>(null);
+  const [cvAdjustJob, setCvAdjustJob] = useState<any | null>(null);
 
   useEffect(() => {
     if (!id) {
@@ -99,12 +102,19 @@ export default function JobLanding() {
               onSaveToggle={() => setIsSaved((v) => !v)}
               onAppliedToggle={() => setIsApplied((v) => !v)}
               onApplyClick={setApplyGateJob}
+              onCvAdjustClick={setCvAdjustJob}
               headingLevel="h1"
             />
           ))}
       </div>
 
       {applyGateJob && <ApplyGateModal job={applyGateJob} onClose={() => setApplyGateJob(null)} />}
+      {cvAdjustJob &&
+        (resumeStudioActive ? (
+          <ResumeStudio job={cvAdjustJob} onClose={() => setCvAdjustJob(null)} />
+        ) : (
+          <CvAdjustOverlay job={cvAdjustJob} onClose={() => setCvAdjustJob(null)} />
+        ))}
     </section>
   );
 }

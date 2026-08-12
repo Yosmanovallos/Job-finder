@@ -1,6 +1,10 @@
 import crypto from "crypto";
 import dotenv from "dotenv";
-import { markTransactionApproved, upgradeUserToPro } from "../db/job-repository.js";
+import {
+  markTransactionApproved,
+  upgradeUserToPro,
+  upgradeUserToProMax
+} from "../db/job-repository.js";
 
 dotenv.config();
 
@@ -81,10 +85,18 @@ export async function handleWompiWebhook(
   }
 
   const until = new Date(Date.now() + PRO_SUBSCRIPTION_DAYS * 24 * 60 * 60 * 1000);
-  await upgradeUserToPro(result.userId, until);
+  // Fase 10: qué tier otorgar viene de la fila de la transacción
+  // (`plan`, escrito por startPaymentCheckout al crearla), nunca
+  // hardcodeado — un pago de Pro Max real que aquí siempre subiera a
+  // 'pro' le cobraría de más a un usuario sin darle lo que pagó.
+  if (result.plan === "pro_max") {
+    await upgradeUserToProMax(result.userId, until);
+  } else {
+    await upgradeUserToPro(result.userId, until);
+  }
 
   console.log(
-    `🎉 [WompiWebhook] Transacción ${transaction.reference} aprobada — usuario ${result.userId} promovido a Pro hasta ${until.toISOString()}.`
+    `🎉 [WompiWebhook] Transacción ${transaction.reference} aprobada — usuario ${result.userId} promovido a ${result.plan} hasta ${until.toISOString()}.`
   );
 
   return { verified: true };

@@ -377,7 +377,12 @@ function runPureFunctionTests() {
 
 // --- Part 2: real HTTP checks against a spawned server, read-only DB -------
 
-async function waitForServer(maxAttempts = 40, delayMs = 250): Promise<void> {
+// maxAttempts bumped 40->80 (2026-08-12): cold tsx startup crossed the old
+// 10s budget once src/index.ts/job-repository.ts grew with the ported
+// job-detail-enrichment pipeline (measured live: consistently ~10-12s to
+// serve /api/health now, previously well under 10s) — the server itself
+// isn't slower to RUN, just slower to transpile cold.
+async function waitForServer(maxAttempts = 80, delayMs = 250): Promise<void> {
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
       const res = await fetch(`${BASE_URL}/api/health`);

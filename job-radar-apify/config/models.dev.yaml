@@ -1,0 +1,98 @@
+# Modelos gratuitos para desarrollo (docs/CV-GENERATION-PLAN.md §5.1) —
+# pulir cada prompt aquí, sin costo, antes de activar contra
+# config/models.local.yaml (gitignored, modelos pagados de producción,
+# Fase 8). Ningún ID de modelo vive en el código: los prompts solo
+# conocen alias (fast_structured, general_balanced), este archivo decide
+# a qué modelo real resuelve cada uno.
+
+providers:
+  anthropic:
+    enabled: false
+  openai_compatible:
+    enabled: true
+    # Nombre del env var que trae la URL base — no la URL en sí, para no
+    # comprometerse a un solo proveedor en el schema. Si no está seteada,
+    # src/cv/openai-compatible-client.ts cae al endpoint real de Gemini.
+    base_url_env: GEMINI_BASE_URL
+  ollama:
+    enabled: false
+
+aliases:
+  # Gemini es el único proveedor con tier gratuito ya verificado en este
+  # plan (§4 Etapa D) — se reusa la misma cuenta/slot openai_compatible
+  # para Etapa A en desarrollo, en vez de abrir una segunda cuenta.
+  # gemini-2.5-flash aparece en /v1beta/models para esta cuenta pero
+  # responde 404 "no longer available to new users" al invocarlo —
+  # gemini-3.6-flash es el modelo flash vigente hoy (verificado en vivo
+  # 2026-08-07), y coincide con el que ya traía el pricing de referencia
+  # en §4 Etapa D.
+  fast_structured: gemini-3.6-flash
+  # Etapa B (Fase 3). En producción (models.local.yaml, Fase 8) esto
+  # resuelve a Sonnet 5 vía Anthropic — en dev, al único proveedor
+  # gratuito disponible, pero un modelo Gemini DISTINTO al de
+  # fast_structured/critique_diverse (mismo motivo que abajo: nada gana
+  # con que dos etapas usen exactamente el mismo modelo en dev).
+  general_balanced: gemini-3.5-flash
+  # Etapa D (Fase 3) — "otro proveedor" que Etapa B es el diseño real
+  # (§4 Etapa D), pero en dev solo hay una cuenta con tier gratuito
+  # (Gemini). Apuntar a un modelo Gemini distinto de general_balanced es
+  # la aproximación más barata a esa independencia mientras tanto — la
+  # diversidad de proveedor real (Gemini crítica a Sonnet) solo existe
+  # desde Fase 8, cuando general_balanced pasa a Anthropic en producción.
+  critique_diverse: gemini-3.1-flash-lite
+  reasoning_high: none
+  embedding: none
+
+pricing:
+  # Sin entrada de pricing = costUsd() devuelve $0 (model-config.ts) —
+  # correcto para el tier gratuito, y el ledger igual registra
+  # tokens/llamadas reales para visibilidad, solo el costo queda en $0.
+  gemini-3.6-flash: { input_per_mtok: 0, output_per_mtok: 0 }
+  gemini-3.5-flash: { input_per_mtok: 0, output_per_mtok: 0 }
+  gemini-3.1-flash-lite: { input_per_mtok: 0, output_per_mtok: 0 }
+
+tasks:
+  cv_extract:
+    model_alias: fast_structured
+    # gemini-3.6-flash consume una porción del presupuesto de tokens en
+    # razonamiento interno antes de emitir el JSON visible. 4000 bastaba
+    # para el fixture corto de Fase 2b, pero un CV real y denso lo
+    # truncaba: verificado en vivo 2026-08-08 con un CV real (6
+    # experiencias, 36 skills) — finish_reason: "length" a los 4000,
+    # completion_tokens real solo 1144 (el resto se lo comió el
+    # razonamiento interno). Con 8000 el mismo CV completa limpio
+    # (finish_reason: "stop", ~3500 completion_tokens, JSON válido
+    # contra CvFactsSchema) con margen real de sobra.
+    max_output_tokens: 8000
+  cv_draft:
+    model_alias: general_balanced
+    # Mismo bug que cv_extract arriba, encontrado en vivo 2026-08-08
+    # probando Fase 8 con el mismo CV real denso (6 experiencias, 36
+    # skills): gemini-3.5-flash a 4000 truncaba (finish_reason: "length",
+    # solo 190 completion_tokens reales). A 8000 completa limpio
+    # (finish_reason: "stop", ~2164 completion_tokens, JSON válido contra
+    # CvDocumentSchema). Este bug afectaba el config gratuito por
+    # defecto — el que de verdad queda live al desplegar — no solo el
+    # experimento de Fase 8 con el modelo pagado.
+    max_output_tokens: 8000
+  cv_critique:
+    model_alias: critique_diverse
+    max_output_tokens: 2000
+  # Fase 8 de docs/RESUME-STUDIO-PLAN.md — reescritura de UNA sola sección
+  # (Claim) a la vez, no todo el documento. Mismo alias que cv_draft
+  # (misma barra de calidad de redacción para el usuario), pero
+  # max_output_tokens generoso pese a que la salida real es chica (un solo
+  # Claim): el mismo bug de razonamiento-interno-consume-presupuesto ya
+  # encontrado en cv_extract/cv_draft (ver notas arriba) aplica a
+  # cualquier modelo "flash" de esta familia, no solo a los de salida
+  # larga. 2000 bastaba para v1 (solo text+supporting_fact_ids) pero
+  # truncó en vivo (finish_reason efectivo: sin JSON completo) al agregar
+  # "rationale" en v2 (Fase 9) — subido a 4000, verificado limpio en el
+  # eval real de esa fase.
+  cv_section_rewrite:
+    model_alias: general_balanced
+    max_output_tokens: 4000
+
+budgets:
+  max_daily_cloud_cost_usd: 5.00
+  stop_on_budget_exceeded: true

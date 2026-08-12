@@ -1,5 +1,5 @@
-import { SourceAdapter, Job, deduplicateJobs } from './types.js';
-import { scrapeLinkedIn } from '../index.js';
+import { SourceAdapter, Job, JobDetail, deduplicateJobs } from './types.js';
+import { scrapeLinkedIn, fetchLinkedInDetail } from '../index.js';
 import { executeWithResilience } from '../engine/resilient-fetch.js';
 import { jitterDelay } from '../engine/jitter-delay.js';
 
@@ -13,5 +13,8 @@ export const linkedinAdapter: SourceAdapter = {
       allJobs.push(...results);
     }
     return deduplicateJobs(allJobs);
+  },
+  fetchDetail(url: string): Promise<Partial<JobDetail> | null> {
+    return fetchLinkedInDetail(url);
   }
 };

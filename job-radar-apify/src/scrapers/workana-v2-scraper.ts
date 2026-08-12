@@ -22,6 +22,7 @@
 
 import { gotScraping } from "got-scraping";
 import { fileURLToPath } from "url";
+import { extractStructuredFromHtml } from "../utils.js";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -34,6 +35,14 @@ export interface WorkanaJob {
   dateText: string;
   source: "Workana";
   publishedAt: string;
+  // The catalog payload (:results-initials) already carries these per item
+  // — confirmed live, 2026-08-11 — so no per-job detail-page fetch is
+  // needed, unlike most other HTML-scraped sources.
+  description?: string;
+  requirements?: string[];
+  technologies?: string[];
+  employmentType?: string;
+  salaryRaw?: string;
 }
 
 // ─── HTML entity decoder (subset needed for Workana payloads) ────────────────
@@ -301,6 +310,11 @@ export async function scrapeWorkanaV2(
 
       if (!publishedAt) continue; // Too old, skip
 
+      const { description, requirements } = extractStructuredFromHtml(item.description || "");
+      const skills: string[] = Array.isArray(item.skills)
+        ? item.skills.map((s: any) => s?.anchorText).filter((n: unknown): n is string => typeof n === "string")
+        : [];
+
       jobs.push({
         jobId: item.slug || `workana-${Math.random().toString(36).substring(7)}`,
         title: decodeEntities(title),
@@ -310,6 +324,17 @@ export async function scrapeWorkanaV2(
         dateText,
         source: "Workana",
         publishedAt,
+        description: description || undefined,
+        requirements: requirements.length > 0 ? requirements : undefined,
+        technologies: skills.length > 0 ? skills : undefined,
+        // Workana projects are freelance work, not traditional employment —
+        // `isHourly` (a real boolean the catalog already provides) is the
+        // one real distinction available, not a schema.org employment type.
+        employmentType: typeof item.isHourly === "boolean" ? (item.isHourly ? "Por hora" : "Proyecto") : undefined,
+        // `budget` is Workana's own free-text range (e.g. "USD 250 - 500",
+        // "USD 15 - 45 / hora") — stored as-is, no attempt to parse it into
+        // numbers across its several formats.
+        salaryRaw: typeof item.budget === "string" && item.budget.trim() ? item.budget.trim() : undefined
       });
       pageCount++;
     }

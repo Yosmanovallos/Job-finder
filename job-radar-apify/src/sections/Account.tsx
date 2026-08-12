@@ -1,7 +1,12 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../auth/auth-provider.js";
-import { PRO_MONTHLY_PRICE_COP, formatCOP, PAYWALL_ENABLED } from "../config.js";
+import {
+  PRO_MONTHLY_PRICE_COP,
+  formatCOP,
+  PAYWALL_ENABLED,
+  RESUME_STUDIO_ENABLED
+} from "../config.js";
 
 interface TransactionRecord {
   id: string;
@@ -9,13 +14,19 @@ interface TransactionRecord {
   status: string;
   amountInCents: number;
   currency: string;
+  plan: string;
   createdAt: string;
 }
+
+const PLAN_LABEL: Record<string, string> = { pro: "Pro", pro_max: "Pro Max" };
 
 const STATUS_LABEL: Record<string, { label: string; className: string }> = {
   approved: { label: "Aprobado", className: "bg-primary/10 text-primary border-primary/30" },
   pending: { label: "Pendiente", className: "bg-accent/10 text-accent border-accent/30" },
-  declined: { label: "Rechazado", className: "bg-destructive/10 text-destructive border-destructive/30" },
+  declined: {
+    label: "Rechazado",
+    className: "bg-destructive/10 text-destructive border-destructive/30"
+  },
   error: { label: "Error", className: "bg-destructive/10 text-destructive border-destructive/30" }
 };
 
@@ -81,9 +92,48 @@ export default function Account() {
   return (
     <section className="min-h-screen px-4 py-16" style={{ backgroundColor: "#fafafa" }}>
       <div className="max-w-lg mx-auto">
-        <h1 className="text-2xl font-bold mb-8 font-heading" style={{ color: "#0e0f10" }}>
+        <h1 className="text-2xl font-bold mb-2 font-heading" style={{ color: "#0e0f10" }}>
           Mi cuenta
         </h1>
+
+        {/* Shell de navegación de Settings (Fase 6 de
+            docs/RESUME-STUDIO-PLAN.md, §6 fila 6) — Cuenta/IA/Currículum/
+            Facturación/Seguridad. Solo "IA" está conectada a una página
+            real hoy, y solo cuando RESUME_STUDIO_ENABLED (mismo patrón
+            hardcoded-boolean que PAYWALL_ENABLED, config.ts) está en
+            true — el resto queda preparado para fases futuras sin que
+            cada una tenga que rediseñar esta barra. */}
+        <nav className="flex items-center gap-1 mb-8 border-b border-[#e6e8e4]">
+          <span className="px-3 py-2 text-xs font-mono font-semibold text-foreground border-b-2 border-primary -mb-px">
+            Cuenta
+          </span>
+          {RESUME_STUDIO_ENABLED && (
+            <Link
+              to="/cuenta/ai/providers"
+              className="px-3 py-2 text-xs font-mono font-semibold text-muted-foreground hover:text-foreground transition-colors"
+            >
+              IA
+            </Link>
+          )}
+          <span
+            className="px-3 py-2 text-xs font-mono font-semibold text-ink-faint/50 cursor-not-allowed"
+            title="Próximamente"
+          >
+            Currículum
+          </span>
+          <span
+            className="px-3 py-2 text-xs font-mono font-semibold text-ink-faint/50 cursor-not-allowed"
+            title="Próximamente"
+          >
+            Facturación
+          </span>
+          <span
+            className="px-3 py-2 text-xs font-mono font-semibold text-ink-faint/50 cursor-not-allowed"
+            title="Próximamente"
+          >
+            Seguridad
+          </span>
+        </nav>
 
         <div className="rounded-2xl border border-[#e6e8e4] bg-[#ffffff] p-6 space-y-5">
           <div>
@@ -227,6 +277,8 @@ export default function Account() {
                     <div>
                       <p className="text-sm text-foreground">
                         {formatCOP(Math.round(t.amountInCents / 100))} {t.currency}
+                        {" · "}
+                        {PLAN_LABEL[t.plan] || t.plan}
                       </p>
                       <p className="text-xs text-ink-faint font-mono">
                         {new Date(t.createdAt).toLocaleDateString("es-CO", {

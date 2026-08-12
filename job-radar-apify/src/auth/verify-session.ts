@@ -1,7 +1,7 @@
-import { createClient } from '@supabase/supabase-js';
-import dotenv from 'dotenv';
-import type { IncomingMessage } from 'http';
-import { getOrCreateUser } from '../db/job-repository.js';
+import { createClient } from "@supabase/supabase-js";
+import dotenv from "dotenv";
+import type { IncomingMessage } from "http";
+import { getOrCreateUser } from "../db/job-repository.js";
 
 dotenv.config();
 
@@ -10,7 +10,7 @@ const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error(
-    '[Auth] Faltan VITE_SUPABASE_URL o VITE_SUPABASE_ANON_KEY en job-radar-apify/.env'
+    "[Auth] Faltan VITE_SUPABASE_URL o VITE_SUPABASE_ANON_KEY en job-radar-apify/.env"
   );
 }
 
@@ -20,13 +20,15 @@ export interface VerifiedSession {
   id: string;
   email: string;
   name: string | null;
-  tier: 'free' | 'pro';
+  tier: "free" | "pro" | "pro_max";
   subscriptionEnd: string | null;
   preferredRoles: string[] | null;
+  /** Fase 1 de docs/RESUME-STUDIO-PLAN.md — ver AppUser.resumeStudioBeta. */
+  resumeStudioBeta: boolean;
 }
 
 function extractBearerToken(req: IncomingMessage): string | null {
-  const header = req.headers['authorization'];
+  const header = req.headers["authorization"];
   if (!header || Array.isArray(header)) return null;
   const match = header.match(/^Bearer\s+(.+)$/i);
   return match ? match[1] : null;
@@ -44,13 +46,18 @@ export async function verifySession(req: IncomingMessage): Promise<VerifiedSessi
   const { data, error } = await supabaseServer.auth.getUser(token);
   if (error || !data.user) return null;
 
-  const appUser = await getOrCreateUser(data.user.id, data.user.email || '', data.user.user_metadata?.full_name);
+  const appUser = await getOrCreateUser(
+    data.user.id,
+    data.user.email || "",
+    data.user.user_metadata?.full_name
+  );
   return {
     id: appUser.id,
     email: appUser.email,
     name: appUser.name,
     tier: appUser.subscriptionTier,
     subscriptionEnd: appUser.subscriptionEnd,
-    preferredRoles: appUser.preferredRoles
+    preferredRoles: appUser.preferredRoles,
+    resumeStudioBeta: appUser.resumeStudioBeta
   };
 }

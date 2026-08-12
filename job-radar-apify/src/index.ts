@@ -2,9 +2,13 @@ import { Client } from "@notionhq/client";
 import dotenv from "dotenv";
 import { gotScraping } from "got-scraping";
 import { fileURLToPath } from "url";
-import { htmlEntities } from "./utils.js";
+import { htmlEntities, extractStructuredFromHtml, mapEmploymentTypeTag } from "./utils.js";
 import { saveRunToCache } from "./cache-manager.js";
 import { FetchBlockedError } from "./engine/resilient-fetch.js";
+import { JobDetail, resolveOutboundUrl } from "./sources/types.js";
+import { extractJobPostingDetail, extractFullJobPosting } from "./lib/job-posting-jsonld.js";
+import { jitterDelay } from "./engine/jitter-delay.js";
+import { filterKnownTechnologyTags } from "./lib/extract-technologies.js";
 
 dotenv.config();
 
@@ -59,6 +63,20 @@ export interface Job {
     | "Glassdoor"
     | "Jooble";
   publishedAt: string; // YYYY-MM-DD
+  // Kept in sync with src/sources/types.ts's Job — that's the interface
+  // adapters/UI actually consume, but the scraper functions in THIS file
+  // build their raw Job[] against this separate, stricter local interface
+  // (narrower `source` union, no index signature), so object literals
+  // pushed here need these fields declared explicitly too.
+  description?: string;
+  requirements?: string[];
+  technologies?: string[];
+  employmentType?: string;
+  salaryMin?: number;
+  salaryMax?: number;
+  salaryCurrency?: string;
+  salaryRaw?: string;
+  applicantCount?: number;
 }
 
 // Store available database properties
@@ -294,6 +312,21 @@ export async function scrapeLinkedIn(
   }
 }
 
+// Detail-page enrichment for one LinkedIn job. Unlike the jobs-guest search
+// endpoint above (which LinkedIn actively rate-limits/blocks), the public
+// /jobs/view/<id> page itself is NOT behind any bot-detection wall —
+// confirmed live (2026-08-11): a single plain, unauthenticated `fetch()`
+// returns 200 with a full JobPosting JSON-LD block, no proxy or
+// got-scraping fingerprinting needed. Still uses the same jitter/circuit-
+// breaker discipline as every other detail fetcher (see ScrapeWorker) —
+// this is LinkedIn's highest-volume, most bot-sensitive source, so staying
+// conservative on request pacing matters more here than anywhere else.
+export async function fetchLinkedInDetail(url: string): Promise<Partial<JobDetail> | null> {
+  const response = await fetch(url, { headers: { "User-Agent": pickUserAgent() } });
+  if (!response.ok) return null;
+  return extractJobPostingDetail(await response.text());
+}
+
 // Per-country domain: Computrabajo runs a separate site per country, not a
 // path prefix off one domain, and Venezuela's real domain is `ve.computrabajo.com`
 // (not the `www.computrabajo.com.ve` a naive `.co`->`.ve` swap would guess) —
@@ -419,6 +452,34 @@ export async function scrapeComputrabajo(keyword: string, country: string = "CO"
   }
 }
 
+// Detail-page enrichment for one Computrabajo job — same translate.goog
+// proxy bypass as the search fetch above (this source actively blocks
+// direct requests). `url` is the Google-redirect-wrapped link saveJobs()
+// stored (see the scraper above); resolveOutboundUrl() unwraps it to get
+// the real host/path to route through the proxy.
+export async function fetchComputrabajoDetail(url: string): Promise<Partial<JobDetail> | null> {
+  const canonical = resolveOutboundUrl(url);
+  let host: string, path: string;
+  try {
+    const parsed = new URL(canonical);
+    host = parsed.hostname;
+    path = parsed.pathname;
+  } catch {
+    return null;
+  }
+
+  const domainConfig = host.includes("ve.computrabajo.com")
+    ? COMPUTRABAJO_COUNTRY_CONFIG.VE
+    : COMPUTRABAJO_COUNTRY_CONFIG.CO;
+  const proxyUrl = `https://${domainConfig.proxyHost}${path}?_x_tr_sl=es&_x_tr_tl=en&_x_tr_hl=es`;
+
+  const response = await fetch(proxyUrl, {
+    headers: { "User-Agent": pickUserAgent(), "Accept-Language": "es-CO,es;q=0.9" }
+  });
+  if (!response.ok) return null;
+  return extractJobPostingDetail(await response.text());
+}
+
 // Scrape Elempleo Colombia with Multi-page Pagination
 export async function scrapeElempleo(keyword: string): Promise<Job[]> {
   console.log(`[Elempleo] Scraping for keyword "${keyword}" (Multi-page)...`);
@@ -501,6 +562,17 @@ export async function scrapeElempleo(keyword: string): Promise<Job[]> {
 }
 
 // Scrape Torre.co opportunities API directly
+// Confirmed live (2026-08-11) values for `commitment`: "full-time" appears
+// on real results; the rest of this map follows Torre's own documented
+// opportunity types so a result with one of them doesn't fall through to
+// "no employment type" just because this session's sample didn't include it.
+const TORRE_COMMITMENT_LABELS: Record<string, string> = {
+  "full-time": "Tiempo completo",
+  "part-time": "Medio tiempo",
+  "per-project": "Por proyecto",
+  volunteer: "Voluntariado"
+};
+
 export async function scrapeTorre(keyword: string): Promise<Job[]> {
   console.log(`[Torre] Searching for keyword "${keyword}"...`);
   const url = "https://search.torre.co/opportunities/_search?offset=0&size=20";
@@ -542,6 +614,10 @@ export async function scrapeTorre(keyword: string): Promise<Job[]> {
         const isRemote = item.remote === true || locations.length === 0;
 
         if (isColombia || isRemote) {
+          const skills: string[] = Array.isArray(item.skills)
+            ? item.skills.map((s: any) => s?.name).filter((n: unknown): n is string => typeof n === "string")
+            : [];
+
           jobs.push({
             jobId: item.id,
             title: htmlEntities(item.objective || "Oportunidad Torre"),
@@ -553,7 +629,15 @@ export async function scrapeTorre(keyword: string): Promise<Job[]> {
             // Full timestamp, not just the calendar date — Torre's API gives
             // real hour/minute precision via `item.created`; truncating it
             // discards exactly what the 24h/48h dashboard filter needs.
-            publishedAt: createdDate.toISOString()
+            publishedAt: createdDate.toISOString(),
+            // `tagline` is Torre's own short plain-text summary — not HTML,
+            // so no extractStructuredFromHtml needed here.
+            description: item.tagline ? htmlEntities(item.tagline).trim() : undefined,
+            technologies: skills.length > 0 ? skills : undefined,
+            employmentType: TORRE_COMMITMENT_LABELS[item.commitment as string]
+            // item.compensation.data comes back null/hidden on every live
+            // result seen so far (2026-08-11) — no confirmed field shape to
+            // map salaryMin/salaryMax from, so left out rather than guessed.
           });
         }
       }
@@ -780,101 +864,99 @@ export async function scrapeMagneto(keyword: string): Promise<Job[]> {
   }
 }
 
-// Scrape WeRemoto directly from server-rendered HTML.
-// Note: the jobs board is fully server-rendered on the homepage (Finsweet
-// CMS pagination via ?c370efcf_page=N) — there is no Jetboost API call
-// involved, that's only used for saved-job bookmarking elsewhere on the
-// site. The dedicated category pages (/categoria-de-trabajo/*) render an
-// empty CMS collection server-side and only populate client-side, so we
-// paginate the homepage instead and filter locally.
+// Detail-page enrichment for one Magneto job — direct fetch, no proxy
+// needed (unlike Computrabajo, Magneto doesn't block direct requests; the
+// search scraper above already fetches this way).
+export async function fetchMagnetoDetail(url: string): Promise<Partial<JobDetail> | null> {
+  const response = await fetch(url, { headers: { "User-Agent": pickUserAgent() } });
+  if (!response.ok) return null;
+  return extractJobPostingDetail(await response.text());
+}
+
+// Scrape WeRemoto via its public sitemap.xml + each job-post page's own
+// JobPosting JSON-LD.
+//
+// This REPLACES an older homepage-HTML-scraping approach (Webflow CMS
+// collection markup, class names like "job-item-accordion") that stopped
+// working entirely — confirmed live (2026-08-11) that
+// weremoto.com/ no longer contains that markup at all (0 matches), so the
+// old scraper silently returned 0 jobs every run. Also confirmed live that
+// weremoto.com/sitemap.xml lists every /job-posts/<slug> URL with a real
+// <lastmod>, and each of those pages carries a full JobPosting JSON-LD
+// block (title, hiringOrganization, description, employmentType,
+// jobLocationType) — a feed (sitemap) + JSON-LD combination that's
+// actually a HIGHER-priority source per AGENTS.md §2.3 (structured feed >
+// HTML+selectors) than what this scraper used before, not just a
+// like-for-like fix.
+//
+// One request per recent posting is unavoidable here — unlike the old
+// approach, the sitemap alone gives no title/company, only a URL and a
+// timestamp — but that same request also yields the full rich detail in
+// one shot, so there's no separate "search" vs "detail" phase for this
+// source (compare RemoteOK/Torre, which are the same shape).
 export async function scrapeWeRemoto(): Promise<Job[]> {
-  console.log("[WeRemoto] Scraping recent postings...");
+  console.log("[WeRemoto] Fetching sitemap.xml...");
   const jobs: Job[] = [];
-  const now = new Date();
-  const monthMap: Record<string, number> = {
-    jan: 0,
-    feb: 1,
-    mar: 2,
-    apr: 3,
-    may: 4,
-    jun: 5,
-    jul: 6,
-    aug: 7,
-    sep: 8,
-    oct: 9,
-    nov: 10,
-    dec: 11
-  };
+  const now = Date.now();
+  const MAX_AGE_DAYS = 2;
 
   try {
-    for (let page = 1; page <= 8; page++) {
-      const url =
-        page === 1
-          ? "https://www.weremoto.com/"
-          : `https://www.weremoto.com/?c370efcf_page=${page}`;
-      const response = await fetch(url, {
-        headers: {
-          "User-Agent": pickUserAgent()
+    const sitemapRes = await fetch("https://www.weremoto.com/sitemap.xml", {
+      headers: { "User-Agent": pickUserAgent() }
+    });
+    if (!sitemapRes.ok) {
+      console.warn(`[WeRemoto] sitemap.xml failed: ${sitemapRes.status} ${sitemapRes.statusText}`);
+      return jobs;
+    }
+    const sitemapXml = await sitemapRes.text();
+
+    const entries = [
+      ...sitemapXml.matchAll(
+        /<loc>(https:\/\/www\.weremoto\.com\/job-posts\/[^<]+)<\/loc>\s*<lastmod>([^<]+)<\/lastmod>/g
+      )
+    ];
+
+    const recentEntries = entries
+      .map(([, url, lastmod]) => ({ url, lastmod, ageDays: (now - new Date(lastmod).getTime()) / (1000 * 60 * 60 * 24) }))
+      .filter((e) => !isNaN(e.ageDays) && e.ageDays <= MAX_AGE_DAYS && e.ageDays >= -0.5);
+
+    console.log(`[WeRemoto] ${entries.length} job-posts in sitemap, ${recentEntries.length} within ${MAX_AGE_DAYS} days.`);
+
+    for (let i = 0; i < recentEntries.length; i++) {
+      if (i > 0) await jitterDelay();
+      const { url, lastmod } = recentEntries[i];
+
+      try {
+        const response = await fetch(url, { headers: { "User-Agent": pickUserAgent() } });
+        if (!response.ok) {
+          console.warn(`[WeRemoto] Job page failed: ${response.status} for ${url}`);
+          continue;
         }
-      });
+        const posting = extractFullJobPosting(await response.text());
+        if (!posting?.title) continue;
 
-      if (!response.ok) {
-        console.warn(
-          `[WeRemoto] Failed on page ${page}: ${response.status} ${response.statusText}`
-        );
-        break;
-      }
-
-      const html = await response.text();
-      const items = html.split("job-item-accordion w-dyn-item");
-      if (items.length <= 1) break; // No more paginated items
-
-      for (let i = 1; i < items.length; i++) {
-        const item = items[i];
-        const titleMatch = item.match(/class="job-title">([^<]+)</);
-        const companyMatch = item.match(/class="company-name">([^<]+)</);
-        const hrefMatch = item.match(
-          /href="(\/job-posts\/[^"]+)"\s+target="_blank"\s+class="job-button-view/
-        );
-        const dateMatch = item.match(/class="date _2">([^<]+)</);
-
-        if (!titleMatch || !hrefMatch || !dateMatch) continue;
-
-        // Location can appear as an invisible empty conditional div followed
-        // by the real value, so pick the first non-empty match in the chunk.
-        const locMatches = [...item.matchAll(/class="remoto[^"]*">([^<]*)</g)];
-        const nonEmptyLoc = locMatches.map((m) => m[1].trim()).find((v) => v.length > 0);
-        const location = nonEmptyLoc ? htmlEntities(nonEmptyLoc) : "Remoto";
-
-        const dm = dateMatch[1].trim().match(/^([A-Za-z]{3})\s+(\d{1,2})$/);
-        if (!dm) continue;
-        const monthIdx = monthMap[dm[1].toLowerCase()];
-        if (monthIdx === undefined) continue;
-        const day = parseInt(dm[2], 10);
-
-        let candidate = new Date(now.getFullYear(), monthIdx, day);
-        if (candidate.getTime() - now.getTime() > 24 * 60 * 60 * 1000) {
-          // A date resolving into the future actually belongs to last year
-          candidate = new Date(now.getFullYear() - 1, monthIdx, day);
-        }
-
-        const ageInDays = (now.getTime() - candidate.getTime()) / (1000 * 60 * 60 * 24);
-        if (ageInDays > 2 || ageInDays < -0.5) continue;
-
-        const yyyy = candidate.getFullYear();
-        const mm = String(candidate.getMonth() + 1).padStart(2, "0");
-        const dd = String(candidate.getDate()).padStart(2, "0");
-
+        const slugMatch = url.match(/\/job-posts\/([^/?#]+)/);
         jobs.push({
-          jobId: hrefMatch[1].replace("/job-posts/", ""),
-          title: htmlEntities(titleMatch[1].trim()),
-          company: companyMatch ? htmlEntities(companyMatch[1].trim()) : "Confidencial",
-          location,
-          url: `https://www.weremoto.com${hrefMatch[1]}`,
-          dateText: dateMatch[1].trim(),
+          jobId: slugMatch ? slugMatch[1] : url,
+          title: htmlEntities(posting.title),
+          company: posting.company ? htmlEntities(posting.company) : "Confidencial",
+          location: posting.location || "Remoto",
+          url,
+          dateText: "Reciente",
           source: "WeRemoto",
-          publishedAt: `${yyyy}-${mm}-${dd}`
+          publishedAt: new Date(lastmod).toISOString(),
+          description: posting.description,
+          requirements: posting.requirements,
+          technologies: posting.technologies,
+          employmentType: posting.employmentType,
+          salaryMin: posting.salaryMin,
+          salaryMax: posting.salaryMax,
+          salaryCurrency: posting.salaryCurrency,
+          salaryRaw: posting.salaryRaw,
+          applicantCount: posting.applicantCount
         });
+      } catch (jobErr: any) {
+        console.warn(`[WeRemoto] Failed fetching ${url}:`, jobErr?.message || jobErr);
       }
     }
   } catch (error) {
@@ -940,6 +1022,14 @@ export async function scrapeGetOnBoard(): Promise<Job[]> {
         const isColombia = countries.some((c) => c.toLowerCase().includes("colombia"));
         if (!isRemote && !isColombia) continue;
 
+        // NOTE: attrs.tags/modality/seniority are JSON:API relationship
+        // stubs ({data:{id,type}}) — confirmed live (2026-08-11) that
+        // `?include=tags,modality,seniority` does NOT resolve them in this
+        // endpoint, so there's no reliable way to turn them into readable
+        // strings yet. Left out rather than guessed; attrs.description and
+        // the numeric salary/applications fields ARE plain values.
+        const { description, requirements } = extractStructuredFromHtml(attrs.description || "");
+
         jobs.push({
           jobId: item.id,
           title: htmlEntities(attrs.title),
@@ -950,7 +1040,12 @@ export async function scrapeGetOnBoard(): Promise<Job[]> {
           url: `https://www.getonbrd.com/jobs/${item.id}`,
           dateText: "Reciente",
           source: "GetOnBoard",
-          publishedAt: new Date(publishedMs).toISOString()
+          publishedAt: new Date(publishedMs).toISOString(),
+          description: description || undefined,
+          requirements: requirements.length > 0 ? requirements : undefined,
+          salaryMin: typeof attrs.min_salary === "number" ? attrs.min_salary : undefined,
+          salaryMax: typeof attrs.max_salary === "number" ? attrs.max_salary : undefined,
+          applicantCount: typeof attrs.applications_count === "number" ? attrs.applications_count : undefined
         });
       }
     }
@@ -992,6 +1087,9 @@ export async function scrapeRemoteOK(): Promise<Job[]> {
       const ageInDays = (now - item.epoch * 1000) / (1000 * 60 * 60 * 24);
       if (ageInDays > 2) continue;
 
+      const { description, requirements } = extractStructuredFromHtml(item.description || "");
+      const tags: string[] = Array.isArray(item.tags) ? item.tags.filter((t: unknown) => typeof t === "string") : [];
+
       jobs.push({
         jobId: String(item.id),
         title: htmlEntities(item.position),
@@ -1000,7 +1098,29 @@ export async function scrapeRemoteOK(): Promise<Job[]> {
         url: item.url,
         dateText: "Reciente",
         source: "RemoteOK",
-        publishedAt: new Date(item.epoch * 1000).toISOString()
+        publishedAt: new Date(item.epoch * 1000).toISOString(),
+        description: description || undefined,
+        requirements: requirements.length > 0 ? requirements : undefined,
+        // Bug real encontrado y corregido 2026-08-12: RemoteOK's raw `tags`
+        // mixes real skills with unrelated site-wide category tags (e.g. a
+        // hotel "Carpenter" listing carrying "marketing"/"exec"/"digital
+        // nomad" alongside "golang"/"swift") — verified live against the
+        // actual API response, not a hypothetical. Filtered to only tags
+        // that are literally a known technology name/alias, never a guess.
+        technologies: (() => {
+          const known = filterKnownTechnologyTags(tags);
+          return known.length > 0 ? known : undefined;
+        })(),
+        employmentType: mapEmploymentTypeTag(tags),
+        // RemoteOK's numeric salary_min/max are real API fields (confirmed
+        // live, 2026-08-11) — used as-is, no currency given by the API so
+        // salaryCurrency is left unset rather than assumed USD. RemoteOK
+        // uses 0 as its "not specified" sentinel (most listings return
+        // salary_min: 0, salary_max: 0) — treated as absent, not a real $0
+        // salary, or every unspecified listing would show a fabricated
+        // "$0 – $0" badge.
+        salaryMin: typeof item.salary_min === "number" && item.salary_min > 0 ? item.salary_min : undefined,
+        salaryMax: typeof item.salary_max === "number" && item.salary_max > 0 ? item.salary_max : undefined
       });
     }
   } catch (error) {
@@ -1028,6 +1148,15 @@ export async function scrapeRemoteOK(): Promise<Job[]> {
 // fetches once, matching RemoteOK/GetOnBoard's catalog-wide pattern (see
 // GLOBAL_SOURCE_CADENCE_MS in source-cadence.ts, which this must be moved
 // into alongside that fix).
+const REMOTIVE_JOB_TYPE_LABELS: Record<string, string> = {
+  full_time: "Tiempo completo",
+  part_time: "Medio tiempo",
+  contract: "Contrato",
+  freelance: "Freelance",
+  internship: "Prácticas",
+  temporary: "Temporal"
+};
+
 export async function scrapeRemotive(): Promise<Job[]> {
   console.log("[Remotive] Fetching postings...");
   const jobs: Job[] = [];
@@ -1056,6 +1185,9 @@ export async function scrapeRemotive(): Promise<Job[]> {
       const ageInDays = (now - publishedDate.getTime()) / (1000 * 60 * 60 * 24);
       if (ageInDays > 2) continue;
 
+      const { description, requirements } = extractStructuredFromHtml(item.description || "");
+      const tags: string[] = Array.isArray(item.tags) ? item.tags.filter((t: unknown) => typeof t === "string") : [];
+
       jobs.push({
         jobId: String(item.id),
         title: htmlEntities(item.title),
@@ -1064,7 +1196,25 @@ export async function scrapeRemotive(): Promise<Job[]> {
         url: item.url,
         dateText: "Reciente",
         source: "Remotive",
-        publishedAt: publishedDate.toISOString()
+        publishedAt: publishedDate.toISOString(),
+        description: description || undefined,
+        requirements: requirements.length > 0 ? requirements : undefined,
+        // Same defensive filter as RemoteOK just above — Remotive's job
+        // board covers non-dev roles too (sales/marketing/etc.), so its
+        // `tags` isn't guaranteed to be pure tech skills either. Only tags
+        // that are literally a known technology name/alias survive.
+        technologies: (() => {
+          const known = filterKnownTechnologyTags(tags);
+          return known.length > 0 ? known : undefined;
+        })(),
+        // Remotive's job_type is an explicit enum field (full_time/part_time/
+        // contract/freelance/internship), separate from RemoteOK's tag-based
+        // signal — mapped directly rather than through mapEmploymentTypeTag.
+        employmentType: REMOTIVE_JOB_TYPE_LABELS[item.job_type as string],
+        // `salary` here is Remotive's own free-text field (e.g. "OTE $25k -
+        // $35k") — no structured min/max is offered, so it's stored as-is
+        // rather than parsed into numbers we'd have to guess at.
+        salaryRaw: typeof item.salary === "string" && item.salary.trim() ? item.salary.trim() : undefined
       });
     }
   } catch (error) {
@@ -1152,7 +1302,14 @@ export async function scrapeJooble(locationQuery: string = "co"): Promise<Job[]>
         url: item.link,
         dateText: "Reciente",
         source: "Jooble",
-        publishedAt: publishedDate.toISOString()
+        publishedAt: publishedDate.toISOString(),
+        // Confirmed live (2026-08-11): `snippet` is plain text (Jooble
+        // truncates it with "..." itself, not HTML), `salary` is free text
+        // (e.g. "$25 - $40 per hour"), `type` is often empty for a given
+        // listing — used only when present, never guessed.
+        description: item.snippet ? htmlEntities(item.snippet).trim() : undefined,
+        salaryRaw: typeof item.salary === "string" && item.salary.trim() ? item.salary.trim() : undefined,
+        employmentType: item.type ? htmlEntities(item.type).trim() || undefined : undefined
       });
     }
   } catch (error) {
@@ -1403,6 +1560,29 @@ export async function scrapeGlassdoor(keyword: string): Promise<Job[]> {
   }
   console.log(`[Glassdoor] Found ${jobs.length} jobs (filtered by date).`);
   return jobs;
+}
+
+// Detail-page enrichment for one Glassdoor job. Works technically — reuses
+// gsFetch (the same got-scraping/real-browser-fingerprint technique the
+// search scraper above needs to pass Cloudflare), and confirmed live
+// (2026-08-11) that it returns 200 with a full JobPosting JSON-LD block.
+// (Indeed's /viewjob page, by contrast, returns a hard 403 through this
+// same technique — not usable at all.)
+//
+// NOT wired into glassdoorAdapter.fetchDetail (see sources/glassdoor.ts):
+// a live test in this same investigation session — just 2 extra requests
+// right after a normal search fetch — triggered a fresh 403 on Glassdoor's
+// SEARCH itself. Combined with this file's own comment on
+// scrapeGlassdoor's history ("Started returning 403 Forbidden during
+// testing... no delay between requests and no cap on keyword fanout"),
+// that's real evidence this source is too fragile to safely add more
+// request volume onto right now. Left implemented and ready — not deleted
+// — in case a future pass wants to revisit with a much lower per-role cap
+// and more careful pacing than the general MAX_DETAIL_FETCHES_PER_ADAPTER_
+// PER_ROLE default (see scrape-worker.ts).
+export async function fetchGlassdoorDetail(url: string): Promise<Partial<JobDetail> | null> {
+  const html = await gsFetch(url, "Glassdoor-detail");
+  return extractJobPostingDetail(html);
 }
 
 // Scrape Indeed via Apify (Optimized single run with combined query)
