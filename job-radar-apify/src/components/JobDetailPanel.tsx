@@ -1,6 +1,6 @@
 import React from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { Star, Check, ArrowUpRight, Search, Lock, Sparkles } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Star, Check, ArrowUpRight, Search, Sparkles } from "lucide-react";
 import { Job } from "../sources/types.js";
 import { getSourceColor } from "../lib/source-colors.js";
 import { getModalityLabel } from "../lib/job-filters.js";
@@ -63,7 +63,7 @@ function initialFor(job: { company?: string; source?: string }): string {
 }
 
 // Right-hand pane of the desktop split-pane dashboard — shows everything we
-// actually know about the selected job. Descripción/Requisitos/Tecnologías/
+// actually know about the selected job. Descripción/Requisitos/Habilidades/
 // Tipo de empleo/Postulantes only render when the underlying field is
 // present — most sources still don't return them (see job-repository.ts's
 // getJobs()), so most jobs still fall back to the plain infoBlock. The
@@ -78,14 +78,8 @@ export const JobDetailPanel: React.FC<JobDetailPanelProps> = ({
   country,
   headingLevel = "h2"
 }) => {
-  const { isAuthenticated, tier } = useAuth();
-  const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
   const TitleTag = headingLevel;
-  // Fase 10 (docs/CV-GENERATION-PLAN.md §12 punto 5): "Generación de CV
-  // es exclusiva de Pro y Pro Max, sin excepción" — un check contra solo
-  // "pro" bloquearía a un suscriptor Pro Max de la función que pagó por
-  // tener.
-  const hasCvAccess = tier === "pro" || tier === "pro_max";
 
   if (!job) {
     return (
@@ -105,21 +99,25 @@ export const JobDetailPanel: React.FC<JobDetailPanelProps> = ({
       : []);
   const modality = getModalityLabel(job.location);
   const sourceColor = getSourceColor(job.source);
-  // Prefiere las tecnologías ya capturadas por la fuente (job.technologies,
-  // real, guardado en la BD) sobre inferirlas — solo cae al extractor
-  // determinista cuando la fuente no las trajo pero sí hay texto de
-  // descripción/requisitos de dónde sacarlas (mismo criterio "dato real
-  // primero" que el resto del panel).
-  const technologies =
-    job.technologies && job.technologies.length > 0
-      ? job.technologies
-      : extractTechnologies(
-          [job.description, ...(job.requirements || [])].filter(Boolean).join("\n")
-        );
+  // Bug real encontrado 2026-08-12 (reporte directo del usuario, "Desarrollador
+  // De Software AI First"): job.technologies es el campo `skills` que cada
+  // fuente arma a su manera — en Magneto resultó ser una lista genérica de
+  // CATEGORÍAS ("Desarrollo de software", "Arquitectura de software") que no
+  // coincidía con NINGUNA tecnología concreta mencionada en la descripción
+  // real (Node.js, Python, TypeScript, Cursor...), aunque sí venía poblado.
+  // extractTechnologies() solo devuelve nombres del catálogo que aparecen
+  // literalmente, palabra completa, en description/requirements — por
+  // construcción SIEMPRE coincide con lo que la vacante realmente dice, así
+  // que ahora es la fuente primaria; job.technologies (el campo crudo de la
+  // fuente) solo se usa si el extractor no encontró nada ahí.
+  const extractedTechnologies = extractTechnologies(
+    [job.description, ...(job.requirements || [])].filter(Boolean).join("\n")
+  );
+  const technologies = extractedTechnologies.length > 0 ? extractedTechnologies : job.technologies || [];
 
   // Reused as-is in both layouts below: standalone near the bottom of the
   // panel when there's no description (today's default for every real
-  // job), or as the right column next to Tecnologías once a source starts
+  // job), or as the right column next to Habilidades once a source starts
   // populating job.description.
   const infoBlock = (
     <div className="space-y-3 text-sm">
@@ -227,42 +225,25 @@ export const JobDetailPanel: React.FC<JobDetailPanelProps> = ({
           {job.dateText && <Badge variant="outline">{job.dateText}</Badge>}
         </div>
 
-        {/* Estilo de tarjeta pedido para "Generar CV para esta vacante"
-            (borde/ícono/texto del mockup), envolviendo el ÚNICO CTA real de
-            CV que existe — Fase 6 (docs/CV-GENERATION-PLAN.md §9.1), Pro/Pro
-            Max, click bloqueado en free lleva a /pricing. Antes había un
-            segundo botón deshabilitado aparte con la misma promesa
-            ("Generar CV" arriba, "Ajustar CV" abajo) — se veía como dos
-            CTAs redundantes, así que se fusionaron en una sola tarjeta; no
-            se agregó ninguna funcionalidad nueva, solo se re-vistió la que
-            ya estaba activa. */}
-        <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 mb-3 flex flex-col sm:flex-row sm:items-center gap-4">
+        {/* Fase 6 (docs/CV-GENERATION-PLAN.md §9.1) puesta en pausa
+            (2026-08-12): la generación de CV todavía no está lista para
+            usuarios reales, así que el CTA queda deshabilitado como teaser
+            ("Muy pronto") en vez de un botón funcional — no hay
+            onClick/navegación, nadie puede activarlo por accidente
+            mientras el pipeline no esté verificado de punta a punta. */}
+        <div className="rounded-lg border border-border bg-muted/30 p-4 mb-3 flex flex-col sm:flex-row sm:items-center gap-4">
           <div className="flex-1 min-w-0">
             <p className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
-              <Sparkles className="h-4 w-4 text-primary shrink-0" /> Genera un CV para esta
-              vacante
+              <Sparkles className="h-4 w-4 text-muted-foreground shrink-0" /> Genera un CV para
+              esta vacante
             </p>
             <p className="text-xs text-muted-foreground mt-1">
               Adaptamos tu CV a esta posición con IA: reordenamos tu experiencia real, alineamos
               palabras clave y revisamos compatibilidad ATS. Nunca inventamos información.
             </p>
           </div>
-          <Button
-            type="button"
-            variant={hasCvAccess ? "default" : "gold"}
-            size="lg"
-            className="font-mono shrink-0"
-            onClick={() => (hasCvAccess ? onCvAdjustClick?.(job) : navigate("/pricing"))}
-          >
-            {hasCvAccess ? (
-              <>
-                <Sparkles className="h-4 w-4" /> Generar CV para esta vacante
-              </>
-            ) : (
-              <>
-                <Lock className="h-4 w-4" /> Generar CV — Solo Pro
-              </>
-            )}
+          <Button type="button" variant="outline" size="lg" className="font-mono shrink-0" disabled>
+            Muy pronto
           </Button>
         </div>
 
@@ -300,7 +281,7 @@ export const JobDetailPanel: React.FC<JobDetailPanelProps> = ({
               {technologies.length > 0 && (
                 <div>
                   <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase mb-2">
-                    Tecnologías
+                    Habilidades
                   </h3>
                   <div className="flex flex-wrap gap-1.5">
                     {technologies.map((tech) => (
