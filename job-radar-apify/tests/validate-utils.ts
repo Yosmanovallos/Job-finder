@@ -106,9 +106,66 @@ const cases: Case[] = [
     // debe generar un salto de línea real antes de sí misma.
     label: 'Etiquetas de sección conocidas de Magneto generan salto de línea real',
     html: 'Serás una pieza clave en la gestión. Responsabilidades: Realizar causaciones contables. Requerimientos: Técnico o Tecnólogo. Nivel de educación: Técnico',
+    // Bug real corregido 2026-08-12 (verificado con dos vacantes reales de
+    // Magneto — "Analista Técnico I+D" y "Desarrollador De Software AI
+    // First"): "Responsabilidades:"/"Requerimientos:" quedaban mezclados
+    // dentro de description como texto plano, sin viñetas ni sección propia
+    // — ahora se enrutan a requirements (splitRequirementsSections).
+    // "Nivel de educación:" no es un REQUIREMENTS_SECTION_LABELS (es
+    // metadata del resumen auto-generado de Magneto), así que se queda en
+    // description con su propio salto de línea, como antes.
+    expectedDescription: 'Serás una pieza clave en la gestión.\nNivel de educación: Técnico',
+    expectedRequirements: ['Realizar causaciones contables.', 'Técnico o Tecnólogo.'],
+    exact: true
+  },
+  {
+    // Vacante real de Magneto ("Desarrollador De Software AI First"):
+    // "Requisitos:" en la MISMA línea que su contenido, sin ningún `\n`
+    // entre ítems — separados por doble espacio. "Ofrecemos" (no incluido
+    // aquí) cerraría la zona sin absorberse a requirements.
+    label: 'Requisitos: con ítems separados por doble espacio (sin \\n) se separan en requirements',
+    html: 'Buscamos un perfil técnico. Requisitos:  Profesional en ingeniería de sistemas.  Experiencia mínima de 3 años.  Manejo de Node.js y Python.',
+    expectedDescription: 'Buscamos un perfil técnico.',
+    expectedRequirements: [
+      'Profesional en ingeniería de sistemas.',
+      'Experiencia mínima de 3 años.',
+      'Manejo de Node.js y Python.'
+    ],
+    exact: true
+  },
+  {
+    // "Ofrecemos" son beneficios del empleador, no requisitos del
+    // candidato — debe cerrar la zona de requirements sin que su
+    // contenido termine ahí (sería tergiversar el dato).
+    label: 'Ofrecemos cierra la zona de requirements sin absorber su contenido',
+    html: 'Perfil requerido\nProfesional en Ingeniería.\nOfrecemos\nSalario a convenir.',
+    expectedDescription: 'Ofrecemos\nSalario a convenir.',
+    expectedRequirements: ['Profesional en Ingeniería.'],
+    exact: true
+  },
+  {
+    // Vacante real de Elempleo ("Profesional Junior de Desarrollos BI",
+    // confirmado en vivo 2026-08-12): sus ítems de "Requisitos:" traen su
+    // propio glifo de viñeta ("•\t") en vez de \n o doble espacio — debe
+    // quitarse para no duplicar el bullet real que renderiza el panel.
+    label: 'Requisitos: con viñeta "•" propia de la fuente se limpia del ítem',
+    html: 'Buscamos un perfil técnico.\nRequisitos:\n•\tFormación: Ingeniero de Sistemas\n•\tExperiencia mínima de 1 año',
+    expectedDescription: 'Buscamos un perfil técnico.',
+    expectedRequirements: ['Formación: Ingeniero de Sistemas', 'Experiencia mínima de 1 año'],
+    exact: true
+  },
+  {
+    // Vacante real de Elempleo ("Auxiliar de Enfermería", DaVita, confirmado
+    // en vivo 2026-08-12): "Requisitos:" nunca cierra con una etiqueta ya
+    // conocida — sin Salario:/Horario:/Tipo de contrato:/Beneficios: en
+    // REQUIREMENTS_STOP_LABELS, la zona seguía abierta hasta el final y
+    // esos términos del empleador (no del candidato) quedaban listados como
+    // si fueran requisitos.
+    label: 'Salario/Horario/Tipo de contrato/Beneficios cierran la zona sin absorberse',
+    html: 'Buscamos auxiliar de enfermería.\nRequisitos:\nTécnico en auxiliar de enfermería\nSalario:\nA convenir\nHorario:\nLunes a sábados.\nTipo de contrato:\nIndefinido.\nBeneficios:\nPrimas extralegales.',
     expectedDescription:
-      'Serás una pieza clave en la gestión.\nResponsabilidades: Realizar causaciones contables.\nRequerimientos: Técnico o Tecnólogo.\nNivel de educación: Técnico',
-    expectedRequirements: [],
+      'Buscamos auxiliar de enfermería.\nSalario:\nA convenir\nHorario:\nLunes a sábados.\nTipo de contrato:\nIndefinido.\nBeneficios:\nPrimas extralegales.',
+    expectedRequirements: ['Técnico en auxiliar de enfermería'],
     exact: true
   }
 ];

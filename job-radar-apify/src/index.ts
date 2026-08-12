@@ -561,6 +561,17 @@ export async function scrapeElempleo(keyword: string): Promise<Job[]> {
   }
 }
 
+// Detail-page enrichment for one Elempleo job — direct fetch, no proxy
+// needed. Confirmed live 2026-08-12 (plain curl, no blocking): elempleo.com
+// job pages carry a real JobPosting JSON-LD with a genuine description
+// (1766 chars on the sample checked), same schema.org standard as
+// Computrabajo/Magneto — reuses the same extractJobPostingDetail() parser.
+export async function fetchElempleoDetail(url: string): Promise<Partial<JobDetail> | null> {
+  const response = await fetch(url, { headers: { "User-Agent": pickUserAgent() } });
+  if (!response.ok) return null;
+  return extractJobPostingDetail(await response.text());
+}
+
 // Scrape Torre.co opportunities API directly
 // Confirmed live (2026-08-11) values for `commitment`: "full-time" appears
 // on real results; the rest of this map follows Torre's own documented
