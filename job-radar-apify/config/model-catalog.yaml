@@ -1,0 +1,63 @@
+# Catálogo de modelos REVISADOS A MANO (docs/CV-GENERATION-PLAN.md
+# §6.5.1/§6.5.2, Fase 12). Un modelo entra aquí SOLO después de revisión
+# humana explícita de una entrada real de `docs/model-catalog-candidates.json`
+# (producido por `scripts/sync-model-catalog.ts`, nunca inventado) — ese
+# script NUNCA escribe este archivo, es hand-edited a propósito (mismo
+# principio de revisión humana que `active: false` para prompts, §0/§10
+# Fase 8, aplicado aquí a "qué modelo se puede llegar a cobrar").
+#
+# Importante, para que una sesión futura no asuma más de lo que hay:
+# entrar en esta lista NO activa nada en el selector de producto (§9.3,
+# `CvAdjustOverlay.tsx`) ni en `AVAILABLE_MODEL_OPTIONS`
+# (`src/cv/generation-pipeline.ts`, Fase 11) — ese es un paso APARTE, con
+# su propio eval real (mismo gate §24.5 del proyecto raíz que ya usa
+# `cv_draft`/`cv_critique`) antes de poder cobrarle a un usuario por él.
+# Este archivo es el catálogo REVISADO, no el catálogo ACTIVO.
+#
+# Fórmula de créditos (§6.5.2): créditos = redondear_arriba(costo_peor_caso_usd / $0.10)
+
+reviewed:
+  - id: gemini-2.5-flash-lite
+    provider: google
+    reviewed_at: "2026-08-09"
+    reviewed_in: "Fase 12 (docs/CV-GENERATION-PLAN.md §10 fila 12)"
+    source: https://models.dev/api.json
+    cost_input_per_mtok: 0.10
+    cost_output_per_mtok: 0.40
+    # Sin tier de precio distinto para contexto grande (a diferencia de
+    # gemini-3.1-pro-preview/gemini-3-pro-preview, que sí lo tienen —
+    # verificado en el mismo candidates.json, worstCaseTierAppliesAboveContextTokens
+    # null para este modelo).
+    worst_case_tier_applies: false
+    context_limit_tokens: 1048576
+    output_limit_tokens: 65536
+    # Cálculo real de créditos, usando los tamaños de prompt YA
+    # documentados en §6.3 (nunca números nuevos inventados para este
+    # ejercicio) — este candidato reemplazaría la Etapa B (§6.5:
+    # "el selector SOLO elige el modelo de la Etapa B"), Etapa D se queda
+    # en el proveedor ya decidido (Fase 3/8: gemini-3.5-flash-lite,
+    # $0.30/$2.50 por Mtok, config/models.local.yaml) sin importar qué
+    # candidato se elija aquí.
+    worst_case_generation_cost_usd_calc: >
+      Etapa B (peor caso, 1 reintento = 2 llamadas, ~3.200 in / 3.000 out
+      tokens c/u, §6.3): 2 × ((3200/1e6)×0.10 + (3000/1e6)×0.40) =
+      2 × $0.00152 = $0.00304.
+      Etapa D (peor caso, 1 reintento, ~3.500 in / 600 out, pricing REAL
+      ya en producción, no un placeholder): 2 × ((3500/1e6)×0.30 +
+      (600/1e6)×2.50) = 2 × $0.00255 = $0.0051.
+      Total peor caso: $0.00304 + $0.0051 = $0.00814.
+    worst_case_generation_cost_usd: 0.00814
+    # redondear_arriba(0.00814 / 0.10) = redondear_arriba(0.0814) = 1
+    # (el mínimo posible — el piso de la fórmula de créditos).
+    credits: 1
+    notes: >
+      Candidato "económico" real, no una hipótesis — bastante más barato
+      que "Estándar" (gemini-3.1-pro-preview, 3 créditos, §6.5.2) y que
+      fast_structured (gemini-3.6-flash, ya usado en Etapa A). Valida en
+      la práctica la "oportunidad a validar" que §5.1 dejó anotada (un
+      tier económico para producción, no solo desarrollo). NO se activa
+      en el selector con esta entrada — falta el eval real de calidad de
+      redacción con este modelo (mismo gate que ya pasaron
+      cv_draft/cv_critique en Fase 8) antes de ofrecerlo a un usuario
+      real. Ejercicio de que el mecanismo de catálogo funciona de punta a
+      punta (Fase 12), no una decisión de producto tomada aquí.

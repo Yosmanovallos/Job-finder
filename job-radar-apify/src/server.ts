@@ -2,6 +2,7 @@ import http from "http";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { randomUUID } from "node:crypto";
 import dotenv from "dotenv";
 import {
   getJobsCached,
@@ -50,6 +51,67 @@ import {
 import { verifySession } from "./auth/verify-session.js";
 import { startPaymentCheckout } from "./payments/checkout.js";
 import { handleWompiWebhook } from "./payments/webhook.js";
+import {
+  upsertCvProfileRawText,
+  getCvProfileStatus,
+  deleteCvProfile,
+  getCvFacts
+} from "./db/cv-profile-repository.js";
+import {
+  getGenerationForJob,
+  getGenerationById,
+  updateGenerationDocument,
+  updateGenerationTemplate
+} from "./db/cv-generation-repository.js";
+import {
+  parseSingleFileUpload,
+  UploadTooLargeError,
+  UploadInvalidError
+} from "./cv/parse-upload.js";
+import {
+  extractTextFromUpload,
+  UnsupportedFileTypeError,
+  TextExtractionError,
+  MAX_UPLOAD_BYTES
+} from "./cv/extract-text.js";
+import { extractAndStoreFacts } from "./cv/extract-facts.js";
+import {
+  getQuotaStatus,
+  QuotaExceededError,
+  GenerationConflictError,
+  GenerationNotFoundError,
+  MODEL_OPTION_CREDIT_COST,
+  type ModelOption,
+  type Tier as CvTier
+} from "./cv/quota.js";
+import {
+  runCvGenerationPipeline,
+  runCvRegenerationPipeline,
+  FactualityRejectedError,
+  ModelOptionNotAvailableError
+} from "./cv/generation-pipeline.js";
+import { InactivePromptError } from "./cv/model-gateway.js";
+import { getDevGateway } from "./cv/gateway-instance.js";
+import { CvDocumentSchema } from "./cv/cv-document-schema.js";
+import { cvSectionRewriteV1, type CvSectionRewriteAction } from "./cv/prompts.js";
+import { collectFactIds } from "./cv/factuality.js";
+import { CV_TEMPLATES, DEFAULT_TEMPLATE_ID, getTemplate } from "./cv/templates/registry.js";
+import { handleResumeStudioRoute } from "./server/routes/resume-studio.js";
+import { RESUME_STUDIO_ENABLED } from "./config.js";
+import { getProviderRegistry } from "./ai-gateway/registry-instance.js";
+import { getCredentialResolver } from "./ai-gateway/credential-resolver-instance.js";
+import type { RunContext } from "./cv/model-gateway.js";
+import {
+  respondToUnexpectedError,
+  checkSensitiveRateLimit,
+  readJsonBodyCapped
+} from "./server/http-helpers.js";
+// renderCvToPdf/renderCvToDocx are NOT imported here at top level, on
+// purpose — pdfkit/docx are sizeable dependency trees that only the two
+// download routes below need, and this file's cold boot already pulls in
+// enough (busboy, mammoth, pdf-parse, the whole CV pipeline) to notice.
+// They're dynamically imported at the point of use instead, so server
+// startup time doesn't pay for two renderers most requests never touch.
 import {
   getClientIp,
   checkRateLimit,
@@ -167,42 +229,202 @@ function searchCompanies(
 // unexpected failure from a DB/network call. The latter's real message
 // (a raw pg error can name a table, column or constraint) is never sent to
 // the client — only logged server-side, where it's actually actionable.
-function respondToUnexpectedError(
-  res: http.ServerResponse,
-  err: any,
-  routeLabel: string,
-  fallbackMessage: string
-): void {
-  if (err instanceof SyntaxError) {
-    res.writeHead(400, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ error: "JSON inválido en el cuerpo de la solicitud" }));
-    return;
-  }
-  console.error(`[${routeLabel}] Error inesperado:`, err);
-  res.writeHead(500, { "Content-Type": "application/json" });
-  res.end(JSON.stringify({ error: fallbackMessage }));
-}
-
 // General cap on the whole /api/* surface (scraping-scale abuse, blind
 // endpoint hammering) — the per-route limits below (sensitive writes) are
 // tighter and checked separately inside those routes.
 const GENERAL_API_RATE_LIMIT = 120;
 const GENERAL_API_RATE_WINDOW_MS = 60 * 1000;
-// For endpoints that write data or cost real money/quota to call (checkout,
-// triggering a scrape) — a much lower bar than the general read cap.
-const SENSITIVE_RATE_LIMIT = 10;
-const SENSITIVE_RATE_WINDOW_MS = 60 * 1000;
+const CV_GENERATE_BODY_MAX_BYTES = 200 * 1024;
+const CHECKOUT_START_BODY_MAX_BYTES = 1 * 1024; // { plan?: "pro" | "pro_max" } — tiny payload, generous cap
 
-function checkSensitiveRateLimit(
-  ip: string,
+// Job title/location/date come from the scraped corpus — untrusted text
+// (AGENTS.md regla 6). Only real fields the client already has go into the
+// prompt's job_requirements (§3.2's documented gap: no description field
+// exists to summarize), and only a sanitized form goes into a filename.
+function buildJobRequirementsText(jobLocation: unknown, jobDateText: unknown): string {
+  const parts: string[] = [];
+  if (typeof jobLocation === "string" && jobLocation.trim())
+    parts.push(`Ubicación: ${jobLocation.trim().slice(0, 200)}`);
+  if (typeof jobDateText === "string" && jobDateText.trim())
+    parts.push(`Publicada: ${jobDateText.trim().slice(0, 100)}`);
+  return parts.join("\n");
+}
+
+// Fase 11 (docs/CV-GENERATION-PLAN.md §6.2 paso 1, §6.5): the client's
+// `modelOption` is only ever a hint — the server re-validates it against
+// the SESSION's real tier (never a value the client claims) and derives
+// the credit cost from `MODEL_OPTION_CREDIT_COST`, never from anything
+// the request body sent. Pro can only ever reach "standard"; requesting
+// anything else from a Pro session is rejected here, before any quota
+// reservation.
+const VALID_MODEL_OPTIONS: ReadonlySet<string> = new Set(["standard", "premium", "compare"]);
+
+function validateModelOptionForTier(
+  tier: CvTier,
+  rawOption: unknown
+):
+  | { ok: true; modelOption: ModelOption; proMaxCreditCost: number | undefined }
+  | { ok: false; error: string } {
+  const candidate = rawOption ?? "standard";
+  if (typeof candidate !== "string" || !VALID_MODEL_OPTIONS.has(candidate)) {
+    return { ok: false, error: "modelOption inválido." };
+  }
+  const modelOption = candidate as ModelOption;
+  if (tier === "pro") {
+    if (modelOption !== "standard") {
+      return { ok: false, error: "Esta opción de modelo requiere una suscripción Pro Max." };
+    }
+    return { ok: true, modelOption: "standard", proMaxCreditCost: undefined };
+  }
+  return { ok: true, modelOption, proMaxCreditCost: MODEL_OPTION_CREDIT_COST[modelOption] };
+}
+
+type ByokOverride = Pick<RunContext, "credentialSource" | "providerId" | "modelId" | "apiKey">;
+
+// Fase 11 de docs/RESUME-STUDIO-PLAN.md — mismo criterio que
+// `validateModelOptionForTier` justo arriba: el servidor nunca confía en
+// lo que el cliente afirma, siempre re-resuelve contra el Provider
+// Registry + Credential Resolver reales antes de construir un RunContext.
+// `providerId`/`modelId` ausentes (el caso de siempre) es válido y
+// significa "sigue con el único modelo Gemini operador-financiado" —
+// cambiar de modelo NUNCA requiere BYOK conectado (decisión explícita del
+// plan aprobado). Si el cliente manda un `providerId` para el que este
+// usuario NO tiene una credencial propia conectada, esto responde con un
+// 409 explícito — nunca cae en silencio al modelo del operador con la
+// credencial equivocada. Caso encontrado en la verificación de esta fase
+// (asesor externo, no la propia verificación con Playwright — el picker
+// nunca ofrece esta combinación porque `handleListModels` solo lista
+// modelos para proveedores CONECTADOS, así que la UI no puede llegar
+// aquí): `CredentialResolver.resolve()` SÍ tiene un fallback real para
+// `"google"` (§3.2 del plan aprobado — es el único proveedor con cuenta
+// operador-financiada), así que un cliente que llame la API directo con
+// `providerId: "google"` y CERO credencial propia recibía
+// `source: "operator_fallback"` en vez del 409 — la key del operador
+// corriendo un `modelId` elegido por el cliente, saltándose la resolución
+// por YAML (que sí tiene pricing real y sí cuenta contra el circuit
+// breaker diario, `costUsd()` devuelve $0 para un modelo BYOK sin entrada
+// de pricing). Fix: solo se arma un `override` cuando la fuente es
+// REALMENTE `"user_byok"` — un `"operator_fallback"` para "google" cae al
+// mismo camino que ausencia total de `providerId`/`modelId` (gateway
+// resuelve por YAML, exactamente igual que si el cliente nunca hubiera
+// mandado nada), coherencia con lo que ya hace el default "Gemini —
+// incluido" del picker (nunca manda `providerId`).
+async function resolveByokOverride(
+  userId: string,
+  rawProviderId: unknown,
+  rawModelId: unknown
+): Promise<{ ok: true; override?: ByokOverride } | { ok: false; status: number; error: string }> {
+  if (rawProviderId === undefined && rawModelId === undefined) {
+    return { ok: true };
+  }
+  if (
+    typeof rawProviderId !== "string" ||
+    !rawProviderId.trim() ||
+    typeof rawModelId !== "string" ||
+    !rawModelId.trim()
+  ) {
+    return {
+      ok: false,
+      status: 400,
+      error: "providerId y modelId deben venir juntos, como texto."
+    };
+  }
+  const providerId = rawProviderId.trim();
+  const modelId = rawModelId.trim();
+  const registry = getProviderRegistry();
+  if (!registry.has(providerId)) {
+    return { ok: false, status: 404, error: `Proveedor "${providerId}" no reconocido.` };
+  }
+  const resolved = await getCredentialResolver().resolve(userId, providerId);
+  if (!resolved || resolved.source !== "user_byok") {
+    return {
+      ok: false,
+      status: 409,
+      error: "Conecta ese proveedor de IA en Cuenta → IA antes de usarlo aquí."
+    };
+  }
+  return {
+    ok: true,
+    override: { credentialSource: resolved.source, providerId, modelId, apiKey: resolved.apiKey }
+  };
+}
+
+function sanitizeFilenamePart(input: string): string {
+  const cleaned = input
+    .replace(/[^\p{L}\p{N} ._-]/gu, "")
+    .trim()
+    .slice(0, 80);
+  return cleaned || "CV";
+}
+
+// Shared error mapping for POST /api/cv/generate and .../regenerate
+// (docs/CV-GENERATION-PLAN.md §9.5) — both run the same pipeline
+// (generation-pipeline.ts) and can fail the same ways.
+function respondToCvGenerationError(
   res: http.ServerResponse,
+  err: unknown,
   routeLabel: string
-): boolean {
-  if (checkRateLimit(ip, SENSITIVE_RATE_LIMIT, SENSITIVE_RATE_WINDOW_MS)) return true;
-  recordSuspiciousEvent(ip, `rate-limit ${routeLabel}`);
-  res.writeHead(429, { "Content-Type": "application/json", "Retry-After": "60" });
-  res.end(JSON.stringify({ error: "Demasiadas solicitudes — intenta de nuevo en un minuto." }));
-  return false;
+): void {
+  if (err instanceof InactivePromptError) {
+    // Generic guard, not dead code: cv_draft/cv_critique pasaron su eval
+    // real de Fase 8 (2026-08-08, docs/CV-GENERATION-PLAN.md §10) y ya
+    // son `active: true` — este branch ya no dispara para ellos, pero
+    // sigue protegiendo cualquier prompt futuro que se agregue todavía
+    // inactivo (§11 — "nada se activa sin haber corrido su eval offline
+    // primero").
+    res.writeHead(503, { "Content-Type": "application/json" });
+    res.end(
+      JSON.stringify({
+        error: "La generación de CV con IA todavía no está activada en este entorno."
+      })
+    );
+    return;
+  }
+  if (err instanceof QuotaExceededError) {
+    res.writeHead(402, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: "Ya usaste toda tu cuota/créditos de este período." }));
+    return;
+  }
+  if (err instanceof ModelOptionNotAvailableError) {
+    // Fase 11 (§10 fila 11): "premium"/"compare" no corren un pipeline
+    // real todavía — rechazado ANTES de reservar cualquier cuota
+    // (generation-pipeline.ts). Nunca alcanzable desde la UI hoy (el
+    // selector los deja bloqueados), solo defensa en profundidad contra
+    // una solicitud manual.
+    res.writeHead(501, { "Content-Type": "application/json" });
+    res.end(
+      JSON.stringify({
+        error: 'Esta opción de modelo todavía no está disponible. Usa "Estándar" por ahora.'
+      })
+    );
+    return;
+  }
+  if (err instanceof GenerationConflictError) {
+    res.writeHead(409, { "Content-Type": "application/json" });
+    res.end(
+      JSON.stringify({ error: "Ya hay una generación para esta vacante en curso o completada." })
+    );
+    return;
+  }
+  if (err instanceof GenerationNotFoundError) {
+    res.writeHead(404, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: "No se encontró una generación previa para regenerar." }));
+    return;
+  }
+  if (err instanceof FactualityRejectedError) {
+    // §6.2 paso 5: cuota nunca se cobra por un fallo del validador — ya
+    // garantizado dentro del pipeline (failGeneration/revertRegeneration),
+    // este bloque solo decide el mensaje HTTP.
+    res.writeHead(422, { "Content-Type": "application/json" });
+    res.end(
+      JSON.stringify({
+        error:
+          "No se pudo generar un CV verificable para esta vacante. No se cobró tu cuota — intenta de nuevo."
+      })
+    );
+    return;
+  }
+  respondToUnexpectedError(res, err, routeLabel, "No se pudo generar el CV.");
 }
 
 // Native Node HTTP Server
@@ -263,12 +485,33 @@ const server = http.createServer(async (req, res) => {
   if (
     pathname.startsWith("/api/") &&
     pathname !== "/api/health" &&
-    !checkRateLimit(clientIp, GENERAL_API_RATE_LIMIT, GENERAL_API_RATE_WINDOW_MS)
+    !checkRateLimit(clientIp, GENERAL_API_RATE_LIMIT, GENERAL_API_RATE_WINDOW_MS, "general")
   ) {
     recordSuspiciousEvent(clientIp, `rate-limit general ${pathname}`);
     res.writeHead(429, { "Content-Type": "application/json", "Retry-After": "60" });
     res.end(JSON.stringify({ error: "Demasiadas solicitudes — intenta de nuevo en un minuto." }));
     return;
+  }
+
+  // 1d. Resume Studio + BYOK route module (docs/RESUME-STUDIO-PLAN.md, Fase
+  // 1) — reservado bajo /api/ai/ y /api/resume-studio/ para que las rutas
+  // que llegan desde Fase 5 en adelante (CRUD de credenciales, registry de
+  // proveedores/modelos) tengan un módulo propio en vez de sumarse a la
+  // cadena de 26 ramas de abajo. `RESUME_STUDIO_ENABLED` es el kill-switch
+  // de despliegue (config.ts) — apagado por defecto, así que hoy esto
+  // nunca delega a nada (el módulo en sí tampoco maneja ninguna ruta
+  // todavía, ver server/routes/resume-studio.ts).
+  if (
+    RESUME_STUDIO_ENABLED &&
+    (pathname.startsWith("/api/ai/") || pathname.startsWith("/api/resume-studio/"))
+  ) {
+    const handled = await handleResumeStudioRoute(req, res, {
+      pathname,
+      method,
+      parsedUrl,
+      clientIp
+    });
+    if (handled) return;
   }
 
   // 2. Health Check Endpoint
@@ -467,7 +710,17 @@ const server = http.createServer(async (req, res) => {
         name: session.name,
         tier: session.tier,
         subscriptionEnd: session.subscriptionEnd,
-        preferredRoles: session.preferredRoles
+        preferredRoles: session.preferredRoles,
+        // Fase 13 de docs/RESUME-STUDIO-PLAN.md — cutover: el gate pasó de
+        // "opt-in por usuario" a "kill-switch de despliegue opt-out".
+        // `RESUME_STUDIO_ENABLED` solo, ya no `&& session.resumeStudioBeta`
+        // — mismo criterio que `GET /api/cv/overlay-bootstrap` abajo, el
+        // frontend nunca vuelve a hacer ese AND. `users.resume_studio_beta`
+        // se queda en el schema (regla de migraciones aditivas, nunca se
+        // borra una columna) y sigue viajando hasta `VerifiedSession`
+        // (`verify-session.ts`) — simplemente ya nadie la lee para decidir
+        // esto; revertir el cutover es tan simple como restaurar el `&&`.
+        resumeStudioActive: RESUME_STUDIO_ENABLED
       })
     );
     return;
@@ -638,7 +891,8 @@ const server = http.createServer(async (req, res) => {
   }
 
   // 6. POST /api/checkout/start (requiere sesión autenticada) — inicia un
-  //    Wompi Web Checkout real (sandbox) para el plan Pro mensual.
+  //    Wompi Web Checkout real (sandbox) para el plan Pro o Pro Max mensual
+  //    (Fase 10, docs/CV-GENERATION-PLAN.md §10).
   if (pathname === "/api/checkout/start" && method === "POST") {
     const session = await verifySession(req);
     if (!session) {
@@ -648,8 +902,25 @@ const server = http.createServer(async (req, res) => {
     }
     if (!checkSensitiveRateLimit(clientIp, res, "POST /api/checkout/start")) return;
 
+    const body = await readJsonBodyCapped(req, CHECKOUT_START_BODY_MAX_BYTES);
+    if (!body.ok) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Cuerpo de la solicitud inválido." }));
+      return;
+    }
+    // Nunca confiar en un valor de plan arbitrario del cliente (AGENTS.md
+    // implícito en todo este archivo) — solo estos dos strings exactos
+    // resuelven a un monto real; cualquier otra cosa cae a "pro", nunca
+    // a un monto inventado por el cliente.
+    const requestedPlan = body.value?.plan;
+    const plan: "pro" | "pro_max" = requestedPlan === "pro_max" ? "pro_max" : "pro";
+
     try {
-      const checkout = await startPaymentCheckout({ userId: session.id, userEmail: session.email });
+      const checkout = await startPaymentCheckout({
+        userId: session.id,
+        userEmail: session.email,
+        plan
+      });
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify(checkout));
     } catch (e: any) {
@@ -686,6 +957,766 @@ const server = http.createServer(async (req, res) => {
       }
     });
     return;
+  }
+
+  // 7a-zero. GET /api/cv/overlay-bootstrap?jobId= (perf follow-up a Fase 11,
+  // 2026-08-09) — reemplaza los 3 fetches paralelos que CvAdjustOverlay.tsx
+  // disparaba al abrir (`/api/cv/profile` + `/api/cv/quota` +
+  // `/api/cv/generations?jobId=`). Medido en vivo contra la Postgres real
+  // de este proyecto (Supabase, no local): cada uno de esos 3 requests paga
+  // por separado el costo de `verifySession` (llamada de red a Supabase
+  // Auth + upsert en `users`) — el más lento (`/api/cv/quota`) tardaba
+  // ~2.1s solo, y el overlay esperaba a los tres antes de salir de
+  // "Cargando...". Un solo `verifySession` + las 3 lecturas en paralelo
+  // (`Promise.all`, no dependen entre sí salvo `facts`, que depende de
+  // `generation.document`) corta esa espera a una fracción. Los 3
+  // endpoints viejos NO se eliminan — `/api/cv/profile` sigue siendo el
+  // que usa el polling de "Procesando tu CV..." mientras corre la Etapa A
+  // (§9.3), un uso legítimamente distinto de este bootstrap de apertura.
+  if (pathname === "/api/cv/overlay-bootstrap" && method === "GET") {
+    const session = await verifySession(req);
+    if (!session) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "No autenticado" }));
+      return;
+    }
+    if (session.tier !== "pro" && session.tier !== "pro_max") {
+      res.writeHead(403, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Esta función requiere una suscripción Pro." }));
+      return;
+    }
+    const jobId = parsedUrl.searchParams.get("jobId") || "";
+    if (!isUuid(jobId)) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "jobId inválido o ausente." }));
+      return;
+    }
+    try {
+      const tier: CvTier = session.tier === "pro_max" ? "pro_max" : "pro";
+      const [profile, quota, generation] = await Promise.all([
+        getCvProfileStatus(session.id),
+        getQuotaStatus(session.id, tier),
+        getGenerationForJob(session.id, jobId)
+      ]);
+      const facts = generation?.document ? await getCvFacts(session.id) : null;
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(
+        JSON.stringify({
+          profile,
+          quota: { ...quota, tier },
+          generation: {
+            id: generation?.id ?? null,
+            status: generation?.status ?? null,
+            document: generation?.document ?? null,
+            // Fase 12 (docs/RESUME-STUDIO-PLAN.md) — original inmutable de la
+            // IA para el modo Comparar. `document` sigue siendo la fuente de
+            // verdad para el editor; este campo es solo lectura, nunca se
+            // vuelve a mandar en un PATCH.
+            generatedDocument: generation?.generatedDocument ?? null,
+            facts: facts ?? null,
+            templateId: generation?.templateId ?? DEFAULT_TEMPLATE_ID
+          },
+          // Fase 13 de docs/RESUME-STUDIO-PLAN.md — mismo cutover que
+          // `resumeStudioActive` en `GET /api/me` arriba: `resumeStudio.active`
+          // ahora es solo `RESUME_STUDIO_ENABLED`, ya no
+          // `&& session.resumeStudioBeta`. Las dos respuestas DEBEN
+          // acordar siempre — ver el comentario de `GET /api/me` para el
+          // razonamiento completo.
+          resumeStudio: { active: RESUME_STUDIO_ENABLED }
+        })
+      );
+    } catch (e: any) {
+      respondToUnexpectedError(
+        res,
+        e,
+        "GET /api/cv/overlay-bootstrap",
+        "No se pudo cargar el editor de CV."
+      );
+    }
+    return;
+  }
+
+  // 7a. /api/cv/profile (docs/CV-GENERATION-PLAN.md §9.3/§9.5, Fase 2a) —
+  // Etapa 0 solamente (subir → extraer texto → guardar raw_text).
+  // `facts_json` se queda NULL hasta que la Etapa A (Fase 2b) corra
+  // contra un modelo real — nunca se finge con un cliente falso solo para
+  // poblar esa columna. Gated a `tier === "pro"`: "pro_max" todavía no
+  // existe como tier real (VerifiedSession.tier es 'free' | 'pro'; Fase 10
+  // extiende esto cuando exista el cobro de Pro Max). Free tier no tiene
+  // ningún acceso, ni siquiera para subir un CV que no podría usar.
+  if (
+    pathname === "/api/cv/profile" &&
+    (method === "POST" || method === "GET" || method === "DELETE")
+  ) {
+    const session = await verifySession(req);
+    if (!session) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "No autenticado" }));
+      return;
+    }
+    if (session.tier !== "pro" && session.tier !== "pro_max") {
+      res.writeHead(403, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Esta función requiere una suscripción Pro." }));
+      return;
+    }
+
+    if (method === "GET") {
+      try {
+        const status = await getCvProfileStatus(session.id);
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify(status));
+      } catch (e: any) {
+        respondToUnexpectedError(res, e, "GET /api/cv/profile", "No se pudo consultar el CV.");
+      }
+      return;
+    }
+
+    if (!checkSensitiveRateLimit(clientIp, res, `${method} /api/cv/profile`)) return;
+
+    if (method === "DELETE") {
+      try {
+        await deleteCvProfile(session.id);
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ status: "ok" }));
+      } catch (e: any) {
+        respondToUnexpectedError(res, e, "DELETE /api/cv/profile", "No se pudo borrar el CV.");
+      }
+      return;
+    }
+
+    // POST — sube un CV nuevo; reemplaza cualquiera que existiera antes.
+    try {
+      const upload = await parseSingleFileUpload(req, { maxBytes: MAX_UPLOAD_BYTES });
+      const { text, truncated } = await extractTextFromUpload(upload.buffer, upload.mimeType);
+      await upsertCvProfileRawText(session.id, text);
+      // Fase 6 wiring (docs/CV-GENERATION-PLAN.md, nota bajo la tabla de
+      // Fase 2b): dispara la Etapa A sin bloquear esta respuesta — el
+      // cliente ve `facts_json` llenarse por separado sondeando
+      // GET /api/cv/profile (hasFacts), nunca esperando aquí a un modelo.
+      void extractAndStoreFacts(session.id, text);
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ status: "ok", truncated }));
+    } catch (e: any) {
+      if (e instanceof UploadTooLargeError) {
+        res.writeHead(413, { "Content-Type": "application/json" });
+        res.end(
+          JSON.stringify({ error: `El archivo supera el máximo de ${MAX_UPLOAD_BYTES} bytes.` })
+        );
+        return;
+      }
+      if (e instanceof UnsupportedFileTypeError || e instanceof UploadInvalidError) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: e.message }));
+        return;
+      }
+      if (e instanceof TextExtractionError) {
+        // El mensaje real del parser nunca se devuelve al cliente tal
+        // cual (podría, en principio, incluir fragmentos derivados del
+        // contenido del archivo) — respondToUnexpectedError abajo maneja
+        // el resto de errores con la misma disciplina (§8.2: nunca
+        // contenido del CV en la respuesta ni en el log).
+        res.writeHead(422, { "Content-Type": "application/json" });
+        res.end(
+          JSON.stringify({
+            error: "No se pudo leer el archivo. Verifica que sea un PDF o DOCX válido."
+          })
+        );
+        return;
+      }
+      respondToUnexpectedError(res, e, "POST /api/cv/profile", "No se pudo procesar el CV.");
+    }
+    return;
+  }
+
+  // 7a-bis. GET /api/cv/quota (Fase 6, Vista 1 §9.3: "Te quedan X de Y
+  // generaciones") — lectura pura, mismo gate 401/403 que /api/cv/profile.
+  // `getQuotaStatus` nunca reserva ni bloquea nada; la decisión real de si
+  // una generación puede proceder sigue siendo solo de
+  // `reserveGenerationQuota` (§6.2), no de este endpoint de display.
+  if (pathname === "/api/cv/quota" && method === "GET") {
+    const session = await verifySession(req);
+    if (!session) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "No autenticado" }));
+      return;
+    }
+    if (session.tier !== "pro" && session.tier !== "pro_max") {
+      res.writeHead(403, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Esta función requiere una suscripción Pro." }));
+      return;
+    }
+    try {
+      // Fase 10: mismo motivo que en generate/regenerate — un Pro Max
+      // hardcodeado a "pro" aquí vería "3 de 3" en vez de sus 14 créditos
+      // reales, aunque la reserva transaccional (que sí ya usaba el tier
+      // real) cobrara correcto — el display y la reserva deben acordar.
+      const tier: CvTier = session.tier === "pro_max" ? "pro_max" : "pro";
+      const status = await getQuotaStatus(session.id, tier);
+      // Fase 11: el cliente necesita el tier real para decidir si dice
+      // "generaciones" (Pro) o "créditos" (Pro Max) — nunca inferirlo de
+      // `limit` (frágil, coincide con el número por casualidad).
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ...status, tier }));
+    } catch (e: any) {
+      respondToUnexpectedError(res, e, "GET /api/cv/quota", "No se pudo consultar la cuota.");
+    }
+    return;
+  }
+
+  // 7a-ter. POST /api/cv/generate (docs/CV-GENERATION-PLAN.md §9.5, Fase 7,
+  // selector de modelo real desde Fase 11 §10 fila 11) — runs the real
+  // pipeline (Etapa B -> D -> validador -> E, generation-pipeline.ts)
+  // against the live gateway. `modelOption` now comes from the request
+  // body, but is ALWAYS re-validated against `session.tier`
+  // (`validateModelOptionForTier`) — the client's claim is never trusted
+  // (§6.2 paso 1). Only "standard" runs a real pipeline today
+  // (`generation-pipeline.ts`'s `AVAILABLE_MODEL_OPTIONS`) — "premium"/
+  // "compare" are rejected (501, `ModelOptionNotAvailableError`) BEFORE
+  // any quota reservation happens; the insufficient-credits scenario for
+  // those options is proven directly against `reserveGenerationQuota`
+  // (tests/validate-cv-quota.ts, Grupo 5), not through this route. Both
+  // are otherwise unreachable from the UI (selector leaves them blocked,
+  // §10 fila 11).
+  // `cv_draft`/`cv_critique` pasaron su eval de Fase 8 y ya son
+  // `active: true` (2026-08-08, §10) — esta ruta genera CVs reales ahora,
+  // contra `getDevGateway()` (aún apuntando a modelos gratuitos por
+  // decisión explícita, ver gateway-instance.ts).
+  if (pathname === "/api/cv/generate" && method === "POST") {
+    const session = await verifySession(req);
+    if (!session) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "No autenticado" }));
+      return;
+    }
+    if (session.tier !== "pro" && session.tier !== "pro_max") {
+      res.writeHead(403, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Esta función requiere una suscripción Pro." }));
+      return;
+    }
+    if (!checkSensitiveRateLimit(clientIp, res, "POST /api/cv/generate")) return;
+
+    const body = await readJsonBodyCapped(req, CV_GENERATE_BODY_MAX_BYTES);
+    if (!body.ok) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Cuerpo de la solicitud inválido." }));
+      return;
+    }
+    const {
+      jobId,
+      jobTitle,
+      jobCompany,
+      jobLocation,
+      jobDateText,
+      modelOption: rawModelOption
+    } = body.value ?? {};
+    if (
+      typeof jobId !== "string" ||
+      !isUuid(jobId) ||
+      typeof jobTitle !== "string" ||
+      !jobTitle.trim() ||
+      typeof jobCompany !== "string" ||
+      !jobCompany.trim()
+    ) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Faltan jobId/jobTitle/jobCompany válidos." }));
+      return;
+    }
+    const tier: CvTier = session.tier === "pro_max" ? "pro_max" : "pro";
+    const optionResult = validateModelOptionForTier(tier, rawModelOption);
+    if (!optionResult.ok) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: optionResult.error }));
+      return;
+    }
+
+    try {
+      const facts = await getCvFacts(session.id);
+      if (!facts) {
+        res.writeHead(409, { "Content-Type": "application/json" });
+        res.end(
+          JSON.stringify({
+            error: "Sube y procesa tu CV base antes de generar uno adaptado a esta vacante."
+          })
+        );
+        return;
+      }
+      const result = await runCvGenerationPipeline({
+        userId: session.id,
+        tier,
+        proMaxCreditCost: optionResult.proMaxCreditCost,
+        jobId,
+        jobTitle: jobTitle.trim().slice(0, 500),
+        jobCompany: jobCompany.trim().slice(0, 255),
+        modelOption: optionResult.modelOption,
+        facts,
+        jobRequirements: buildJobRequirementsText(jobLocation, jobDateText),
+        gateway: getDevGateway()
+      });
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ id: result.generationId, document: result.document, facts }));
+    } catch (e) {
+      respondToCvGenerationError(res, e, "POST /api/cv/generate");
+    }
+    return;
+  }
+
+  // 7a-quater. GET /api/cv/generations?jobId= (§9.2/§9.5) — read-only,
+  // decides Vista 1 (setup) vs Vista 2 (editor) on open. Only a
+  // `completed` row routes to the editor; a `reserved` (mid-flight) or
+  // `failed` row behaves like "no generation exists yet" on the client.
+  if (pathname === "/api/cv/generations" && method === "GET") {
+    const session = await verifySession(req);
+    if (!session) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "No autenticado" }));
+      return;
+    }
+    if (session.tier !== "pro" && session.tier !== "pro_max") {
+      res.writeHead(403, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Esta función requiere una suscripción Pro." }));
+      return;
+    }
+    const jobId = parsedUrl.searchParams.get("jobId") || "";
+    if (!isUuid(jobId)) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "jobId inválido o ausente." }));
+      return;
+    }
+    try {
+      const generation = await getGenerationForJob(session.id, jobId);
+      // The editor (§9.4) reorders/hides real skill/education/certification
+      // ids and needs their names to render — it can only ever choose among
+      // ids that already exist in CvFacts (never invent one), so shipping
+      // the vault alongside the document here is what makes that possible
+      // without a second endpoint. Fetched only when there's a document to
+      // edit; ownership is already the same session that owns the CV.
+      const facts = generation?.document ? await getCvFacts(session.id) : null;
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(
+        JSON.stringify({
+          id: generation?.id ?? null,
+          status: generation?.status ?? null,
+          document: generation?.document ?? null,
+          facts: facts ?? null
+        })
+      );
+    } catch (e: any) {
+      respondToUnexpectedError(
+        res,
+        e,
+        "GET /api/cv/generations",
+        "No se pudo consultar la generación."
+      );
+    }
+    return;
+  }
+
+  // 7a-quater-bis. POST /api/cv/generations/:id/sections/rewrite (Fase 8
+  // de docs/RESUME-STUDIO-PLAN.md) — reescribe UNA sola sección (Claim) a
+  // la vez para las acciones "Mejorar"/"Adaptar"/"Más ejecutivo" del
+  // Resume Studio. Nunca escribe en `document_json` — solo devuelve la
+  // propuesta; el cliente decide Aceptar/Descartar y, si acepta, la
+  // persiste por el mismo PATCH que ya usa "Guardar cambios" (nunca un
+  // segundo camino de escritura). Sin cargo de cuota/créditos en esta
+  // fase — `quota.ts` está scopeado por vacante (`reserveGenerationQuota`,
+  // §6.2), y esto no es una generación nueva; protegido en cambio por
+  // `checkSensitiveRateLimit` (10/60s por IP) + el circuit breaker diario
+  // ya existente del gateway (`max_daily_cloud_cost_usd`). Nota explícita
+  // para la Fase 14 (cutover de facturación): ambos son protecciones
+  // agregadas, no por-usuario — un usuario podría agotar el presupuesto
+  // diario completo del operador con acciones de sección repetidas; no se
+  // resuelve aquí a propósito, mismo criterio que Fase 2 dejó pendiente el
+  // fix de cache key para BYOK hasta su propia fase.
+  {
+    const match = pathname.match(/^\/api\/cv\/generations\/([^/]+)\/sections\/rewrite$/);
+    if (match && method === "POST") {
+      const generationId = match[1]!;
+      if (!isUuid(generationId)) {
+        res.writeHead(404, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "No se encontró esa generación." }));
+        return;
+      }
+      const session = await verifySession(req);
+      if (!session) {
+        res.writeHead(401, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "No autenticado" }));
+        return;
+      }
+      if (session.tier !== "pro" && session.tier !== "pro_max") {
+        res.writeHead(403, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Esta función requiere una suscripción Pro." }));
+        return;
+      }
+      if (!checkSensitiveRateLimit(clientIp, res, "POST /api/cv/generations/:id/sections/rewrite"))
+        return;
+
+      const body = await readJsonBodyCapped(req, CV_GENERATE_BODY_MAX_BYTES);
+      if (!body.ok) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Cuerpo de la solicitud inválido." }));
+        return;
+      }
+      const { sectionLabel, currentText, action, providerId, modelId } = (body.value ??
+        {}) as Record<string, unknown>;
+      const VALID_ACTIONS: CvSectionRewriteAction[] = ["mejorar", "adaptar", "ejecutivo"];
+      if (
+        typeof sectionLabel !== "string" ||
+        !sectionLabel.trim() ||
+        typeof currentText !== "string" ||
+        !currentText.trim() ||
+        typeof action !== "string" ||
+        !VALID_ACTIONS.includes(action as CvSectionRewriteAction)
+      ) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Faltan sectionLabel/currentText/action válidos." }));
+        return;
+      }
+
+      // Fase 11 — modelo elegido en el ModelPicker del Studio, opcional.
+      const byokResolution = await resolveByokOverride(session.id, providerId, modelId);
+      if (!byokResolution.ok) {
+        res.writeHead(byokResolution.status, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: byokResolution.error }));
+        return;
+      }
+
+      try {
+        const generation = await getGenerationById(generationId, session.id);
+        if (!generation) {
+          res.writeHead(404, { "Content-Type": "application/json" });
+          res.end(
+            JSON.stringify({ error: "No se encontró una generación completada con ese id." })
+          );
+          return;
+        }
+        const facts = await getCvFacts(session.id);
+        if (!facts) {
+          res.writeHead(409, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "Tu CV base ya no está disponible." }));
+          return;
+        }
+
+        const { output } = await getDevGateway().run(
+          cvSectionRewriteV1,
+          {
+            facts,
+            jobTitle: generation.jobTitle,
+            jobCompany: generation.jobCompany,
+            sectionLabel: sectionLabel.trim().slice(0, 200),
+            currentText: currentText.trim().slice(0, 4000),
+            action: action as CvSectionRewriteAction,
+            requestNonce: randomUUID()
+          },
+          { userId: session.id, cvGenerationId: generationId, ...(byokResolution.override ?? {}) }
+        );
+
+        // Nunca confiar solo en que el schema haya validado la FORMA de
+        // supporting_fact_ids — se re-verifica aquí que cada id citado
+        // exista de verdad en la bóveda de ESTE usuario (AGENTS.md regla
+        // 5), la misma garantía que factuality.ts aplica al documento
+        // completo, aplicada a una sola sección. Si falla, nunca se
+        // devuelve la propuesta al cliente.
+        const authorized = collectFactIds(facts);
+        const invalidIds = output.supporting_fact_ids.filter((id) => !authorized.has(id));
+        if (invalidIds.length > 0) {
+          res.writeHead(422, { "Content-Type": "application/json" });
+          res.end(
+            JSON.stringify({
+              error:
+                "La propuesta de la IA citó datos que no existen en tu perfil — no se pudo verificar. Intenta de nuevo."
+            })
+          );
+          return;
+        }
+
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ proposal: output }));
+      } catch (e) {
+        if (e instanceof InactivePromptError) {
+          res.writeHead(503, { "Content-Type": "application/json" });
+          res.end(
+            JSON.stringify({ error: "Esta función todavía no está activada en este entorno." })
+          );
+          return;
+        }
+        respondToUnexpectedError(
+          res,
+          e,
+          "POST /api/cv/generations/:id/sections/rewrite",
+          "No se pudo generar una propuesta para esta sección."
+        );
+      }
+      return;
+    }
+  }
+
+  // 7a-quater-ter. PATCH /api/cv/generations/:id/template (Fase 10 de
+  // docs/RESUME-STUDIO-PLAN.md) — cambia SOLO `template_id`. Nunca toca
+  // `document_json`, nunca llama al gateway/pipeline de IA — verificable
+  // con un grep: ni este bloque ni `updateGenerationTemplate()` importan
+  // nada de `cv/model-gateway.js`/`cv/generation-pipeline.js`/
+  // `ai-gateway/*`. DOCX se queda en un solo formato ATS sin importar la
+  // plantilla elegida (decisión §2 del plan aprobado) — por eso este
+  // endpoint no toca nada de `render-docx.ts`.
+  {
+    const match = pathname.match(/^\/api\/cv\/generations\/([^/]+)\/template$/);
+    if (match && method === "PATCH") {
+      const generationId = match[1]!;
+      if (!isUuid(generationId)) {
+        res.writeHead(404, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "No se encontró esa generación." }));
+        return;
+      }
+      const session = await verifySession(req);
+      if (!session) {
+        res.writeHead(401, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "No autenticado" }));
+        return;
+      }
+      if (session.tier !== "pro" && session.tier !== "pro_max") {
+        res.writeHead(403, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Esta función requiere una suscripción Pro." }));
+        return;
+      }
+      const body = await readJsonBodyCapped(req, 1024);
+      if (!body.ok) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Cuerpo de la solicitud inválido." }));
+        return;
+      }
+      const { templateId } = (body.value ?? {}) as Record<string, unknown>;
+      if (typeof templateId !== "string" || !CV_TEMPLATES.some((t) => t.id === templateId)) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "templateId inválido." }));
+        return;
+      }
+      try {
+        const updated = await updateGenerationTemplate(generationId, session.id, templateId);
+        if (!updated) {
+          res.writeHead(404, { "Content-Type": "application/json" });
+          res.end(
+            JSON.stringify({ error: "No se encontró una generación completada con ese id." })
+          );
+          return;
+        }
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ status: "ok", templateId }));
+      } catch (e) {
+        respondToUnexpectedError(
+          res,
+          e,
+          "PATCH /api/cv/generations/:id/template",
+          "No se pudo cambiar la plantilla."
+        );
+      }
+      return;
+    }
+  }
+
+  // 7a-quinquies. /api/cv/generations/:id[/pdf|/docx|/regenerate] (§9.5) —
+  // PATCH saves an edit (free, no LLM, no factuality re-check — §11: that
+  // validator governs what the AI generates on its own, never what the
+  // user edits into their own document afterward). GET pdf/docx render
+  // on-demand (Etapa F, free) over whatever `document_json` is right now.
+  // POST regenerate re-runs the real pipeline over an existing completed
+  // row (accumulates quota, §6.2 — see quota.ts's reserveRegenerationQuota).
+  {
+    const match = pathname.match(/^\/api\/cv\/generations\/([^/]+)(?:\/(pdf|docx|regenerate))?$/);
+    const validCombo =
+      match &&
+      ((method === "PATCH" && !match[2]) ||
+        (method === "GET" && (match[2] === "pdf" || match[2] === "docx")) ||
+        (method === "POST" && match[2] === "regenerate"));
+
+    if (validCombo) {
+      const generationId = match[1]!;
+      const action = match[2];
+
+      if (!isUuid(generationId)) {
+        res.writeHead(404, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "No se encontró esa generación." }));
+        return;
+      }
+
+      const session = await verifySession(req);
+      if (!session) {
+        res.writeHead(401, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "No autenticado" }));
+        return;
+      }
+      if (session.tier !== "pro" && session.tier !== "pro_max") {
+        res.writeHead(403, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Esta función requiere una suscripción Pro." }));
+        return;
+      }
+
+      if (method === "PATCH") {
+        if (!checkSensitiveRateLimit(clientIp, res, "PATCH /api/cv/generations/:id")) return;
+        const body = await readJsonBodyCapped(req, CV_GENERATE_BODY_MAX_BYTES);
+        if (!body.ok) {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "Cuerpo de la solicitud inválido." }));
+          return;
+        }
+        const parsed = CvDocumentSchema.safeParse(body.value);
+        if (!parsed.success) {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(
+            JSON.stringify({
+              error: "El documento no tiene la forma esperada.",
+              issues: parsed.error.issues.map((i) => i.path.join("."))
+            })
+          );
+          return;
+        }
+        try {
+          const updated = await updateGenerationDocument(generationId, session.id, parsed.data);
+          if (!updated) {
+            res.writeHead(404, { "Content-Type": "application/json" });
+            res.end(
+              JSON.stringify({ error: "No se encontró una generación completada con ese id." })
+            );
+            return;
+          }
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ status: "ok" }));
+        } catch (e: any) {
+          respondToUnexpectedError(
+            res,
+            e,
+            "PATCH /api/cv/generations/:id",
+            "No se pudo guardar el CV."
+          );
+        }
+        return;
+      }
+
+      if (method === "GET") {
+        try {
+          const generation = await getGenerationById(generationId, session.id);
+          if (!generation) {
+            res.writeHead(404, { "Content-Type": "application/json" });
+            res.end(
+              JSON.stringify({ error: "No se encontró una generación completada con ese id." })
+            );
+            return;
+          }
+          const facts = await getCvFacts(session.id);
+          if (!facts) {
+            res.writeHead(409, { "Content-Type": "application/json" });
+            res.end(
+              JSON.stringify({
+                error: "Tu CV base ya no está disponible — no se puede generar el documento."
+              })
+            );
+            return;
+          }
+          const filenameBase = `CV - ${sanitizeFilenamePart(generation.jobTitle)}`;
+          if (action === "pdf") {
+            const { renderCvToPdf } = await import("./cv/render-pdf.js");
+            const buf = await renderCvToPdf(
+              generation.document,
+              facts,
+              getTemplate(generation.templateId)
+            );
+            res.writeHead(200, {
+              "Content-Type": "application/pdf",
+              "Content-Disposition": `attachment; filename="${filenameBase}.pdf"`
+            });
+            res.end(buf);
+          } else {
+            const { renderCvToDocx } = await import("./cv/render-docx.js");
+            const buf = await renderCvToDocx(generation.document, facts);
+            res.writeHead(200, {
+              "Content-Type":
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+              "Content-Disposition": `attachment; filename="${filenameBase}.docx"`
+            });
+            res.end(buf);
+          }
+        } catch (e: any) {
+          respondToUnexpectedError(
+            res,
+            e,
+            `GET /api/cv/generations/:id/${action}`,
+            "No se pudo generar el documento."
+          );
+        }
+        return;
+      }
+
+      // POST .../regenerate
+      if (!checkSensitiveRateLimit(clientIp, res, "POST /api/cv/generations/:id/regenerate"))
+        return;
+      const body = await readJsonBodyCapped(req, CV_GENERATE_BODY_MAX_BYTES);
+      if (!body.ok) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Cuerpo de la solicitud inválido." }));
+        return;
+      }
+      const {
+        jobLocation,
+        jobDateText,
+        modelOption: rawModelOption,
+        providerId: regenProviderId,
+        modelId: regenModelId
+      } = body.value ?? {};
+      const regenTier: CvTier = session.tier === "pro_max" ? "pro_max" : "pro";
+      const regenOptionResult = validateModelOptionForTier(regenTier, rawModelOption);
+      if (!regenOptionResult.ok) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: regenOptionResult.error }));
+        return;
+      }
+      // Fase 11 — modelo elegido en el ModelPicker del Studio, opcional.
+      const regenByokResolution = await resolveByokOverride(
+        session.id,
+        regenProviderId,
+        regenModelId
+      );
+      if (!regenByokResolution.ok) {
+        res.writeHead(regenByokResolution.status, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: regenByokResolution.error }));
+        return;
+      }
+      try {
+        const existing = await getGenerationById(generationId, session.id);
+        if (!existing) {
+          res.writeHead(404, { "Content-Type": "application/json" });
+          res.end(
+            JSON.stringify({ error: "No se encontró una generación completada con ese id." })
+          );
+          return;
+        }
+        const facts = await getCvFacts(session.id);
+        if (!facts) {
+          res.writeHead(409, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "Sube y procesa tu CV base antes de regenerar." }));
+          return;
+        }
+        // Fase 11 (§10 fila 11): "Regenerar desde cero" deja elegir de
+        // nuevo la opción de modelo (§9.4) — mismo `validateModelOptionForTier`
+        // que /api/cv/generate, nunca confía en lo que mandó el cliente.
+        const result = await runCvRegenerationPipeline({
+          userId: session.id,
+          tier: regenTier,
+          proMaxCreditCost: regenOptionResult.proMaxCreditCost,
+          generationId,
+          modelOption: regenOptionResult.modelOption,
+          facts,
+          jobTitle: existing.jobTitle,
+          jobCompany: existing.jobCompany,
+          jobRequirements: buildJobRequirementsText(jobLocation, jobDateText),
+          gateway: getDevGateway(),
+          credentialOverride: regenByokResolution.override
+        });
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ id: result.generationId, document: result.document, facts }));
+      } catch (e) {
+        respondToCvGenerationError(res, e, "POST /api/cv/generations/:id/regenerate");
+      }
+      return;
+    }
   }
 
   // 7b. GET /empleos/:id/:slug — server-rendered per-job page for
@@ -790,7 +1821,9 @@ const server = http.createServer(async (req, res) => {
           const href = buildJobPath(job);
           const title = escapeHtml(job.title);
           const company = escapeHtml(job.company || "Confidencial");
-          const location = escapeHtml(job.location || getCountryConfig(job.country || category.country).name);
+          const location = escapeHtml(
+            job.location || getCountryConfig(job.country || category.country).name
+          );
           const source = escapeHtml(job.source || "");
           return `<li><a href="${href}">${title}</a> — ${company} · ${location} · ${source}</li>`;
         })
@@ -987,7 +2020,10 @@ const server = http.createServer(async (req, res) => {
     // above, so this can never say something different from the structured
     // data next to it.
     const jobDetailSnippet = `<h1>${escapeHtml(visible.title)}</h1>\n<p>${escapeHtml(buildJobDescription(visible, { companyActiveCount }))}</p>`;
-    indexHtml = indexHtml.replace('<div id="app"></div>', `<div id="app">${jobDetailSnippet}</div>`);
+    indexHtml = indexHtml.replace(
+      '<div id="app"></div>',
+      `<div id="app">${jobDetailSnippet}</div>`
+    );
 
     indexHtml = indexHtml
       .replace(/<title>[\s\S]*?<\/title>/, `<title>${escapeHtml(meta.title)}</title>`)
@@ -1035,9 +2071,13 @@ const server = http.createServer(async (req, res) => {
   // `/empresas` was "unknown to Google" — this closes that gap the same
   // way §1.1 closed it for /dashboard.
   const isVeEmpresas = pathname === "/ve/empresas" || pathname.startsWith("/ve/empresas/");
-  if ((pathname === "/empresas" || pathname.startsWith("/empresas/") || isVeEmpresas) && method === "GET") {
+  if (
+    (pathname === "/empresas" || pathname.startsWith("/empresas/") || isVeEmpresas) &&
+    method === "GET"
+  ) {
     const basePath = isVeEmpresas ? pathname.slice(3) : pathname;
-    const slug = basePath === "/empresas" ? null : basePath.slice("/empresas/".length).split("/")[0] || null;
+    const slug =
+      basePath === "/empresas" ? null : basePath.slice("/empresas/".length).split("/")[0] || null;
     const requestCountry = isVeEmpresas ? "VE" : "CO";
     const countryConfig = getCountryConfig(requestCountry);
 
@@ -1147,7 +2187,8 @@ const server = http.createServer(async (req, res) => {
     // country-scoping rules as GET /api/companies/:slug (server.ts's own
     // API handler below), so SSR never disagrees with what the client
     // fetch would have shown.
-    const companyName = (await resolveCompanyBySlug(slug)) || resolveCompanyNameFromJobs(slug, countryJobs);
+    const companyName =
+      (await resolveCompanyBySlug(slug)) || resolveCompanyNameFromJobs(slug, countryJobs);
     if (!companyName) {
       res.writeHead(404, { "Content-Type": "text/html; charset=utf-8" });
       res.end(
@@ -1515,7 +2556,10 @@ const server = http.createServer(async (req, res) => {
     // post-hydration DOM never disagree.
     const heroCountryConfig = getCountryConfig(isVe ? "VE" : "CO");
     const heroHeading = `Encuentra todas las vacantes de ${heroCountryConfig.name} en un solo lugar`;
-    indexHtml = indexHtml.replace('<div id="app"></div>', `<div id="app"><h1>${escapeHtml(heroHeading)}</h1></div>`);
+    indexHtml = indexHtml.replace(
+      '<div id="app"></div>',
+      `<div id="app"><h1>${escapeHtml(heroHeading)}</h1></div>`
+    );
 
     const selfUrl = isVe ? `${SITE_URL}/ve` : `${SITE_URL}/`;
     indexHtml = indexHtml.replace(
@@ -1553,7 +2597,10 @@ const server = http.createServer(async (req, res) => {
           /<meta\s+name=["']description["'][^>]*\/>/,
           `<meta name="description" content="${escapeHtml(veDescription)}" />`
         )
-        .replace(/<meta property="og:locale" content="[^"]*" \/>/, `<meta property="og:locale" content="es_VE" />`)
+        .replace(
+          /<meta property="og:locale" content="[^"]*" \/>/,
+          `<meta property="og:locale" content="es_VE" />`
+        )
         .replace(
           /<meta property="og:title" content="[^"]*" \/>/,
           `<meta property="og:title" content="${escapeHtml(veTitle)}" />`

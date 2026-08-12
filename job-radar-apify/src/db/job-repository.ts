@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import dotenv from "dotenv";
 import { pool } from "./client.js";
-import { Job, normalizeJobUrl } from "../sources/types.js";
+import { Job, JobDetail, normalizeJobUrl } from "../sources/types.js";
 import { getCountryConfig } from "../countries/index.js";
 import { saveRunToCache, getAllCachedRuns } from "../cache-manager.js";
 import { validateJobs } from "./job-validator.js";
@@ -11,7 +11,7 @@ import { enqueueIndexingNotifications } from "./indexing-repository.js";
 
 dotenv.config();
 
-export type SubscriptionTier = "free" | "pro";
+export type SubscriptionTier = "free" | "pro" | "pro_max";
 
 // SHA256 helper for url_hash. Delegates URL normalization to
 // normalizeJobUrl (sources/types.ts) so the DB-level hash and the
@@ -49,10 +49,16 @@ export function computeContentFingerprint(job: Job): string {
 /**
  * Saves a list of scraped jobs to Postgres with url_hash deduplication and sources array merging.
  */
+export interface InsertedJobRef {
+  id: string;
+  url: string;
+  source: string;
+}
+
 export async function saveJobs(
   jobs: Job[],
   roleOrigin: string = "General"
-): Promise<{ savedCount: number; duplicateCount: number }> {
+): Promise<{ savedCount: number; duplicateCount: number; insertedJobs: InsertedJobRef[] }> {
   let savedCount = 0;
   let duplicateCount = 0;
   // Collected across the loop, enqueued in one batched INSERT after it —
@@ -60,6 +66,10 @@ export async function saveJobs(
   // this per-iteration would triple the query count of a loop that already
   // runs over every scraped job on every 15-min tick.
   const newlyInsertedUrls: string[] = [];
+  // Fase de enriquecimiento (fuentes HTML con fetch de detalle) — solo las
+  // filas realmente nuevas de esta corrida, nunca las re-vistas. Ver
+  // ScrapeWorker.processRoleJob, que es el único consumidor.
+  const insertedJobs: InsertedJobRef[] = [];
 
   const { valid, discarded } = validateJobs(jobs);
   if (discarded.length > 0) {
@@ -110,8 +120,10 @@ export async function saveJobs(
     }
 
     const result = await pool.query(
-      `INSERT INTO jobs (url_hash, content_fingerprint, title, company, location, url, source, sources, date_text, published_at, role_origin, country)
-       VALUES ($1, $11, $2, $3, $4, $5, $6, jsonb_build_array($10::text), $7, $8, $9, $12)
+      `INSERT INTO jobs (url_hash, content_fingerprint, title, company, location, url, source, sources, date_text, published_at, role_origin, country,
+                          description, requirements, technologies, employment_type, salary_min, salary_max, salary_currency, salary_raw, applicant_count)
+       VALUES ($1, $11, $2, $3, $4, $5, $6, jsonb_build_array($10::text), $7, $8, $9, $12,
+               $13, $14::jsonb, $15::jsonb, $16, $17, $18, $19, $20, $21)
        ON CONFLICT (url_hash) DO UPDATE SET
          sources = CASE
            WHEN jobs.sources @> to_jsonb(EXCLUDED.source::text) THEN jobs.sources
@@ -125,6 +137,12 @@ export async function saveJobs(
          -- Google had accumulated on the old URL. created_at intentionally
          -- stays untouched (it answers "when was this job first posted,"
          -- not "is it still live").
+         --
+         -- Deliberately NOT setting description/requirements/technologies/
+         -- employment_type/salary_*/applicant_count here: those only get
+         -- written on first INSERT of a genuinely new row. A job re-seen on
+         -- a later tick is already in the table — it keeps whatever detail
+         -- (or lack of it) it had when first captured, never backfilled.
          last_seen_at = NOW()
        RETURNING id, (xmax = 0) AS inserted`,
       [
@@ -145,7 +163,16 @@ export async function saveJobs(
         // does NOT update country on a re-scrape of an existing URL: a
         // job's country is a fact about where it was posted, not about
         // which tick most recently re-discovered it.
-        job.country ?? null
+        job.country ?? null,
+        job.description ?? null,
+        JSON.stringify(job.requirements ?? []),
+        JSON.stringify(job.technologies ?? []),
+        job.employmentType ?? null,
+        job.salaryMin ?? null,
+        job.salaryMax ?? null,
+        job.salaryCurrency ?? null,
+        job.salaryRaw ?? null,
+        job.applicantCount ?? null
       ]
     );
 
@@ -155,6 +182,7 @@ export async function saveJobs(
       if (isPubliclyDescribable(savedJob)) {
         newlyInsertedUrls.push(buildJobUrl(savedJob));
       }
+      insertedJobs.push({ id: result.rows[0].id, url: job.url, source: job.source });
     } else {
       duplicateCount++;
     }
@@ -172,15 +200,20 @@ export async function saveJobs(
     }
   }
 
-  // Also persist run metadata to local JSON cache for GET /api/runs (history browsing, not paywall-relevant)
+  // Also persist run metadata to local JSON cache for GET /api/runs (history
+  // browsing, not paywall-relevant). `data/jobs-cache.json` is tracked in
+  // git — description/requirements can run into thousands of characters
+  // per job across hundreds of roles, so they're stripped here rather than
+  // let this file balloon; the full detail already lives in Postgres.
   try {
     const runId = `run_${Date.now()}`;
+    const lightweightJobs = (jobs as any[]).map(({ description, requirements, ...rest }) => rest);
     saveRunToCache({
       id: runId,
       name: `${roleOrigin} (${jobs.length} Vacantes)`,
       role: roleOrigin,
       timestamp: new Date().toISOString(),
-      jobs: jobs as any[]
+      jobs: lightweightJobs
     });
   } catch (e) {
     console.warn("[JobRepository] Warning: Could not save run to local cache file:", e);
@@ -189,7 +222,50 @@ export async function saveJobs(
   console.log(
     `💾 [JobRepository] Guardado en Postgres: ${savedCount} nuevas vacantes, ${duplicateCount} fusionadas en deduplicación.`
   );
-  return { savedCount, duplicateCount };
+  return { savedCount, duplicateCount, insertedJobs };
+}
+
+/**
+ * Writes detail-page enrichment (description, requirements, technologies,
+ * employment type, salary fields, applicant count) onto a specific,
+ * already-saved row. Only ever called by ScrapeWorker right after
+ * saveJobs(), scoped to that call's own insertedJobs — never on a re-scrape
+ * of an existing job, so this is the one place besides the original INSERT
+ * that can populate these columns, and it only ever targets a row this
+ * exact process just created.
+ */
+export async function updateJobDetail(id: string, detail: JobDetail): Promise<void> {
+  // COALESCE, not a blind overwrite: the search-results fetch for some
+  // sources (Torre today) already stores description/technologies/
+  // employmentType inline at INSERT time (see saveJobs()). If that same
+  // source ever gets a fetchDetail too, a field this detail fetch didn't
+  // find (passed as NULL below) must keep whatever real value is already
+  // on the row, not erase it.
+  await pool.query(
+    `UPDATE jobs SET
+       description = COALESCE($2, description),
+       requirements = COALESCE($3::jsonb, requirements),
+       technologies = COALESCE($4::jsonb, technologies),
+       employment_type = COALESCE($5, employment_type),
+       salary_min = COALESCE($6, salary_min),
+       salary_max = COALESCE($7, salary_max),
+       salary_currency = COALESCE($8, salary_currency),
+       salary_raw = COALESCE($9, salary_raw),
+       applicant_count = COALESCE($10, applicant_count)
+     WHERE id = $1`,
+    [
+      id,
+      detail.description ?? null,
+      detail.requirements ? JSON.stringify(detail.requirements) : null,
+      detail.technologies ? JSON.stringify(detail.technologies) : null,
+      detail.employmentType ?? null,
+      detail.salaryMin ?? null,
+      detail.salaryMax ?? null,
+      detail.salaryCurrency ?? null,
+      detail.salaryRaw ?? null,
+      detail.applicantCount ?? null
+    ]
+  );
 }
 
 // The active corpus is inherently bounded — `purgeOldJobs` deletes anything
@@ -223,6 +299,7 @@ export async function getJobs(
     `SELECT * FROM (
        SELECT DISTINCT ON (lower(trim(title)), lower(trim(COALESCE(company, 'confidencial'))), lower(trim(COALESCE(location, CASE country WHEN 'VE' THEN 'venezuela' ELSE 'colombia' END))))
               id, url_hash, title, company, location, url, source, sources, date_text, published_at, role_origin, country,
+              description, requirements, technologies, employment_type, salary_min, salary_max, salary_currency, salary_raw, applicant_count,
               (published_at > NOW() - INTERVAL '48 hours') AS is_locked
        FROM jobs
        WHERE is_active = TRUE
@@ -250,9 +327,54 @@ export async function getJobs(
       role_origin: row.role_origin,
       country: row.country,
       publishedAt: row.published_at,
-      isLocked: row.is_locked
+      isLocked: row.is_locked,
+      description: row.description,
+      requirements: Array.isArray(row.requirements) ? row.requirements : [],
+      technologies: Array.isArray(row.technologies) ? row.technologies : [],
+      employmentType: row.employment_type,
+      applicantCount: row.applicant_count,
+      salary: buildSalaryLabel(row)
     };
   });
+}
+
+/**
+ * Faithful, non-inventive salary label: uses the source's own free-text
+ * (`salary_raw`, e.g. Remotive's "OTE $25k - $35k") when present, since
+ * that's the exact string the source published. Falls back to formatting
+ * salary_min/max with thousands separators — deliberately no compact
+ * "9.5M" style rounding/scaling, since the unit (annual? monthly? USD?
+ * local currency?) varies per source and guessing it would misrepresent
+ * the number. Returns undefined (never a placeholder) when nothing real
+ * is available.
+ */
+function buildSalaryLabel(row: {
+  salary_raw?: string | null;
+  salary_min?: string | number | null;
+  salary_max?: string | number | null;
+  salary_currency?: string | null;
+}): string | undefined {
+  if (row.salary_raw) return row.salary_raw;
+
+  // A bare number with no currency (e.g. GetOnBoard's min_salary/max_salary,
+  // which never come with a currency in this API — confirmed live,
+  // 2026-08-11) reads as more precise than it is and could be misread as
+  // the wrong order of magnitude. Only render the min/max pair once a real
+  // currency is attached; otherwise omit rather than show a naked number.
+  if (!row.salary_currency) return undefined;
+
+  // Defensivo además del fix en job-posting-jsonld.ts (2026-08-12): filas ya
+  // guardadas antes de ese fix pueden tener un 0 literal como "no
+  // especificado" (mismo sentinel que RemoteOK) — nunca se muestra como un
+  // límite real.
+  const min = row.salary_min != null && Number(row.salary_min) > 0 ? Number(row.salary_min) : null;
+  const max = row.salary_max != null && Number(row.salary_max) > 0 ? Number(row.salary_max) : null;
+  if (min == null && max == null) return undefined;
+
+  const fmt = (n: number) => new Intl.NumberFormat("en-US").format(n);
+  const currency = `${row.salary_currency} `;
+  if (min != null && max != null && min !== max) return `${currency}${fmt(min)} – ${fmt(max)}`;
+  return `${currency}${fmt(min ?? max ?? 0)}`;
 }
 
 // getJobs()'s DISTINCT ON query has no index backing the lower(trim(...))
@@ -298,12 +420,28 @@ export async function getJobsCached(limit: number = DEFAULT_JOBS_LIMIT): Promise
  * the frontend can render a truthful (not invented) teaser.
  */
 export function maskLockedFields(jobs: any[], tier: SubscriptionTier): any[] {
-  if (!PAYWALL_ENABLED || tier === "pro") {
+  if (!PAYWALL_ENABLED || tier === "pro" || tier === "pro_max") {
     return jobs.map((job) => ({ ...job, isLocked: false }));
   }
   return jobs.map((job) => {
     if (!job.isLocked) return job;
-    return { ...job, company: null, location: null, url: null, dateText: null };
+    return {
+      ...job,
+      company: null,
+      location: null,
+      url: null,
+      dateText: null,
+      // Rich detail is part of the same freshness gate as the rest of a
+      // locked job's identifying info — a free-tier user shouldn't get the
+      // full description/requirements/salary for a <48h posting just
+      // because those fields happen to live on a different column set.
+      description: null,
+      requirements: [],
+      technologies: [],
+      employmentType: null,
+      salary: null,
+      applicantCount: null
+    };
   });
 }
 
@@ -340,15 +478,26 @@ export interface AppUser {
   subscriptionTier: SubscriptionTier;
   subscriptionEnd: string | null;
   preferredRoles: string[] | null;
+  /** Fase 1 de docs/RESUME-STUDIO-PLAN.md — flag por-usuario del beta,
+   * DEFAULT false en el schema. No confundir con RESUME_STUDIO_ENABLED (env,
+   * kill-switch de despliegue) — este campo solo importa si ese env es true. */
+  resumeStudioBeta: boolean;
 }
 
 function effectiveTier(row: {
   subscription_tier: string;
   subscription_end: string | null;
 }): SubscriptionTier {
-  if (row.subscription_tier !== "pro") return "free";
+  // Bug real encontrado por el asesor antes de escribir el resto de Fase
+  // 10 (docs/CV-GENERATION-PLAN.md §10): esta función hardcodeaba
+  // `!== "pro"` y devolvía "pro" a secas — con `subscription_tier =
+  // 'pro_max'` ya escrito en la fila, esto devolvía "free"
+  // incondicionalmente. Sin este fix, un usuario que paga $29.900 por
+  // Pro Max queda bloqueado de TODO lo que Pro Max debería desbloquear —
+  // compilaría limpio, pero rompería el producto en producción real.
+  if (row.subscription_tier !== "pro" && row.subscription_tier !== "pro_max") return "free";
   if (row.subscription_end && new Date(row.subscription_end).getTime() < Date.now()) return "free";
-  return "pro";
+  return row.subscription_tier as SubscriptionTier;
 }
 
 /**
@@ -363,7 +512,7 @@ export async function getOrCreateUser(
     `INSERT INTO users (id, email, name)
      VALUES ($1, $2, $3)
      ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email
-     RETURNING id, email, name, subscription_tier, subscription_end, preferred_roles`,
+     RETURNING id, email, name, subscription_tier, subscription_end, preferred_roles, resume_studio_beta`,
     [authUid, email, name ?? null]
   );
   const row = result.rows[0];
@@ -373,7 +522,8 @@ export async function getOrCreateUser(
     name: row.name,
     subscriptionTier: effectiveTier(row),
     subscriptionEnd: row.subscription_end,
-    preferredRoles: row.preferred_roles
+    preferredRoles: row.preferred_roles,
+    resumeStudioBeta: row.resume_studio_beta
   };
 }
 
@@ -385,7 +535,7 @@ export async function getOrCreateUser(
 export async function updateUserName(authUid: string, name: string): Promise<AppUser> {
   const result = await pool.query(
     `UPDATE users SET name = $2 WHERE id = $1
-     RETURNING id, email, name, subscription_tier, subscription_end, preferred_roles`,
+     RETURNING id, email, name, subscription_tier, subscription_end, preferred_roles, resume_studio_beta`,
     [authUid, name]
   );
   const row = result.rows[0];
@@ -395,7 +545,8 @@ export async function updateUserName(authUid: string, name: string): Promise<App
     name: row.name,
     subscriptionTier: effectiveTier(row),
     subscriptionEnd: row.subscription_end,
-    preferredRoles: row.preferred_roles
+    preferredRoles: row.preferred_roles,
+    resumeStudioBeta: row.resume_studio_beta
   };
 }
 
@@ -408,7 +559,7 @@ export async function updateUserName(authUid: string, name: string): Promise<App
 export async function updateUserPreferredRoles(authUid: string, roles: string[]): Promise<AppUser> {
   const result = await pool.query(
     `UPDATE users SET preferred_roles = $2::jsonb WHERE id = $1
-     RETURNING id, email, name, subscription_tier, subscription_end, preferred_roles`,
+     RETURNING id, email, name, subscription_tier, subscription_end, preferred_roles, resume_studio_beta`,
     [authUid, JSON.stringify(roles)]
   );
   const row = result.rows[0];
@@ -418,7 +569,8 @@ export async function updateUserPreferredRoles(authUid: string, roles: string[])
     name: row.name,
     subscriptionTier: effectiveTier(row),
     subscriptionEnd: row.subscription_end,
-    preferredRoles: row.preferred_roles
+    preferredRoles: row.preferred_roles,
+    resumeStudioBeta: row.resume_studio_beta
   };
 }
 
@@ -438,6 +590,16 @@ export async function upgradeUserToPro(authUid: string, until: Date): Promise<vo
   );
 }
 
+/** Fase 10 (docs/CV-GENERATION-PLAN.md §10) — mismo patrón que
+ * `upgradeUserToPro`, tier separado en vez de un parámetro genérico
+ * para que ningún caller pueda pasar un string arbitrario a la columna. */
+export async function upgradeUserToProMax(authUid: string, until: Date): Promise<void> {
+  await pool.query(
+    `UPDATE users SET subscription_tier = 'pro_max', subscription_end = $2 WHERE id = $1`,
+    [authUid, until.toISOString()]
+  );
+}
+
 // --- Payment transactions --------------------------------------------------------
 
 export interface PendingTransactionInput {
@@ -445,13 +607,18 @@ export interface PendingTransactionInput {
   reference: string;
   amountInCents: number;
   currency: string;
+  /** Fase 10: qué tier este pago debe otorgar al aprobarse — el webhook
+   * (`markTransactionApproved` abajo) lo devuelve para decidir entre
+   * `upgradeUserToPro`/`upgradeUserToProMax`. Default 'pro' preserva el
+   * comportamiento de todo caller anterior a Fase 10 sin tocarlos. */
+  plan?: "pro" | "pro_max";
 }
 
 export async function createPendingTransaction(input: PendingTransactionInput): Promise<void> {
   await pool.query(
-    `INSERT INTO transactions (user_id, reference, amount_in_cents, currency, status)
-     VALUES ($1, $2, $3, $4, 'pending')`,
-    [input.userId, input.reference, input.amountInCents, input.currency]
+    `INSERT INTO transactions (user_id, reference, amount_in_cents, currency, status, plan)
+     VALUES ($1, $2, $3, $4, 'pending', $5)`,
+    [input.userId, input.reference, input.amountInCents, input.currency, input.plan ?? "pro"]
   );
 }
 
@@ -461,13 +628,14 @@ export interface TransactionRecord {
   status: string;
   amountInCents: number;
   currency: string;
+  plan: string;
   createdAt: string;
 }
 
 /** Payment history for a user's own Account page — newest first. */
 export async function getTransactionsForUser(authUid: string): Promise<TransactionRecord[]> {
   const result = await pool.query(
-    `SELECT id, reference, status, amount_in_cents, currency, created_at
+    `SELECT id, reference, status, amount_in_cents, currency, plan, created_at
      FROM transactions
      WHERE user_id = $1
      ORDER BY created_at DESC
@@ -480,6 +648,7 @@ export async function getTransactionsForUser(authUid: string): Promise<Transacti
     status: row.status,
     amountInCents: Number(row.amount_in_cents),
     currency: row.currency,
+    plan: row.plan,
     createdAt: row.created_at
   }));
 }
@@ -491,14 +660,14 @@ export async function getTransactionsForUser(authUid: string): Promise<Transacti
 export async function markTransactionApproved(
   reference: string,
   wompiTransactionId: string
-): Promise<{ userId: string } | null> {
+): Promise<{ userId: string; plan: "pro" | "pro_max" } | null> {
   const result = await pool.query(
     `UPDATE transactions
      SET status = 'approved', wompi_transaction_id = $2, updated_at = NOW()
      WHERE reference = $1 AND status <> 'approved'
-     RETURNING user_id`,
+     RETURNING user_id, plan`,
     [reference, wompiTransactionId]
   );
   if (result.rows.length === 0) return null;
-  return { userId: result.rows[0].user_id };
+  return { userId: result.rows[0].user_id, plan: result.rows[0].plan };
 }

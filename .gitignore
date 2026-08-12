@@ -35,6 +35,7 @@ Thumbs.db
 
 # Local config overrides
 config/*.local.yaml
+job-radar-apify/config/*.local.yaml
 .claude/settings.local.json
 
 # LLM cache + usage ledger (may reference private data)

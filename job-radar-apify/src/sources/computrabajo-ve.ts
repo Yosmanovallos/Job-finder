@@ -1,5 +1,5 @@
-import { SourceAdapter, Job, deduplicateJobs } from './types.js';
-import { scrapeComputrabajo } from '../index.js';
+import { SourceAdapter, Job, JobDetail, deduplicateJobs } from './types.js';
+import { scrapeComputrabajo, fetchComputrabajoDetail } from '../index.js';
 import { executeWithResilience } from '../engine/resilient-fetch.js';
 import { jitterDelay } from '../engine/jitter-delay.js';
 
@@ -18,5 +18,11 @@ export const computrabajoVEAdapter: SourceAdapter = {
       allJobs.push(...results);
     }
     return deduplicateJobs(allJobs);
+  },
+  fetchDetail(url: string): Promise<Partial<JobDetail> | null> {
+    // fetchComputrabajoDetail infers CO vs VE from the URL's own host
+    // (COMPUTRABAJO_COUNTRY_CONFIG lookup in index.ts), same as the -VE
+    // suffix here is cosmetic — the real country signal is the URL itself.
+    return fetchComputrabajoDetail(url);
   }
 };

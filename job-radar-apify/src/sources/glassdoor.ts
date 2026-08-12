@@ -21,4 +21,10 @@ export const glassdoorAdapter: SourceAdapter = {
     }
     return deduplicateJobs(allJobs);
   }
+  // No fetchDetail wired here on purpose — see fetchGlassdoorDetail's
+  // comment in src/index.ts. The JSON-LD content is real and good when it
+  // works, but this source has documented history of getting 403'd under
+  // request volume (see the comment above), and a live test during this
+  // same investigation triggered a fresh 403 after just 2 extra requests.
+  // Not worth risking the search fetch that already works reliably.
 };

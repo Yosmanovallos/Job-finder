@@ -27,12 +27,23 @@ export function getClientIp(req: IncomingMessage): string {
 }
 
 interface IpState {
-  // Sliding window of request timestamps, used by checkRateLimit — pruned
-  // lazily on each check rather than via a background timer.
-  requestTimestamps: number[];
+  // Per-SCOPE sliding windows of request timestamps, used by
+  // checkRateLimit — pruned lazily on each check rather than via a
+  // background timer. Real bug found live 2026-08-08: this used to be a
+  // single shared `number[]` for every caller regardless of `scope`, so
+  // the lenient general limit (120/min, checked on every /api/* request)
+  // and the strict sensitive limit (10/min, checked only on
+  // checkout/CV-generate/etc.) were secretly the SAME counter — a normal
+  // dashboard session (a handful of ordinary GETs) exhausted the
+  // "sensitive" budget before the user ever attempted a sensitive action,
+  // so the very first checkout/CV-generate click of a session reliably
+  // 429'd. Keyed by scope now so two limiters never collide.
+  requestTimestamps: Map<string, number[]>;
   // Timestamps of "suspicious" events (401/403/429/rate-limit hits) for
   // this IP — separate window from the rate limiter's, feeds the alert and
-  // auto-block thresholds.
+  // auto-block thresholds. Deliberately still IP-wide, not per-scope: L2/L3
+  // care about how sketchy this IP looks overall, not which specific limit
+  // it tripped.
   suspiciousTimestamps: number[];
   // Set once this IP crosses BLOCK_THRESHOLD; requests are rejected
   // immediately (before touching any route) until this time passes. Never
@@ -48,7 +59,7 @@ const ipStates = new Map<string, IpState>();
 function getState(ip: string): IpState {
   let state = ipStates.get(ip);
   if (!state) {
-    state = { requestTimestamps: [], suspiciousTimestamps: [], blockedUntil: null };
+    state = { requestTimestamps: new Map(), suspiciousTimestamps: [], blockedUntil: null };
     ipStates.set(ip, state);
   }
   return state;
@@ -63,8 +74,12 @@ const STALE_AFTER_MS = 30 * 60 * 1000;
 setInterval(() => {
   const now = Date.now();
   for (const [ip, state] of ipStates) {
+    let lastRequest = 0;
+    for (const timestamps of state.requestTimestamps.values()) {
+      lastRequest = Math.max(lastRequest, timestamps[timestamps.length - 1] || 0);
+    }
     const lastActivity = Math.max(
-      state.requestTimestamps[state.requestTimestamps.length - 1] || 0,
+      lastRequest,
       state.suspiciousTimestamps[state.suspiciousTimestamps.length - 1] || 0
     );
     if (now - lastActivity > STALE_AFTER_MS && (!state.blockedUntil || state.blockedUntil < now)) {
@@ -88,14 +103,30 @@ export function isBlocked(ip: string): boolean {
  * if `limit` was already reached within `windowMs`. Callers are responsible
  * for calling recordSuspiciousEvent() on a false result — this function
  * only tracks the rate, not what should happen when it's exceeded.
+ *
+ * `scope` isolates this call's counter from any other caller using a
+ * different `scope` for the same IP (e.g. "general" vs "sensitive") — two
+ * limiters checking the same IP must never share one counter, or the
+ * stricter one gets exhausted by traffic the looser one was meant to allow
+ * (see the note on `IpState.requestTimestamps` for the real incident this
+ * fixed).
  */
-export function checkRateLimit(ip: string, limit: number, windowMs: number): boolean {
+export function checkRateLimit(
+  ip: string,
+  limit: number,
+  windowMs: number,
+  scope: string
+): boolean {
   const state = getState(ip);
   const now = Date.now();
   const cutoff = now - windowMs;
-  state.requestTimestamps = state.requestTimestamps.filter((t) => t > cutoff);
-  if (state.requestTimestamps.length >= limit) return false;
-  state.requestTimestamps.push(now);
+  const timestamps = (state.requestTimestamps.get(scope) ?? []).filter((t) => t > cutoff);
+  if (timestamps.length >= limit) {
+    state.requestTimestamps.set(scope, timestamps);
+    return false;
+  }
+  timestamps.push(now);
+  state.requestTimestamps.set(scope, timestamps);
   return true;
 }
 
@@ -113,7 +144,10 @@ const BLOCK_DURATION_MS = 15 * 60 * 1000;
 async function sendSecurityAlert(message: string): Promise<void> {
   const webhookUrl = process.env.SECURITY_ALERT_WEBHOOK_URL;
   if (!webhookUrl) {
-    console.error("[SecurityMonitor] ALERTA (sin SECURITY_ALERT_WEBHOOK_URL configurado):", message);
+    console.error(
+      "[SecurityMonitor] ALERTA (sin SECURITY_ALERT_WEBHOOK_URL configurado):",
+      message
+    );
     return;
   }
   try {

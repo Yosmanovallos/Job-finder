@@ -35,6 +35,7 @@ const AuthCallback = lazy(() => import("./sections/AuthCallback.js"));
 const Pricing = lazy(() => import("./sections/Pricing.js"));
 const Legal = lazy(() => import("./sections/Legal.js"));
 const Account = lazy(() => import("./sections/Account.js"));
+const AccountAiProviders = lazy(() => import("./sections/AccountAiProviders.js"));
 
 function Landing() {
   // "/" (Colombia, default) vs "/ve" (Venezuela) — same pattern as
@@ -123,6 +124,20 @@ function AppRoutes() {
         element={
           <RequireAuth>
             <Account />
+          </RequireAuth>
+        }
+      />
+      {/* Ruta hermana plana, no anidada bajo /cuenta vía <Outlet> — mismo
+          patrón que /empresas/:slug junto a /empresas. Fase 6 de
+          docs/RESUME-STUDIO-PLAN.md; primera superficie visible de BYOK.
+          RESUME_STUDIO_ENABLED (config.ts) sigue en false hoy, así que el
+          link de navegación en Account.tsx no se muestra todavía — llegar
+          aquí por URL directa cae en el propio guard de la página. */}
+      <Route
+        path="/cuenta/ai/providers"
+        element={
+          <RequireAuth>
+            <AccountAiProviders />
           </RequireAuth>
         }
       />

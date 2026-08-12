@@ -1,4 +1,4 @@
-import { PRO_MONTHLY_PRICE_COP, formatCOP } from "../config.js";
+import { PRO_MONTHLY_PRICE_COP, PRO_MAX_MONTHLY_PRICE_COP, formatCOP } from "../config.js";
 
 /**
  * Shared plan copy — used by both the landing page's pricing teaser
@@ -35,6 +35,28 @@ export const pricingPlans = [
     cta: "Suscribirme",
     ctaVariant: "solid" as const,
     popular: true,
+    to: "/pricing"
+  },
+  {
+    id: "pro_max",
+    name: "Pro Max",
+    price: formatCOP(PRO_MAX_MONTHLY_PRICE_COP),
+    period: "COP/mes",
+    // Deliberadamente NO menciona "Premium"/"Comparar" ni el selector de
+    // modelo estilo Cursor — esos son de Fase 11 (docs/CV-GENERATION-PLAN.md
+    // §10), no existen todavía. Listar una feature que no está construida
+    // sería inventar (AGENTS.md regla 5) y le vendería al usuario algo que
+    // no puede usar hoy. Con solo esto, Pro Max hoy es 14 créditos vs 3 de
+    // Pro al doble del precio — diferenciación real pero débil hasta que
+    // Fase 11 dé sentido al precio; anotado tal cual en el plan, no oculto.
+    features: [
+      "Todo lo del plan Pro",
+      "14 generaciones de CV adaptado por mes (vs. 3 de Pro)",
+      "Pago seguro con Wompi"
+    ],
+    cta: "Suscribirme",
+    ctaVariant: "outline" as const,
+    popular: false,
     to: "/pricing"
   }
 ];

@@ -1,0 +1,38 @@
+name: CV Retention Tick
+
+on:
+  schedule:
+    - cron: "0 7 * * *" # Daily, 07:00 UTC — retention is a 30-day grace
+      # window (docs/CV-GENERATION-PLAN.md §8.3), a daily check is more
+      # than enough granularity; unlike scrape-jobs.yml's 15 min cadence,
+      # there's no freshness pressure here.
+  workflow_dispatch:
+
+concurrency:
+  group: cv-retention-tick
+  cancel-in-progress: false
+
+jobs:
+  cv-retention-tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Dependencies
+        run: |
+          cd job-radar-apify
+          npm ci || npm install
+
+      - name: Run CV retention tick
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          cd job-radar-apify
+          npx tsx scripts/run-cv-retention-tick.ts

@@ -49,6 +49,33 @@ CREATE INDEX IF NOT EXISTS idx_jobs_country ON jobs (country);
 -- is idempotent (no-op if the column already has no default).
 ALTER TABLE jobs ALTER COLUMN location DROP DEFAULT;
 
+-- Detalle enriquecido de la vacante (docs/LINKEDIN-DESCRIPTION-PLAN.md —
+-- SUPERSEDED, ver nota al inicio de ese doc). Aditivo, todo nullable:
+-- NULL siempre significa "no capturado", nunca se sintetiza un valor.
+-- description/requirements/employment_type/applicant_count las escribe
+-- saveJobs() (job-repository.ts) SOLO en el INSERT de una fila nueva
+-- (para las fuentes que ya traen el dato en su propia respuesta — Torre/
+-- RemoteOK/Remotive/GetOnBoard) o el enriquecimiento post-insert de
+-- ScrapeWorker vía updateJobDetail() (para LinkedIn/Computrabajo/Magneto,
+-- que necesitan un fetch aparte a la página de detalle) — nunca en el
+-- UPDATE de una fila ya existente, así una vacante vieja jamás se
+-- "completa" retroactivamente con datos que no vinieron con ella
+-- originalmente.
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS description TEXT;
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS requirements JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS technologies JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS employment_type VARCHAR(50);
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS salary_min NUMERIC;
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS salary_max NUMERIC;
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS salary_currency VARCHAR(10);
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS salary_raw VARCHAR(255);
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS applicant_count INTEGER;
+-- Sin uso, a propósito (decisión 2026-08-12): reemplazadas por
+-- salary_min/max/currency/raw arriba. No se borran hasta reconciliar
+-- por completo con feat/vacantes-detalle — nullable, sin costo real.
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS salary VARCHAR(100);
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS description_fetched_at TIMESTAMPTZ;
+
 -- Índices de alto rendimiento para Paywall y Consultas Instantáneas
 CREATE INDEX IF NOT EXISTS idx_jobs_published_at ON jobs (published_at DESC);
 CREATE INDEX IF NOT EXISTS idx_jobs_url_hash ON jobs (url_hash);
@@ -90,6 +117,13 @@ CREATE TABLE IF NOT EXISTS users (
 ALTER TABLE users ADD COLUMN IF NOT EXISTS preferred_roles JSONB DEFAULT NULL;
 ALTER TABLE users ALTER COLUMN preferred_roles SET DEFAULT NULL;
 
+-- Fase 1 de docs/RESUME-STUDIO-PLAN.md — flag por-usuario para el beta del
+-- Resume Studio (Pilares A/B). DEFAULT false: nadie ve el nuevo flujo hasta
+-- que se lo habilite explícitamente por fila; el kill-switch de despliegue
+-- (RESUME_STUDIO_ENABLED, variable de entorno) apaga la feature para todos
+-- sin importar esta columna, mismo patrón que PAYWALL_ENABLED en config.ts.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS resume_studio_beta BOOLEAN NOT NULL DEFAULT false;
+
 -- 4. Tabla `social_posts`: Historial y estado de publicaciones en redes sociales
 CREATE TABLE IF NOT EXISTS social_posts (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -117,6 +151,16 @@ CREATE TABLE IF NOT EXISTS transactions (
 
 CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON transactions (user_id);
 CREATE INDEX IF NOT EXISTS idx_transactions_reference ON transactions (reference);
+
+-- Corrección aditiva (Fase 10, docs/CV-GENERATION-PLAN.md §10): la tabla
+-- se creó pensando en un único plan pagado (Pro). Con Pro Max agregando
+-- un segundo monto/tier, el webhook necesita saber CUÁL plan pagó cada
+-- transacción para subir al usuario al tier correcto (nunca "pro" a
+-- secas) — `amount_in_cents` por sí solo no basta como esa señal porque
+-- es un valor libre, no una clave. Default 'pro': toda fila creada antes
+-- de esta columna (o por el checkout viejo, sin tocar) sigue siendo
+-- correctamente un pago de Pro.
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS plan VARCHAR(20) NOT NULL DEFAULT 'pro';
 
 -- 6. Tabla `role_source_runs`: última corrida por (rol, fuente) — permite
 -- cadencia distinta por fuente en vez de por rol (search_roles.last_run_at
@@ -209,6 +253,182 @@ CREATE TABLE IF NOT EXISTS company_reputation_alias (
 
 CREATE INDEX IF NOT EXISTS idx_company_reputation_alias_raw_name ON company_reputation_alias (raw_company_name);
 
+-- 11. Tabla `cv_profiles`: la hoja de vida base de cada usuario Pro/Pro Max
+-- (docs/CV-GENERATION-PLAN.md §3.1/§9.3, Fase 0). Un solo perfil por
+-- usuario — subir un CV nuevo reemplaza (UPSERT), nunca acumula versiones
+-- viejas (`UNIQUE (user_id)`). `raw_text` es el texto ya extraído del
+-- PDF/DOCX subido, acotado a 6.000 caracteres ANTES de llegar aquí (§7,
+-- anti-abuso) — el `CHECK` es una segunda capa, no la única. `facts_json`
+-- es la bóveda de hechos estructurada (`CvFacts`, §3.1) que la Etapa A
+-- produce — nunca escrita a mano por otra ruta. Nullable: la subida
+-- (Fase 2a, Etapa 0) inserta la fila con `raw_text` y `facts_json = NULL`;
+-- la extracción real contra un modelo vivo (Fase 2b, Etapa A) rellena
+-- `facts_json` después, en un UPDATE aparte — son dos pasos con historias
+-- de verificación distintas (uno es plumbing, el otro es fidelidad de un
+-- LLM) y no tenía sentido fingir el segundo con un cliente falso solo para
+-- poder insertar la fila. El texto crudo y los hechos se borran por la
+-- política de retención (§8.3: 30 días de gracia tras vencer la
+-- suscripción sin renovar) o a solicitud explícita del usuario — ninguna
+-- de las dos cosas vive en el schema, son jobs/rutas aparte que operan
+-- sobre esta tabla.
+CREATE TABLE IF NOT EXISTS cv_profiles (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    raw_text    TEXT NOT NULL CHECK (char_length(raw_text) <= 6000),
+    facts_json  JSONB,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (user_id)
+);
+-- Corrección aditiva (Fase 2a, 2026-08-07): la tabla se creó en Fase 0 con
+-- `facts_json JSONB NOT NULL`; idempotente re-ejecutar aunque ya esté
+-- nullable.
+ALTER TABLE cv_profiles ALTER COLUMN facts_json DROP NOT NULL;
+-- Corrección aditiva (Fase 9, docs/CV-GENERATION-PLAN.md §8.3): el job de
+-- limpieza por retención pone `raw_text = NULL` 30 días después de que
+-- vence la suscripción sin renovar (ver cv-retention-repository.ts) —
+-- necesita poder ser NULL. El CHECK de longitud no se toca: en Postgres
+-- un CHECK sobre una columna NULL evalúa a NULL, no a false, así que una
+-- fila con `raw_text = NULL` sigue pasando la restricción sin cambiarla.
+ALTER TABLE cv_profiles ALTER COLUMN raw_text DROP NOT NULL;
+
+-- 12. Tabla `cv_generations`: un CV generado/editado para una vacante
+-- específica (docs/CV-GENERATION-PLAN.md §3.2/§9.5, Fase 0). `job_id` usa
+-- `ON DELETE SET NULL`, no CASCADE — `jobs` purga filas viejas
+-- (purgeOldJobs()) independientemente de si un usuario ya pagó créditos
+-- por generar un CV para esa vacante; perder esa vacante del corpus no
+-- debe borrar el CV que el usuario ya generó y puede seguir editando/
+-- descargando. `job_title`/`job_company` son una copia fija tomada al
+-- momento de generar, precisamente para que el CV siga teniendo contexto
+-- legible aun si `job_id` queda NULL después. `model_option`
+-- ('standard'|'premium'|'compare') y `credits_charged` quedan siempre
+-- poblados — la cuota de Pro Y Pro Max se verifica igual, sumando
+-- `credits_charged` (Pro cobra 1 por generación/regeneración; ver
+-- src/cv/quota.ts y la corrección de Fase 4 en §6.2 — `COUNT(*)` de filas
+-- no sirve para Pro porque `UNIQUE (user_id, job_id)` limita a una fila
+-- por vacante sin importar cuántas veces se regenere).
+-- `generated_document_json` es inmutable (lo que salió del pipeline);
+-- `document_json` es el estado actual, mutado por cada guardado del
+-- editor — Etapa F siempre renderiza este último. `UNIQUE (user_id,
+-- job_id)` — reabrir "Ajustar CV" en la misma vacante siempre resuelve a
+-- la misma fila (§9.2); los NULL de `job_id` tras una purga no chocan
+-- entre sí (comportamiento estándar de UNIQUE en Postgres). "Inmutable"
+-- arriba es sobre el pipeline normal (nunca lo pisa un guardado del
+-- editor) — el job de retención (Fase 9, §8.3, cv-retention-repository.ts)
+-- SÍ pone ambos campos en NULL 30 días después de vencer la suscripción
+-- sin renovar; el resto de la fila (metadata de auditoría/cuota ya
+-- cobrada) se conserva.
+CREATE TABLE IF NOT EXISTS cv_generations (
+    id                       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id                  UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    job_id                   UUID REFERENCES jobs(id) ON DELETE SET NULL,
+    job_title                VARCHAR(500) NOT NULL,
+    job_company              VARCHAR(255) NOT NULL,
+    status                   VARCHAR(20) NOT NULL DEFAULT 'reserved', -- 'reserved' | 'completed' | 'failed'
+    model_option             VARCHAR(20) NOT NULL,                   -- 'standard' | 'premium' | 'compare'
+    credits_charged          INTEGER NOT NULL,
+    generated_document_json  JSONB,
+    document_json            JSONB,
+    -- Fase 10 de docs/RESUME-STUDIO-PLAN.md — qué CvTemplateSpec usar al
+    -- renderizar PDF/preview (src/cv/templates/*.ts). Nunca afecta
+    -- document_json/generated_document_json ni dispara el pipeline de IA
+    -- — cambiar de plantilla es puramente de presentación. Default
+    -- explícito 'ats_classic' = el único layout que existía antes de
+    -- esta fase, así que toda fila vieja renderiza EXACTAMENTE igual que
+    -- siempre sin necesitar backfill.
+    template_id              VARCHAR(50) NOT NULL DEFAULT 'ats_classic',
+    edited_at                TIMESTAMPTZ,
+    created_at               TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at               TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (user_id, job_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_cv_generations_user_created ON cv_generations (user_id, created_at DESC);
+
+-- Fase 10 de docs/RESUME-STUDIO-PLAN.md — aditivo para despliegues donde
+-- `cv_generations` ya existía antes de esta fase (mismo patrón que
+-- `resume_studio_beta`/`preferred_roles` arriba: la definición de
+-- CREATE TABLE de arriba ya la trae para un deploy nuevo desde cero,
+-- esta línea es la que de verdad importa contra la BD real).
+ALTER TABLE cv_generations ADD COLUMN IF NOT EXISTS template_id VARCHAR(50) NOT NULL DEFAULT 'ats_classic';
+
+-- 13. Tabla `llm_response_cache`: cache por hash de cada llamada al
+-- gateway nativo de este subproyecto (docs/CV-GENERATION-PLAN.md §6.1,
+-- Fase 0/1) — puerto de `packages/models/src/gateway.ts` del proyecto
+-- raíz, pero en Postgres en vez de `var/llm-cache/*.json` porque Render
+-- free tier tiene disco efímero (se pierde en cada redeploy, y con él la
+-- cuenta de qué ya se generó). `key` es el sha256 de
+-- (prompt+version+model+system+user), igual que el gateway original.
+CREATE TABLE IF NOT EXISTS llm_response_cache (
+    key         VARCHAR(64) PRIMARY KEY,
+    output_json JSONB NOT NULL,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Fase 2 de docs/RESUME-STUDIO-PLAN.md — fix de la cache key compartida,
+-- hecho ANTES de que exista el primer proveedor BYOK, no después. `key`
+-- (arriba) ya deja de ser puramente global desde que model-gateway.ts
+-- empieza a incluir user_id/provider_id en el hash para llamadas
+-- financiadas con la key propia de un usuario (nunca para el fallback del
+-- operador, que sigue exactamente igual que hoy) — estas dos columnas son
+-- la copia consultable/limpiable de esa misma decisión, no una fuente de
+-- verdad alternativa. `user_id` con ON DELETE CASCADE es lo que hace que
+-- borrar una cuenta también borre su cache scoped (nunca queda huérfano
+-- reteniendo fragmentos de su CV/vacante indefinidamente — no hay TTL en
+-- esta tabla, ver nota de la auditoría del plan aprobado). NULL en ambas
+-- columnas = entrada compartida/global, exactamente el comportamiento
+-- actual, cero regresión.
+ALTER TABLE llm_response_cache ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES users(id) ON DELETE CASCADE;
+ALTER TABLE llm_response_cache ADD COLUMN IF NOT EXISTS provider_id VARCHAR(50);
+CREATE INDEX IF NOT EXISTS idx_llm_response_cache_user ON llm_response_cache (user_id) WHERE user_id IS NOT NULL;
+
+-- 14. Tabla `llm_usage_ledger`: costo real de cada llamada LLM del
+-- pipeline de CV (docs/CV-GENERATION-PLAN.md §6.1/§6.2, Fase 0/1) — mismo
+-- motivo que la tabla anterior, Postgres en vez de `var/llm-usage.jsonl`.
+-- Es la fuente del circuit breaker diario (`SUM(cost_usd) WHERE ts >=
+-- hoy AND cached = false`, §6.1) y del registro de costo real aunque una
+-- generación termine en `status = 'failed'` y no se cobre en créditos al
+-- usuario (§6.2 paso 5) — el gasto en dólares sí ocurrió y debe quedar
+-- visible independientemente de si se cobró o no.
+CREATE TABLE IF NOT EXISTS llm_usage_ledger (
+    id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    ts                TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    user_id           UUID REFERENCES users(id) ON DELETE CASCADE,
+    stage             VARCHAR(20) NOT NULL,   -- 'extract' | 'draft' | 'critique' | 'regenerate'
+    model             VARCHAR(100) NOT NULL,
+    input_tokens      INTEGER NOT NULL,
+    output_tokens     INTEGER NOT NULL,
+    cost_usd          NUMERIC NOT NULL,
+    cached            BOOLEAN NOT NULL DEFAULT FALSE,
+    cv_generation_id  UUID REFERENCES cv_generations(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_llm_usage_ledger_ts ON llm_usage_ledger (ts);
+
+-- 15. Tabla `user_ai_credentials`: credenciales BYOK cifradas (Fase 3 de
+-- docs/RESUME-STUDIO-PLAN.md, plan aprobado 2026-08-09 en §3.2). Inerte —
+-- nada la llama todavía; `credential-crypto.ts` (esta misma fase) trae el
+-- módulo de cifrado, `credential-resolver.ts` (Fase 5) es quien la va a
+-- leer de verdad. Es el dato más sensible que este proyecto va a guardar
+-- jamás — más que el CV crudo de `cv_profiles` — así que RLS se habilita
+-- en esta MISMA migración, nunca como follow-up (regla explícita del plan
+-- aprobado, ver la nota "defense-in-depth" más abajo sobre qué pasa si no).
+CREATE TABLE IF NOT EXISTS user_ai_credentials (
+    id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id        UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    provider_id    VARCHAR(50) NOT NULL,
+    label          VARCHAR(100),
+    last4          VARCHAR(4) NOT NULL,       -- para mostrar "····3f2a", nunca la key completa
+    ciphertext     BYTEA NOT NULL,
+    iv             BYTEA NOT NULL,            -- 12 bytes aleatorios, único por fila, nunca reusado
+    auth_tag       BYTEA NOT NULL,            -- tag de AES-256-GCM
+    key_version    INTEGER NOT NULL DEFAULT 1, -- rotación futura de BYOK_ENCRYPTION_KEY sin migración big-bang
+    validated_at   TIMESTAMPTZ,
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (user_id, provider_id)
+);
+
 -- =============================================================================
 -- ROW LEVEL SECURITY: every read/write from this app goes through the `pool`
 -- (direct `pg` connection as the `postgres` role, which has BYPASSRLS — see
@@ -232,6 +452,11 @@ ALTER TABLE source_circuit_state ENABLE ROW LEVEL SECURITY;
 ALTER TABLE indexing_queue ENABLE ROW LEVEL SECURITY;
 ALTER TABLE company_reputation ENABLE ROW LEVEL SECURITY;
 ALTER TABLE company_reputation_alias ENABLE ROW LEVEL SECURITY;
+ALTER TABLE cv_profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE cv_generations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE llm_response_cache ENABLE ROW LEVEL SECURITY;
+ALTER TABLE llm_usage_ledger ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_ai_credentials ENABLE ROW LEVEL SECURITY;
 
 -- Defense-in-depth on top of the RLS-with-zero-policies block above: Supabase
 -- grants anon/authenticated broad SELECT/INSERT/UPDATE/DELETE on every
@@ -249,5 +474,6 @@ ALTER TABLE company_reputation_alias ENABLE ROW LEVEL SECURITY;
 -- has BYPASSRLS and is unaffected by any of this.
 REVOKE ALL ON jobs, search_roles, users, social_posts, transactions,
   role_source_runs, source_circuit_state, indexing_queue, company_reputation,
-  company_reputation_alias
+  company_reputation_alias, cv_profiles, cv_generations, llm_response_cache,
+  llm_usage_ledger, user_ai_credentials
   FROM anon, authenticated;
