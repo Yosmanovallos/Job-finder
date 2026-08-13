@@ -1,4 +1,4 @@
-import { extractStructuredFromHtml, htmlEntities } from '../src/utils.js';
+import { extractStructuredFromHtml, htmlEntities } from "../src/utils.js";
 
 type Case = {
   label: string;
@@ -18,18 +18,19 @@ const cases: Case[] = [
     // Ara": ":" pegados directo a la palabra siguiente. Seguro de corregir
     // a diferencia del punto — los dos puntos nunca son parte de una
     // abreviatura real en español.
-    label: 'Dos puntos pegados a la palabra siguiente ganan espacio',
-    html: 'Lo que necesitamos de ti:Vivir actualmente. Condiciones laborales:Contrato a término indefinido.',
-    expectedDescription: 'Lo que necesitamos de ti: Vivir actualmente. Condiciones laborales: Contrato a término indefinido.',
+    label: "Dos puntos pegados a la palabra siguiente ganan espacio",
+    html: "Lo que necesitamos de ti:Vivir actualmente. Condiciones laborales:Contrato a término indefinido.",
+    expectedDescription:
+      "Lo que necesitamos de ti: Vivir actualmente. Condiciones laborales: Contrato a término indefinido.",
     expectedRequirements: [],
     exact: true
   },
   {
     // Notación de hora/proporción con dígitos no debe tocarse — el patrón
     // solo actúa sobre letras después de los dos puntos, nunca dígitos.
-    label: 'Notación de hora (dígitos tras los dos puntos) no se toca',
-    html: 'El turno empieza a las 3:00pm y la pantalla es 16:9.',
-    expectedDescription: 'El turno empieza a las 3:00pm y la pantalla es 16:9.',
+    label: "Notación de hora (dígitos tras los dos puntos) no se toca",
+    html: "El turno empieza a las 3:00pm y la pantalla es 16:9.",
+    expectedDescription: "El turno empieza a las 3:00pm y la pantalla es 16:9.",
     expectedRequirements: [],
     exact: true
   },
@@ -40,10 +41,10 @@ const cases: Case[] = [
     // directamente a la palabra anterior/siguiente, sin espacio en el HTML
     // fuente, que es la forma real en que un editor de texto enriquecido
     // (Word/CMS) suele emitir ese HTML.
-    label: 'Tags inline pegados a palabras adyacentes no concatenan sin espacio',
-    html: '<p>disponibilidad de laborar en Sabaneta- Antioquia o lugares aledaños<strong>Pasión por el servicio al cliente, excelente actitud y disposición para aprender.</strong>Capacidad para realizar múltiples tareas</p>',
+    label: "Tags inline pegados a palabras adyacentes no concatenan sin espacio",
+    html: "<p>disponibilidad de laborar en Sabaneta- Antioquia o lugares aledaños<strong>Pasión por el servicio al cliente, excelente actitud y disposición para aprender.</strong>Capacidad para realizar múltiples tareas</p>",
     expectedDescription:
-      'disponibilidad de laborar en Sabaneta- Antioquia o lugares aledaños Pasión por el servicio al cliente, excelente actitud y disposición para aprender. Capacidad para realizar múltiples tareas',
+      "disponibilidad de laborar en Sabaneta- Antioquia o lugares aledaños Pasión por el servicio al cliente, excelente actitud y disposición para aprender. Capacidad para realizar múltiples tareas",
     expectedRequirements: []
   },
   {
@@ -54,34 +55,34 @@ const cases: Case[] = [
     // el HTML crudo directo (no hay <span>/<li>/coma entre las frases, es
     // así en el dato fuente). Sin frontera de tag que detectar, la señal
     // usada es minúscula->mayúscula, segura en español.
-    label: 'Palabras clave de Magneto pegadas sin tag (bug de su propio dato fuente)',
-    html: 'Palabras clave: Asistente Administrativa y ContableAsistente ContableAuxiliar ContableAuxiliar AdministrativaContapymeNómina electrónicaBogotá',
+    label: "Palabras clave de Magneto pegadas sin tag (bug de su propio dato fuente)",
+    html: "Palabras clave: Asistente Administrativa y ContableAsistente ContableAuxiliar ContableAuxiliar AdministrativaContapymeNómina electrónicaBogotá",
     expectedDescription:
-      'Palabras clave: Asistente Administrativa y Contable Asistente Contable Auxiliar Contable Auxiliar Administrativa Contapyme Nómina electrónica Bogotá',
+      "Palabras clave: Asistente Administrativa y Contable Asistente Contable Auxiliar Contable Auxiliar Administrativa Contapyme Nómina electrónica Bogotá",
     expectedRequirements: []
   },
   {
-    label: '<p> de apertura sin cerrar (HTML mal anidado) sigue separando líneas',
-    html: '<p>Primera oración.<p>Segunda oración sin que la primera se haya cerrado.</p>',
-    expectedDescription: 'Primera oración.\nSegunda oración sin que la primera se haya cerrado.',
+    label: "<p> de apertura sin cerrar (HTML mal anidado) sigue separando líneas",
+    html: "<p>Primera oración.<p>Segunda oración sin que la primera se haya cerrado.</p>",
+    expectedDescription: "Primera oración.\nSegunda oración sin que la primera se haya cerrado.",
     expectedRequirements: []
   },
   {
-    label: '<br> sigue funcionando como salto de línea',
-    html: 'Línea uno<br>Línea dos<br/>Línea tres',
-    expectedDescription: 'Línea uno\nLínea dos\nLínea tres',
+    label: "<br> sigue funcionando como salto de línea",
+    html: "Línea uno<br>Línea dos<br/>Línea tres",
+    expectedDescription: "Línea uno\nLínea dos\nLínea tres",
     expectedRequirements: []
   },
   {
-    label: '<li> se extraen como requirements, no quedan en la descripción',
-    html: '<p>Intro del puesto.</p><ul><li>Requisito uno</li><li>Requisito dos</li></ul>',
-    expectedDescription: 'Intro del puesto.',
-    expectedRequirements: ['Requisito uno', 'Requisito dos']
+    label: "<li> se extraen como requirements, no quedan en la descripción",
+    html: "<p>Intro del puesto.</p><ul><li>Requisito uno</li><li>Requisito dos</li></ul>",
+    expectedDescription: "Intro del puesto.",
+    expectedRequirements: ["Requisito uno", "Requisito dos"]
   },
   {
-    label: 'HTML vacío no revienta',
-    html: '',
-    expectedDescription: '',
+    label: "HTML vacío no revienta",
+    html: "",
+    expectedDescription: "",
     expectedRequirements: []
   },
   {
@@ -93,10 +94,10 @@ const cases: Case[] = [
     // un muro de líneas cortas picadas. Ahora se normalizan a espacio antes
     // de cualquier otro procesamiento — el resultado debe ser UNA sola
     // línea fluida, sin `\n` de por medio.
-    label: '\\n crudos de wrap (mitad de frase) se colapsan a espacio, no a salto de línea',
-    html: 'trabajamos cada día con un\npropósito claro: democratizar el acceso a alimentos de calidad para todos los\ncolombianos.',
+    label: "\\n crudos de wrap (mitad de frase) se colapsan a espacio, no a salto de línea",
+    html: "trabajamos cada día con un\npropósito claro: democratizar el acceso a alimentos de calidad para todos los\ncolombianos.",
     expectedDescription:
-      'trabajamos cada día con un propósito claro: democratizar el acceso a alimentos de calidad para todos los colombianos.',
+      "trabajamos cada día con un propósito claro: democratizar el acceso a alimentos de calidad para todos los colombianos.",
     expectedRequirements: [],
     exact: true
   },
@@ -104,8 +105,8 @@ const cases: Case[] = [
     // Vacante real de Magneto sin NINGÚN separador entre secciones (ni tag
     // ni `\n`) — solo la lista fija de etiquetas de su plantilla. Cada una
     // debe generar un salto de línea real antes de sí misma.
-    label: 'Etiquetas de sección conocidas de Magneto generan salto de línea real',
-    html: 'Serás una pieza clave en la gestión. Responsabilidades: Realizar causaciones contables. Requerimientos: Técnico o Tecnólogo. Nivel de educación: Técnico',
+    label: "Etiquetas de sección conocidas de Magneto generan salto de línea real",
+    html: "Serás una pieza clave en la gestión. Responsabilidades: Realizar causaciones contables. Requerimientos: Técnico o Tecnólogo. Nivel de educación: Técnico",
     // Bug real corregido 2026-08-12 (verificado con dos vacantes reales de
     // Magneto — "Analista Técnico I+D" y "Desarrollador De Software AI
     // First"): "Responsabilidades:"/"Requerimientos:" quedaban mezclados
@@ -114,8 +115,8 @@ const cases: Case[] = [
     // "Nivel de educación:" no es un REQUIREMENTS_SECTION_LABELS (es
     // metadata del resumen auto-generado de Magneto), así que se queda en
     // description con su propio salto de línea, como antes.
-    expectedDescription: 'Serás una pieza clave en la gestión.\nNivel de educación: Técnico',
-    expectedRequirements: ['Realizar causaciones contables.', 'Técnico o Tecnólogo.'],
+    expectedDescription: "Serás una pieza clave en la gestión.\nNivel de educación: Técnico",
+    expectedRequirements: ["Realizar causaciones contables.", "Técnico o Tecnólogo."],
     exact: true
   },
   {
@@ -123,13 +124,13 @@ const cases: Case[] = [
     // "Requisitos:" en la MISMA línea que su contenido, sin ningún `\n`
     // entre ítems — separados por doble espacio. "Ofrecemos" (no incluido
     // aquí) cerraría la zona sin absorberse a requirements.
-    label: 'Requisitos: con ítems separados por doble espacio (sin \\n) se separan en requirements',
-    html: 'Buscamos un perfil técnico. Requisitos:  Profesional en ingeniería de sistemas.  Experiencia mínima de 3 años.  Manejo de Node.js y Python.',
-    expectedDescription: 'Buscamos un perfil técnico.',
+    label: "Requisitos: con ítems separados por doble espacio (sin \\n) se separan en requirements",
+    html: "Buscamos un perfil técnico. Requisitos:  Profesional en ingeniería de sistemas.  Experiencia mínima de 3 años.  Manejo de Node.js y Python.",
+    expectedDescription: "Buscamos un perfil técnico.",
     expectedRequirements: [
-      'Profesional en ingeniería de sistemas.',
-      'Experiencia mínima de 3 años.',
-      'Manejo de Node.js y Python.'
+      "Profesional en ingeniería de sistemas.",
+      "Experiencia mínima de 3 años.",
+      "Manejo de Node.js y Python."
     ],
     exact: true
   },
@@ -137,10 +138,10 @@ const cases: Case[] = [
     // "Ofrecemos" son beneficios del empleador, no requisitos del
     // candidato — debe cerrar la zona de requirements sin que su
     // contenido termine ahí (sería tergiversar el dato).
-    label: 'Ofrecemos cierra la zona de requirements sin absorber su contenido',
-    html: 'Perfil requerido\nProfesional en Ingeniería.\nOfrecemos\nSalario a convenir.',
-    expectedDescription: 'Ofrecemos\nSalario a convenir.',
-    expectedRequirements: ['Profesional en Ingeniería.'],
+    label: "Ofrecemos cierra la zona de requirements sin absorber su contenido",
+    html: "Perfil requerido\nProfesional en Ingeniería.\nOfrecemos\nSalario a convenir.",
+    expectedDescription: "Ofrecemos\nSalario a convenir.",
+    expectedRequirements: ["Profesional en Ingeniería."],
     exact: true
   },
   {
@@ -149,9 +150,9 @@ const cases: Case[] = [
     // propio glifo de viñeta ("•\t") en vez de \n o doble espacio — debe
     // quitarse para no duplicar el bullet real que renderiza el panel.
     label: 'Requisitos: con viñeta "•" propia de la fuente se limpia del ítem',
-    html: 'Buscamos un perfil técnico.\nRequisitos:\n•\tFormación: Ingeniero de Sistemas\n•\tExperiencia mínima de 1 año',
-    expectedDescription: 'Buscamos un perfil técnico.',
-    expectedRequirements: ['Formación: Ingeniero de Sistemas', 'Experiencia mínima de 1 año'],
+    html: "Buscamos un perfil técnico.\nRequisitos:\n•\tFormación: Ingeniero de Sistemas\n•\tExperiencia mínima de 1 año",
+    expectedDescription: "Buscamos un perfil técnico.",
+    expectedRequirements: ["Formación: Ingeniero de Sistemas", "Experiencia mínima de 1 año"],
     exact: true
   },
   {
@@ -161,11 +162,11 @@ const cases: Case[] = [
     // REQUIREMENTS_STOP_LABELS, la zona seguía abierta hasta el final y
     // esos términos del empleador (no del candidato) quedaban listados como
     // si fueran requisitos.
-    label: 'Salario/Horario/Tipo de contrato/Beneficios cierran la zona sin absorberse',
-    html: 'Buscamos auxiliar de enfermería.\nRequisitos:\nTécnico en auxiliar de enfermería\nSalario:\nA convenir\nHorario:\nLunes a sábados.\nTipo de contrato:\nIndefinido.\nBeneficios:\nPrimas extralegales.',
+    label: "Salario/Horario/Tipo de contrato/Beneficios cierran la zona sin absorberse",
+    html: "Buscamos auxiliar de enfermería.\nRequisitos:\nTécnico en auxiliar de enfermería\nSalario:\nA convenir\nHorario:\nLunes a sábados.\nTipo de contrato:\nIndefinido.\nBeneficios:\nPrimas extralegales.",
     expectedDescription:
-      'Buscamos auxiliar de enfermería.\nSalario:\nA convenir\nHorario:\nLunes a sábados.\nTipo de contrato:\nIndefinido.\nBeneficios:\nPrimas extralegales.',
-    expectedRequirements: ['Técnico en auxiliar de enfermería'],
+      "Buscamos auxiliar de enfermería.\nSalario:\nA convenir\nHorario:\nLunes a sábados.\nTipo de contrato:\nIndefinido.\nBeneficios:\nPrimas extralegales.",
+    expectedRequirements: ["Técnico en auxiliar de enfermería"],
     exact: true
   }
 ];
@@ -176,14 +177,32 @@ const entityCases: EntityCase[] = [
   {
     // Bug real 2026-08-12: faltaba este entity, así que "&nbsp;" quedaba
     // literal en descripciones scrapeadas en vez de convertirse en espacio.
-    label: '&nbsp; se decodifica a espacio',
-    input: 'Tiendas Ara!&nbsp;En Tiendas Ara',
-    expected: 'Tiendas Ara! En Tiendas Ara'
+    label: "&nbsp; se decodifica a espacio",
+    input: "Tiendas Ara!&nbsp;En Tiendas Ara",
+    expected: "Tiendas Ara! En Tiendas Ara"
+  },
+  {
+    // Bug real 2026-08-12, verificado en vivo contra el propio
+    // <title>/og:title/JSON-LD de una vacante real de Elempleo (ID
+    // 1886752131, "bogot&#228;"): entidad numérica fuera de la lista
+    // específica de arriba quedaba mostrándose literal ("&#228;") en vez de
+    // decodificarse a "ä" — decodifica fielmente lo que la fuente envía
+    // (aunque sea un typo de la fuente), nunca lo "corrige" a "á".
+    label:
+      "Entidad numérica decimal fuera de la lista específica (&#228;) se decodifica genéricamente",
+    input: "Profesional junior soporte tecnico  bogot&#228;",
+    expected: "Profesional junior soporte tecnico  bogotä"
+  },
+  {
+    label:
+      "Entidad numérica hexadecimal fuera de la lista específica (&#x2764;) se decodifica genéricamente",
+    input: "Trabajo que amamos &#x2764;",
+    expected: "Trabajo que amamos ❤"
   }
 ];
 
 function normalize(s: string): string {
-  return s.replace(/\s+/g, ' ').trim();
+  return s.replace(/\s+/g, " ").trim();
 }
 
 async function main() {
@@ -195,7 +214,9 @@ async function main() {
 
   for (const c of cases) {
     const { description, requirements } = extractStructuredFromHtml(c.html);
-    const descOk = c.exact ? description === c.expectedDescription : normalize(description) === normalize(c.expectedDescription);
+    const descOk = c.exact
+      ? description === c.expectedDescription
+      : normalize(description) === normalize(c.expectedDescription);
     const reqOk = JSON.stringify(requirements) === JSON.stringify(c.expectedRequirements);
     if (descOk && reqOk) {
       console.log(`✅ [PASSED] ${c.label}`);
@@ -230,7 +251,9 @@ async function main() {
   }
 
   console.log(`\n==================================================`);
-  console.log(`🎉 [TEST SUITE PASSED] extractStructuredFromHtml/htmlEntities verificado (${total} casos).`);
+  console.log(
+    `🎉 [TEST SUITE PASSED] extractStructuredFromHtml/htmlEntities verificado (${total} casos).`
+  );
   console.log(`==================================================\n`);
   process.exit(0);
 }
