@@ -1,45 +1,64 @@
 export function htmlEntities(str: string): string {
-  if (!str) return '';
-  return str
-    .replaceAll('&amp;', '&')
-    .replaceAll('&lt;', '<')
-    .replaceAll('&gt;', '>')
-    .replaceAll('&quot;', '"')
-    .replaceAll('&#39;', "'")
-    .replaceAll('&apos;', "'")
-    .replaceAll('&#225;', 'á')
-    .replaceAll('&#233;', 'é')
-    .replaceAll('&#237;', 'í')
-    .replaceAll('&#243;', 'ó')
-    .replaceAll('&#250;', 'ú')
-    .replaceAll('&#241;', 'ñ')
-    .replaceAll('&#193;', 'Á')
-    .replaceAll('&#201;', 'É')
-    .replaceAll('&#205;', 'Í')
-    .replaceAll('&#211;', 'Ó')
-    .replaceAll('&#218;', 'Ú')
-    .replaceAll('&#209;', 'Ñ')
-    .replaceAll('&#252;', 'ü')
-    .replaceAll('&#220;', 'Ü')
-    .replaceAll('&#231;', 'ç')
-    .replaceAll('&#199;', 'Ç')
-    .replaceAll('&#x2F;', '/')
-    .replaceAll('&#xF1;', 'ñ')
-    .replaceAll('&#xE1;', 'á')
-    .replaceAll('&#xE9;', 'é')
-    .replaceAll('&#xED;', 'í')
-    .replaceAll('&#xF3;', 'ó')
-    .replaceAll('&#xFA;', 'ú')
-    .replaceAll('&#xC1;', 'Á')
-    .replaceAll('&#xC9;', 'É')
-    .replaceAll('&#xCD;', 'Í')
-    .replaceAll('&#xD3;', 'Ó')
-    .replaceAll('&#xDA;', 'Ú')
-    .replaceAll('&#xD1;', 'Ñ')
-    // Bug real encontrado 2026-08-12 verificando datos en vivo: faltaba
-    // este entity, así que descripciones scrapeadas (ej. Magneto) mostraban
-    // "&nbsp;" literal en vez de un espacio en el texto renderizado.
-    .replaceAll('&nbsp;', ' ');
+  if (!str) return "";
+  return (
+    str
+      .replaceAll("&amp;", "&")
+      .replaceAll("&lt;", "<")
+      .replaceAll("&gt;", ">")
+      .replaceAll("&quot;", '"')
+      .replaceAll("&#39;", "'")
+      .replaceAll("&apos;", "'")
+      .replaceAll("&#225;", "á")
+      .replaceAll("&#233;", "é")
+      .replaceAll("&#237;", "í")
+      .replaceAll("&#243;", "ó")
+      .replaceAll("&#250;", "ú")
+      .replaceAll("&#241;", "ñ")
+      .replaceAll("&#193;", "Á")
+      .replaceAll("&#201;", "É")
+      .replaceAll("&#205;", "Í")
+      .replaceAll("&#211;", "Ó")
+      .replaceAll("&#218;", "Ú")
+      .replaceAll("&#209;", "Ñ")
+      .replaceAll("&#252;", "ü")
+      .replaceAll("&#220;", "Ü")
+      .replaceAll("&#231;", "ç")
+      .replaceAll("&#199;", "Ç")
+      .replaceAll("&#x2F;", "/")
+      .replaceAll("&#xF1;", "ñ")
+      .replaceAll("&#xE1;", "á")
+      .replaceAll("&#xE9;", "é")
+      .replaceAll("&#xED;", "í")
+      .replaceAll("&#xF3;", "ó")
+      .replaceAll("&#xFA;", "ú")
+      .replaceAll("&#xC1;", "Á")
+      .replaceAll("&#xC9;", "É")
+      .replaceAll("&#xCD;", "Í")
+      .replaceAll("&#xD3;", "Ó")
+      .replaceAll("&#xDA;", "Ú")
+      .replaceAll("&#xD1;", "Ñ")
+      // Bug real encontrado 2026-08-12 verificando datos en vivo: faltaba
+      // este entity, así que descripciones scrapeadas (ej. Magneto) mostraban
+      // "&nbsp;" literal en vez de un espacio en el texto renderizado.
+      .replaceAll("&nbsp;", " ")
+      // Bug real encontrado 2026-08-12, verificado en vivo contra el propio
+      // <title>/og:title/JSON-LD de una vacante real de Elempleo (ID
+      // 1886752131): traía "&#228;" ("bogot&#228;") — el título REAL de esa
+      // vacante en Elempleo dice "Ä" (typo del lado de la fuente, tecleraron
+      // diéresis en vez de tilde), confirmado en las tres representaciones de
+      // su propia página, no un artefacto nuestro. La lista de arriba solo
+      // cubre los acentos españoles más comunes; cualquier entidad numérica
+      // fuera de esa lista quedaba mostrándose literal ("&#228;") en vez de
+      // decodificarse. Un decoder genérico para CUALQUIER &#NNN;/&#xHHH;
+      // cierra toda la clase de bug de una vez, no solo este caso puntual —
+      // decodifica fielmente lo que la fuente realmente envía, incluso si es
+      // un typo de la fuente; nunca lo "corrige" a lo que probablemente quiso
+      // decir (eso sí sería inventar el dato). Corre al final, después de la
+      // lista específica de arriba, así que nunca cambia el comportamiento ya
+      // probado para esos casos — solo agrega cobertura para el resto.
+      .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
+      .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
+  );
 }
 
 /**
@@ -81,8 +100,8 @@ export function htmlEntities(str: string): string {
 // "16:9").
 function splitGluedSpanishWords(text: string): string {
   return text
-    .replace(/([a-zñáéíóúü])([A-ZÑÁÉÍÓÚÜ])/g, '$1 $2')
-    .replace(/:([A-Za-zÁÉÍÓÚÑáéíóúñ])/g, ': $1');
+    .replace(/([a-zñáéíóúü])([A-ZÑÁÉÍÓÚÜ])/g, "$1 $2")
+    .replace(/:([A-Za-zÁÉÍÓÚÑáéíóúñ])/g, ": $1");
 }
 
 // Bug real encontrado y corregido 2026-08-12, verificado leyendo el JSON-LD
@@ -118,10 +137,10 @@ function splitGluedSpanishWords(text: string): string {
 // mirar la línea siguiente.
 function collapseWrappedNewlines(text: string): string {
   return text
-    .replace(/\r\n?/g, '\n')
-    .replace(/\t+/g, ' ')
-    .replace(/,\n/g, ', ')
-    .replace(/([a-zñáéíóúü])\n(?=[a-zñáéíóúü])/g, '$1 ');
+    .replace(/\r\n?/g, "\n")
+    .replace(/\t+/g, " ")
+    .replace(/,\n/g, ", ")
+    .replace(/([a-zñáéíóúü])\n(?=[a-zñáéíóúü])/g, "$1 ");
 }
 
 // Encontrado el mismo día en otra vacante real de Magneto ("Asistente
@@ -133,15 +152,15 @@ function collapseWrappedNewlines(text: string): string {
 // dondequiera que aparezcan, es seguro porque son literales conocidos de
 // la plantilla de Magneto, no un patrón adivinado sobre texto libre.
 const KNOWN_SECTION_LABELS = [
-  'Palabras clave:',
-  'Responsabilidades:',
-  'Requerimientos:',
-  'Nivel de educación:',
-  'Sectores laborales:',
-  'Cargo:',
-  'Otras habilidades:',
-  'Habilidades técnicas:',
-  'Habilidades interpersonales:'
+  "Palabras clave:",
+  "Responsabilidades:",
+  "Requerimientos:",
+  "Nivel de educación:",
+  "Sectores laborales:",
+  "Cargo:",
+  "Otras habilidades:",
+  "Habilidades técnicas:",
+  "Habilidades interpersonales:"
 ];
 // Etiquetas reales confirmadas en vivo (2026-08-12, dos vacantes distintas de
 // Magneto — "Analista Técnico I+D" y "Desarrollador De Software AI First")
@@ -151,11 +170,11 @@ const KNOWN_SECTION_LABELS = [
 // como texto plano sin viñetas ni sección propia — la corrección de abajo
 // (`splitRequirementsSections`) lo separa a `requirements` real.
 const REQUIREMENTS_SECTION_LABELS = [
-  'Requisitos:',
-  'Requerimientos:',
-  'Responsabilidades:',
-  'Perfil requerido',
-  'Responsabilidades principales'
+  "Requisitos:",
+  "Requerimientos:",
+  "Responsabilidades:",
+  "Perfil requerido",
+  "Responsabilidades principales"
 ];
 // Etiquetas que, si aparecen DENTRO de una zona de requirements, la cierran
 // sin absorber su propio contenido — "Ofrecemos" son beneficios que ofrece
@@ -174,23 +193,23 @@ const REQUIREMENTS_SECTION_LABELS = [
 // se quedan dentro de la zona a propósito — son genuinamente lo que se le
 // pide al candidato.
 const REQUIREMENTS_STOP_LABELS = [
-  'Ofrecemos',
-  'Salario:',
-  'Horario:',
-  'Tipo de contrato:',
-  'Beneficios:',
+  "Ofrecemos",
+  "Salario:",
+  "Horario:",
+  "Tipo de contrato:",
+  "Beneficios:",
   ...KNOWN_SECTION_LABELS
 ];
 
 const SECTION_LABEL_PATTERN = new RegExp(
   `\\s*(${[...KNOWN_SECTION_LABELS, ...REQUIREMENTS_SECTION_LABELS, ...REQUIREMENTS_STOP_LABELS]
     .filter((l, i, arr) => arr.indexOf(l) === i)
-    .map((l) => l.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
-    .join('|')})`,
-  'g'
+    .map((l) => l.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .join("|")})`,
+  "g"
 );
 function insertKnownSectionBreaks(text: string): string {
-  return text.replace(SECTION_LABEL_PATTERN, '\n$1');
+  return text.replace(SECTION_LABEL_PATTERN, "\n$1");
 }
 
 /**
@@ -203,7 +222,10 @@ function insertKnownSectionBreaks(text: string): string {
  * items separated by a double space, not a real newline, on that one line)
  * has its remainder split on 2+ spaces into individual items.
  */
-function splitRequirementsSections(lines: string[]): { description: string[]; requirements: string[] } {
+function splitRequirementsSections(lines: string[]): {
+  description: string[];
+  requirements: string[];
+} {
   const description: string[] = [];
   const requirements: string[] = [];
   let inZone = false;
@@ -246,18 +268,18 @@ export function extractStructuredFromHtml(html: string): {
   description: string;
   requirements: string[];
 } {
-  if (!html) return { description: '', requirements: [] };
+  if (!html) return { description: "", requirements: [] };
   const flattened = collapseWrappedNewlines(html);
 
   const stripTags = (s: string) =>
-    splitGluedSpanishWords(htmlEntities(s.replace(/<[^>]+>/g, ' ')))
-      .replace(/\s+/g, ' ')
+    splitGluedSpanishWords(htmlEntities(s.replace(/<[^>]+>/g, " ")))
+      .replace(/\s+/g, " ")
       .trim();
 
   const requirements: string[] = [];
   const liMatches = flattened.match(/<li[^>]*>[^]*?<\/li>/gi) || [];
   for (const li of liMatches) {
-    const text = stripTags(li.replace(/^<li[^>]*>/i, '').replace(/<\/li>$/i, ''));
+    const text = stripTags(li.replace(/^<li[^>]*>/i, "").replace(/<\/li>$/i, ""));
     if (text) requirements.push(text);
   }
 
@@ -274,10 +296,10 @@ export function extractStructuredFromHtml(html: string): {
   // "tienda.Liderar" sin espacio. Ahora tanto apertura como cierre de
   // p/div/h1-6 cuentan como frontera de línea, sin depender de que el
   // tag esté bien cerrado.
-  const withoutLists = flattened.replace(/<(ul|ol)[^>]*>[^]*?<\/\1>/gi, '\n');
+  const withoutLists = flattened.replace(/<(ul|ol)[^>]*>[^]*?<\/\1>/gi, "\n");
   const withBreaks = withoutLists
-    .replace(/<\/?\s*(p|div|h[1-6])(?:\s[^>]*)?\/?>/gi, '\n')
-    .replace(/<br\s*\/?>/gi, '\n');
+    .replace(/<\/?\s*(p|div|h[1-6])(?:\s[^>]*)?\/?>/gi, "\n")
+    .replace(/<br\s*\/?>/gi, "\n");
   // Catch-all for any remaining inline tag (<strong>, <em>, <span>, ...):
   // a SPACE, not empty string — an inline tag glued directly onto an
   // adjacent word with no whitespace ("Berrio<strong>Tendrás") must not
@@ -285,7 +307,7 @@ export function extractStructuredFromHtml(html: string): {
   // introduces around normally-spaced tags is harmless: every line gets
   // collapsed via /\s+/g below.
   const withSections = insertKnownSectionBreaks(
-    splitGluedSpanishWords(htmlEntities(withBreaks.replace(/<[^>]+>/g, ' ')))
+    splitGluedSpanishWords(htmlEntities(withBreaks.replace(/<[^>]+>/g, " ")))
   );
   // Trim only — NOT the usual /\s+/g single-space collapse yet.
   // splitRequirementsSections still needs to see a real double space as the
@@ -294,21 +316,21 @@ export function extractStructuredFromHtml(html: string): {
   // Each resulting description line / requirement item gets the normal
   // whitespace collapse applied to it individually right below instead.
   const lines = withSections
-    .split('\n')
+    .split("\n")
     .map((line) => line.trim())
     .filter(Boolean);
   const split = splitRequirementsSections(lines);
-  const normalize = (s: string) => s.replace(/\s+/g, ' ').trim();
+  const normalize = (s: string) => s.replace(/\s+/g, " ").trim();
   // Bug real confirmado en vivo 2026-08-12 (Elempleo, "Profesional Junior de
   // Desarrollos BI"): sus ítems de "Requisitos:" vienen con un glifo de
   // viñeta propio ("•\tFormación: Ingeniero de Sistemas") — sin esto, el
   // bullet real del <li> que ya renderiza el panel quedaría duplicado con
   // el "•" literal del texto fuente. Solo quita el glifo + espacio inicial,
   // nunca toca el resto del contenido.
-  const stripBulletPrefix = (s: string) => s.replace(/^[•▪●‣·*-]\s*/, '');
+  const stripBulletPrefix = (s: string) => s.replace(/^[•▪●‣·*-]\s*/, "");
   requirements.push(...split.requirements.map((s) => stripBulletPrefix(normalize(s))));
 
-  return { description: split.description.map(normalize).join('\n'), requirements };
+  return { description: split.description.map(normalize).join("\n"), requirements };
 }
 
 // Known, literal employment-type markers that RemoteOK puts directly inside
