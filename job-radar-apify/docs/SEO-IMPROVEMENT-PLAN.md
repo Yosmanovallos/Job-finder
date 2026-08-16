@@ -1115,6 +1115,120 @@ nada sobre el orden de `getPendingIndexingBatch()` de todas formas, así
 que la consulta directa es la verificación más específica disponible para
 este cambio puntual.
 
+### 1.21 Incidente de egress en Supabase: 81.7GB/5GB con solo 32 MAU (2026-08-15)
+
+Motivado por el dashboard de Supabase mostrando `Services restricted` —
+egress al 1635% de la cuota Free (81,727MB/5GB) con Database Size en
+0.125GB y Monthly Active Users en 32. Esa desproporción (egress ≫≫ tamaño
+de datos y ≫≫ tráfico humano) descarta uso real de usuarios como causa.
+
+**Causa raíz confirmada leyendo el código**: `getJobs()`
+(`src/db/job-repository.ts`) hace `SELECT *` (vía `DISTINCT ON`) sobre
+toda la tabla `jobs`, incluyendo `description`/`requirements`/
+`technologies` (jsonb/texto largo, la mayor parte del peso de cada fila a
+esta escala de corpus, ~10k vacantes activas). Ese resultado se cacheaba
+(`getJobsCached`) con TTL de solo 120s, compartido por 9 rutas públicas
+**sin autenticación** — incluyendo `/sitemap-jobs.xml`, páginas de
+categoría, `/empresas` y `/dashboard` SSR — que un crawler/bot puede
+golpear indefinidamente sin ningún usuario humano de por medio. A ese TTL,
+`81,727MB ÷ ~30MB/refresh ≈ un refresh completo cada ~16 min`, 24/7 — medido
+después contra la BD real: el cuerpo completo de `getJobs()` pesa ~26MB
+(47,839 vacantes activas), así que ese estimado inicial era razonable, pero
+también implica que subir el TTL de 120s→10min por sí solo no es la
+mitigación dominante (16min ya era más lento que el TTL nuevo) — la
+reducción real viene de sacar `description`/`requirements`/`technologies`
+del `SELECT` (~26MB→~18MB, -31%, menos de lo esperado: esas tres columnas
+no son tan pesadas como el resto de la fila a esta escala) y, sobre todo,
+de dejar de traer el corpus completo solo para resolver un id (ver
+`getJobById` abajo). Proyección peor-caso con el fix aplicado (los 3
+endpoints que se quedaron en el caché completo — `/api/jobs`,
+`/api/companies/:slug`, `/dashboard` SSR — refrescando cada 10min sin
+parar): ~112GB/mes solo de esos tres + ~78GB/mes de los 5 endpoints
+livianos ≈ 190GB/mes peor caso contra la cuota Pro de 250GB. Con margen,
+pero no de sobra — si el egress vuelve a subir, el siguiente paso es
+aligerar también `/dashboard` SSR y `/api/jobs` (ver pendiente al final).
+
+**Fix** (`src/db/job-repository.ts`, `src/server.ts`):
+
+- `getJobsLight()` / `getJobsLightCached()`: mismo dedupe `DISTINCT ON`,
+  pero sin `description`/`requirements`/`technologies` en el `SELECT`.
+  Usado donde esos campos nunca se leen: `/api/companies/search`, la
+  página de categoría, `/empresas`, `/sitemap-jobs.xml`. Verificado campo
+  por campo antes del cambio (`isPubliclyDescribable`, `buildJobsSitemapXml`,
+  `searchCompanies`, `applyJobFilters` — ninguno toca esos tres campos).
+- `getJobById(id)`: fetch de una sola fila (`WHERE id = $1`, ya indexado
+  por ser `PRIMARY KEY`) para las rutas de detalle (`/empleos/:id`,
+  `/api/jobs/:id`), que antes traían el corpus completo (50k filas) solo
+  para encontrar una. El conteo de "otras vacantes de la misma empresa"
+  (SEO Fase 9, §9.3) sigue usando el corpus liviano, no uno nuevo.
+  **Corrección tras revisión** (el primer intento tenía un bug real): un
+  `id` válido puede pertenecer a una fila que el `DISTINCT ON` de
+  `getJobs()`/`getJobsLight()` ya no elige como canónica de su grupo
+  `(title, company, location)` (la misma vacante re-scrapeada, una fila
+  más vieja perdiendo contra una más nueva). `getJobById()` la trae igual
+  por ser una consulta directa por PK — servirla 200 con un `JobPosting`
+  completo en una URL que el sitemap/los links ya no generan es la misma
+  clase de soft-404/duplicado que §1.18 arregló, solo que para esta ruta.
+  Confirmado contra producción: **64 de 47,839 vacantes activas están
+  colapsadas** (no son la elección canónica de su grupo). Fix: ambas
+  rutas ahora exigen que el `id` también aparezca en el corpus liviano
+  (la misma vista deduped que arma sitemap/links) antes de aceptar el
+  cuerpo completo — si no aparece, sigue el mismo 404/410 de siempre. De
+  paso, el `ORDER BY` interno del `DISTINCT ON` (en ambas funciones) gana
+  un desempate final `id DESC` — sin él, dos cachés que refrescan en
+  momentos distintos podían elegir canónicos distintos ante un empate de
+  `published_at`, lo que habría reabierto el bug de churn de URL que
+  `last_seen_at` (§9.2) ya cerró.
+- `JOBS_CACHE_TTL_MS`: 120s → 10min.
+- `scripts/migrate-jobs-dedupe-index.ts` (nuevo, no corrido aún en
+  producción — requiere `DATABASE_URL` explícito, ver cabecera del
+  script): índice funcional que respalda el `ORDER BY`/`DISTINCT ON` de
+  `getJobs()`/`getJobsLight()`, hoy un full scan + sort de toda la tabla
+  en cada cache-miss.
+
+**Deliberadamente NO tocadas** (mismo cache completo, mismo TTL nuevo de
+10min, sin cambio de forma): `/api/jobs` y `/api/companies/:slug` —
+`JobDetailPanel.tsx` lee `.description` directo del job ya cargado
+client-side en la lista (no vuelve a pedirlo), así que aligerar esas dos
+rutas rompería el panel de detalle en el dashboard. `/dashboard` SSR
+tampoco — `window.__SSR_JOBS__` alimenta el mismo estado `jobs` que
+`JobDetailPanel` lee en el primer load anónimo (`Dashboard.tsx`), mismo
+riesgo. La página de categoría (`window.__SSR_CATEGORY__`, `jobs: page`)
+SÍ se aligeró pese a embeber un array de jobs — verificado que
+`CategoryJobRow.tsx` es un `<Link>` de navegación real a `/empleos/:id`
+(comentario propio del componente: "Unlike JobCard/JobListItem... this
+row's whole point is a real internal Link"), nunca un panel client-side
+que lea `.description` del mismo objeto, así que no aplica la misma
+trampa.
+
+Verificado: `tsc --noEmit` (sin errores nuevos vs. baseline — un único
+`implicit any` nuevo en el mapper de `getJobsLight()`, corregido con
+anotación explícita), `npm run build` en verde, `test:seo` en verde
+(incluye título/canonical/JSON-LD/conteo de sitemap contra datos reales de
+producción — el único fallo, la fila de `indexing_queue`, es preexistente
+y reproducible también sin este cambio), `test:dashboard-filters` y
+`test:companies-search` en verde. No se corrió `/seo drift compare`
+todavía — es un cambio interno de datos servidos (mismos campos, mismos
+valores, solo se dejan de sobre-pedir columnas no usadas), sin tocar
+título/meta/canonical/schema, pero corresponde correrlo contra las 6 URLs
+de baseline una vez desplegado, mismo patrón que el resto de este
+documento.
+
+**Diagnóstico adicional corrido contra producción** (solo lectura):
+0 filas de contaminación de `test:companies-search` en Postgres
+(`company ILIKE 'zztest%' OR url ILIKE '%example.com%'` → 0) — ese test
+sí escribe en el `jobs-cache.json` local (revertido manualmente tras cada
+corrida en esta sesión), pero limpia sus propias filas de Postgres.
+
+**Pendiente, no parte de este fix**: correr
+`scripts/migrate-jobs-dedupe-index.ts` contra producción (aditivo, seguro
+de re-correr) y decidir si `/api/jobs`/`/api/companies/:slug`/`/dashboard`
+SSR también deberían aligerarse — requeriría que `JobDetailPanel` pida el
+detalle completo on-demand (`getJobById`) al abrir un job en vez de
+leerlo del array ya cargado, cambio de flujo client-side fuera de alcance
+aquí. Ver la proyección de 190GB/mes peor-caso arriba: no es urgente hoy,
+pero es el siguiente paso si el egress vuelve a subir.
+
 ## 2. Primer paso al reiniciar sesión: baseline de `seo-drift`
 
 Antes de cualquier fase nueva de la tabla de abajo, capturar un baseline

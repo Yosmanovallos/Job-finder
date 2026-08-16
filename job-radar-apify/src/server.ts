@@ -6,6 +6,8 @@ import { randomUUID } from "node:crypto";
 import dotenv from "dotenv";
 import {
   getJobsCached,
+  getJobsLightCached,
+  getJobById,
   getRuns,
   maskLockedFields,
   updateUserName,
@@ -594,8 +596,15 @@ const server = http.createServer(async (req, res) => {
     const id = pathname.slice("/api/jobs/".length);
     const session = await verifySession(req);
     const tier = session?.tier || "free";
-    const jobs = await getJobsCached(50000);
-    const job = jobs.find((j: any) => j.jobId === id);
+    // Gate on membership in the deduped light corpus, not just "the row
+    // exists" — getJobById() reads straight off `jobs` by primary key, which
+    // would also return a row DISTINCT ON collapsed as a non-canonical
+    // duplicate (same (title, company, location) group, older/losing
+    // published_at). Serving that id 200 would resurrect exactly the
+    // soft-404/near-duplicate class §1.18 fixed, just for this API instead
+    // of the SSR page.
+    const [fullJob, lightJobs] = await Promise.all([getJobById(id), getJobsLightCached(50000)]);
+    const job = lightJobs.some((j: any) => j.jobId === id) ? fullJob : null;
     if (!job) {
       res.writeHead(404, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: "Vacante no encontrada" }));
@@ -620,7 +629,7 @@ const server = http.createServer(async (req, res) => {
     const limit = Math.min(Math.max(parseInt(params.get("limit") || "20", 10) || 20, 1), 100);
     const offset = Math.max(parseInt(params.get("offset") || "0", 10) || 0, 0);
     const country = params.get("country") || undefined;
-    const jobs = await getJobsCached(50000);
+    const jobs = await getJobsLightCached(50000);
     // Country-scoped same as GET /api/jobs (country = $1 OR country IS NULL)
     // — a company directory browsed from Venezuela must never surface a
     // Colombia-only employer, and vice versa (remote-hiring companies still
@@ -1724,11 +1733,11 @@ const server = http.createServer(async (req, res) => {
   // purely decorative for click-through readability; matching is always by
   // `:id` (a jobId, stable), so a stale slug from a since-edited title never
   // 404s — the canonical tag below just points at the freshly computed one.
-  // Reuses the same getJobsCached()+maskLockedFields() the public
-  // /api/jobs/:id route already uses, so a crawler (unauthenticated, same
-  // as an anonymous visitor) can never see more than a real visitor would —
-  // no separate cloaking-risk logic to keep in sync if PAYWALL_ENABLED is
-  // ever turned back on.
+  // Reuses the same getJobById()+maskLockedFields() the public /api/jobs/:id
+  // route already uses, so a crawler (unauthenticated, same as an anonymous
+  // visitor) can never see more than a real visitor would — no separate
+  // cloaking-risk logic to keep in sync if PAYWALL_ENABLED is ever turned
+  // back on.
   // Handles both the Colombia (unprefixed) and Venezuela (/ve-prefixed)
   // category pages under one branch — job DETAIL pages never get the /ve
   // prefix (see the guard just below), only the city/role "hub" pages do,
@@ -1782,7 +1791,7 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
-      const jobs = await getJobsCached(50000);
+      const jobs = await getJobsLightCached(50000);
       const visibleJobs = maskLockedFields(jobs, "free");
       // country is always set here — for "ciudad" it's the matched city's
       // own country (Bogotá/Caracas are never ambiguous), for "rol" it's
@@ -1938,8 +1947,18 @@ const server = http.createServer(async (req, res) => {
 
     const session = await verifySession(req);
     const tier = session?.tier || "free";
-    const jobs = await getJobsCached(50000);
-    const job = jobs.find((j: any) => j.jobId === id);
+    // Single-row fetch (getJobById), not the full cached corpus — this route
+    // only ever needs one job's body. The light corpus below is still loaded
+    // for the same-company count, which never needs description/requirements
+    // — AND to gate `job`: getJobById() reads straight off `jobs` by primary
+    // key, which would also return a row DISTINCT ON collapsed as a
+    // non-canonical duplicate of some other row's (title, company, location)
+    // group (older/losing published_at). Serving that id 200 with a full
+    // JobPosting would resurrect exactly the soft-404/near-duplicate class
+    // §1.18 fixed — only an id that's still the canonical pick in `jobs`
+    // (the same deduped view the sitemap/links are built from) may resolve.
+    const [fullJob, jobs] = await Promise.all([getJobById(id), getJobsLightCached(50000)]);
+    const job = jobs.some((j: any) => j.jobId === id) ? fullJob : null;
 
     if (!id || !job) {
       // SEO Fase 5 (docs/SEO-PLAN.md §5.6): distinguish "this id existed and
@@ -1965,9 +1984,9 @@ const server = http.createServer(async (req, res) => {
 
     const [visible] = maskLockedFields([job], tier);
     // Free uniqueness signal for the JobPosting description (SEO Fase 9,
-    // docs/SEO-PLAN.md §9.3): `jobs` is the same up-to-50,000-row list
-    // already loaded above for the id lookup, so counting same-company rows
-    // is an in-memory filter, not a new Postgres query.
+    // docs/SEO-PLAN.md §9.3): `jobs` is the light corpus already loaded above
+    // (getJobsLightCached), so counting same-company rows is an in-memory
+    // filter over cached data, not a new Postgres query.
     // Never for "Confidencial"/"Empresa confidencial" (COMPANY_SEARCH_EXCLUDED,
     // §78 above): those are undisclosed-employer placeholders shared by
     // thousands of unrelated postings, not one company — counting them would
@@ -2081,7 +2100,7 @@ const server = http.createServer(async (req, res) => {
     const requestCountry = isVeEmpresas ? "VE" : "CO";
     const countryConfig = getCountryConfig(requestCountry);
 
-    const jobs = await getJobsCached(50000);
+    const jobs = await getJobsLightCached(50000);
     // Always the public (tier: "free") view, same reasoning as the
     // category branch: this is what an anonymous crawler/visitor sees,
     // never session-specific content.
@@ -2510,7 +2529,7 @@ const server = http.createServer(async (req, res) => {
     // crawler — a sitemap has no session to resolve a real tier from
     // anyway, and it must never list a page (see isPubliclyDescribable
     // inside buildJobsSitemapXml) it wouldn't also show that visitor.
-    const jobs = await getJobsCached(50000);
+    const jobs = await getJobsLightCached(50000);
     const visibleJobs = maskLockedFields(jobs, "free");
     const xml = buildJobsSitemapXml(visibleJobs);
     res.writeHead(200, { "Content-Type": "application/xml; charset=utf-8" });

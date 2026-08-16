@@ -303,7 +303,7 @@ export async function getJobs(
               (published_at > NOW() - INTERVAL '48 hours') AS is_locked
        FROM jobs
        WHERE is_active = TRUE
-       ORDER BY lower(trim(title)), lower(trim(COALESCE(company, 'confidencial'))), lower(trim(COALESCE(location, CASE country WHEN 'VE' THEN 'venezuela' ELSE 'colombia' END))), published_at DESC
+       ORDER BY lower(trim(title)), lower(trim(COALESCE(company, 'confidencial'))), lower(trim(COALESCE(location, CASE country WHEN 'VE' THEN 'venezuela' ELSE 'colombia' END))), published_at DESC, id DESC
      ) deduped
      ORDER BY published_at DESC, id DESC
      LIMIT $1 OFFSET $2`,
@@ -336,6 +336,113 @@ export async function getJobs(
       salary: buildSalaryLabel(row)
     };
   });
+}
+
+// Same DISTINCT ON dedupe as getJobs(), but omits description/requirements/
+// technologies from the SELECT list. Those three columns (jsonb + long text)
+// are most of getJobs()'s row weight at this corpus size, yet most callers
+// (sitemap, category hub pages, /empresas, /dashboard SSR, company search)
+// only ever read title/company/location/url/salary — never the job body.
+// Egress incident 2026-08-15: those callers' shared cache (getJobsCached)
+// was refetching the full heavy corpus every 120s regardless, and public
+// bot/crawler traffic (not the 32 real MAU) drove that into 81GB/5GB quota
+// exceeded. Callers that DO need the body for one specific job (the
+// /empleos/:id and /api/jobs/:id detail routes) use getJobById() instead of
+// pulling every row's description just to find one.
+export async function getJobsLight(
+  limit: number = DEFAULT_JOBS_LIMIT,
+  offset: number = 0
+): Promise<any[]> {
+  const result = await pool.query(
+    `SELECT * FROM (
+       SELECT DISTINCT ON (lower(trim(title)), lower(trim(COALESCE(company, 'confidencial'))), lower(trim(COALESCE(location, CASE country WHEN 'VE' THEN 'venezuela' ELSE 'colombia' END))))
+              id, url_hash, title, company, location, url, source, sources, date_text, published_at, role_origin, country,
+              employment_type, salary_min, salary_max, salary_currency, salary_raw, applicant_count,
+              (published_at > NOW() - INTERVAL '48 hours') AS is_locked
+       FROM jobs
+       WHERE is_active = TRUE
+       ORDER BY lower(trim(title)), lower(trim(COALESCE(company, 'confidencial'))), lower(trim(COALESCE(location, CASE country WHEN 'VE' THEN 'venezuela' ELSE 'colombia' END))), published_at DESC, id DESC
+     ) deduped
+     ORDER BY published_at DESC, id DESC
+     LIMIT $1 OFFSET $2`,
+    [limit, offset]
+  );
+
+  return result.rows.map((row: any) => {
+    const sources: string[] = Array.isArray(row.sources) ? row.sources : [];
+    const alsoIn = sources.filter((s) => s !== row.source);
+
+    return {
+      jobId: row.id,
+      title: row.title,
+      company: row.company,
+      location: row.location,
+      url: row.url,
+      dateText: row.date_text,
+      source: row.source,
+      sources,
+      alsoIn,
+      role_origin: row.role_origin,
+      country: row.country,
+      publishedAt: row.published_at,
+      isLocked: row.is_locked,
+      description: null,
+      requirements: [] as string[],
+      technologies: [] as string[],
+      employmentType: row.employment_type,
+      applicantCount: row.applicant_count,
+      salary: buildSalaryLabel(row)
+    };
+  });
+}
+
+/**
+ * Single-row fetch for the job-detail routes (/empleos/:id, /api/jobs/:id):
+ * these need the full body (description/requirements/technologies) for
+ * exactly one job, never the whole corpus. `id` always comes from a link
+ * this app itself generated (sitemap/list/category page), which only ever
+ * points at the row DISTINCT ON already picked as canonical for its
+ * (title, company, location) group — so a plain `WHERE id = $1` is the same
+ * row getJobs()'s dedupe would have returned, without re-deduping 10k rows
+ * to find it.
+ */
+export async function getJobById(id: string): Promise<any | null> {
+  const result = await pool.query(
+    `SELECT id, url_hash, title, company, location, url, source, sources, date_text, published_at, role_origin, country,
+            description, requirements, technologies, employment_type, salary_min, salary_max, salary_currency, salary_raw, applicant_count,
+            (published_at > NOW() - INTERVAL '48 hours') AS is_locked
+     FROM jobs
+     WHERE id = $1 AND is_active = TRUE
+     LIMIT 1`,
+    [id]
+  );
+  if (result.rows.length === 0) return null;
+
+  const row = result.rows[0];
+  const sources: string[] = Array.isArray(row.sources) ? row.sources : [];
+  const alsoIn = sources.filter((s) => s !== row.source);
+
+  return {
+    jobId: row.id,
+    title: row.title,
+    company: row.company,
+    location: row.location,
+    url: row.url,
+    dateText: row.date_text,
+    source: row.source,
+    sources,
+    alsoIn,
+    role_origin: row.role_origin,
+    country: row.country,
+    publishedAt: row.published_at,
+    isLocked: row.is_locked,
+    description: row.description,
+    requirements: Array.isArray(row.requirements) ? row.requirements : [],
+    technologies: Array.isArray(row.technologies) ? row.technologies : [],
+    employmentType: row.employment_type,
+    applicantCount: row.applicant_count,
+    salary: buildSalaryLabel(row)
+  };
 }
 
 /**
@@ -390,10 +497,13 @@ function buildSalaryLabel(row: {
 // is the immediate, zero-schema-risk mitigation.
 let jobsCache: { data: any[]; expiresAt: number } | null = null;
 let jobsCachePending: Promise<any[]> | null = null;
-// Scraping runs on an hours-long per-role cadence, so a couple of minutes of
-// staleness here is invisible in practice — chosen to make the still-slow
-// cold query (see below) rare rather than just occasional.
-const JOBS_CACHE_TTL_MS = 120_000;
+// Scraping runs on an hours-long per-role cadence, so several minutes of
+// staleness here is invisible in practice. Raised from 120s to 10min after
+// the 2026-08-15 egress incident (see getJobsLight()'s comment): at 120s,
+// public bot/crawler traffic alone was enough to refetch this heavy query
+// every ~16min around the clock and blow a 5GB/month quota. 10min still
+// means the corpus is never more than one scrape-cycle-fraction stale.
+const JOBS_CACHE_TTL_MS = 10 * 60_000;
 
 export async function getJobsCached(limit: number = DEFAULT_JOBS_LIMIT): Promise<any[]> {
   const now = Date.now();
@@ -411,6 +521,27 @@ export async function getJobsCached(limit: number = DEFAULT_JOBS_LIMIT): Promise
       throw err;
     });
   return jobsCachePending;
+}
+
+let jobsLightCache: { data: any[]; expiresAt: number } | null = null;
+let jobsLightCachePending: Promise<any[]> | null = null;
+
+export async function getJobsLightCached(limit: number = DEFAULT_JOBS_LIMIT): Promise<any[]> {
+  const now = Date.now();
+  if (jobsLightCache && jobsLightCache.expiresAt > now) return jobsLightCache.data;
+  if (jobsLightCachePending) return jobsLightCachePending;
+
+  jobsLightCachePending = getJobsLight(limit)
+    .then((data) => {
+      jobsLightCache = { data, expiresAt: Date.now() + JOBS_CACHE_TTL_MS };
+      jobsLightCachePending = null;
+      return data;
+    })
+    .catch((err) => {
+      jobsLightCachePending = null;
+      throw err;
+    });
+  return jobsLightCachePending;
 }
 
 /**
