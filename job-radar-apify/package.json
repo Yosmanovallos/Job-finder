@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "type": "module",
   "engines": {
-    "node": ">=20"
+    "node": "24.18.0"
   },
   "scripts": {
     "build": "vite build --outDir public",
@@ -20,6 +20,7 @@
     "test:password-reset": "tsx tests/validate-password-reset.ts",
     "test:payment-flow": "tsx tests/validate-payment-flow.ts",
     "test:dashboard-filters": "tsx tests/validate-dashboard-filters.ts",
+    "test:job-pagination": "tsx tests/validate-job-pagination.ts",
     "test:role-matching": "tsx tests/validate-role-matching.ts",
     "test:extract-technologies": "tsx tests/validate-extract-technologies.ts",
     "test:utils": "tsx tests/validate-utils.ts",

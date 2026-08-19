@@ -67,6 +67,9 @@ export default function Dashboard() {
   const [appliedJobIds, setAppliedJobIds] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadMoreError, setLoadMoreError] = useState(false);
+  const [retryNonce, setRetryNonce] = useState(0);
   const [checkoutBanner, setCheckoutBanner] = useState<CheckoutBannerState>(null);
   // Job the apply-gate modal is currently open for (null = closed). Shared
   // between the mobile JobCard list and the desktop detail panel so both
@@ -181,18 +184,24 @@ export default function Dashboard() {
       setJobs(Array.isArray(ssrJobs.jobs) ? ssrJobs.jobs : []);
       setTotal(ssrJobs.total || 0);
       setHasMore(!!ssrJobs.hasMore);
+      setLoadError(null);
       setIsLoading(false);
       return;
     }
 
     setIsLoading(true);
+    setLoadError(null);
+    setLoadMoreError(false);
     setJobs([]);
 
     const headers: Record<string, string> = {};
     if (accessToken) headers["Authorization"] = `Bearer ${accessToken}`;
 
     fetch(`/api/jobs?${buildQuery(0)}`, { headers })
-      .then((res) => (res.ok ? res.json() : { jobs: [], total: 0, hasMore: false }))
+      .then((res) => {
+        if (!res.ok) throw new Error(`GET /api/jobs respondió ${res.status}`);
+        return res.json();
+      })
       .then((data) => {
         if (myRequestId !== requestIdRef.current) return;
         setJobs(Array.isArray(data.jobs) ? data.jobs : []);
@@ -204,29 +213,34 @@ export default function Dashboard() {
         setJobs([]);
         setTotal(0);
         setHasMore(false);
+        setLoadError("No pudimos cargar las vacantes. El servidor puede estar recuperándose.");
       })
       .finally(() => {
         if (myRequestId === requestIdRef.current) setIsLoading(false);
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accessToken, filterKey]);
+  }, [accessToken, filterKey, retryNonce]);
 
   const loadMore = useCallback(() => {
     if (isLoadingMore || !hasMore || personalFilterActive) return;
     const myRequestId = requestIdRef.current;
     setIsLoadingMore(true);
+    setLoadMoreError(false);
 
     const headers: Record<string, string> = {};
     if (accessToken) headers["Authorization"] = `Bearer ${accessToken}`;
 
     fetch(`/api/jobs?${buildQuery(jobs.length)}`, { headers })
-      .then((res) => (res.ok ? res.json() : { jobs: [], hasMore: false }))
+      .then((res) => {
+        if (!res.ok) throw new Error(`GET /api/jobs respondió ${res.status}`);
+        return res.json();
+      })
       .then((data) => {
         if (myRequestId !== requestIdRef.current) return;
         setJobs((prev) => [...prev, ...(Array.isArray(data.jobs) ? data.jobs : [])]);
         setHasMore(!!data.hasMore);
       })
-      .catch(() => {})
+      .catch(() => setLoadMoreError(true))
       .finally(() => setIsLoadingMore(false));
   }, [accessToken, buildQuery, jobs.length, hasMore, isLoadingMore, personalFilterActive]);
 
@@ -671,7 +685,7 @@ export default function Dashboard() {
         )}
 
         <div>
-          <StatsBar totalJobs={total} filteredJobs={visibleJobs.length} />
+          {!loadError && <StatsBar totalJobs={total} filteredJobs={visibleJobs.length} />}
 
           {isLoading ? (
             <div className="space-y-3">
@@ -685,6 +699,17 @@ export default function Dashboard() {
                   <div className="h-3 w-2/3 rounded bg-[#f1f2f0]" />
                 </div>
               ))}
+            </div>
+          ) : loadError ? (
+            <div
+              role="alert"
+              className="text-center py-16 px-4 rounded-2xl border border-destructive/30 bg-card text-muted-foreground"
+            >
+              <span className="text-3xl block mb-3">⚠️</span>
+              <p className="font-mono text-sm">{loadError}</p>
+              <Button className="mt-5" onClick={() => setRetryNonce((value) => value + 1)}>
+                Reintentar
+              </Button>
             </div>
           ) : visibleJobs.length > 0 ? (
             <>
@@ -800,6 +825,11 @@ export default function Dashboard() {
                 <div ref={sentinelRef} className="h-10 flex items-center justify-center mt-4">
                   {isLoadingMore && (
                     <span className="w-5 h-5 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+                  )}
+                  {loadMoreError && !isLoadingMore && (
+                    <Button variant="outline" size="sm" onClick={loadMore}>
+                      No se pudo cargar más. Reintentar
+                    </Button>
                   )}
                   {!hasMore && jobs.length > 0 && (
                     <span className="text-xs font-mono text-ink-faint">

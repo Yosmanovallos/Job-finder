@@ -1,12 +1,15 @@
 import crypto from "crypto";
 import dotenv from "dotenv";
 import { pool } from "./client.js";
-import { Job, JobDetail, normalizeJobUrl } from "../sources/types.js";
+import type { Job, JobDetail } from "../sources/types.js";
+import { normalizeJobUrl } from "../sources/types.js";
 import { getCountryConfig } from "../countries/index.js";
 import { saveRunToCache, getAllCachedRuns } from "../cache-manager.js";
 import { validateJobs } from "./job-validator.js";
 import { PAYWALL_ENABLED } from "../config.js";
 import { buildJobUrl, isPubliclyDescribable } from "../lib/job-seo.js";
+import { expandRoleWords, getRoleMatchWords, tokenizeJobSearch } from "../lib/job-filters.js";
+import type { JobFilterParams } from "../lib/job-filters.js";
 import { enqueueIndexingNotifications } from "./indexing-repository.js";
 
 dotenv.config();
@@ -368,7 +371,7 @@ export async function getJobsLight(
     [limit, offset]
   );
 
-  return result.rows.map((row: any) => {
+  return result.rows.map((row) => {
     const sources: string[] = Array.isArray(row.sources) ? row.sources : [];
     const alsoIn = sources.filter((s) => s !== row.source);
 
@@ -396,6 +399,370 @@ export async function getJobsLight(
   });
 }
 
+export interface JobsPageOptions {
+  filters?: JobFilterParams;
+  preferredRoles?: string[] | null;
+  limit?: number;
+  offset?: number;
+  includeDetails?: boolean;
+}
+
+export interface JobsPage {
+  jobs: Job[];
+  total: number;
+}
+
+const JOBS_PAGE_CACHE_TTL_MS = 15_000;
+const JOBS_PAGE_CACHE_MAX_ENTRIES = 16;
+const jobsPageCache = new Map<string, { data: JobsPage; expiresAt: number }>();
+const jobsPagePending = new Map<string, Promise<JobsPage>>();
+
+function cloneJobsPage(page: JobsPage): JobsPage {
+  return {
+    total: page.total,
+    jobs: page.jobs.map((job) => ({
+      ...job,
+      sources: Array.isArray(job.sources) ? [...job.sources] : job.sources,
+      alsoIn: Array.isArray(job.alsoIn) ? [...job.alsoIn] : job.alsoIn,
+      requirements: Array.isArray(job.requirements) ? [...job.requirements] : job.requirements,
+      technologies: Array.isArray(job.technologies) ? [...job.technologies] : job.technologies
+    }))
+  };
+}
+
+function jobsPageCacheKey(options: JobsPageOptions): string {
+  return JSON.stringify({
+    filters: options.filters || {},
+    preferredRoles: options.preferredRoles || [],
+    limit: options.limit ?? 24,
+    offset: options.offset ?? 0,
+    includeDetails: options.includeDetails !== false
+  });
+}
+
+interface JobPageRow {
+  id: string;
+  title: string;
+  company: string;
+  location: string;
+  url: string;
+  source: string;
+  sources: unknown;
+  date_text: string;
+  published_at: string;
+  role_origin: string | null;
+  country: string | null;
+  employment_type: string | null;
+  salary_min: string | number | null;
+  salary_max: string | number | null;
+  salary_currency: string | null;
+  salary_raw: string | null;
+  applicant_count: number | null;
+  is_locked: boolean;
+  description: string | null;
+  requirements: unknown;
+  technologies: unknown;
+  total_count?: string | number;
+}
+
+interface SqlParts {
+  values: unknown[];
+  param(value: unknown): string;
+}
+
+function createSqlParts(): SqlParts {
+  const values: unknown[] = [];
+  return {
+    values,
+    param(value: unknown) {
+      values.push(value);
+      return `$${values.length}`;
+    }
+  };
+}
+
+function escapePostgresRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function titleWordPredicate(sql: SqlParts, word: string, column = "title"): string {
+  const pattern = `(^|[^a-z0-9_])${escapePostgresRegex(word.toLowerCase())}([^a-z0-9_]|$)`;
+  return `LOWER(${column}) ~ ${sql.param(pattern)}`;
+}
+
+function rolePredicate(sql: SqlParts, role: string, column = "title"): string {
+  const match = getRoleMatchWords(role);
+  if (match.words.length === 0) return "FALSE";
+  const joiner = match.mode === "any" ? " OR " : " AND ";
+  return `(${match.words.map((word) => titleWordPredicate(sql, word, column)).join(joiner)})`;
+}
+
+function buildJobWhere(filters: JobFilterParams, sql: SqlParts): string[] {
+  const where: string[] = [];
+  const rawSearch = filters.search?.trim();
+
+  if (rawSearch) {
+    const search = rawSearch.toLowerCase();
+    const searchWords = tokenizeJobSearch(search);
+    if (searchWords.length <= 1) {
+      const like = sql.param(`%${search}%`);
+      where.push(
+        `(LOWER(title) LIKE ${like} OR LOWER(COALESCE(company, '')) LIKE ${like} OR ` +
+          `LOWER(COALESCE(location, '')) LIKE ${like} OR ${rolePredicate(sql, rawSearch)})`
+      );
+    } else {
+      for (const word of searchWords) {
+        const expanded = expandRoleWords(word);
+        const forms = expanded.length > 0 ? expanded : [word];
+        const predicates = forms.map((form) => {
+          const like = sql.param(`%${form.toLowerCase()}%`);
+          return (
+            `(LOWER(title) LIKE ${like} OR LOWER(COALESCE(company, '')) LIKE ${like} OR ` +
+            `LOWER(COALESCE(location, '')) LIKE ${like})`
+          );
+        });
+        where.push(`(${predicates.join(" OR ")})`);
+      }
+    }
+  }
+
+  if (filters.sources?.length) {
+    const wanted = sql.param(filters.sources);
+    where.push(`(source = ANY(${wanted}::text[]) OR sources ?| ${wanted}::text[])`);
+  }
+
+  if (filters.cities?.length) {
+    const cityPredicates = filters.cities.map((city) => {
+      const normalized = city.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+      const like = sql.param(`%${normalized}%`);
+      return (
+        `LOWER(TRANSLATE(COALESCE(location, ''), ` +
+        `'áéíóúüñÁÉÍÓÚÜÑ', 'aeiouunAEIOUUN')) LIKE ${like}`
+      );
+    });
+    where.push(`(${cityPredicates.join(" OR ")})`);
+  }
+
+  if (filters.modality && filters.modality !== "all") {
+    const location = "LOWER(COALESCE(location, ''))";
+    if (filters.modality === "remoto") {
+      where.push(`(${location} LIKE '%remoto%' OR ${location} LIKE '%remote%')`);
+    } else if (filters.modality === "hibrido") {
+      where.push(`(${location} LIKE '%híbrido%' OR ${location} LIKE '%hibrido%')`);
+    } else if (filters.modality === "presencial") {
+      where.push(
+        `(${location} NOT LIKE '%remoto%' AND ${location} NOT LIKE '%remote%' AND ` +
+          `${location} NOT LIKE '%híbrido%' AND ${location} NOT LIKE '%hibrido%')`
+      );
+    }
+  }
+
+  if (filters.freshness && filters.freshness !== "all") {
+    const hours = filters.freshness === "24h" ? 24 : filters.freshness === "48h" ? 48 : 168;
+    where.push(`published_at >= NOW() - (${sql.param(hours)}::int * INTERVAL '1 hour')`);
+  }
+
+  if (filters.roles?.length) {
+    where.push(`(${filters.roles.map((role) => rolePredicate(sql, role)).join(" OR ")})`);
+  }
+
+  if (filters.company) where.push(`company = ${sql.param(filters.company)}`);
+  if (filters.country) {
+    where.push(`(country IS NULL OR country = ${sql.param(filters.country.toUpperCase())})`);
+  }
+  return where;
+}
+
+/**
+ * Filters, counts and paginates in Postgres. Only the requested page enters
+ * the Node heap; detail columns are joined after the bounded page is chosen.
+ */
+export async function getJobsPage(options: JobsPageOptions = {}): Promise<JobsPage> {
+  const cacheKey = jobsPageCacheKey(options);
+  const cached = jobsPageCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    jobsPageCache.delete(cacheKey);
+    jobsPageCache.set(cacheKey, cached);
+    return cloneJobsPage(cached.data);
+  }
+  if (cached) jobsPageCache.delete(cacheKey);
+
+  const existingRequest = jobsPagePending.get(cacheKey);
+  if (existingRequest) return cloneJobsPage(await existingRequest);
+
+  const request = queryJobsPage(options);
+  jobsPagePending.set(cacheKey, request);
+  try {
+    const data = await request;
+    while (jobsPageCache.size >= JOBS_PAGE_CACHE_MAX_ENTRIES) {
+      const oldestKey = jobsPageCache.keys().next().value;
+      if (typeof oldestKey !== "string") break;
+      jobsPageCache.delete(oldestKey);
+    }
+    jobsPageCache.set(cacheKey, {
+      data: cloneJobsPage(data),
+      expiresAt: Date.now() + JOBS_PAGE_CACHE_TTL_MS
+    });
+    return cloneJobsPage(data);
+  } finally {
+    jobsPagePending.delete(cacheKey);
+  }
+}
+
+async function queryJobsPage(options: JobsPageOptions): Promise<JobsPage> {
+  const filters = options.filters || {};
+  const limit = Math.min(Math.max(options.limit ?? 24, 1), 100);
+  const offset = Math.max(options.offset ?? 0, 0);
+  const sql = createSqlParts();
+  const where = buildJobWhere(filters, sql);
+  const preferredRoles = filters.roles?.length ? [] : options.preferredRoles || [];
+  const preferencePredicate = preferredRoles.length
+    ? `(${preferredRoles.map((role) => rolePredicate(sql, role)).join(" OR ")})`
+    : "FALSE";
+  const limitParam = sql.param(limit);
+  const offsetParam = sql.param(offset);
+  const detailColumns = options.includeDetails === false
+    ? "NULL::text AS description, NULL::jsonb AS requirements, NULL::jsonb AS technologies"
+    : "details.description, details.requirements, details.technologies";
+
+  const result = await pool.query(
+    `WITH canonical AS MATERIALIZED (
+       SELECT DISTINCT ON (lower(trim(title)), lower(trim(COALESCE(company, 'confidencial'))), lower(trim(COALESCE(location, CASE country WHEN 'VE' THEN 'venezuela' ELSE 'colombia' END))))
+              id, title, company, location, url, source, sources, date_text, published_at,
+              role_origin, country, employment_type, salary_min, salary_max,
+              salary_currency, salary_raw, applicant_count,
+              (published_at > NOW() - INTERVAL '48 hours') AS is_locked
+       FROM jobs
+       WHERE is_active = TRUE
+       ORDER BY lower(trim(title)), lower(trim(COALESCE(company, 'confidencial'))), lower(trim(COALESCE(location, CASE country WHEN 'VE' THEN 'venezuela' ELSE 'colombia' END))), published_at DESC, id DESC
+     ), filtered AS (
+       SELECT canonical.*,
+              CASE WHEN ${preferencePredicate} THEN 0 ELSE 1 END AS preference_rank,
+              COUNT(*) OVER() AS total_count
+       FROM canonical
+       ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
+     ), page AS (
+       SELECT * FROM filtered
+       ORDER BY preference_rank, published_at DESC, id DESC
+       LIMIT ${limitParam} OFFSET ${offsetParam}
+     )
+     SELECT page.*, ${detailColumns}
+     FROM page
+     JOIN jobs details ON details.id = page.id
+     ORDER BY page.preference_rank, page.published_at DESC, page.id DESC`,
+    sql.values
+  );
+
+  const rows = result.rows as JobPageRow[];
+  const jobs = rows.map((row) => {
+    const sources: string[] = Array.isArray(row.sources) ? row.sources : [];
+    return {
+      jobId: row.id,
+      title: row.title,
+      company: row.company,
+      location: row.location,
+      url: row.url,
+      dateText: row.date_text,
+      source: row.source,
+      sources,
+      alsoIn: sources.filter((source) => source !== row.source),
+      role_origin: row.role_origin ?? undefined,
+      country: row.country,
+      publishedAt: row.published_at,
+      isLocked: row.is_locked,
+      description: row.description ?? undefined,
+      requirements: Array.isArray(row.requirements) ? row.requirements : [],
+      technologies: Array.isArray(row.technologies) ? row.technologies : [],
+      employmentType: row.employment_type ?? undefined,
+      applicantCount: row.applicant_count ?? undefined,
+      salary: buildSalaryLabel(row)
+    };
+  });
+
+  if (rows.length === 0 && offset > 0) {
+    const first = await queryJobsPage({ ...options, limit: 1, offset: 0, includeDetails: false });
+    return { jobs: [], total: first.total };
+  }
+  return { jobs, total: Number(rows[0]?.total_count || 0) };
+}
+
+export interface CompanyPage {
+  companies: Array<{ company: string; count: number }>;
+  total: number;
+}
+
+export async function searchActiveCompanies(
+  query: string,
+  country: string | undefined,
+  limit: number,
+  offset: number,
+  prioritizedCompanies: string[] = []
+): Promise<CompanyPage> {
+  const sql = createSqlParts();
+  const where = ["company IS NOT NULL", "company NOT IN ('Confidencial', 'Empresa confidencial')"];
+  const trimmed = query.trim().toLowerCase();
+  if (trimmed.length >= 2) where.push(`LOWER(company) LIKE ${sql.param(`%${trimmed}%`)}`);
+  if (country) where.push(`(country IS NULL OR country = ${sql.param(country.toUpperCase())})`);
+  const prioritizedParam = sql.param(prioritizedCompanies);
+  const limitParam = sql.param(Math.min(Math.max(limit, 1), 100));
+  const offsetParam = sql.param(Math.max(offset, 0));
+  const result = await pool.query(
+    `WITH canonical AS MATERIALIZED (
+       SELECT DISTINCT ON (lower(trim(title)), lower(trim(COALESCE(company, 'confidencial'))), lower(trim(COALESCE(location, CASE country WHEN 'VE' THEN 'venezuela' ELSE 'colombia' END))))
+              id, company, country, published_at
+       FROM jobs
+       WHERE is_active = TRUE
+       ORDER BY lower(trim(title)), lower(trim(COALESCE(company, 'confidencial'))), lower(trim(COALESCE(location, CASE country WHEN 'VE' THEN 'venezuela' ELSE 'colombia' END))), published_at DESC, id DESC
+     ), grouped AS (
+       SELECT company, COUNT(*) AS count
+       FROM canonical
+       WHERE ${where.join(" AND ")}
+       GROUP BY company
+     )
+     SELECT company, count, COUNT(*) OVER() AS total_count
+     FROM grouped
+     ORDER BY CASE WHEN company = ANY(${prioritizedParam}::text[]) THEN 0 ELSE 1 END,
+              count DESC, LOWER(company), company
+     LIMIT ${limitParam} OFFSET ${offsetParam}`,
+    sql.values
+  );
+  const rows = result.rows as Array<{ company: string; count: string | number; total_count: string | number }>;
+  if (rows.length === 0 && offset > 0) {
+    const first = await searchActiveCompanies(query, country, 1, 0, prioritizedCompanies);
+    return { companies: [], total: first.total };
+  }
+  return {
+    companies: rows.map((row) => ({ company: row.company, count: Number(row.count) })),
+    total: Number(rows[0]?.total_count || 0)
+  };
+}
+
+export async function getActiveCompanyNames(country?: string): Promise<string[]> {
+  const values: unknown[] = [];
+  const countryWhere = country ? "AND (country IS NULL OR country = $1)" : "";
+  if (country) values.push(country.toUpperCase());
+  const result = await pool.query(
+    `SELECT DISTINCT company
+     FROM jobs
+     WHERE is_active = TRUE AND company IS NOT NULL ${countryWhere}`,
+    values
+  );
+  return (result.rows as Array<{ company: string }>).map((row) => row.company);
+}
+
+export async function countCanonicalJobsByCompany(company: string): Promise<number> {
+  const result = await pool.query(
+    `SELECT COUNT(*) AS count FROM (
+       SELECT DISTINCT ON (lower(trim(title)), lower(trim(COALESCE(company, 'confidencial'))), lower(trim(COALESCE(location, CASE country WHEN 'VE' THEN 'venezuela' ELSE 'colombia' END)))) id
+       FROM jobs
+       WHERE is_active = TRUE AND company = $1
+       ORDER BY lower(trim(title)), lower(trim(COALESCE(company, 'confidencial'))), lower(trim(COALESCE(location, CASE country WHEN 'VE' THEN 'venezuela' ELSE 'colombia' END))), published_at DESC, id DESC
+     ) canonical`,
+    [company]
+  );
+  return Number(result.rows[0]?.count || 0);
+}
+
 /**
  * Single-row fetch for the job-detail routes (/empleos/:id, /api/jobs/:id):
  * these need the full body (description/requirements/technologies) for
@@ -408,11 +775,25 @@ export async function getJobsLight(
  */
 export async function getJobById(id: string): Promise<any | null> {
   const result = await pool.query(
-    `SELECT id, url_hash, title, company, location, url, source, sources, date_text, published_at, role_origin, country,
-            description, requirements, technologies, employment_type, salary_min, salary_max, salary_currency, salary_raw, applicant_count,
-            (published_at > NOW() - INTERVAL '48 hours') AS is_locked
-     FROM jobs
-     WHERE id = $1 AND is_active = TRUE
+    `SELECT candidate.id, candidate.url_hash, candidate.title, candidate.company, candidate.location,
+            candidate.url, candidate.source, candidate.sources, candidate.date_text,
+            candidate.published_at, candidate.role_origin, candidate.country,
+            candidate.description, candidate.requirements, candidate.technologies,
+            candidate.employment_type, candidate.salary_min, candidate.salary_max,
+            candidate.salary_currency, candidate.salary_raw, candidate.applicant_count,
+            (candidate.published_at > NOW() - INTERVAL '48 hours') AS is_locked
+     FROM jobs candidate
+     WHERE candidate.id = $1 AND candidate.is_active = TRUE
+       AND NOT EXISTS (
+         SELECT 1
+         FROM jobs newer
+         WHERE newer.is_active = TRUE
+           AND lower(trim(newer.title)) = lower(trim(candidate.title))
+           AND lower(trim(COALESCE(newer.company, 'confidencial'))) = lower(trim(COALESCE(candidate.company, 'confidencial')))
+           AND lower(trim(COALESCE(newer.location, CASE newer.country WHEN 'VE' THEN 'venezuela' ELSE 'colombia' END))) =
+               lower(trim(COALESCE(candidate.location, CASE candidate.country WHEN 'VE' THEN 'venezuela' ELSE 'colombia' END)))
+           AND (newer.published_at, newer.id) > (candidate.published_at, candidate.id)
+       )
      LIMIT 1`,
     [id]
   );
@@ -484,44 +865,10 @@ function buildSalaryLabel(row: {
   return `${currency}${fmt(min ?? max ?? 0)}`;
 }
 
-// getJobs()'s DISTINCT ON query has no index backing the lower(trim(...))
-// expressions it groups/sorts by, so Postgres does a full scan + sort of the
-// whole `jobs` table on every call — measured at 500ms-2s against the real
-// corpus. GET /api/jobs used to call getJobs() once per dashboard load; once
-// pagination made it call this on every scroll/filter change too, that cost
-// started showing up as a visible loading spinner on every page. Caching the
-// unfiltered corpus for a short TTL turns the expensive query into "at most
-// once every 30s across all requests" — everything after that (pagination,
-// filtering) is a plain in-memory array operation, effectively free at this
-// corpus size. A proper fix is a matching functional index in Postgres; this
-// is the immediate, zero-schema-risk mitigation.
-let jobsCache: { data: any[]; expiresAt: number } | null = null;
-let jobsCachePending: Promise<any[]> | null = null;
-// Scraping runs on an hours-long per-role cadence, so several minutes of
-// staleness here is invisible in practice. Raised from 120s to 10min after
-// the 2026-08-15 egress incident (see getJobsLight()'s comment): at 120s,
-// public bot/crawler traffic alone was enough to refetch this heavy query
-// every ~16min around the clock and blow a 5GB/month quota. 10min still
-// means the corpus is never more than one scrape-cycle-fraction stale.
+// Full job bodies are deliberately never cached by the web server: retaining
+// them caused the 256MB Render heap abort. Only the body-free sitemap corpus
+// keeps a bounded TTL cache.
 const JOBS_CACHE_TTL_MS = 10 * 60_000;
-
-export async function getJobsCached(limit: number = DEFAULT_JOBS_LIMIT): Promise<any[]> {
-  const now = Date.now();
-  if (jobsCache && jobsCache.expiresAt > now) return jobsCache.data;
-  if (jobsCachePending) return jobsCachePending;
-
-  jobsCachePending = getJobs(limit)
-    .then((data) => {
-      jobsCache = { data, expiresAt: Date.now() + JOBS_CACHE_TTL_MS };
-      jobsCachePending = null;
-      return data;
-    })
-    .catch((err) => {
-      jobsCachePending = null;
-      throw err;
-    });
-  return jobsCachePending;
-}
 
 let jobsLightCache: { data: any[]; expiresAt: number } | null = null;
 let jobsLightCachePending: Promise<any[]> | null = null;
@@ -552,7 +899,8 @@ export async function getJobsLightCached(limit: number = DEFAULT_JOBS_LIMIT): Pr
  */
 export function maskLockedFields(jobs: any[], tier: SubscriptionTier): any[] {
   if (!PAYWALL_ENABLED || tier === "pro" || tier === "pro_max") {
-    return jobs.map((job) => ({ ...job, isLocked: false }));
+    for (const job of jobs) job.isLocked = false;
+    return jobs;
   }
   return jobs.map((job) => {
     if (!job.isLocked) return job;

@@ -1,4 +1,4 @@
-import { Job } from "../sources/types.js";
+import type { Job } from "../sources/types.js";
 import { getModalityLabel, CITY_OPTIONS } from "./job-filters.js";
 import { DEFAULT_ROLES_200 } from "../queue/scheduler.js";
 import { getCountryConfig, DEFAULT_COUNTRY } from "../countries/index.js";
@@ -458,7 +458,10 @@ export function buildCompanyUrl(companyName: string, country?: string | null): s
 // are possible (there's no unique company id in this schema) — accepted
 // as a rare, low-stakes edge case, same tradeoff every slug-based URL
 // scheme here already makes.
-export function resolveCompanyNameFromJobs(slug: string, jobs: Job[]): string | null {
+export function resolveCompanyNameFromJobs(
+  slug: string,
+  jobs: Array<Pick<Job, "company">>
+): string | null {
   for (const job of jobs) {
     if (job.company && slugify(job.company) === slug) return job.company;
   }

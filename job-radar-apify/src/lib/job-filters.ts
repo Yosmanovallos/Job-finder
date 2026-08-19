@@ -9,6 +9,13 @@ import { getCountryConfig } from "../countries/index.js";
 
 const ROLE_STOPWORDS = new Set(["de", "la", "el", "los", "las", "en", "y", "del", "para"]);
 
+export function tokenizeJobSearch(search: string): string[] {
+  return search
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((word) => word.length > 0 && !ROLE_STOPWORDS.has(word));
+}
+
 // role_origin only records which of the searched roles happened to discover
 // a job's URL first (the dedup upsert never updates it on later
 // re-discovery), and some sources match keyword variants loosely enough that
@@ -83,10 +90,18 @@ function titleContainsWord(title: string, word: string): boolean {
 
 export function jobMatchesRole(role: string, job: any): boolean {
   const title = (job.title || "").toLowerCase();
+  const match = getRoleMatchWords(role);
+  if (match.mode === "any") return match.words.some((word) => titleContainsWord(title, word));
+  return match.words.every((word) => titleContainsWord(title, word));
+}
+
+/** Canonical role-match plan shared by the in-memory and SQL matchers. */
+export function getRoleMatchWords(role: string): { mode: "any" | "all"; words: string[] } {
   const words = expandRoleWords(role);
-  const distinctive = words.filter((w) => (ROLE_WORD_FREQUENCY[w] || 0) < 2);
-  if (distinctive.length > 0) return distinctive.some((w) => titleContainsWord(title, w));
-  return words.every((w) => titleContainsWord(title, w));
+  const distinctive = words.filter((word) => (ROLE_WORD_FREQUENCY[word] || 0) < 2);
+  return distinctive.length > 0
+    ? { mode: "any", words: distinctive }
+    : { mode: "all", words };
 }
 
 // Same detection the modality filter uses, exposed separately so the job
@@ -192,7 +207,7 @@ export function applyJobFilters(jobs: Job[], filters: JobFilterParams): Job[] {
     // 1-2 char query ("r", "go") is a legitimate literal search and must
     // still be required below; dropping it here would leave searchWords
     // empty and match the entire corpus instead of nothing extra.
-    const searchWords = search.split(/\s+/).filter((w) => w.length > 0 && !ROLE_STOPWORDS.has(w));
+    const searchWords = tokenizeJobSearch(search);
 
     if (searchWords.length <= 1) {
       // Single word (or only stopwords): unchanged from before this fix —

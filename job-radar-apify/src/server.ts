@@ -5,9 +5,12 @@ import { fileURLToPath } from "url";
 import { randomUUID } from "node:crypto";
 import dotenv from "dotenv";
 import {
-  getJobsCached,
+  getJobsPage,
   getJobsLightCached,
   getJobById,
+  getActiveCompanyNames,
+  searchActiveCompanies,
+  countCanonicalJobsByCompany,
   getRuns,
   maskLockedFields,
   updateUserName,
@@ -18,11 +21,11 @@ import { markRoleForImmediateRescan } from "./db/scheduler-repository.js";
 import { wasJobPurged } from "./db/indexing-repository.js";
 import {
   getReputationForCompanies,
-  resolveCompanyBySlug,
-  ReputationEntry
+  resolveCompanyBySlug
 } from "./db/company-reputation-repository.js";
-import { applyJobFilters, sortByPreferredRoles, JobFilterParams } from "./lib/job-filters.js";
-import { getCompanyLogoUrl } from "./data/company-logo-domains.js";
+import type { ReputationEntry } from "./db/company-reputation-repository.js";
+import type { JobFilterParams } from "./lib/job-filters.js";
+import { COMPANY_LOGO_DOMAINS, getCompanyLogoUrl } from "./data/company-logo-domains.js";
 import { getCountryConfig } from "./countries/index.js";
 import {
   escapeHtml,
@@ -44,7 +47,6 @@ import {
   buildCategoriesSitemapXml,
   resolveCompanyNameFromJobs,
   buildCompanyPath,
-  buildCompanyUrl,
   buildCompanyMeta,
   buildCompanyOrganizationSchema,
   buildCompaniesItemList,
@@ -132,11 +134,15 @@ const PORT = process.env.PORT || 3000;
 // batched query for however many jobs are in the caller's current page
 // (never the whole corpus, never N+1 per job). A job whose company has no
 // confirmed alias just gets an empty array, never a guessed/fuzzy result.
-async function attachReputation<T extends { company: string }>(
+async function attachReputation<T extends { company: string | null }>(
   jobs: T[]
 ): Promise<(T & { reputation: ReputationEntry[] })[]> {
-  const reputationMap = await getReputationForCompanies(jobs.map((j) => j.company));
-  return jobs.map((j) => ({ ...j, reputation: reputationMap.get(j.company) || [] }));
+  const companies = jobs.flatMap((job) => job.company ? [job.company] : []);
+  const reputationMap = await getReputationForCompanies(companies);
+  return jobs.map((job) => ({
+    ...job,
+    reputation: job.company ? reputationMap.get(job.company) || [] : []
+  }));
 }
 
 // GET /api/companies/search backing (Fase E4) — "Confidencial"/"Empresa
@@ -158,72 +164,6 @@ const REPUTATION_SOURCE_LABELS: Record<string, string> = {
   gptw: "Great Place to Work",
   computrabajo: "Computrabajo"
 };
-
-export interface CompanySearchResult {
-  company: string;
-  count: number;
-  // Only set for the small hand-verified subset in company-logo-domains.ts
-  // (see its header comment) — null for every other company, which keeps
-  // rendering its plain-initial avatar.
-  logoUrl: string | null;
-}
-
-export interface CompanySearchPage {
-  companies: CompanySearchResult[];
-  total: number;
-}
-
-// offset/limit (not just a fixed top-N) so /empresas (Fase E5, the company
-// directory) can page through all 5,525+ distinct companies via infinite
-// scroll, same pattern as GET /api/jobs — this same function also still
-// backs the small single-page FilterBar dropdown from Fase E4, which just
-// never passes an offset.
-function searchCompanies(
-  jobs: { company?: string }[],
-  query: string,
-  limit: number,
-  offset: number
-): CompanySearchPage {
-  const counts = new Map<string, number>();
-  for (const job of jobs) {
-    if (!job.company || COMPANY_SEARCH_EXCLUDED.has(job.company)) continue;
-    counts.set(job.company, (counts.get(job.company) || 0) + 1);
-  }
-
-  const q = query.trim().toLowerCase();
-  let entries = Array.from(counts.entries());
-  // Under 2 chars: too short to narrow anything meaningfully — return the
-  // top companies by vacancy count instead, so the UI has suggestions to
-  // show before the caller has typed enough to filter.
-  if (q.length >= 2) {
-    entries = entries.filter(([name]) => name.toLowerCase().includes(q));
-  }
-
-  // logoUrl has to be resolved before sorting (not after, like before this
-  // ordering rule existed) since it's now a sort key itself.
-  const results: CompanySearchResult[] = entries.map(([company, count]) => ({
-    company,
-    count,
-    logoUrl: getCompanyLogoUrl(company)
-  }));
-
-  // Companies with a real curated logo first, then everyone else — both
-  // groups independently ranked by vacancy count descending. Stable
-  // alphabetical tiebreak on equal counts within a group — without it,
-  // ties order by Map insertion (corpus iteration order), which can
-  // reshuffle between two page requests if getJobsCached()'s TTL refreshes
-  // in between, silently duplicating or skipping a company across an
-  // infinite-scroll page boundary.
-  results.sort((a, b) => {
-    if (!!a.logoUrl !== !!b.logoUrl) return a.logoUrl ? -1 : 1;
-    return b.count - a.count || a.company.localeCompare(b.company);
-  });
-
-  return {
-    companies: results.slice(offset, offset + limit),
-    total: results.length
-  };
-}
 
 // A route's own validation always returns its own specific, safe 400
 // before ever reaching a catch block — so whatever lands here is either a
@@ -430,7 +370,22 @@ function respondToCvGenerationError(
 }
 
 // Native Node HTTP Server
-const server = http.createServer(async (req, res) => {
+const server = http.createServer((req, res) => {
+  void handleRequest(req, res).catch((error: unknown) => {
+    console.error("[server] Error no capturado en una solicitud:", error);
+    if (!res.headersSent) {
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Error interno del servidor." }));
+    } else if (!res.writableEnded) {
+      res.end();
+    }
+  });
+});
+
+async function handleRequest(
+  req: http.IncomingMessage,
+  res: http.ServerResponse
+): Promise<void> {
   const parsedUrl = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
   const pathname = parsedUrl.pathname;
   const method = req.method || "GET";
@@ -540,19 +495,11 @@ const server = http.createServer(async (req, res) => {
 
   // 4. GET /api/jobs — tier is always resolved server-side from a verified
   //    session; free/anonymous callers get the 48h freshness paywall masking.
-  //    Filters + pagination happen here, in Node, against the full active
-  //    corpus (never in the browser) — as the corpus grows past a few
-  //    thousand rows, shipping everything to the client on every visit stops
-  //    being viable, so only the requested page is ever serialized out.
+  //    PostgreSQL filters/counts/paginates; only the requested page enters
+  //    the Node heap.
   if (pathname === "/api/jobs" && method === "GET") {
     const session = await verifySession(req);
     const tier = session?.tier || "free";
-    // 50k comfortably covers the corpus for years of growth at current
-    // scraping cadence — this is a fetch-into-Node cap, not a limit on what
-    // reaches the browser (that's the separate limit/offset pagination below).
-    const jobs = await getJobsCached(50000);
-    const visibleJobs = maskLockedFields(jobs, tier);
-
     const params = parsedUrl.searchParams;
     const filters: JobFilterParams = {
       search: params.get("search") || undefined,
@@ -564,25 +511,27 @@ const server = http.createServer(async (req, res) => {
       company: params.get("company") || undefined,
       country: params.get("country") || undefined
     };
-    let filtered = applyJobFilters(visibleJobs, filters);
+    const limit = Math.min(Math.max(parseInt(params.get("limit") || "24", 10) || 24, 1), 100);
+    const offset = Math.max(parseInt(params.get("offset") || "0", 10) || 0, 0);
+    const result = await getJobsPage({
+      filters,
+      preferredRoles: session?.preferredRoles,
+      limit,
+      offset,
+      includeDetails: true
+    });
+    const visibleJobs = maskLockedFields(result.jobs, tier);
+    const page = await attachReputation(visibleJobs);
     // A manual role filter (checked in FilterBar) is an explicit, stronger
     // signal than the soft onboarding preference — only reorder by
     // preference when the caller didn't already filter by role themselves.
-    if (!filters.roles && session?.preferredRoles) {
-      filtered = sortByPreferredRoles(filtered, session.preferredRoles);
-    }
-
-    const limit = Math.min(Math.max(parseInt(params.get("limit") || "24", 10) || 24, 1), 100);
-    const offset = Math.max(parseInt(params.get("offset") || "0", 10) || 0, 0);
-    const page = await attachReputation(filtered.slice(offset, offset + limit));
-
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(
       JSON.stringify({
         jobs: page,
         count: page.length,
-        total: filtered.length,
-        hasMore: offset + limit < filtered.length
+        total: result.total,
+        hasMore: offset + page.length < result.total
       })
     );
     return;
@@ -603,8 +552,7 @@ const server = http.createServer(async (req, res) => {
     // published_at). Serving that id 200 would resurrect exactly the
     // soft-404/near-duplicate class §1.18 fixed, just for this API instead
     // of the SSR page.
-    const [fullJob, lightJobs] = await Promise.all([getJobById(id), getJobsLightCached(50000)]);
-    const job = lightJobs.some((j: any) => j.jobId === id) ? fullJob : null;
+    const job = await getJobById(id);
     if (!job) {
       res.writeHead(404, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: "Vacante no encontrada" }));
@@ -629,13 +577,22 @@ const server = http.createServer(async (req, res) => {
     const limit = Math.min(Math.max(parseInt(params.get("limit") || "20", 10) || 20, 1), 100);
     const offset = Math.max(parseInt(params.get("offset") || "0", 10) || 0, 0);
     const country = params.get("country") || undefined;
-    const jobs = await getJobsLightCached(50000);
+    const companyPage = await searchActiveCompanies(
+      q,
+      country,
+      limit,
+      offset,
+      Object.keys(COMPANY_LOGO_DOMAINS)
+    );
     // Country-scoped same as GET /api/jobs (country = $1 OR country IS NULL)
     // — a company directory browsed from Venezuela must never surface a
     // Colombia-only employer, and vice versa (remote-hiring companies still
     // show in both, same as remote jobs do).
-    const countryJobs = country ? applyJobFilters(jobs, { country }) : jobs;
-    const { companies, total } = searchCompanies(countryJobs, q, limit, offset);
+    const companies = companyPage.companies.map((item) => ({
+      ...item,
+      logoUrl: getCompanyLogoUrl(item.company)
+    }));
+    const total = companyPage.total;
 
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ companies, total, hasMore: offset + limit < total }));
@@ -658,36 +615,39 @@ const server = http.createServer(async (req, res) => {
 
     const session = await verifySession(req);
     const tier = session?.tier || "free";
-    const jobs = await getJobsCached(50000);
-    const visibleJobs = maskLockedFields(jobs, tier);
+    const companyNames = await getActiveCompanyNames(country);
     // Same country scoping as the search endpoint above, applied BEFORE
     // resolution — resolveCompanyNameFromJobs()'s fallback only matches
     // against this country-scoped view, so a slug that only resolves via a
     // job from the other country correctly falls through to the 404 below
     // instead of resolving into a company page with zero jobs to show.
-    const countryJobs = country ? applyJobFilters(visibleJobs, { country }) : visibleJobs;
-
     const companyName =
-      (await resolveCompanyBySlug(slug)) || resolveCompanyNameFromJobs(slug, countryJobs);
+      (await resolveCompanyBySlug(slug)) ||
+      resolveCompanyNameFromJobs(slug, companyNames.map((company) => ({ company })));
     if (!companyName) {
       res.writeHead(404, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: "Empresa no encontrada" }));
       return;
     }
 
-    const matched = applyJobFilters(countryJobs, { company: companyName });
+    const matched = await getJobsPage({
+      filters: { company: companyName, country },
+      limit: 60,
+      offset: 0,
+      includeDetails: false
+    });
     // resolveCompanyBySlug() (the curated Merco/GPTW alias table) is
     // country-agnostic, so it can resolve a real companyName that simply
     // has no jobs in this country's scoped view (e.g. a Colombia-only
     // curated company hit while browsing from /ve/empresas). Treating that
     // as "not found here" — not an empty-but-200 company page — is what
     // keeps the two countries' directories from ever cross-linking.
-    if (country && matched.length === 0) {
+    if (country && matched.total === 0) {
       res.writeHead(404, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: "Empresa no encontrada" }));
       return;
     }
-    const page = matched.slice(0, 60);
+    const page = maskLockedFields(matched.jobs, tier);
     const reputationMap = await getReputationForCompanies([companyName]);
 
     res.writeHead(200, { "Content-Type": "application/json" });
@@ -697,7 +657,7 @@ const server = http.createServer(async (req, res) => {
         logoUrl: getCompanyLogoUrl(companyName),
         reputation: reputationMap.get(companyName) || [],
         jobs: page,
-        total: matched.length
+        total: matched.total
       })
     );
     return;
@@ -1791,8 +1751,6 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
-      const jobs = await getJobsLightCached(50000);
-      const visibleJobs = maskLockedFields(jobs, "free");
       // country is always set here — for "ciudad" it's the matched city's
       // own country (Bogotá/Caracas are never ambiguous), for "rol" it's
       // requestCountry. Before this field existed, a role page had no
@@ -1806,9 +1764,14 @@ const server = http.createServer(async (req, res) => {
       // isPubliclyDescribable filters out any locked job the same way
       // buildJobsSitemapXml/the job-detail branch already do — a category
       // page must never list a job it can't also link a working page for.
-      const matched = applyJobFilters(visibleJobs, filterParams).filter(isPubliclyDescribable);
-      const total = matched.length;
-      const page = matched.slice(0, 60);
+      const matched = await getJobsPage({
+        filters: filterParams,
+        limit: 60,
+        offset: 0,
+        includeDetails: false
+      });
+      const page = maskLockedFields(matched.jobs, "free").filter(isPubliclyDescribable);
+      const total = matched.total;
 
       let indexHtml: string;
       try {
@@ -1957,8 +1920,7 @@ const server = http.createServer(async (req, res) => {
     // JobPosting would resurrect exactly the soft-404/near-duplicate class
     // §1.18 fixed — only an id that's still the canonical pick in `jobs`
     // (the same deduped view the sitemap/links are built from) may resolve.
-    const [fullJob, jobs] = await Promise.all([getJobById(id), getJobsLightCached(50000)]);
-    const job = jobs.some((j: any) => j.jobId === id) ? fullJob : null;
+    const job = await getJobById(id);
 
     if (!id || !job) {
       // SEO Fase 5 (docs/SEO-PLAN.md §5.6): distinguish "this id existed and
@@ -1996,7 +1958,7 @@ const server = http.createServer(async (req, res) => {
     // near-duplicates to Google).
     const companyActiveCount =
       job.company && !COMPANY_SEARCH_EXCLUDED.has(job.company)
-        ? jobs.filter((j: any) => j.company === job.company).length
+        ? await countCanonicalJobsByCompany(job.company)
         : undefined;
 
     let indexHtml: string;
@@ -2100,13 +2062,6 @@ const server = http.createServer(async (req, res) => {
     const requestCountry = isVeEmpresas ? "VE" : "CO";
     const countryConfig = getCountryConfig(requestCountry);
 
-    const jobs = await getJobsLightCached(50000);
-    // Always the public (tier: "free") view, same reasoning as the
-    // category branch: this is what an anonymous crawler/visitor sees,
-    // never session-specific content.
-    const visibleJobs = maskLockedFields(jobs, "free");
-    const countryJobs = applyJobFilters(visibleJobs, { country: requestCountry });
-
     let indexHtml: string;
     try {
       indexHtml = fs.readFileSync(path.join(PUBLIC_DIR, "index.html"), "utf-8");
@@ -2120,7 +2075,18 @@ const server = http.createServer(async (req, res) => {
       // Directory hub — same PAGE_SIZE the client's first paint already
       // uses (CompaniesDirectory.tsx), so the SSR payload matches what
       // the client would have fetched anyway instead of a different page.
-      const { companies, total } = searchCompanies(countryJobs, "", 48, 0);
+      const companyPage = await searchActiveCompanies(
+        "",
+        requestCountry,
+        48,
+        0,
+        Object.keys(COMPANY_LOGO_DOMAINS)
+      );
+      const companies = companyPage.companies.map((item) => ({
+        ...item,
+        logoUrl: getCompanyLogoUrl(item.company)
+      }));
+      const total = companyPage.total;
       const heading = `Empresas en ${countryConfig.name}`;
       const meta = {
         title: `${heading} | BuscoTrabajo`,
@@ -2206,8 +2172,10 @@ const server = http.createServer(async (req, res) => {
     // country-scoping rules as GET /api/companies/:slug (server.ts's own
     // API handler below), so SSR never disagrees with what the client
     // fetch would have shown.
+    const companyNames = await getActiveCompanyNames(requestCountry);
     const companyName =
-      (await resolveCompanyBySlug(slug)) || resolveCompanyNameFromJobs(slug, countryJobs);
+      (await resolveCompanyBySlug(slug)) ||
+      resolveCompanyNameFromJobs(slug, companyNames.map((company) => ({ company })));
     if (!companyName) {
       res.writeHead(404, { "Content-Type": "text/html; charset=utf-8" });
       res.end(
@@ -2216,12 +2184,17 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    const matched = applyJobFilters(countryJobs, { company: companyName });
+    const matched = await getJobsPage({
+      filters: { company: companyName, country: requestCountry },
+      limit: 60,
+      offset: 0,
+      includeDetails: false
+    });
     // A curated (resolveCompanyBySlug) company can resolve to a real name
     // that simply has no jobs in this country's scoped view — treated as
     // "not found here", never an empty-but-200 page, same rule the API
     // enforces (server.ts's /api/companies/:slug handler).
-    if (matched.length === 0) {
+    if (matched.total === 0) {
       res.writeHead(404, { "Content-Type": "text/html; charset=utf-8" });
       res.end(
         '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Empresa no encontrada | BuscoTrabajo</title><meta name="robots" content="noindex"></head><body><h1>Empresa no encontrada</h1><p><a href="/dashboard">Ver todas las vacantes</a></p></body></html>'
@@ -2231,12 +2204,11 @@ const server = http.createServer(async (req, res) => {
     // Never link a job in the visible SSR list that wouldn't also render
     // for the same anonymous visitor — same filter the sitemap/category
     // branches already apply.
-    const publicMatched = matched.filter(isPubliclyDescribable);
-    const page = publicMatched.slice(0, 60);
+    const page = maskLockedFields(matched.jobs, "free").filter(isPubliclyDescribable);
 
     const reputationMap = await getReputationForCompanies([companyName]);
     const reputation = reputationMap.get(companyName) || [];
-    const meta = buildCompanyMeta(companyName, matched.length, requestCountry);
+    const meta = buildCompanyMeta(companyName, matched.total, requestCountry);
 
     const reputationItems = reputation
       .map((r) => {
@@ -2269,7 +2241,7 @@ const server = http.createServer(async (req, res) => {
       logoUrl: getCompanyLogoUrl(companyName),
       reputation,
       jobs: page,
-      total: matched.length
+      total: matched.total
     });
     indexHtml = indexHtml.replace(
       "</head>",
@@ -2355,20 +2327,24 @@ const server = http.createServer(async (req, res) => {
     // before this change.
     const session = await verifySession(req);
     const tier = session?.tier || "free";
-    const jobs = await getJobsCached(50000);
-    const visibleJobs = maskLockedFields(jobs, tier);
+    const result = await getJobsPage({
+      filters: { country },
+      limit: 24,
+      offset: 0,
+      includeDetails: true
+    });
+    const visibleJobs = maskLockedFields(result.jobs, tier);
     // Filtered by the real requested country — without this the embedded
     // window.__SSR_JOBS__ payload would mix both countries, which
     // Dashboard.tsx's SSR shortcut would then trust verbatim on first
     // paint — exactly the CO/VE mixing this app's country separation
     // exists to prevent.
-    const allFiltered = applyJobFilters(visibleJobs, { country });
     // Reputation attached here too (not just /api/jobs) so the very first
     // anonymous paint — which reads window.__SSR_JOBS__ below instead of
     // re-fetching /api/jobs, see Dashboard.tsx — can show it immediately
     // if that first page's selected job happens to have it.
-    const firstPage = await attachReputation(allFiltered.slice(0, 24));
-    const total = allFiltered.length;
+    const firstPage = await attachReputation(visibleJobs);
+    const total = result.total;
     const hasMore = total > firstPage.length;
 
     let indexHtml: string;
@@ -2673,7 +2649,7 @@ const server = http.createServer(async (req, res) => {
       res.end(content, "utf-8");
     }
   });
-});
+}
 
 server.listen(PORT, () => {
   console.log(`\n==================================================`);

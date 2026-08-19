@@ -1229,6 +1229,34 @@ leerlo del array ya cargado, cambio de flujo client-side fuera de alcance
 aquí. Ver la proyección de 190GB/mes peor-caso arriba: no es urgente hoy,
 pero es el siguiente paso si el egress vuelve a subir.
 
+### 1.22 Hotfix de memoria del servidor web + estado de error real (2026-08-19)
+
+Incidente confirmado en Render: reinicios con salida 134 y
+`FATAL ERROR: JavaScript heap out of memory`; V8 llegaba a ~253 MB de un
+heap efectivo de ~256 MB. Las rutas públicas materializaban 50.000 vacantes
+completas y el caché/copiado mantenía varias versiones simultáneas.
+
+Hotfix local, **no desplegado**:
+
+- `getJobsPage()` filtra, cuenta, ordena y pagina en PostgreSQL; solo la
+  página solicitada entra al heap de Node.
+- Las páginas resultantes usan un caché LRU de 16 entradas y 15 segundos,
+  con deduplicación de consultas simultáneas. Mantiene fluidez bajo ráfagas
+  sin volver a retener el corpus completo.
+- API, dashboard, categorías y empresas ya no cargan el corpus completo.
+  El sitemap conserva únicamente el caché liviano sin cuerpos de vacante.
+- `getJobById()` valida la fila canónica en SQL y el conteo por empresa
+  usa una consulta escalar.
+- Con el paywall apagado, `maskLockedFields()` reutiliza el arreglo.
+- El dashboard muestra un error recuperable y `Reintentar` ante 5xx/red,
+  en lugar de presentar falsamente “0 de 0 vacantes”.
+- Node queda fijado a `24.18.0`; el rango abierto había permitido que
+  Render arrancara con Node 26.7.0.
+
+La prueba `test:job-pagination` es de solo lectura. Las pruebas SEO que
+insertan filas temporales no se ejecutan contra la base compartida sin
+autorización explícita.
+
 ## 2. Primer paso al reiniciar sesión: baseline de `seo-drift`
 
 Antes de cualquier fase nueva de la tabla de abajo, capturar un baseline
