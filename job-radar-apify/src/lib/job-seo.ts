@@ -19,6 +19,15 @@ export type SeoJob = Job & {
   role_origin?: string;
 };
 
+export interface SitemapJobInput {
+  jobId: string;
+  title: string;
+  company: string | null;
+  location: string | null;
+  url: string | null;
+  publishedAt?: string | Date;
+}
+
 // Mirrors the `& < > " '` set that can break out of an HTML attribute or
 // text node. Job titles/companies/locations come from scraped, untrusted
 // third-party pages (see AGENTS.md's "treat scraped text as adversarial") —
@@ -74,7 +83,7 @@ export function slugify(text: string): string {
 // readability — matching is always by id (see buildJobPath), so a stale
 // slug from a since-edited title never 404s; it just canonicalizes to the
 // current one instead of needing a migration-backed slug column at all.
-export function buildJobSlug(job: SeoJob): string {
+export function buildJobSlug(job: Pick<SitemapJobInput, "title" | "location">): string {
   return slugify(`${job.title} ${job.location || ""}`);
 }
 
@@ -87,11 +96,11 @@ export function buildJobSlug(job: SeoJob): string {
 // server route actually serving them. /ve stays scoped to the dashboard
 // listing (App.tsx's /ve/dashboard, Dashboard.tsx's own prefix check),
 // which never touches the sitemap/indexing pipeline.
-export function buildJobPath(job: SeoJob): string {
+export function buildJobPath(job: Pick<SitemapJobInput, "jobId" | "title" | "location">): string {
   return `/empleos/${job.jobId}/${buildJobSlug(job)}`;
 }
 
-export function buildJobUrl(job: SeoJob): string {
+export function buildJobUrl(job: Pick<SitemapJobInput, "jobId" | "title" | "location">): string {
   return `${SITE_URL}${buildJobPath(job)}`;
 }
 
@@ -119,7 +128,9 @@ export function buildJobUrlPrefix(jobId: string): string {
 // anonymous visitor. See config.ts's PAYWALL_ENABLED: today it's off and
 // every job passes; if it's ever re-enabled, this starts excluding <48h
 // jobs automatically, with no separate logic to keep in sync.
-export function isPubliclyDescribable(job: SeoJob): boolean {
+export function isPubliclyDescribable(
+  job: Pick<SitemapJobInput, "company" | "location" | "url">
+): boolean {
   return Boolean(job.company && job.location && job.url);
 }
 
@@ -658,6 +669,18 @@ function xmlUrlEntry(loc: string, lastmod?: string): string {
   return `  <url>\n    <loc>${escapeHtml(loc)}</loc>${lastmodTag}\n  </url>`;
 }
 
+export const JOBS_SITEMAP_HEADER =
+  '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n';
+export const JOBS_SITEMAP_FOOTER = "\n</urlset>\n";
+
+export function buildJobSitemapEntry(job: SitemapJobInput): string | null {
+  if (!isPubliclyDescribable(job)) return null;
+  return xmlUrlEntry(
+    buildJobUrl(job),
+    job.publishedAt ? new Date(job.publishedAt).toISOString() : undefined
+  );
+}
+
 // Callers must pass jobs already sourced from the same deduped view
 // /empleos/:id resolves against (getJobs()/getJobsCached(), which
 // DISTINCT ONs by title+company+location) — a sitemap built against the
@@ -667,15 +690,10 @@ function xmlUrlEntry(loc: string, lastmod?: string): string {
 // buildJobPosting() does: a locked job has no real page to list yet.
 export function buildJobsSitemapXml(jobs: SeoJob[]): string {
   const urls = jobs
-    .filter(isPubliclyDescribable)
-    .map((job) =>
-      xmlUrlEntry(
-        buildJobUrl(job),
-        job.publishedAt ? new Date(job.publishedAt).toISOString() : undefined
-      )
-    )
+    .map(buildJobSitemapEntry)
+    .filter((entry): entry is string => entry !== null)
     .join("\n");
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`;
+  return `${JOBS_SITEMAP_HEADER}${urls}${JOBS_SITEMAP_FOOTER}`;
 }
 
 export function buildSitemapIndexXml(sitemapUrls: string[]): string {

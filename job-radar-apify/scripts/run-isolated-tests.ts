@@ -13,7 +13,8 @@ const root = fileURLToPath(new URL("../", import.meta.url));
 const postgresImage = "postgres@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685";
 const suites: Record<string, string[]> = {
   unit: ["validate-test-safety.test.ts", "validate-dashboard-filters.ts", "validate-role-matching.ts"],
-  integration: ["validate-isolated-database.ts", "validate-job-pagination.ts", "validate-seo-job-pages.ts", "validate-companies-search.ts"],
+  integration: ["validate-isolated-database.ts", "validate-job-pagination.ts", "validate-seo-job-pages.ts", "validate-companies-search.ts", "validate-sitemap-streaming.ts"],
+  sitemap: ["validate-sitemap-streaming.ts"],
   pagination: ["validate-job-pagination.ts"],
   seo: ["validate-seo-job-pages.ts"],
   companies: ["validate-companies-search.ts"],
@@ -21,7 +22,7 @@ const suites: Record<string, string[]> = {
 };
 const selection = process.argv[2] || "unit";
 if (!Object.hasOwn(suites, selection) || process.argv.slice(3).some((arg) => arg !== "--dry-run")) {
-  throw new Error("[P0] Suite inválida. Usa unit, integration, pagination, seo, companies o baseline; --dry-run es opcional.");
+  throw new Error("[P0] Suite inválida. Usa unit, integration, sitemap, pagination, seo, companies o baseline; --dry-run es opcional.");
 }
 
 function docker(args: string[], env: NodeJS.ProcessEnv): string {

@@ -16,6 +16,7 @@
     "cli": "tsx src/index.ts",
     "test:unit": "tsx scripts/run-isolated-tests.ts unit",
     "test:integration": "tsx scripts/run-isolated-tests.ts integration",
+    "test:sitemap": "tsx scripts/run-isolated-tests.ts sitemap",
     "test:baseline": "tsx scripts/run-isolated-tests.ts baseline",
     "test:canary:adapters": "tsx tests/validate-adapters.ts",
     "test:adapters": "tsx tests/validate-adapters.ts",

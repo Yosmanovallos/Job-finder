@@ -399,6 +399,138 @@ export async function getJobsLight(
   });
 }
 
+export interface CanonicalSitemapJob {
+  jobId: string;
+  title: string;
+  company: string | null;
+  location: string | null;
+  url: string | null;
+  publishedAt: string | Date;
+  isLocked: boolean;
+}
+
+export interface SitemapStreamOptions {
+  onReady?: () => void | Promise<void>;
+  onJob: (job: CanonicalSitemapJob) => void | Promise<void>;
+  signal?: AbortSignal;
+  limit?: number;
+  batchSize?: number;
+  statementTimeoutMs?: number;
+}
+
+export class SitemapStreamAbortedError extends Error {
+  constructor() {
+    super("La descarga del sitemap fue cancelada.");
+    this.name = "SitemapStreamAbortedError";
+  }
+}
+
+interface SitemapJobRow {
+  id: string;
+  title: string;
+  company: string | null;
+  location: string | null;
+  url: string | null;
+  published_at: string | Date;
+  is_locked: boolean;
+}
+
+/**
+ * Reads the canonical job view through a server-side cursor. At most one
+ * small batch is retained while the caller writes it, so slow clients apply
+ * backpressure all the way to PostgreSQL instead of filling the Node heap.
+ */
+export async function streamCanonicalSitemapJobs(options: SitemapStreamOptions): Promise<number> {
+  const limit = Math.min(Math.max(options.limit ?? 50_000, 1), 50_000);
+  const batchSize = Math.min(Math.max(options.batchSize ?? 250, 1), 1_000);
+  const statementTimeoutMs = Math.min(
+    Math.max(options.statementTimeoutMs ?? 10_000, 1_000),
+    30_000
+  );
+  if (options.signal?.aborted) throw new SitemapStreamAbortedError();
+
+  const client = await pool.connect();
+  let transactionOpen = false;
+  let completed = false;
+  let backendPid: number | null = null;
+  let cancelPromise: Promise<unknown> | null = null;
+  const cancelBackend = () => {
+    if (completed || cancelPromise || backendPid === null) return;
+    cancelPromise = pool
+      .query("SELECT pg_cancel_backend($1)", [backendPid])
+      .catch(() => undefined);
+  };
+  options.signal?.addEventListener("abort", cancelBackend, { once: true });
+
+  try {
+    if (options.signal?.aborted) throw new SitemapStreamAbortedError();
+    await client.query("BEGIN READ ONLY");
+    transactionOpen = true;
+    const backend = await client.query<{ pid: number }>("SELECT pg_backend_pid() AS pid");
+    backendPid = backend.rows[0]?.pid ?? null;
+    await client.query("SELECT set_config('statement_timeout', $1, true)", [
+      `${statementTimeoutMs}ms`
+    ]);
+    await client.query(
+      `DECLARE sitemap_jobs_cursor NO SCROLL CURSOR FOR
+       SELECT id, title, company, location, url, published_at,
+              (published_at > NOW() - INTERVAL '48 hours') AS is_locked
+       FROM (
+         SELECT DISTINCT ON (lower(trim(title)), lower(trim(COALESCE(company, 'confidencial'))), lower(trim(COALESCE(location, CASE country WHEN 'VE' THEN 'venezuela' ELSE 'colombia' END))))
+                id, title, company, location, url, published_at
+         FROM jobs
+         WHERE is_active = TRUE
+         ORDER BY lower(trim(title)), lower(trim(COALESCE(company, 'confidencial'))), lower(trim(COALESCE(location, CASE country WHEN 'VE' THEN 'venezuela' ELSE 'colombia' END))), published_at DESC, id DESC
+       ) canonical
+       ORDER BY published_at DESC, id DESC
+       LIMIT ${limit}`
+    );
+    await options.onReady?.();
+
+    let count = 0;
+    while (count < limit) {
+      if (options.signal?.aborted) throw new SitemapStreamAbortedError();
+      const result = await client.query(`FETCH FORWARD ${batchSize} FROM sitemap_jobs_cursor`);
+      const rows = result.rows as SitemapJobRow[];
+      for (const row of rows) {
+        if (options.signal?.aborted) throw new SitemapStreamAbortedError();
+        await options.onJob({
+          jobId: row.id,
+          title: row.title,
+          company: row.company,
+          location: row.location,
+          url: row.url,
+          publishedAt: row.published_at,
+          isLocked: row.is_locked
+        });
+        count += 1;
+      }
+      if (rows.length < batchSize) break;
+    }
+
+    await client.query("CLOSE sitemap_jobs_cursor");
+    await client.query("COMMIT");
+    transactionOpen = false;
+    completed = true;
+    return count;
+  } catch (error) {
+    if (transactionOpen) {
+      try {
+        await client.query("ROLLBACK");
+      } catch {
+        // The connection may already have been canceled or closed.
+      }
+    }
+    if (options.signal?.aborted) throw new SitemapStreamAbortedError();
+    throw error;
+  } finally {
+    completed = true;
+    options.signal?.removeEventListener("abort", cancelBackend);
+    await cancelPromise;
+    client.release();
+  }
+}
+
 export interface JobsPageOptions {
   filters?: JobFilterParams;
   preferredRoles?: string[] | null;
@@ -863,32 +995,6 @@ function buildSalaryLabel(row: {
   const currency = `${row.salary_currency} `;
   if (min != null && max != null && min !== max) return `${currency}${fmt(min)} – ${fmt(max)}`;
   return `${currency}${fmt(min ?? max ?? 0)}`;
-}
-
-// Full job bodies are deliberately never cached by the web server: retaining
-// them caused the 256MB Render heap abort. Only the body-free sitemap corpus
-// keeps a bounded TTL cache.
-const JOBS_CACHE_TTL_MS = 10 * 60_000;
-
-let jobsLightCache: { data: any[]; expiresAt: number } | null = null;
-let jobsLightCachePending: Promise<any[]> | null = null;
-
-export async function getJobsLightCached(limit: number = DEFAULT_JOBS_LIMIT): Promise<any[]> {
-  const now = Date.now();
-  if (jobsLightCache && jobsLightCache.expiresAt > now) return jobsLightCache.data;
-  if (jobsLightCachePending) return jobsLightCachePending;
-
-  jobsLightCachePending = getJobsLight(limit)
-    .then((data) => {
-      jobsLightCache = { data, expiresAt: Date.now() + JOBS_CACHE_TTL_MS };
-      jobsLightCachePending = null;
-      return data;
-    })
-    .catch((err) => {
-      jobsLightCachePending = null;
-      throw err;
-    });
-  return jobsLightCachePending;
 }
 
 /**

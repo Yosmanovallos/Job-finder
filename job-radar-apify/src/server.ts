@@ -6,7 +6,6 @@ import { randomUUID } from "node:crypto";
 import dotenv from "dotenv";
 import {
   getJobsPage,
-  getJobsLightCached,
   getJobById,
   getActiveCompanyNames,
   searchActiveCompanies,
@@ -15,7 +14,9 @@ import {
   maskLockedFields,
   updateUserName,
   updateUserPreferredRoles,
-  getTransactionsForUser
+  getTransactionsForUser,
+  streamCanonicalSitemapJobs,
+  SitemapStreamAbortedError
 } from "./db/job-repository.js";
 import { markRoleForImmediateRescan } from "./db/scheduler-repository.js";
 import { wasJobPurged } from "./db/indexing-repository.js";
@@ -35,7 +36,9 @@ import {
   buildJobPosting,
   buildJobDescription,
   buildJobPath,
-  buildJobsSitemapXml,
+  buildJobSitemapEntry,
+  JOBS_SITEMAP_HEADER,
+  JOBS_SITEMAP_FOOTER,
   buildSitemapIndexXml,
   isUuid,
   resolveCategorySlug,
@@ -129,6 +132,34 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PUBLIC_DIR = path.join(__dirname, "..", "public");
 const PORT = process.env.PORT || 3000;
+const MAX_CONCURRENT_SITEMAP_STREAMS = 1;
+const SITEMAP_MAX_DURATION_MS = 30_000;
+let activeSitemapStreams = 0;
+
+function writeWithBackpressure(
+  res: http.ServerResponse,
+  chunk: string,
+  signal: AbortSignal
+): Promise<void> {
+  if (signal.aborted) return Promise.reject(new SitemapStreamAbortedError());
+  if (res.write(chunk)) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const cleanup = () => {
+      res.off("drain", onDrain);
+      signal.removeEventListener("abort", onAbort);
+    };
+    const onDrain = () => {
+      cleanup();
+      resolve();
+    };
+    const onAbort = () => {
+      cleanup();
+      reject(new SitemapStreamAbortedError());
+    };
+    res.once("drain", onDrain);
+    signal.addEventListener("abort", onAbort, { once: true });
+  });
+}
 
 // Reputación de empleador (docs/COMPANY-REPUTATION-PLAN.md, Fase R2) — one
 // batched query for however many jobs are in the caller's current page
@@ -1946,9 +1977,8 @@ async function handleRequest(
 
     const [visible] = maskLockedFields([job], tier);
     // Free uniqueness signal for the JobPosting description (SEO Fase 9,
-    // docs/SEO-PLAN.md §9.3): `jobs` is the light corpus already loaded above
-    // (getJobsLightCached), so counting same-company rows is an in-memory
-    // filter over cached data, not a new Postgres query.
+    // docs/SEO-PLAN.md §9.3): the count is computed by a scalar canonical SQL
+    // query, never by loading or retaining the full job corpus in Node.
     // Never for "Confidencial"/"Empresa confidencial" (COMPANY_SEARCH_EXCLUDED,
     // §78 above): those are undisclosed-employer placeholders shared by
     // thousands of unrelated postings, not one company — counting them would
@@ -2505,11 +2535,72 @@ async function handleRequest(
     // crawler — a sitemap has no session to resolve a real tier from
     // anyway, and it must never list a page (see isPubliclyDescribable
     // inside buildJobsSitemapXml) it wouldn't also show that visitor.
-    const jobs = await getJobsLightCached(50000);
-    const visibleJobs = maskLockedFields(jobs, "free");
-    const xml = buildJobsSitemapXml(visibleJobs);
-    res.writeHead(200, { "Content-Type": "application/xml; charset=utf-8" });
-    res.end(xml);
+    if (activeSitemapStreams >= MAX_CONCURRENT_SITEMAP_STREAMS) {
+      res.writeHead(503, {
+        "Content-Type": "text/plain; charset=utf-8",
+        "Retry-After": "30",
+        "Cache-Control": "no-store"
+      });
+      res.end("Sitemap temporalmente ocupado; intenta de nuevo en unos segundos.");
+      return;
+    }
+
+    activeSitemapStreams += 1;
+    const controller = new AbortController();
+    let headersStarted = false;
+    const abort = () => controller.abort();
+    const timeout = setTimeout(abort, SITEMAP_MAX_DURATION_MS);
+    req.once("aborted", abort);
+    res.once("close", abort);
+    try {
+      let wroteEntry = false;
+      await streamCanonicalSitemapJobs({
+        signal: controller.signal,
+        limit: 50_000,
+        batchSize: 250,
+        statementTimeoutMs: 10_000,
+        onReady: async () => {
+          res.writeHead(200, {
+            "Content-Type": "application/xml; charset=utf-8"
+          });
+          headersStarted = true;
+          await writeWithBackpressure(res, JOBS_SITEMAP_HEADER, controller.signal);
+        },
+        onJob: async (job) => {
+          const [visibleJob] = maskLockedFields([job], "free");
+          const entry = buildJobSitemapEntry(visibleJob);
+          if (!entry) return;
+          await writeWithBackpressure(
+            res,
+            `${wroteEntry ? "\n" : ""}${entry}`,
+            controller.signal
+          );
+          wroteEntry = true;
+        }
+      });
+      await writeWithBackpressure(res, JOBS_SITEMAP_FOOTER, controller.signal);
+      res.end();
+    } catch (error) {
+      if (error instanceof SitemapStreamAbortedError || controller.signal.aborted) {
+        if (!res.writableEnded) res.destroy();
+      } else if (!headersStarted) {
+        console.error("[sitemap-jobs] No se pudo iniciar el stream:", error);
+        res.writeHead(503, {
+          "Content-Type": "text/plain; charset=utf-8",
+          "Retry-After": "60",
+          "Cache-Control": "no-store"
+        });
+        res.end("Sitemap temporalmente no disponible.");
+      } else {
+        console.error("[sitemap-jobs] El stream falló después de iniciar la respuesta:", error);
+        res.destroy();
+      }
+    } finally {
+      clearTimeout(timeout);
+      req.off("aborted", abort);
+      res.off("close", abort);
+      activeSitemapStreams -= 1;
+    }
     return;
   }
 

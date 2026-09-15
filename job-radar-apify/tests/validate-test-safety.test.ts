@@ -99,7 +99,7 @@ test("P0-ENV-002: preload blocks TCP, HTTP and dotenv before application imports
   }
 });
 
-for (const file of ["validate-seo-job-pages.ts", "validate-companies-search.ts", "validate-job-pagination.ts", "validate-public-baseline.ts", "validate-isolated-database.ts", "validate-adapters.ts"]) {
+for (const file of ["validate-seo-job-pages.ts", "validate-companies-search.ts", "validate-job-pagination.ts", "validate-public-baseline.ts", "validate-isolated-database.ts", "validate-sitemap-streaming.ts", "validate-adapters.ts"]) {
   test(`P0-ENTRY-001: direct invocation of ${file} fails before loading the application`, () => {
     const result = spawnSync(process.execPath, ["--import", import.meta.resolve("tsx"), fileURLToPath(new URL(file, import.meta.url))], {
       env: buildTestEnvironment(process.env, { runId, directory, databaseUrl, httpPort: 3981, mode: "offline" }),
