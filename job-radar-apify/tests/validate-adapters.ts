@@ -1,7 +1,8 @@
+import "./require-live-sources.js";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { allAdapters, Job } from "../src/sources/index.js";
+import { allAdapters, type Job } from "../src/sources/index.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -31,7 +32,7 @@ async function runCharacterizationTests() {
     if (fs.existsSync(fixturePath)) {
       try {
         fixtureJobs = JSON.parse(fs.readFileSync(fixturePath, "utf-8"));
-      } catch (e) {
+      } catch {
         fixtureJobs = [];
       }
     }
@@ -110,16 +111,17 @@ async function runCharacterizationTests() {
         fixtureCount: fixtureJobs.length,
         adapterCount: liveJobs.length
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
       console.error(
-        `❌ [FAILED] ${adapter.name}: Excepción no capturada durante la ejecución: ${err?.message || err}`
+        `❌ [FAILED] ${adapter.name}: Excepción no capturada durante la ejecución: ${message}`
       );
       resultsSummary.push({
         name: adapter.name,
         status: "FAILED",
         fixtureCount: fixtureJobs.length,
         adapterCount: 0,
-        reason: err?.message || String(err)
+        reason: message
       });
       allPassed = false;
     }

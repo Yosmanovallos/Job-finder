@@ -99,6 +99,32 @@ pnpm notion:schema:check && pnpm notion:sync --dry-run   # --execute explícito
 pnpm apply:prepare --job <uuid> && pnpm apply:approve --application <uuid>
 ```
 
+## Production improvements — P0 verification
+
+- Work in the isolated `codex/prod-improvements-seo-ux-security` worktree;
+  do not inspect, merge or modify the frozen CV Generator work.
+- In `job-radar-apify`, `npm run test:unit` runs offline safety, dashboard
+  filter and role-matching checks with sanitized environment and blocked TCP.
+- `npm run test:integration` provisions its own disposable PostgreSQL 16
+  container (local Docker required, pinned image, temporary data, random
+  loopback port). It runs pagination, SEO and company-search checks.
+  `test:seo`, `test:companies-search` and `test:job-pagination` use the same
+  isolation; their direct test entry points reject the normal environment.
+- Do not treat the old SEO suite as read-only: it writes `indexing_queue`.
+  Other historical `test:*` commands are not automatically safe or isolated.
+- `npm run test:baseline` builds with synthetic settings and `envDir: false`,
+  then captures local SSR/SEO metadata and desktop/mobile screenshots.
+  Chromium must be installed with `npx playwright install chromium`.
+  Its generated `public/` build is for tests, not deployment.
+- Add `-- --dry-run` to the new runner commands to inspect the selected
+  suites without starting Docker or making writes. Logs, JSON reports and
+  screenshots stay in the printed OS temporary directory, not tracked data.
+- Live adapter canaries require explicit approval and `--allow-live-sources`;
+  they are never part of unit/integration/baseline runs.
+- P0 gates are not waived: the base `74f066b` has existing typecheck and
+  historical-test lint failures. Report these separately from new errors;
+  do not alter frozen code or suppress checks to claim phase completion.
+
 ## Package layout
 
 - `packages/config` — Zod env loader, actionable errors.

@@ -1,3 +1,4 @@
+import "./require-isolated-database.js";
 import { spawn, ChildProcess } from "child_process";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -48,8 +49,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // clearRepository()/saveJobs(), so it's read-only and safe to run
 // alongside the app or another test, but a dedicated port still avoids any
 // EADDRINUSE flakiness if something else is on 3000.
-const TEST_PORT = 3981;
-const BASE_URL = `http://localhost:${TEST_PORT}`;
+const TEST_PORT = Number(process.env.TEST_HTTP_PORT);
+const BASE_URL = `http://127.0.0.1:${TEST_PORT}`;
 
 let failures = 0;
 
@@ -420,8 +421,9 @@ function runPureFunctionTests() {
 // job-detail-enrichment pipeline (measured live: consistently ~10-12s to
 // serve /api/health now, previously well under 10s) — the server itself
 // isn't slower to RUN, just slower to transpile cold.
-async function waitForServer(maxAttempts = 80, delayMs = 250): Promise<void> {
+async function waitForServer(server: ChildProcess, maxAttempts = 80, delayMs = 250): Promise<void> {
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    if (server.exitCode !== null) throw new Error(`El servidor de prueba terminó con código ${server.exitCode}.`);
     try {
       const res = await fetch(`${BASE_URL}/api/health`);
       if (res.ok) return;
@@ -435,10 +437,11 @@ async function waitForServer(maxAttempts = 80, delayMs = 250): Promise<void> {
 
 function startServer(): ChildProcess {
   const serverPath = path.join(__dirname, "..", "src", "server.ts");
-  return spawn("npx", ["tsx", serverPath], {
-    cwd: path.join(__dirname, ".."),
-    shell: true,
-    detached: true,
+  return spawn(process.execPath, [...process.execArgv, serverPath], {
+    cwd: process.cwd(),
+    shell: false,
+    detached: false,
+    stdio: "inherit",
     env: { ...process.env, PORT: String(TEST_PORT) }
   });
 }
@@ -446,7 +449,7 @@ function startServer(): ChildProcess {
 function killServerTree(server: ChildProcess): void {
   if (server.pid) {
     try {
-      process.kill(-server.pid, "SIGKILL");
+      server.kill("SIGTERM");
     } catch {
       // Group may already be gone.
     }
@@ -484,7 +487,7 @@ async function runHttpTests() {
 
   const server = startServer();
   try {
-    await waitForServer();
+    await waitForServer(server);
 
     // Regression: existing routes must be completely unaffected.
     for (const route of ["/", "/dashboard", "/api/health", "/api/jobs"]) {

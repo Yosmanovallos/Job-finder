@@ -1,5 +1,12 @@
-import { Job } from '../src/sources/types.js';
-import { FilterState } from '../src/components/FilterBar.js';
+import assert from 'node:assert/strict';
+import type { Job } from '../src/sources/types.js';
+import type { FilterState } from '../src/components/FilterBar.js';
+import { applyJobFilters } from '../src/lib/job-filters.js';
+
+const defaultFilters: FilterState = {
+  search: '', sources: [], modality: 'all', freshness: 'all', savedOnly: false,
+  appliedOnly: false, selectedRoles: [], cities: [], company: ''
+};
 
 // Sample dataset of 100 jobs for instant local filtering benchmark
 const sampleJobs: Job[] = Array.from({ length: 100 }, (_, i) => ({
@@ -14,36 +21,17 @@ const sampleJobs: Job[] = Array.from({ length: 100 }, (_, i) => ({
 }));
 
 function applyFiltersLocally(jobs: Job[], filters: FilterState): Job[] {
-  let result = [...jobs];
-
-  if (filters.search.trim()) {
-    const s = filters.search.toLowerCase();
-    result = result.filter(j => 
-      j.title.toLowerCase().includes(s) ||
-      j.company.toLowerCase().includes(s) ||
-      j.location.toLowerCase().includes(s)
-    );
-  }
-
-  if (filters.source && filters.source !== 'all') {
-    result = result.filter(j => j.source === filters.source);
-  }
-
-  if (filters.modality && filters.modality !== 'all') {
-    const m = filters.modality.toLowerCase();
-    result = result.filter(j => {
-      const loc = j.location.toLowerCase();
-      if (m === 'remoto') return loc.includes('remoto');
-      if (m === 'hibrido') return loc.includes('híbrido') || loc.includes('hibrido');
-      if (m === 'presencial') return !loc.includes('remoto') && !loc.includes('híbrido');
-      return true;
-    });
-  }
-
-  return result;
+  return applyJobFilters(jobs, {
+    search: filters.search, sources: filters.sources, cities: filters.cities,
+    modality: filters.modality, freshness: filters.freshness,
+    roles: filters.selectedRoles, company: filters.company
+  });
 }
 
 async function runDashboardFilterTests() {
+  assert.equal(applyFiltersLocally(sampleJobs, { ...defaultFilters, sources: ['LinkedIn', 'Computrabajo'] }).length, 67);
+  assert.equal(applyFiltersLocally(sampleJobs, defaultFilters).length, 100);
+  assert.equal(applyFiltersLocally(sampleJobs, { ...defaultFilters, cities: ['Bogotá'] }).length, 25);
   console.log(`\n==================================================`);
   console.log(`🧪 TEST DE VALIDACIÓN DE FILTROS INSTANTÁNEOS DEL DASHBOARD`);
   console.log(`==================================================\n`);
@@ -52,8 +40,9 @@ async function runDashboardFilterTests() {
 
   // Test 1: Source Filter Execution Time (< 50ms)
   const start1 = performance.now();
-  const res1 = applyFiltersLocally(sampleJobs, { search: '', source: 'LinkedIn', modality: 'all', freshness: 'all', savedOnly: false });
+  const res1 = applyFiltersLocally(sampleJobs, { ...defaultFilters, sources: ['LinkedIn'] });
   const duration1 = performance.now() - start1;
+  assert.equal(res1.length, 34);
 
   console.log(`🔍 [Test 1] Filtro por Fuente "LinkedIn": ${res1.length} vacantes devueltas en ${duration1.toFixed(2)}ms.`);
   if (duration1 > 50) {
@@ -64,7 +53,7 @@ async function runDashboardFilterTests() {
 
   // Test 2: Modality Filter Execution
   const start2 = performance.now();
-  const res2 = applyFiltersLocally(sampleJobs, { search: '', source: 'all', modality: 'remoto', freshness: 'all', savedOnly: false });
+  const res2 = applyFiltersLocally(sampleJobs, { ...defaultFilters, modality: 'remoto' });
   const duration2 = performance.now() - start2;
 
   console.log(`\n🔍 [Test 2] Filtro por Modalidad "Remoto": ${res2.length} vacantes devueltas en ${duration2.toFixed(2)}ms.`);
@@ -76,7 +65,7 @@ async function runDashboardFilterTests() {
 
   // Test 3: Text Search Query Filter Execution
   const start3 = performance.now();
-  const res3 = applyFiltersLocally(sampleJobs, { search: 'Senior', source: 'all', modality: 'all', freshness: 'all', savedOnly: false });
+  const res3 = applyFiltersLocally(sampleJobs, { ...defaultFilters, search: 'Senior' });
   const duration3 = performance.now() - start3;
 
   console.log(`\n🔍 [Test 3] Búsqueda por palabra clave "Senior": ${res3.length} vacantes devueltas en ${duration3.toFixed(2)}ms.`);

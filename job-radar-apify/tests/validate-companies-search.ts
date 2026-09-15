@@ -1,16 +1,24 @@
-import { spawn, ChildProcess } from "child_process";
+import "./require-isolated-database.js";
+import { spawn, type ChildProcess } from "child_process";
+import { z } from "zod";
 import path from "path";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 import { saveJobs } from "../src/db/job-repository.js";
 import { pool } from "../src/db/client.js";
-import { Job } from "../src/sources/types.js";
+import type { Job } from "../src/sources/types.js";
 
 dotenv.config();
 
+const companySearchResponseSchema = z.object({
+  companies: z.array(z.object({ company: z.string(), count: z.number().int().nonnegative() })),
+  total: z.number().int().nonnegative(),
+  hasMore: z.boolean()
+});
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const TEST_PORT = 3977;
-const BASE_URL = `http://localhost:${TEST_PORT}`;
+const TEST_PORT = Number(process.env.TEST_HTTP_PORT);
+const BASE_URL = `http://127.0.0.1:${TEST_PORT}`;
 // "Zz" prefix keeps this test's companies sorted away from real ones. Real
 // cleanup is scoped by URL prefix (below), not by this company name prefix
 // — the two placeholder-exclusion test rows deliberately use company =
@@ -35,12 +43,13 @@ async function cleanupTestJobs(): Promise<void> {
 
 // maxAttempts bumped 40->80 (2026-08-12): same cold-tsx-startup fix as
 // validate-seo-job-pages.ts — see that file's comment for the measurement.
-async function waitForServer(maxAttempts = 80, delayMs = 250): Promise<void> {
+async function waitForServer(server: ChildProcess, maxAttempts = 80, delayMs = 250): Promise<void> {
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    if (server.exitCode !== null) throw new Error(`El servidor de prueba terminó con código ${server.exitCode}.`);
     try {
       const res = await fetch(`${BASE_URL}/api/health`);
       if (res.ok) return;
-    } catch (e) {
+    } catch {
       // not up yet
     }
     await new Promise((r) => setTimeout(r, delayMs));
@@ -50,10 +59,11 @@ async function waitForServer(maxAttempts = 80, delayMs = 250): Promise<void> {
 
 function startServer(): ChildProcess {
   const serverPath = path.join(__dirname, "..", "src", "server.ts");
-  return spawn("npx", ["tsx", serverPath], {
-    cwd: path.join(__dirname, ".."),
-    shell: true,
-    detached: true,
+  return spawn(process.execPath, [...process.execArgv, serverPath], {
+    cwd: process.cwd(),
+    shell: false,
+    detached: false,
+    stdio: "inherit",
     env: { ...process.env, PORT: String(TEST_PORT) }
   });
 }
@@ -61,8 +71,8 @@ function startServer(): ChildProcess {
 function killServerTree(server: ChildProcess): void {
   if (server.pid) {
     try {
-      process.kill(-server.pid, "SIGKILL");
-    } catch (e) {
+      server.kill("SIGTERM");
+    } catch {
       // Group may already be gone.
     }
   }
@@ -110,14 +120,14 @@ async function runCompaniesSearchValidation() {
   // a thrown Error so cleanup + killServerTree always run before the outer
   // .catch() exits non-zero.
   try {
-    await waitForServer();
+    await waitForServer(server);
     console.log(`✅ [Test] Servidor arriba.`);
 
     // Test 1: substring match, case-insensitive
     console.log(`\n🔍 [Test 1] q="zztest corp" hace match por substring, insensible a mayúsculas...`);
     const res1 = await fetch(`${BASE_URL}/api/companies/search?q=zztest%20corp`);
-    const body1 = await res1.json();
-    const names1 = body1.companies.map((c: any) => c.company);
+    const body1 = companySearchResponseSchema.parse(await res1.json());
+    const names1 = body1.companies.map((c) => c.company);
     if (!names1.includes(COMPANY_MANY) || !names1.includes(COMPANY_FEW) || !names1.includes(COMPANY_ONE)) {
       throw new Error(`[Test 1] Esperaba las 3 empresas ZzTest en el resultado. Body: ${JSON.stringify(body1)}`);
     }
@@ -131,8 +141,8 @@ async function runCompaniesSearchValidation() {
     // this only asserts the two literal placeholders never appear.
     console.log(`\n🔍 [Test 2] Los dos placeholders exactos nunca aparecen (variantes de casing sí)...`);
     const res2 = await fetch(`${BASE_URL}/api/companies/search?q=confidencial&limit=50`);
-    const body2 = await res2.json();
-    const names2 = body2.companies.map((c: any) => c.company);
+    const body2 = companySearchResponseSchema.parse(await res2.json());
+    const names2 = body2.companies.map((c) => c.company);
     if (names2.includes("Confidencial") || names2.includes("Empresa confidencial")) {
       throw new Error(`[Test 2] Los placeholders exactos no deben aparecer nunca. Body: ${JSON.stringify(body2)}`);
     }
@@ -141,15 +151,15 @@ async function runCompaniesSearchValidation() {
     // Test 3: ordered by count descending
     console.log(`\n🔍 [Test 3] Orden por conteo de vacantes descendente...`);
     const res3 = await fetch(`${BASE_URL}/api/companies/search?q=zztest%20corp`);
-    const body3 = await res3.json();
-    const order3 = body3.companies.map((c: any) => c.company);
+    const body3 = companySearchResponseSchema.parse(await res3.json());
+    const order3 = body3.companies.map((c) => c.company);
     const idxMany = order3.indexOf(COMPANY_MANY);
     const idxFew = order3.indexOf(COMPANY_FEW);
     const idxOne = order3.indexOf(COMPANY_ONE);
     if (!(idxMany < idxFew && idxFew < idxOne)) {
       throw new Error(`[Test 3] Esperaba orden Cinco(5) > Dos(2) > Uno(1). Body: ${JSON.stringify(body3.companies)}`);
     }
-    const countMany = body3.companies.find((c: any) => c.company === COMPANY_MANY)?.count;
+    const countMany = body3.companies.find((c) => c.company === COMPANY_MANY)?.count;
     if (countMany !== 5) {
       throw new Error(`[Test 3] ${COMPANY_MANY} debía tener count=5, llegó ${countMany}.`);
     }
@@ -158,12 +168,12 @@ async function runCompaniesSearchValidation() {
     // Test 4: limit cap
     console.log(`\n🔍 [Test 4] limit respeta el tope (y el tope máximo de 100)...`);
     const res4 = await fetch(`${BASE_URL}/api/companies/search?q=zztest%20corp&limit=2`);
-    const body4 = await res4.json();
+    const body4 = companySearchResponseSchema.parse(await res4.json());
     if (body4.companies.length !== 2) {
       throw new Error(`[Test 4] Con limit=2 esperaba 2 resultados, llegaron ${body4.companies.length}.`);
     }
     const res4b = await fetch(`${BASE_URL}/api/companies/search?limit=9999`);
-    const body4b = await res4b.json();
+    const body4b = companySearchResponseSchema.parse(await res4b.json());
     if (body4b.companies.length > 100) {
       throw new Error(`[Test 4] limit debe capearse en 100, llegaron ${body4b.companies.length}.`);
     }
@@ -172,7 +182,7 @@ async function runCompaniesSearchValidation() {
     // Test 5: q vacío o de 1 char devuelve sugerencias top-N globales (no vacío)
     console.log(`\n🔍 [Test 5] q vacío devuelve sugerencias (top-N global), no un array vacío...`);
     const res5 = await fetch(`${BASE_URL}/api/companies/search?limit=5`);
-    const body5 = await res5.json();
+    const body5 = companySearchResponseSchema.parse(await res5.json());
     if (!Array.isArray(body5.companies) || body5.companies.length === 0) {
       throw new Error(`[Test 5] q vacío debía devolver sugerencias top-N, llegó: ${JSON.stringify(body5)}`);
     }
@@ -194,8 +204,8 @@ async function runCompaniesSearchValidation() {
       COMPANY_ONE
     ];
     const resFull = await fetch(`${BASE_URL}/api/companies/search?q=zztest%20corp&limit=6`);
-    const bodyFull = await resFull.json();
-    const orderFull = bodyFull.companies.map((c: any) => c.company);
+    const bodyFull = companySearchResponseSchema.parse(await resFull.json());
+    const orderFull = bodyFull.companies.map((c) => c.company);
     if (JSON.stringify(orderFull) !== JSON.stringify(expectedOrder)) {
       throw new Error(
         `[Test 6] Orden esperado ${JSON.stringify(expectedOrder)}, llegó ${JSON.stringify(orderFull)}.`
@@ -203,12 +213,12 @@ async function runCompaniesSearchValidation() {
     }
 
     const resPage1 = await fetch(`${BASE_URL}/api/companies/search?q=zztest%20corp&limit=3&offset=0`);
-    const bodyPage1 = await resPage1.json();
+    const bodyPage1 = companySearchResponseSchema.parse(await resPage1.json());
     const resPage2 = await fetch(`${BASE_URL}/api/companies/search?q=zztest%20corp&limit=3&offset=3`);
-    const bodyPage2 = await resPage2.json();
+    const bodyPage2 = companySearchResponseSchema.parse(await resPage2.json());
     const pagedOrder = [
-      ...bodyPage1.companies.map((c: any) => c.company),
-      ...bodyPage2.companies.map((c: any) => c.company)
+      ...bodyPage1.companies.map((c) => c.company),
+      ...bodyPage2.companies.map((c) => c.company)
     ];
     if (JSON.stringify(pagedOrder) !== JSON.stringify(expectedOrder)) {
       throw new Error(

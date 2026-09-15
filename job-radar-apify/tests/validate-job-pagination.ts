@@ -1,3 +1,4 @@
+import "./require-isolated-database.js";
 import {
   getJobById,
   getJobsPage,
