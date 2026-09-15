@@ -30,6 +30,18 @@ function report(ok: boolean, label: string, detail: string): void {
 async function main(): Promise<void> {
   console.log("🔎 Verificación P2 (solo lectura) — no modifica ninguna tabla.\n");
 
+  // 0. Corpus intacto: conteos de lo que ya existía, para comparar antes y
+  //    después de la migración. Solo totales, ningún dato de nadie.
+  const corpus = await pool.query<{ vacantes: string; usuarios: string; transacciones: string; roles: string }>(
+    `SELECT (SELECT COUNT(*) FROM jobs)::text AS vacantes,
+            (SELECT COUNT(*) FROM users)::text AS usuarios,
+            (SELECT COUNT(*) FROM transactions)::text AS transacciones,
+            (SELECT COUNT(*) FROM search_roles)::text AS roles`
+  );
+  const before = corpus.rows[0];
+  console.log(`📦 Corpus actual: ${before.vacantes} vacantes, ${before.usuarios} usuarios, ${before.transacciones} transacciones, ${before.roles} roles.`);
+  console.log("   (P2 no escribe en ninguna de estas tablas; compara este número antes y después de migrar.)\n");
+
   // 1. ¿Existen las dos tablas nuevas?
   const tables = await pool.query<{ table_name: string }>(
     `SELECT table_name FROM information_schema.tables
