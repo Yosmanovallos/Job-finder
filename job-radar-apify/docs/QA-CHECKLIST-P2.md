@@ -1,0 +1,82 @@
+# QA — P2 Observabilidad de ejecuciones (`74bbe7a`, `7aa6738`, `f0b9e21`)
+
+Checklist para validar y publicar la fase P2. Nada de esto está aplicado
+todavía: la rama `codex/prod-improvements-seo-ux-security` es local y
+producción sigue exactamente como estaba.
+
+## Qué toca y qué NO toca esta fase
+
+| Cosa | ¿La toca? |
+|---|---|
+| Tabla `jobs` (todas las vacantes) | **No.** P2 no la lee para escribir ni la modifica. |
+| `users`, `transactions`, `cv_*`, `company_reputation`, `indexing_queue` | **No.** |
+| Tablas nuevas `scrape_runs` / `source_attempts` | Sí — se crean vacías. |
+| Borrados | Solo filas de `scrape_runs` con más de 30 días (y sus intentos en cascada). Nunca vacantes. |
+| Datos personales | Ninguno: no se guardan usuarios, correos, ni contenido de vacantes. |
+| Mensajes de error crudos | No se guardan (pueden traer URLs con credenciales); solo la clase del error. |
+
+## 1. Antes de tocar producción (local, sin riesgo)
+
+Requiere Docker Desktop abierto. Usa una base temporal, nunca la real.
+
+- [ ] `npm run test:unit`
+- [ ] `npm run test:integration`
+- [ ] `npm run build`
+
+## 2. Crear las tablas en la base real
+
+La migración aplica `schema.sql` completo, como en fases anteriores: todo
+es `CREATE TABLE/INDEX IF NOT EXISTS` y `ADD COLUMN IF NOT EXISTS`, sin
+`DROP TABLE`, `TRUNCATE` ni `DELETE`.
+
+- [ ] `npx tsx scripts/migrate.ts`
+- [ ] Repetirlo una segunda vez: debe terminar igual de bien (idempotente).
+- [ ] `npx tsx scripts/verify-p2-observability.ts` → tablas creadas, RLS
+      activo, 0 permisos para `anon`/`authenticated`.
+
+Si algo falla aquí, **no despliegues** y revisa antes.
+
+## 3. Token del panel de diagnóstico (opcional)
+
+Sin esto, `/api/admin/runs` responde `404` y el resto funciona igual.
+
+- [ ] Generar: `node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"`
+- [ ] Guardarlo en el gestor de contraseñas (nunca en git ni en un chat).
+- [ ] Render → servicio `job-radar-apify` → Environment → `OPS_ADMIN_TOKEN`.
+- [ ] Añadir la variable (vacía, solo como documentación) a `.env.example`.
+
+## 4. Desplegar
+
+- [ ] Fusionar la rama a la que Render tiene conectada y subirla.
+- [ ] Esperar el despliegue y comprobar que el sitio carga con normalidad.
+
+Orden recomendado: tablas (paso 2) antes del despliegue. Si se invierte,
+no se pierde nada: los ticks siguen guardando vacantes y solo `/api/runs`
+responde `503` hasta aplicar la migración.
+
+## 5. Después del despliegue
+
+- [ ] `https://tu-sitio/api/runs` responde `200` con ejecuciones reales.
+- [ ] Tras uno o dos ticks (15 min), `npx tsx scripts/verify-p2-observability.ts`
+      muestra ejecuciones y el estado real por fuente.
+- [ ] El resumen del workflow en GitHub Actions trae la columna **Estado**.
+- [ ] Con token: `Invoke-RestMethod "https://tu-sitio/api/admin/runs" -Headers @{Authorization="Bearer $t"}`
+- [ ] Sin token o con uno incorrecto: responde `401`.
+- [ ] Velocidad: `npx tsx scripts/verify-p2-observability.ts --url https://tu-sitio.com`
+      → p95 por debajo de 800 ms.
+
+## 6. Una semana después
+
+- [ ] `npx tsx scripts/verify-p2-observability.ts` → tamaño de
+      `source_attempts` por debajo de ~15 MB. Si lo supera, bajar la
+      retención de 30 a 14 días (`RUN_RETENTION_DAYS` en
+      `src/observability/run-telemetry.ts`).
+
+## Marcha atrás
+
+- **Revertir el código:** `git revert` de los tres commits. Las tablas
+  quedan sin usarse; no se pierde ninguna vacante.
+- **Quitar las tablas** (solo si quieres limpiar de verdad; borra el
+  historial de ejecuciones, nada más):
+  `DROP TABLE source_attempts; DROP TABLE scrape_runs;`
+- **Apagar solo el panel admin:** borrar `OPS_ADMIN_TOKEN` en Render.
