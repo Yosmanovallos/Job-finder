@@ -29,10 +29,17 @@ La migración aplica `schema.sql` completo, como en fases anteriores: todo
 es `CREATE TABLE/INDEX IF NOT EXISTS` y `ADD COLUMN IF NOT EXISTS`, sin
 `DROP TABLE`, `TRUNCATE` ni `DELETE`.
 
-- [ ] `npx tsx scripts/migrate.ts`
-- [ ] Repetirlo una segunda vez: debe terminar igual de bien (idempotente).
-- [ ] `npx tsx scripts/verify-p2-observability.ts` → tablas creadas, RLS
-      activo, 0 permisos para `anon`/`authenticated`.
+- [x] `npx tsx scripts/migrate.ts` — **hecho 2026-09-15**.
+- [x] Repetirlo una segunda vez: terminó igual de bien (idempotente).
+- [x] `npx tsx scripts/verify-p2-observability.ts` → tablas creadas, RLS
+      activo, 0 permisos para `anon`/`authenticated`, ambas vacías (32 kB),
+      corpus intacto.
+
+> Nota: el `.env` vive en la carpeta principal, no en el worktree. Para
+> ejecutar los scripts de esta rama contra la base real sin duplicar el
+> archivo de credenciales, sitúate en `Job-finder/job-radar-apify` (de ahí
+> se cargan las variables) e invoca el script por su ruta completa en
+> `Job-finder-prod-improvements/job-radar-apify/scripts/…`.
 
 Si algo falla aquí, **no despliegues** y revisa antes.
 

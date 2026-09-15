@@ -71,8 +71,11 @@ recrearon `HEAD`/`commondir`/`gitdir` y se reconstruyó solo el índice
 
 ## Publicación (fuera de esta sesión, requiere aprobación)
 
-1. `npx tsx scripts/migrate.ts` contra staging; verificar RLS y `REVOKE`
-   con los roles reales `anon`/`authenticated`.
+1. ✅ **Hecho (2026-09-15, autorizado por el usuario).** No hay entorno de
+   staging: `npx tsx scripts/migrate.ts` se aplicó contra la única base
+   real, dos veces (idempotente). Verificado con
+   `scripts/verify-p2-observability.ts`: ambas tablas con RLS activo, 0
+   grants a `anon`/`authenticated`, vacías, y corpus sin cambios.
 2. Configurar `OPS_ADMIN_TOKEN` (≥32 caracteres) en Render.
 3. Desplegar; observar un tick CO, uno VE y uno de navegador en
    `/api/admin/runs`.
