@@ -27,8 +27,8 @@ mejoras de SEO/UX/seguridad/observabilidad.
 |---|---|---|---|---|
 | P0 | Aislamiento de tests, PostgreSQL desechable, baseline | ✅ Done | `a73a85e` | `openspec/changes/archive/p0-test-isolation/` |
 | P1 | Hotfix sitemap: streaming, memoria acotada | ✅ Done | `d03b7a5` | `openspec/changes/archive/p1-sitemap-streaming/` |
-| P2 | Observabilidad: `ScrapeRun`/`SourceAttempt`, estados clasificados, `/api/runs` | 🔵 Spec draft | — | `openspec/changes/p2-run-observability/` |
-| P3 | Timeouts efectivos, cancelación, cadencia, leases | ⬜ Pendiente | — | — |
+| P2 | Observabilidad: `ScrapeRun`/`SourceAttempt`, estados clasificados, `/api/runs` | ✅ Done | `74bbe7a` | `openspec/changes/archive/p2-run-observability/` |
+| P3 | Timeouts efectivos, cancelación, cadencia, leases | 🔵 Spec draft | — | `openspec/changes/p3-execution-deadlines/` |
 | P4 | Contrato `SourceFetchResult`, transporte/proxy por política | ⬜ Pendiente | — | — |
 | P5 | Recuperación de adaptadores (una fuente por entrega) | ⬜ Pendiente | — | — |
 | P6 | Cola persistente de enriquecimiento + calidad de datos | ⬜ Pendiente | — | — |
@@ -47,6 +47,8 @@ Leyenda: ✅ done · 🔵 spec/draft · 🟡 en implementación · ⬜ pendiente
 - `/sitemap-jobs.xml` cargaba hasta 50.000 vacantes y construía todo el XML
   en memoria → reproducible OOM/502 en Render. **Resuelto en P1.**
 - `/api/runs` lee el historial del caché JSON local, no ejecuciones reales.
+  **Resuelto en P2** (lee `scrape_runs`; el caché JSON sigue escribiéndose
+  para scripts heredados, pero ya no es fuente de historial).
 - Varias rutas devuelven `[]` ante errores, bloqueos o circuito abierto.
 - Timeouts del tick usan `Promise.race` sin cancelar el trabajo restante.
 - Enriquecimiento: hasta 8 vacantes nuevas por adaptador/rol; las omitidas
@@ -54,6 +56,21 @@ Leyenda: ✅ done · 🔵 spec/draft · 🟡 en implementación · ⬜ pendiente
 - Workflows en Node 20; la app declara Node `24.18.0`.
 - Baseline de gates heredados: 35 errores de typecheck, 33 de lint en
   tests históricos. Reportar siempre separados de errores nuevos.
+  *(Corrección de alcance, P2: en `61ec1b1`, `npx tsc --noEmit -p .` en
+  `job-radar-apify` da 29; `npx eslint job-radar-apify` desde la raíz del
+  worktree da **295** en todo el paquete, 52 de ellos en `tests/`. La cifra
+  "27" de P1 correspondía a un alcance más estrecho no registrado. Desde P2
+  el gate es un diff antes/después del mismo comando por archivo y regla.)*
+- `validateJobs()` no incluye `Jooble` en `KNOWN_SOURCES`: toda vacante de
+  Jooble se descarta antes de persistir. Visible desde P2 como
+  `failed / all_rejected_by_validation`; corregir en P5/P6.
+- Scrapers de `src/index.ts` distintos de Jooble siguen tragando errores y
+  devolviendo `[]` sin señal; P2 solo cubre `executeWithResilience`, Jooble
+  y los scrapers de navegador. Pendiente en P4/P5.
+- Entorno (2026-09-15): los metadatos git de este worktree fueron podados
+  por un proceso externo (patrón `git worktree prune` desde WSL, que ve la
+  ruta `C:/…` como inexistente) y se recrearon con aprobación. Recomendado:
+  `git worktree lock` sobre este worktree y no ejecutar `prune` desde WSL.
 
 ## Contratos propuestos (aprobar antes de programar cada fase)
 
@@ -219,3 +236,4 @@ rollback.
 |---|---|---|
 | 2026-09-15 | P0 | Commit `a73a85e`. Runner aislado, PostgreSQL desechable, baseline 9 rutas/18 capturas. Gates heredados documentados (35 tsc / 33 lint, 0 nuevos). |
 | 2026-09-15 | P1 | Commit `d03b7a5`. Sitemap en streaming (lotes de 250, backpressure, 50k máx., 1 descarga concurrente, timeouts 10s/30s, cancelación de cursor, 503 seguro). 100k filas sintéticas, ~34 MB heap extra, ~304 MB RSS. tsc 29 heredados / lint 27 heredados, 0 nuevos. |
+| 2026-09-15 | P2 | Commit `74bbe7a`. `scrape_runs`/`source_attempts` aditivos (RLS + `REVOKE`); `RunRecorder` clasifica cada intento con señales reales (circuito abierto, deny, reintentos agotados, errores tragados, credencial ausente, rechazo por validación) — ningún fallo como éxito vacío; latido 60 s, reconciliación a `interrupted` (10 min) y derivación en lectura; rezagados → `timeout` sin sobrescritura; retención 30 d; `/api/runs` desde Postgres (forma compatible, paginado, sin datos operativos, `503` ante fallo) y `/api/admin/runs` con `OPS_ADMIN_TOKEN` fail-closed. Tick de navegador incluido. OBS-001…012 en integración; unit 34/34, integración 6/6, baseline y build en verde. tsc 29 / eslint 295 heredados (alcance corregido, ver hallazgos), 0 nuevos. Sin migración en BD real, sin push ni despliegue. |
