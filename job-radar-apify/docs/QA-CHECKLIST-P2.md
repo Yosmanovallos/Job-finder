@@ -47,15 +47,19 @@ Si algo falla aquí, **no despliegues** y revisa antes.
 
 Sin esto, `/api/admin/runs` responde `404` y el resto funciona igual.
 
-- [ ] Generar: `node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"`
-- [ ] Guardarlo en el gestor de contraseñas (nunca en git ni en un chat).
-- [ ] Render → servicio `job-radar-apify` → Environment → `OPS_ADMIN_TOKEN`.
-- [ ] Añadir la variable (vacía, solo como documentación) a `.env.example`.
+- [x] Generar: `node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"`
+- [x] Guardarlo en el gestor de contraseñas (nunca en git ni en un chat).
+- [x] Render → servicio `job-radar-apify` → Environment → `OPS_ADMIN_TOKEN`
+      — **hecho 2026-09-15**; comprobado de forma indirecta (404 → 401).
+- [x] Añadir la variable a `.env.example`.
 
 ## 4. Desplegar
 
-- [ ] Fusionar la rama a la que Render tiene conectada y subirla.
-- [ ] Esperar el despliegue y comprobar que el sitio carga con normalidad.
+- [x] Fusionar la rama a la que Render tiene conectada y subirla —
+      **hecho 2026-09-15**: `main` avanzó de `74f066b` a `5d41861` en
+      fast-forward, sin `--force`.
+- [x] Esperar el despliegue y comprobar que el sitio carga con normalidad
+      — activo ~60 s después del push, `/api/health` en `200`.
 
 Orden recomendado: tablas (paso 2) antes del despliegue. Si se invierte,
 no se pierde nada: los ticks siguen guardando vacantes y solo `/api/runs`

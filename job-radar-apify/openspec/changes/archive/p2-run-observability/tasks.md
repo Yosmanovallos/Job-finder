@@ -76,14 +76,27 @@ recrearon `HEAD`/`commondir`/`gitdir` y se reconstruyó solo el índice
    real, dos veces (idempotente). Verificado con
    `scripts/verify-p2-observability.ts`: ambas tablas con RLS activo, 0
    grants a `anon`/`authenticated`, vacías, y corpus sin cambios.
-2. Configurar `OPS_ADMIN_TOKEN` (≥32 caracteres) en Render.
-3. Desplegar; observar un tick CO, uno VE y uno de navegador en
-   `/api/admin/runs`.
+2. ✅ **Hecho (2026-09-15, por el usuario).** `OPS_ADMIN_TOKEN` configurado
+   en Render. Verificado sin conocer el valor: `/api/admin/runs` pasó de
+   `404` (variable ausente) a `401` sin token y con token incorrecto.
+3. ✅ **Desplegado (2026-09-15).** `main` avanzó a `5d41861`; el código
+   nuevo quedó activo ~60 s después del push. `/api/runs` responde `200`
+   con el contrato nuevo y ya no expone los registros de prueba que servía
+   el caché JSON versionado. **Pendiente:** observar el primer tick real
+   CO/VE/navegador (ver nota de cadencia abajo).
 4. Confirmar que un tick cancelado aparece `interrupted` en ≤ 25 min.
 5. Confirmar el tamaño real de `source_attempts` tras 7 días frente a la
    estimación (~20–40 MB a 30 días).
-6. Medir p95 de `GET /api/runs` en staging con volumen realista (gate
-   "sin deterioro >10%", no medido en P2).
-7. **Acción del usuario:** documentar `OPS_ADMIN_TOKEN` (≥32 caracteres,
-   opcional; sin él la vista admin responde `404`) en `.env.example`,
-   archivo denegado a agentes.
+6. ✅ **Hecho (2026-09-15)** contra producción ya desplegada: p95 de
+   `GET /api/runs` = 258 ms, mediana 151 ms (objetivo < 800 ms).
+7. ✅ **Hecho por el usuario (2026-09-15):** `OPS_ADMIN_TOKEN` documentado
+   en `.env.example`.
+
+### Nota de cadencia observada al desplegar (evidencia para P3)
+
+El tick CO está programado cada 15 min, pero las ejecuciones reales de
+2026-09-15 fueron 16:54, 19:53 y 22:30 UTC — entre 1,5 y 3 h de separación.
+GitHub está descartando la mayoría de las ejecuciones programadas, justo el
+riesgo que documenta el plan (§P3). Consecuencia práctica: tras desplegar,
+la primera ejecución registrada puede tardar horas en aparecer salvo que se
+dispare el workflow a mano (`workflow_dispatch` está habilitado).
