@@ -132,6 +132,10 @@ RunRecorder.disabled(): RunRecorder                  // no-op para llamadores si
   `status` (aditivo).
 - `saveJobs()` devuelve además `validCount` (aditivo); sigue escribiendo
   el caché JSON (lo leen `check-cache-jobs.ts`/`fix-cache-urls.ts`).
+- `getRuns()` (`job-repository.ts`) se eliminó: su único llamador era
+  `server.ts`, que ahora delega en `routes/runs.ts` → `listRuns()`.
+  `getAllCachedRuns()` (`cache-manager.ts`) queda sin llamadores; es código
+  heredado fuera del alcance de P2 y no se toca.
 - `scripts/run-scrape-tick.ts`: `reconcileStaleRuns()` → `start` →
   catálogo global y roles con intentos → espera acotada existente →
   `finish()` (intentos en curso → `timeout`) → `purgeOldRuns(30)` →
@@ -168,6 +172,11 @@ ejecuciones con agregado por estado indexado por `run_id`.
 - Si la migración no está aplicada al desplegar el código: los ticks
   siguen guardando vacantes (OBS-007) y `/api/runs` responde `503` hasta
   aplicar `scripts/migrate.ts`.
+- Rendimiento: el p95 de `/api/runs` no se midió en P2 (ver OBS-008);
+  se mide en staging antes de ampliar.
+- `OPS_ADMIN_TOKEN` no se añadió a `.env.example`: el archivo está
+  denegado a agentes (`.claude/settings.json`, `Read(./.env.*)`). Queda
+  como acción del usuario.
 
 ## Pruebas
 

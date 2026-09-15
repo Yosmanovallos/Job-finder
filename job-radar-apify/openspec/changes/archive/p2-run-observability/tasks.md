@@ -30,8 +30,9 @@
       lecturas pública/admin.
 - [x] Señales en `src/engine/resilient-fetch.ts`, `scrapeJooble`
       (`src/index.ts`) y scrapers de navegador.
-- [x] `src/db/job-repository.ts`: `saveJobs().validCount`, `getRuns()` desde
-      Postgres.
+- [x] `src/db/job-repository.ts`: `saveJobs().validCount`; `getRuns()`
+      eliminado (sin llamadores tras delegar `/api/runs` en
+      `routes/runs.ts` → `listRuns()`).
 - [x] `src/queue/listing-attempt.ts` + `src/queue/scrape-worker.ts`:
       intentos `listing` / `detail`.
 - [x] `scripts/run-scrape-tick.ts` y `scripts/run-browser-tick.ts`: ciclo de
@@ -78,3 +79,8 @@ recrearon `HEAD`/`commondir`/`gitdir` y se reconstruyó solo el índice
 4. Confirmar que un tick cancelado aparece `interrupted` en ≤ 25 min.
 5. Confirmar el tamaño real de `source_attempts` tras 7 días frente a la
    estimación (~20–40 MB a 30 días).
+6. Medir p95 de `GET /api/runs` en staging con volumen realista (gate
+   "sin deterioro >10%", no medido en P2).
+7. **Acción del usuario:** documentar `OPS_ADMIN_TOKEN` (≥32 caracteres,
+   opcional; sin él la vista admin responde `404`) en `.env.example`,
+   archivo denegado a agentes.

@@ -5,7 +5,6 @@ import type { Job, JobDetail } from "../sources/types.js";
 import { normalizeJobUrl } from "../sources/types.js";
 import { getCountryConfig } from "../countries/index.js";
 import { saveRunToCache } from "../cache-manager.js";
-import { listRuns, toPublicRun, type PublicRunSummary } from "./run-repository.js";
 import { validateJobs } from "./job-validator.js";
 import { PAYWALL_ENABLED } from "../config.js";
 import { buildJobUrl, isPubliclyDescribable } from "../lib/job-seo.js";
@@ -1031,18 +1030,6 @@ export function maskLockedFields(jobs: any[], tier: SubscriptionTier): any[] {
       applicantCount: null
     };
   });
-}
-
-/**
- * Latest persisted scraping runs, public-safe shape (P2 — see
- * src/db/run-repository.ts). The local JSON cache is still written by
- * saveJobs() for the legacy scripts that read it, but it never reflected
- * production ticks (it lives on the Actions runner's disk and in git), so it
- * is no longer the source of run history.
- */
-export async function getRuns(): Promise<PublicRunSummary[]> {
-  const page = await listRuns({ limit: 20, before: null, includeTest: false });
-  return page.runs.map(toPublicRun);
 }
 
 /**

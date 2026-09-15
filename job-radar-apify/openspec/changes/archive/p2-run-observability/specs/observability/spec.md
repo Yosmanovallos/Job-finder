@@ -46,7 +46,11 @@ mientras la fuente no los reporte.
 exactos (p. ej. `2/2/0/2/0`, duplicados `0/2`, rechazados `1/0/1`,
 detalle `1/1/0/0`), `request_count` real (2 con reintentos, 0 con circuito
 abierto), `bytes`/`cost` en `null`, ningún mensaje de error crudo
-persistido.
+persistido. Total de la ejecución `jobs_received = 7` (Ok 2 + Dup 2 +
+Invalid 1 + Partial 1 + Detail 1): la primera versión del test esperaba 8
+por un error de suma; un adaptador que lanza nunca llega a fijar
+contadores (`received = null`), así que 7 es el valor correcto y la
+aserción se corrigió al total real, no al revés.
 
 ## OBS-003 — Ningún fallo se presenta como éxito vacío
 
@@ -150,6 +154,12 @@ escritura y trabajo intacto; store que cuelga → `finish` acotado
 `400` con cursor manipulado, sin roles/SHA/run id/repositorio/clases de
 error/ejecución de prueba, `503` sin `runs` al ocultar la tabla.
 Cambio aprobado: los `id` pasan de `run_<epoch>` a UUID.
+**No medido:** gate de rendimiento del plan (p95 sin deterioro >10%).
+`/api/runs` pasó de leer un JSON local a una consulta con dos agregados
+`LATERAL` (≤ 51 ejecuciones, índice `(run_id, started_at, id)`) y la ruta no
+está en `validate-public-baseline.ts`; con la base desechable casi vacía
+una medición local no sería representativa. Queda como paso de
+publicación: medir p95 en staging con volumen de 30 días.
 
 ## OBS-009 — Vista administrativa paginada
 
