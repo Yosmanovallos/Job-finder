@@ -101,6 +101,9 @@ pnpm apply:prepare --job <uuid> && pnpm apply:approve --application <uuid>
 
 ## Production improvements — P0 verification
 
+- Roadmap maestro: `job-radar-apify/docs/PROD-IMPROVEMENTS-PLAN.md`
+  (estado por fase, gates, rollback). Artefactos spec-driven por cambio:
+  `job-radar-apify/openspec/` — un cambio por fase, archivar al completar.
 - Work in the isolated `codex/prod-improvements-seo-ux-security` worktree;
   do not inspect, merge or modify the frozen CV Generator work.
 - In `job-radar-apify`, `npm run test:unit` runs offline safety, dashboard
