@@ -5,6 +5,7 @@ import { fileURLToPath } from "url";
 import { htmlEntities, extractStructuredFromHtml, mapEmploymentTypeTag } from "./utils.js";
 import { saveRunToCache } from "./cache-manager.js";
 import { FetchBlockedError } from "./engine/resilient-fetch.js";
+import { reportSourceSignal } from "./observability/run-telemetry.js";
 import { JobDetail, resolveOutboundUrl } from "./sources/types.js";
 import { extractJobPostingDetail, extractFullJobPosting } from "./lib/job-posting-jsonld.js";
 import { jitterDelay } from "./engine/jitter-delay.js";
@@ -1269,6 +1270,8 @@ export async function scrapeJooble(locationQuery: string = "co"): Promise<Job[]>
   const apiKey = process.env.JOOBLE_API_KEY;
   if (!apiKey) {
     console.warn("[Jooble] JOOBLE_API_KEY no configurada — omitiendo (fuente opcional).");
+    // P2: tells the run telemetry this `[]` is a configuration gap, not an empty feed.
+    reportSourceSignal("misconfigured");
     return [];
   }
 
@@ -1285,6 +1288,7 @@ export async function scrapeJooble(locationQuery: string = "co"): Promise<Job[]>
 
     if (!response.ok) {
       console.warn(`[Jooble] Failed: ${response.status} ${response.statusText}`);
+      reportSourceSignal("swallowed_error");
       return [];
     }
 
@@ -1293,6 +1297,7 @@ export async function scrapeJooble(locationQuery: string = "co"): Promise<Job[]>
       console.warn(
         `[Jooble] Response OK but "jobs" is not an array (totalCount=${data.totalCount}). Raw keys: ${Object.keys(data).join(", ")}`
       );
+      reportSourceSignal("swallowed_error");
       return [];
     }
     console.log(`[Jooble] "${locationQuery}": totalCount=${data.totalCount}, page batch=${data.jobs.length}`);
@@ -1325,6 +1330,7 @@ export async function scrapeJooble(locationQuery: string = "co"): Promise<Job[]>
     }
   } catch (error) {
     console.error("[Jooble] Fetch error:", error);
+    reportSourceSignal("swallowed_error");
   }
   console.log(`[Jooble] Found ${jobs.length} jobs (filtered by date).`);
   return jobs;

@@ -8,7 +8,10 @@ import {
   GLOBAL_SOURCE_CADENCE_MS_VE
 } from "../src/queue/source-cadence.js";
 import { DEFAULT_ROLES_200 } from "../src/queue/scheduler.js";
-import { ScrapeWorker } from "../src/queue/scrape-worker.js";
+import { ScrapeWorker, type SourceRunResult } from "../src/queue/scrape-worker.js";
+import { runListingAttempt } from "../src/queue/listing-attempt.js";
+import { RunRecorder, runTelemetrySafely } from "../src/observability/run-telemetry.js";
+import { createPgRunStore, purgeOldRuns, reconcileStaleRuns } from "../src/db/run-repository.js";
 import { resolveJobCountry } from "../src/countries/index.js";
 import {
   seedSearchRoles,
@@ -17,7 +20,6 @@ import {
   markGlobalSourceRun,
   purgeOldJobs
 } from "../src/db/scheduler-repository.js";
-import { saveJobs } from "../src/db/job-repository.js";
 import { pool } from "../src/db/client.js";
 
 dotenv.config();
@@ -66,21 +68,22 @@ interface RoleResult {
   roleName: string;
   savedCount: number;
   duplicateCount: number;
-  perSource: Record<string, { fetched: number; error?: string }>;
+  perSource: Record<string, SourceRunResult>;
   timedOut: boolean;
 }
 
 async function runWithTimeout(
   roleName: string,
   adapters: SourceAdapter[],
-  trackedPromises: Promise<any>[]
+  trackedPromises: Promise<any>[],
+  recorder: RunRecorder
 ): Promise<RoleResult> {
   const timeoutPromise = new Promise<null>((resolve) => {
     setTimeout(() => resolve(null), PER_ROLE_TIMEOUT_MS);
   });
 
   const workPromise = worker
-    .processRoleJob({ roleName, dateRange: "48h", adapters, country: TICK_COUNTRY })
+    .processRoleJob({ roleName, dateRange: "48h", adapters, country: TICK_COUNTRY, recorder })
     .catch((err) => {
       console.error(`❌ [Tick] Rol "${roleName}" falló:`, err?.message || err);
       return null;
@@ -113,13 +116,14 @@ async function runWithTimeout(
 
 async function runBatched(
   items: { roleName: string; adapters: SourceAdapter[] }[],
-  trackedPromises: Promise<any>[]
+  trackedPromises: Promise<any>[],
+  recorder: RunRecorder
 ): Promise<RoleResult[]> {
   const results: RoleResult[] = [];
   for (let i = 0; i < items.length; i += CONCURRENCY) {
     const batch = items.slice(i, i + CONCURRENCY);
     const batchResults = await Promise.all(
-      batch.map((item) => runWithTimeout(item.roleName, item.adapters, trackedPromises))
+      batch.map((item) => runWithTimeout(item.roleName, item.adapters, trackedPromises, recorder))
     );
     results.push(...batchResults);
   }
@@ -132,38 +136,43 @@ async function runBatched(
  * RoleResult shape purely so the existing writeSummary/reporting path can
  * fold this in without a second code path.
  */
-async function runGlobalCatalogSources(): Promise<RoleResult | null> {
+async function runGlobalCatalogSources(recorder: RunRecorder): Promise<RoleResult | null> {
   const dueSources = await getDueGlobalSources(GLOBAL_CADENCE_MS);
   if (dueSources.length === 0) return null;
 
   console.log(`🌐 [Tick] Fuentes de catálogo global vencidas: [${dueSources.join(", ")}]`);
 
-  const perSource: Record<string, { fetched: number; error?: string }> = {};
+  const perSource: Record<string, SourceRunResult> = {};
   let savedCount = 0;
   let duplicateCount = 0;
 
   for (const sourceName of dueSources) {
     const adapter = adapterByName.get(sourceName);
     if (!adapter) continue;
+    const attemptRef: { id?: string } = {};
+    const listingStatus = () => (attemptRef.id ? recorder.statusOf(attemptRef.id) : undefined);
     try {
-      const results = await adapter.fetch([], "48h");
-      const fetched = Array.isArray(results) ? results.length : 0;
-      perSource[sourceName] = { fetched };
-
-      for (const job of results) {
-        job.country = resolveJobCountry(job, TICK_COUNTRY);
-      }
-
-      if (fetched > 0) {
-        const saved = await saveJobs(results, "General");
-        savedCount += saved.savedCount;
-        duplicateCount += saved.duplicateCount;
-      }
+      const listing = await runListingAttempt(
+        recorder,
+        {
+          source: sourceName,
+          role: null,
+          roleOrigin: "General",
+          stampCountry: (job) => {
+            job.country = resolveJobCountry(job, TICK_COUNTRY);
+          },
+          attemptRef
+        },
+        () => adapter.fetch([], "48h")
+      );
+      perSource[sourceName] = { fetched: listing.fetched, status: listingStatus() };
+      savedCount += listing.savedCount;
+      duplicateCount += listing.duplicateCount;
 
       await markGlobalSourceRun(sourceName);
     } catch (err: any) {
       console.error(`❌ [Tick] Fuente global ${sourceName} falló:`, err?.message || err);
-      perSource[sourceName] = { fetched: 0, error: err?.message || String(err) };
+      perSource[sourceName] = { fetched: 0, error: err?.message || String(err), status: listingStatus() };
     }
   }
 
@@ -185,9 +194,10 @@ async function runGlobalCatalogSources(): Promise<RoleResult | null> {
  * against an already-closed pool.
  */
 async function runGlobalCatalogSourcesWithTimeout(
-  trackedPromises: Promise<any>[]
+  trackedPromises: Promise<any>[],
+  recorder: RunRecorder
 ): Promise<RoleResult | null> {
-  const workPromise = runGlobalCatalogSources().catch((err) => {
+  const workPromise = runGlobalCatalogSources(recorder).catch((err) => {
     console.error(`❌ [Tick] Catálogo global falló:`, err?.message || err);
     return null;
   });
@@ -208,7 +218,7 @@ async function runGlobalCatalogSourcesWithTimeout(
 }
 
 function writeSummary(results: RoleResult[], deletedOld: number) {
-  const perSourceTotals: Record<string, { fetched: number; errors: number }> = {};
+  const perSourceTotals: Record<string, { fetched: number; errors: number; statuses: Set<string> }> = {};
   let totalSaved = 0;
   let totalDuplicates = 0;
   let timedOutRoles = 0;
@@ -218,9 +228,10 @@ function writeSummary(results: RoleResult[], deletedOld: number) {
     totalDuplicates += r.duplicateCount;
     if (r.timedOut) timedOutRoles++;
     for (const [source, stats] of Object.entries(r.perSource)) {
-      const bucket = (perSourceTotals[source] ||= { fetched: 0, errors: 0 });
+      const bucket = (perSourceTotals[source] ||= { fetched: 0, errors: 0, statuses: new Set() });
       bucket.fetched += stats.fetched;
       if (stats.error) bucket.errors++;
+      if (stats.status) bucket.statuses.add(stats.status);
     }
   }
 
@@ -232,19 +243,19 @@ function writeSummary(results: RoleResult[], deletedOld: number) {
     `Vacantes nuevas guardadas: **${totalSaved}** | Duplicadas fusionadas: **${totalDuplicates}** | Purgadas (>30d): **${deletedOld}**`
   );
   lines.push("");
-  lines.push("| Fuente | Vacantes obtenidas | Errores |");
-  lines.push("|---|---|---|");
+  lines.push("| Fuente | Vacantes obtenidas | Errores | Estado |");
+  lines.push("|---|---|---|---|");
 
   const sourceNames = Object.keys(perSourceTotals).sort();
   for (const source of sourceNames) {
-    const { fetched, errors } = perSourceTotals[source];
+    const { fetched, errors, statuses } = perSourceTotals[source];
     // fetched === 0 alone (even with errors === 0) is flagged too: several
     // adapters swallow request-level failures (e.g. a 403) internally and
     // just return an empty array instead of throwing, so the exception-only
     // check misses a real block. Zero results across every keyword variant
     // for an active role in a 48h window is itself the strongest signal.
     const flag = fetched === 0 ? " ⚠️ posible bloqueo/caída (0 resultados)" : "";
-    lines.push(`| ${source} | ${fetched} | ${errors}${flag} |`);
+    lines.push(`| ${source} | ${fetched} | ${errors}${flag} | ${[...statuses].sort().join(", ") || "—"} |`);
   }
 
   const summary = lines.join("\n");
@@ -264,9 +275,26 @@ function writeSummary(results: RoleResult[], deletedOld: number) {
   }
 }
 
+// Set as soon as main() opens a run, so the fatal handler can still close it
+// (a crash would otherwise leave it `running` until reconciled as interrupted).
+let activeRecorder: RunRecorder | null = null;
+
 async function main() {
   const startedAt = Date.now();
   console.log(`🌎 [Tick] TICK_COUNTRY=${TICK_COUNTRY}`);
+
+  // P2 (openspec p2-run-observability): a tick killed by Actions never writes
+  // its own outcome — close runs whose heartbeat stopped before opening a new
+  // one. Telemetry calls never throw and never gate the scrape itself.
+  const reconciled = await runTelemetrySafely("reconcileStaleRuns", () => reconcileStaleRuns(), { runs: 0, attempts: 0 });
+  if (reconciled.runs > 0) {
+    console.warn(
+      `🧟 [Tick] ${reconciled.runs} ejecución(es) sin latido marcadas como interrupted (${reconciled.attempts} intentos en curso).`
+    );
+  }
+  const recorder = await RunRecorder.start({ workflow: "scrape-tick", country: TICK_COUNTRY, store: createPgRunStore() });
+  activeRecorder = recorder;
+
   await seedSearchRoles(DEFAULT_ROLES_200);
 
   const trackedPromises: Promise<any>[] = [];
@@ -278,7 +306,7 @@ async function main() {
   // below (see GLOBAL_CATALOG_TIMEOUT_MS) — trackedPromises is shared with
   // the per-role path so main() waits for a straggler either way before
   // closing the pool.
-  const globalResult = await runGlobalCatalogSourcesWithTimeout(trackedPromises);
+  const globalResult = await runGlobalCatalogSourcesWithTimeout(trackedPromises, recorder);
 
   const due = await getDueRoleSources(ROLE_CADENCE_MS);
   const results: RoleResult[] = [];
@@ -300,7 +328,7 @@ async function main() {
       `🕒 [Tick] ${due.size} roles con fuentes vencidas — procesando ${items.length} (tope ${MAX_ROLES_PER_RUN}/tick, el resto se recoge en el próximo).`
     );
 
-    results.push(...(await runBatched(items, trackedPromises)));
+    results.push(...(await runBatched(items, trackedPromises, recorder)));
   }
 
   if (globalResult) results.push(globalResult);
@@ -329,11 +357,20 @@ async function main() {
     }
   }
 
+  // Attempts still in flight at this point are closed as `timeout`; if they
+  // finish later they keep saving jobs but cannot rewrite that outcome.
+  const run = await recorder.finish();
+  console.log(
+    `📡 [Tick] Ejecución ${run.runId}: ${run.status} (${run.reason})${run.telemetryEnabled ? "" : " — telemetría no persistida"}.`
+  );
+  await runTelemetrySafely("purgeOldRuns", () => purgeOldRuns(), 0);
+
   await pool.end();
 }
 
 main().catch(async (err) => {
   console.error("❌ [Tick] Error inesperado:", err?.message || err);
+  await activeRecorder?.finish({ fatal: true });
   await pool.end();
   process.exit(1);
 });

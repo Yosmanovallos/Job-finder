@@ -10,7 +10,6 @@ import {
   getActiveCompanyNames,
   searchActiveCompanies,
   countCanonicalJobsByCompany,
-  getRuns,
   maskLockedFields,
   updateUserName,
   updateUserPreferredRoles,
@@ -104,6 +103,7 @@ import { cvSectionRewriteV1, type CvSectionRewriteAction } from "./cv/prompts.js
 import { collectFactIds } from "./cv/factuality.js";
 import { CV_TEMPLATES, DEFAULT_TEMPLATE_ID, getTemplate } from "./cv/templates/registry.js";
 import { handleResumeStudioRoute } from "./server/routes/resume-studio.js";
+import { handleRunsRoute, isRunsRoute } from "./server/routes/runs.js";
 import { RESUME_STUDIO_ENABLED } from "./config.js";
 import { getProviderRegistry } from "./ai-gateway/registry-instance.js";
 import { getCredentialResolver } from "./ai-gateway/credential-resolver-instance.js";
@@ -516,11 +516,9 @@ async function handleRequest(
     return;
   }
 
-  // 3. GET /api/runs
-  if (pathname === "/api/runs" && method === "GET") {
-    const runs = await getRuns();
-    res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ runs, count: runs.length }));
+  // 3. GET /api/runs (public-safe) + GET /api/admin/runs[/:id] (operator
+  //    token) — persisted run observability, see server/routes/runs.ts (P2).
+  if (isRunsRoute(pathname) && (await handleRunsRoute(req, res, { pathname, method, parsedUrl }))) {
     return;
   }
 

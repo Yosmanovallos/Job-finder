@@ -430,6 +430,75 @@ CREATE TABLE IF NOT EXISTS user_ai_credentials (
 );
 
 -- =============================================================================
+-- P2 — Observabilidad de ejecuciones (docs/PROD-IMPROVEMENTS-PLAN.md,
+-- openspec/changes/archive/p2-run-observability). Aditivo: no altera tablas
+-- existentes. `scrape_runs` = una fila por tick (scrape-tick CO/VE,
+-- browser-tick); `source_attempts` = una fila por fuente × rol × etapa.
+-- Escritas por src/observability/run-telemetry.ts vía src/db/run-repository.ts;
+-- un fallo aquí nunca impide guardar vacantes. Nunca se guarda el mensaje de
+-- error crudo (puede contener URLs con credenciales), solo `error_class`.
+-- tests/validate-run-observability.ts aplica este bloque BEGIN/END tal cual.
+-- =============================================================================
+-- BEGIN p2-run-observability
+CREATE TABLE IF NOT EXISTS scrape_runs (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    workflow        VARCHAR(50)  NOT NULL,               -- 'scrape-tick' | 'browser-tick'
+    trigger         VARCHAR(30)  NOT NULL,               -- GITHUB_EVENT_NAME | 'manual' | 'test'
+    is_test         BOOLEAN      NOT NULL DEFAULT FALSE,
+    country         VARCHAR(2),                          -- NULL = tick multi-país (navegador)
+    git_sha         VARCHAR(40),
+    gh_repository   VARCHAR(200),
+    gh_workflow     VARCHAR(200),
+    gh_run_id       VARCHAR(20),
+    gh_run_attempt  INTEGER,
+    status          VARCHAR(20)  NOT NULL DEFAULT 'running'
+                    CHECK (status IN ('running', 'success', 'empty', 'partial', 'failed', 'timeout', 'interrupted', 'skipped')),
+    reason          VARCHAR(100),
+    started_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    heartbeat_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    finished_at     TIMESTAMPTZ,
+    reconciled_at   TIMESTAMPTZ,
+    attempts_total  INTEGER      NOT NULL DEFAULT 0,
+    jobs_received   INTEGER      NOT NULL DEFAULT 0,
+    jobs_new        INTEGER      NOT NULL DEFAULT 0,
+    jobs_duplicate  INTEGER      NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_scrape_runs_started ON scrape_runs (started_at DESC, id DESC);
+CREATE INDEX IF NOT EXISTS idx_scrape_runs_running_heartbeat ON scrape_runs (heartbeat_at) WHERE status = 'running';
+
+CREATE TABLE IF NOT EXISTS source_attempts (
+    id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    run_id           UUID NOT NULL REFERENCES scrape_runs(id) ON DELETE CASCADE,
+    source_name      VARCHAR(100) NOT NULL,
+    role_name        VARCHAR(255),                       -- NULL = catálogo global / navegador
+    stage            VARCHAR(20)  NOT NULL CHECK (stage IN ('listing', 'detail', 'verification')),
+    status           VARCHAR(20)  NOT NULL DEFAULT 'running'
+                     CHECK (status IN ('running', 'success', 'empty', 'partial', 'failed', 'timeout', 'interrupted',
+                                       'skipped', 'blocked', 'misconfigured', 'rate_limited', 'quota_exhausted',
+                                       'schema_changed')),
+    reason           VARCHAR(100),
+    error_class      VARCHAR(100),
+    started_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    finished_at      TIMESTAMPTZ,
+    duration_ms      INTEGER,
+    received_count   INTEGER,
+    valid_count      INTEGER,
+    filtered_count   INTEGER,
+    new_count        INTEGER,
+    duplicate_count  INTEGER,
+    failed_count     INTEGER,
+    request_count    INTEGER,
+    bytes_received   BIGINT,                             -- NULL = la fuente no lo reporta (nunca inventado)
+    cost_usd         NUMERIC(12, 6)                      -- NULL = sin coste conocido
+);
+CREATE INDEX IF NOT EXISTS idx_source_attempts_run ON source_attempts (run_id, started_at, id);
+CREATE INDEX IF NOT EXISTS idx_source_attempts_source ON source_attempts (source_name, started_at DESC);
+
+ALTER TABLE scrape_runs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE source_attempts ENABLE ROW LEVEL SECURITY;
+-- END p2-run-observability
+
+-- =============================================================================
 -- ROW LEVEL SECURITY: every read/write from this app goes through the `pool`
 -- (direct `pg` connection as the `postgres` role, which has BYPASSRLS — see
 -- src/db/client.ts) or from GitHub Actions cron scripts using the same
@@ -475,5 +544,5 @@ ALTER TABLE user_ai_credentials ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON jobs, search_roles, users, social_posts, transactions,
   role_source_runs, source_circuit_state, indexing_queue, company_reputation,
   company_reputation_alias, cv_profiles, cv_generations, llm_response_cache,
-  llm_usage_ledger, user_ai_credentials
+  llm_usage_ledger, user_ai_credentials, scrape_runs, source_attempts
   FROM anon, authenticated;

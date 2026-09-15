@@ -1,4 +1,5 @@
 import { pool } from "../db/client.js";
+import { reportSourceSignal } from "../observability/run-telemetry.js";
 
 /**
  * Thrown by a scraper when a source returns a definitive deny (401/403) —
@@ -94,6 +95,9 @@ export async function executeWithResilience<T>(
     console.warn(
       `[ResilientEngine] ${sourceName} está en estado DEGRADADO (Circuit Breaker ABIERTO). Omitiendo ejecución sin detener el sistema.`
     );
+    // P2: the attempt learns this `[]` means "skipped", not "empty". Signals
+    // are a no-op outside a tracked attempt (e.g. the reputation pipeline).
+    reportSourceSignal("circuit_open");
     return [];
   }
 
@@ -101,6 +105,7 @@ export async function executeWithResilience<T>(
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
+      reportSourceSignal("request");
       const results = await fetcher();
       if (Array.isArray(results)) {
         await recordSuccess(sourceName);
@@ -113,6 +118,7 @@ export async function executeWithResilience<T>(
       );
       if (err instanceof FetchBlockedError) {
         console.warn(`🚫 [ResilientEngine] ${sourceName}: deny definitivo — no se reintenta.`);
+        reportSourceSignal("blocked");
         await recordFailure(sourceName);
         return [];
       }
@@ -121,6 +127,7 @@ export async function executeWithResilience<T>(
         console.log(`⏳ [ResilientEngine] Reintentando ${sourceName} en ${delay / 1000}s...`);
         await new Promise((res) => setTimeout(res, delay));
       } else {
+        reportSourceSignal("retries_exhausted");
         await recordFailure(sourceName);
       }
     }

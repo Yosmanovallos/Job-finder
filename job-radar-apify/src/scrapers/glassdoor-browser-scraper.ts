@@ -24,6 +24,7 @@
  */
 
 import { browserFetch } from "../engine/browser-fetch.js";
+import { reportSourceSignal } from "../observability/run-telemetry.js";
 import { fileURLToPath } from "url";
 
 export interface GlassdoorJob {
@@ -149,6 +150,8 @@ export async function scrapeGlassdoorBrowser(country: Country = "CO"): Promise<G
     console.log(`[GlassdoorBrowser:${country}] ${config.fallbackLocationName} (country-wide): ${countryJobs.length} jobs within 1 day.`);
   } catch (error: any) {
     console.error(`[GlassdoorBrowser:${country}] Country-wide query failed: ${error.message}`);
+    // P2: a swallowed failure must not read as an empty source in run telemetry.
+    reportSourceSignal("swallowed_error");
   }
 
   for (const { slug, locationId } of config.cities) {
@@ -161,6 +164,7 @@ export async function scrapeGlassdoorBrowser(country: Country = "CO"): Promise<G
       console.log(`[GlassdoorBrowser:${country}] ${slug}: ${cityJobs.length} jobs within 1 day (${jobs.length} total so far).`);
     } catch (error: any) {
       console.warn(`[GlassdoorBrowser:${country}] ${slug} failed, skipping: ${error.message}`);
+      reportSourceSignal("swallowed_error");
     }
   }
 

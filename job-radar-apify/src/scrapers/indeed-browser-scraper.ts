@@ -32,6 +32,7 @@
  */
 
 import { browserFetch } from "../engine/browser-fetch.js";
+import { reportSourceSignal } from "../observability/run-telemetry.js";
 import { fileURLToPath } from "url";
 
 export interface IndeedJob {
@@ -151,6 +152,8 @@ export async function scrapeIndeedBrowser(country: Country = "CO"): Promise<Inde
     console.log(`[IndeedBrowser:${country}] ${config.countryName} (country-wide): ${countryJobs.length} jobs within 1 day.`);
   } catch (error: any) {
     console.error(`[IndeedBrowser:${country}] Country-wide query failed: ${error.message}`);
+    // P2: a swallowed failure must not read as an empty source in run telemetry.
+    reportSourceSignal("swallowed_error");
   }
 
   for (const city of config.cities) {
@@ -163,6 +166,7 @@ export async function scrapeIndeedBrowser(country: Country = "CO"): Promise<Inde
       console.log(`[IndeedBrowser:${country}] ${city}: ${cityJobs.length} jobs within 1 day (${jobs.length} total so far).`);
     } catch (error: any) {
       console.warn(`[IndeedBrowser:${country}] ${city} failed, skipping: ${error.message}`);
+      reportSourceSignal("swallowed_error");
     }
   }
 

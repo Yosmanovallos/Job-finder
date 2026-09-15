@@ -4,7 +4,8 @@ import { pool } from "./client.js";
 import type { Job, JobDetail } from "../sources/types.js";
 import { normalizeJobUrl } from "../sources/types.js";
 import { getCountryConfig } from "../countries/index.js";
-import { saveRunToCache, getAllCachedRuns } from "../cache-manager.js";
+import { saveRunToCache } from "../cache-manager.js";
+import { listRuns, toPublicRun, type PublicRunSummary } from "./run-repository.js";
 import { validateJobs } from "./job-validator.js";
 import { PAYWALL_ENABLED } from "../config.js";
 import { buildJobUrl, isPubliclyDescribable } from "../lib/job-seo.js";
@@ -61,7 +62,7 @@ export interface InsertedJobRef {
 export async function saveJobs(
   jobs: Job[],
   roleOrigin: string = "General"
-): Promise<{ savedCount: number; duplicateCount: number; insertedJobs: InsertedJobRef[] }> {
+): Promise<{ savedCount: number; duplicateCount: number; validCount: number; insertedJobs: InsertedJobRef[] }> {
   let savedCount = 0;
   let duplicateCount = 0;
   // Collected across the loop, enqueued in one batched INSERT after it —
@@ -225,7 +226,9 @@ export async function saveJobs(
   console.log(
     `💾 [JobRepository] Guardado en Postgres: ${savedCount} nuevas vacantes, ${duplicateCount} fusionadas en deduplicación.`
   );
-  return { savedCount, duplicateCount, insertedJobs };
+  // validCount: jobs that passed validateJobs — lets run telemetry (P2) tell
+  // "source returned nothing" apart from "everything it returned was rejected".
+  return { savedCount, duplicateCount, validCount: valid.length, insertedJobs };
 }
 
 /**
@@ -1031,11 +1034,15 @@ export function maskLockedFields(jobs: any[], tier: SubscriptionTier): any[] {
 }
 
 /**
- * Retrieves all scraping runs (history browsing only — out of paywall scope,
- * left on the local JSON cache rather than migrated to Postgres in this phase).
+ * Latest persisted scraping runs, public-safe shape (P2 — see
+ * src/db/run-repository.ts). The local JSON cache is still written by
+ * saveJobs() for the legacy scripts that read it, but it never reflected
+ * production ticks (it lives on the Actions runner's disk and in git), so it
+ * is no longer the source of run history.
  */
-export async function getRuns() {
-  return getAllCachedRuns();
+export async function getRuns(): Promise<PublicRunSummary[]> {
+  const page = await listRuns({ limit: 20, before: null, includeTest: false });
+  return page.runs.map(toPublicRun);
 }
 
 /**

@@ -34,7 +34,9 @@ import { scrapeGlassdoorBrowser, type Country } from "../src/scrapers/glassdoor-
 import { scrapeIndeedBrowser } from "../src/scrapers/indeed-browser-scraper.js";
 import { closeBrowser } from "../src/engine/browser-fetch.js";
 import { deduplicateJobs } from "../src/sources/types.js";
-import { saveJobs } from "../src/db/job-repository.js";
+import { runListingAttempt } from "../src/queue/listing-attempt.js";
+import { RunRecorder, runTelemetrySafely, type AttemptStatus } from "../src/observability/run-telemetry.js";
+import { createPgRunStore, reconcileStaleRuns } from "../src/db/run-repository.js";
 import { pool } from "../src/db/client.js";
 
 dotenv.config();
@@ -45,35 +47,42 @@ interface SourceResult {
   savedCount: number;
   duplicateCount: number;
   error?: string;
+  status?: AttemptStatus;
 }
 
 async function runSource(
   label: string,
   country: Country,
-  fetcher: () => Promise<any[]>
+  fetcher: () => Promise<any[]>,
+  recorder: RunRecorder
 ): Promise<SourceResult> {
+  const attemptRef: { id?: string } = {};
+  const listingStatus = () => (attemptRef.id ? recorder.statusOf(attemptRef.id) : undefined);
   try {
-    const raw = await fetcher();
-    const jobs = deduplicateJobs(raw);
-    for (const job of jobs) {
-      // Both sources are genuinely country-scoped per query (each URL
-      // filters to a specific city or country, unlike Workana's global
-      // freelance catalog) — the country the query itself targeted is the
-      // correct stamp directly, no isRemoteLocation() guessing needed. A
-      // job whose own location text says "remoto" would still be a real
-      // CO/VE-market remote posting (surfaced by that country's search),
-      // not a leak the way Workana's cross-country catalog was.
-      job.country = country;
-    }
-    const fetched = jobs.length;
-    if (fetched === 0) {
-      return { label, fetched: 0, savedCount: 0, duplicateCount: 0 };
-    }
-    const { savedCount, duplicateCount } = await saveJobs(jobs, "General");
-    return { label, fetched, savedCount, duplicateCount };
+    const { fetched, savedCount, duplicateCount } = await runListingAttempt(
+      recorder,
+      {
+        source: label,
+        role: null,
+        roleOrigin: "General",
+        stampCountry: (job) => {
+          // Both sources are genuinely country-scoped per query (each URL
+          // filters to a specific city or country, unlike Workana's global
+          // freelance catalog) — the country the query itself targeted is the
+          // correct stamp directly, no isRemoteLocation() guessing needed. A
+          // job whose own location text says "remoto" would still be a real
+          // CO/VE-market remote posting (surfaced by that country's search),
+          // not a leak the way Workana's cross-country catalog was.
+          job.country = country;
+        },
+        attemptRef
+      },
+      async () => deduplicateJobs(await fetcher())
+    );
+    return { label, fetched, savedCount, duplicateCount, status: listingStatus() };
   } catch (err: any) {
     console.error(`❌ [BrowserTick] ${label} failed:`, err?.message || err);
-    return { label, fetched: 0, savedCount: 0, duplicateCount: 0, error: err?.message || String(err) };
+    return { label, fetched: 0, savedCount: 0, duplicateCount: 0, error: err?.message || String(err), status: listingStatus() };
   }
 }
 
@@ -81,11 +90,11 @@ function writeSummary(results: SourceResult[]) {
   const lines: string[] = [];
   lines.push(`## 🌐 Browser scrape tick — ${new Date().toISOString()}`);
   lines.push("");
-  lines.push("| Fuente | Vacantes obtenidas | Nuevas | Duplicadas | Errores |");
-  lines.push("|---|---|---|---|---|");
+  lines.push("| Fuente | Vacantes obtenidas | Nuevas | Duplicadas | Errores | Estado |");
+  lines.push("|---|---|---|---|---|---|");
   for (const r of results) {
     const flag = r.fetched === 0 ? " ⚠️ posible bloqueo/caída (0 resultados)" : "";
-    lines.push(`| ${r.label} | ${r.fetched} | ${r.savedCount} | ${r.duplicateCount} | ${r.error ? "1" + flag : "0" + flag} |`);
+    lines.push(`| ${r.label} | ${r.fetched} | ${r.savedCount} | ${r.duplicateCount} | ${r.error ? "1" + flag : "0" + flag} | ${r.status ?? "—"} |`);
   }
   const summary = lines.join("\n");
   console.log("\n" + summary + "\n");
@@ -99,16 +108,29 @@ function writeSummary(results: SourceResult[]) {
   }
 }
 
+// Set once main() opens a run so the fatal handler can close it (P2).
+let activeRecorder: RunRecorder | null = null;
+
 async function main() {
   console.log(`🌐 [BrowserTick] Starting — Glassdoor + Indeed (CO + VE) via Playwright + residential proxy`);
 
+  // Same run lifecycle as run-scrape-tick.ts (openspec p2-run-observability);
+  // telemetry never throws and never gates scraping.
+  await runTelemetrySafely("reconcileStaleRuns", () => reconcileStaleRuns(), { runs: 0, attempts: 0 });
+  const recorder = await RunRecorder.start({ workflow: "browser-tick", country: null, store: createPgRunStore() });
+  activeRecorder = recorder;
+
   const results: SourceResult[] = [];
-  results.push(await runSource("Glassdoor-CO", "CO", () => scrapeGlassdoorBrowser("CO")));
-  results.push(await runSource("Glassdoor-VE", "VE", () => scrapeGlassdoorBrowser("VE")));
-  results.push(await runSource("Indeed-CO", "CO", () => scrapeIndeedBrowser("CO")));
-  results.push(await runSource("Indeed-VE", "VE", () => scrapeIndeedBrowser("VE")));
+  results.push(await runSource("Glassdoor-CO", "CO", () => scrapeGlassdoorBrowser("CO"), recorder));
+  results.push(await runSource("Glassdoor-VE", "VE", () => scrapeGlassdoorBrowser("VE"), recorder));
+  results.push(await runSource("Indeed-CO", "CO", () => scrapeIndeedBrowser("CO"), recorder));
+  results.push(await runSource("Indeed-VE", "VE", () => scrapeIndeedBrowser("VE"), recorder));
 
   writeSummary(results);
+  const run = await recorder.finish();
+  console.log(
+    `📡 [BrowserTick] Run ${run.runId}: ${run.status} (${run.reason})${run.telemetryEnabled ? "" : " — telemetry not persisted"}.`
+  );
 
   await closeBrowser();
   await pool.end();
@@ -116,6 +138,7 @@ async function main() {
 
 main().catch(async (err) => {
   console.error("❌ [BrowserTick] Unexpected error:", err?.message || err);
+  await activeRecorder?.finish({ fatal: true });
   await closeBrowser();
   await pool.end();
   process.exit(1);

@@ -37,6 +37,17 @@ CREATE TABLE indexing_queue (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   sent_at TIMESTAMPTZ
 );
+CREATE TABLE role_source_runs (
+  role_name VARCHAR(255) NOT NULL,
+  source_name VARCHAR(100) NOT NULL,
+  last_run_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (role_name, source_name)
+);
+CREATE TABLE source_circuit_state (
+  source_name VARCHAR(100) PRIMARY KEY,
+  failures INTEGER NOT NULL DEFAULT 0,
+  open_until TIMESTAMPTZ
+);
 CREATE TABLE company_reputation (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   company_name VARCHAR(255) NOT NULL,

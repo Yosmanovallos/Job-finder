@@ -1,10 +1,12 @@
 import { allAdapters, Job, SourceAdapter } from "../sources/index.js";
-import { saveJobs, updateJobDetail, InsertedJobRef } from "../db/job-repository.js";
+import { updateJobDetail, InsertedJobRef } from "../db/job-repository.js";
 import { markRoleSourceRun } from "../db/scheduler-repository.js";
 import { generateRoleKeywordsWithAI } from "../ai-role-agent.js";
 import { DEFAULT_COUNTRY, resolveJobCountry } from "../countries/index.js";
 import { executeWithResilience } from "../engine/resilient-fetch.js";
 import { jitterDelay } from "../engine/jitter-delay.js";
+import { RunRecorder, type AttemptHandle, type AttemptStatus } from "../observability/run-telemetry.js";
+import { runListingAttempt } from "./listing-attempt.js";
 
 // Bounds how many detail pages get fetched per adapter per role per tick
 // (AGENTS.md #12 — no unbounded loop). A role can produce dozens of new
@@ -31,6 +33,16 @@ interface WorkerJobOptions {
    * country regardless of which country's tick happened to discover them
    * (see schema.sql's jobs.country comment). */
   country?: string;
+  /** P2 run telemetry. Optional: without it, attempts are still classified
+   * in memory (perSource[].status) but nothing is persisted. */
+  recorder?: RunRecorder;
+}
+
+export interface SourceRunResult {
+  fetched: number;
+  error?: string;
+  /** Classified outcome of this source's listing attempt (P2). */
+  status?: AttemptStatus;
 }
 
 export class ScrapeWorker {
@@ -67,7 +79,7 @@ export class ScrapeWorker {
     totalJobs: number;
     savedCount: number;
     duplicateCount: number;
-    perSource: Record<string, { fetched: number; error?: string }>;
+    perSource: Record<string, SourceRunResult>;
   }> {
     this.checkMemory();
 
@@ -90,7 +102,8 @@ export class ScrapeWorker {
     let totalJobs = 0;
     let savedCount = 0;
     let duplicateCount = 0;
-    const perSource: Record<string, { fetched: number; error?: string }> = {};
+    const perSource: Record<string, SourceRunResult> = {};
+    const recorder = options.recorder ?? RunRecorder.disabled();
 
     // Saved per-adapter, immediately after each fetch — not batched until the
     // whole role finishes. A role needing all 12 sources can take 10-15+ min
@@ -101,24 +114,34 @@ export class ScrapeWorker {
     // unfinished part — this way, whatever already fetched is already safely
     // in Postgres by the time anything might cut the process off.
     for (const adapter of adapters) {
+      const attemptRef: { id?: string } = {};
+      const listingStatus = () => (attemptRef.id ? recorder.statusOf(attemptRef.id) : undefined);
       try {
-        const results = await adapter.fetch(keywordsToUse, dateRange);
-        const fetched = Array.isArray(results) ? results.length : 0;
-        totalJobs += fetched;
-        perSource[adapter.name] = { fetched };
+        const listing = await runListingAttempt(
+          recorder,
+          {
+            source: adapter.name,
+            role: roleName,
+            roleOrigin: roleName,
+            stampCountry: (job) => {
+              job.country = resolveJobCountry(job, country);
+            },
+            attemptRef
+          },
+          () => adapter.fetch(keywordsToUse, dateRange)
+        );
+        totalJobs += listing.fetched;
+        savedCount += listing.savedCount;
+        duplicateCount += listing.duplicateCount;
+        perSource[adapter.name] = { fetched: listing.fetched, status: listingStatus() };
 
-        for (const job of results) {
-          job.country = resolveJobCountry(job, country);
-        }
-
-        if (fetched > 0) {
-          const saved = await saveJobs(results, roleName);
-          savedCount += saved.savedCount;
-          duplicateCount += saved.duplicateCount;
-
-          if (adapter.fetchDetail && saved.insertedJobs.length > 0) {
-            await this.enrichNewJobs(adapter, saved.insertedJobs);
-          }
+        // Separate attempt, after the listing is already persisted: a slow or
+        // blocked detail host shows up as its own outcome instead of hiding
+        // a healthy listing (or vice versa).
+        if (adapter.fetchDetail && listing.insertedJobs.length > 0) {
+          await recorder.trackAttempt({ source: adapter.name, role: roleName, stage: "detail" }, (attempt) =>
+            this.enrichNewJobs(adapter, listing.insertedJobs, attempt)
+          );
         }
 
         await markRoleSourceRun(roleName, adapter.name);
@@ -127,7 +150,7 @@ export class ScrapeWorker {
           `❌ [ScrapeWorker] Error en adaptador ${adapter.name} procesando "${roleName}":`,
           err?.message || err
         );
-        perSource[adapter.name] = { fetched: 0, error: err?.message || String(err) };
+        perSource[adapter.name] = { fetched: 0, error: err?.message || String(err), status: listingStatus() };
       }
     }
 
@@ -154,7 +177,16 @@ export class ScrapeWorker {
    * retry forever, and one job's failure never stops the rest of the
    * batch (each iteration has its own try/catch).
    */
-  private async enrichNewJobs(adapter: SourceAdapter, insertedJobs: InsertedJobRef[]): Promise<void> {
+  private async enrichNewJobs(
+    adapter: SourceAdapter,
+    insertedJobs: InsertedJobRef[],
+    attempt: AttemptHandle
+  ): Promise<void> {
+    const slice = insertedJobs.slice(0, MAX_DETAIL_FETCHES_PER_ADAPTER_PER_ROLE);
+    let obtained = 0;
+    let failed = 0;
+    // received = new rows eligible for detail; filtered = left out by the cap.
+    attempt.setCounters({ received: insertedJobs.length, filtered: insertedJobs.length - slice.length, valid: 0, failed: 0 });
     // Cool-down before the first detail request: confirmed live (2026-08-11)
     // that starting detail fetches immediately after a source's search
     // phase (which can already be 20-30+ requests across keyword variants,
@@ -164,7 +196,6 @@ export class ScrapeWorker {
     // doesn't fix a code bug, it just stops piling detail requests directly
     // on top of a host that may still be warm from the search burst.
     await jitterDelay(3000, 6000);
-    const slice = insertedJobs.slice(0, MAX_DETAIL_FETCHES_PER_ADAPTER_PER_ROLE);
     for (let i = 0; i < slice.length; i++) {
       if (i > 0) await jitterDelay();
       const ref = slice[i];
@@ -189,12 +220,16 @@ export class ScrapeWorker {
             salaryRaw: detail.salaryRaw,
             applicantCount: detail.applicantCount
           });
+          obtained++;
+          attempt.setCounters({ valid: obtained });
         }
       } catch (err: any) {
         console.warn(
           `⚠️ [ScrapeWorker] Detalle fallido para ${adapter.name} (${ref.url}):`,
           err?.message || err
         );
+        failed++;
+        attempt.setCounters({ failed });
       }
     }
   }
