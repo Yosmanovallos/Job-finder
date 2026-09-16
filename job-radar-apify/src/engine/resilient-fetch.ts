@@ -1,5 +1,6 @@
 import { pool } from "../db/client.js";
 import { reportSourceSignal } from "../observability/run-telemetry.js";
+import { BUDGET_ESTIMATES, hasBudget, isCancelled, sleepWithContext, type FetchContext } from "./fetch-context.js";
 
 /**
  * Thrown by a scraper when a source returns a definitive deny (401/403) —
@@ -89,8 +90,19 @@ export async function recordSuccess(sourceName: string): Promise<void> {
 export async function executeWithResilience<T>(
   sourceName: string,
   fetcher: () => Promise<T[]>,
-  maxRetries: number = 3
+  maxRetries: number = 3,
+  ctx?: FetchContext
 ): Promise<T[]> {
+  // P3 (EXE-003): the deadline is checked BEFORE the circuit-breaker query,
+  // so an expired tick doesn't even spend a round-trip to Postgres deciding
+  // whether to start something it has no budget to finish. `ctx` is optional
+  // — without it this behaves exactly as before, which is what lets the
+  // reputation pipeline keep calling it unchanged.
+  if (isCancelled(ctx)) {
+    reportSourceSignal("deadline_exceeded");
+    return [];
+  }
+
   if (await isSourceDegraded(sourceName)) {
     console.warn(
       `[ResilientEngine] ${sourceName} está en estado DEGRADADO (Circuit Breaker ABIERTO). Omitiendo ejecución sin detener el sistema.`
@@ -124,8 +136,23 @@ export async function executeWithResilience<T>(
       }
       if (attempt < maxRetries) {
         const delay = delays[attempt - 1] || 3000;
+        // P3 (EXE-004): don't start a retry the deadline can't cover, and
+        // don't sleep through the deadline waiting to start one. Before this,
+        // a 9s backoff could burn the tail of the budget only to fire a
+        // request that was dead on arrival.
+        if (!hasBudget(ctx, delay + BUDGET_ESTIMATES.retry)) {
+          console.warn(
+            `⏱️ [ResilientEngine] ${sourceName}: sin presupuesto para el reintento ${attempt + 1}/${maxRetries} — se abandona sin dormir.`
+          );
+          reportSourceSignal("deadline_exceeded");
+          return [];
+        }
         console.log(`⏳ [ResilientEngine] Reintentando ${sourceName} en ${delay / 1000}s...`);
-        await new Promise((res) => setTimeout(res, delay));
+        await sleepWithContext(delay, ctx);
+        if (isCancelled(ctx)) {
+          reportSourceSignal("deadline_exceeded");
+          return [];
+        }
       } else {
         reportSourceSignal("retries_exhausted");
         await recordFailure(sourceName);

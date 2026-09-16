@@ -28,7 +28,7 @@ mejoras de SEO/UX/seguridad/observabilidad.
 | P0 | Aislamiento de tests, PostgreSQL desechable, baseline | ✅ Done | `a73a85e` | `openspec/changes/archive/p0-test-isolation/` |
 | P1 | Hotfix sitemap: streaming, memoria acotada | ✅ Done | `d03b7a5` | `openspec/changes/archive/p1-sitemap-streaming/` |
 | P2 | Observabilidad: `ScrapeRun`/`SourceAttempt`, estados clasificados, `/api/runs` | ✅ Done | `74bbe7a` | `openspec/changes/archive/p2-run-observability/` |
-| P3 | Timeouts efectivos, cancelación, cadencia, leases | 🔵 Spec draft | — | `openspec/changes/p3-execution-deadlines/` |
+| P3 | Timeouts efectivos, cancelación, cadencia, leases | 🟡 Implementada, sin desplegar | — | `openspec/changes/p3-execution-deadlines/` |
 | P4 | Contrato `SourceFetchResult`, transporte/proxy por política | ⬜ Pendiente | — | — |
 | P5 | Recuperación de adaptadores (una fuente por entrega) | ⬜ Pendiente | — | — |
 | P6 | Cola persistente de enriquecimiento + calidad de datos | ⬜ Pendiente | — | — |
@@ -67,6 +67,32 @@ Leyenda: ✅ done · 🔵 spec/draft · 🟡 en implementación · ⬜ pendiente
 - Scrapers de `src/index.ts` distintos de Jooble siguen tragando errores y
   devolviendo `[]` sin señal; P2 solo cubre `executeWithResilience`, Jooble
   y los scrapers de navegador. Pendiente en P4/P5.
+- **P3 (2026-09-15), medido en producción con P2 ya instrumentando:**
+  - El presupuesto del tick no cabía en sí mismo: 3 min (catálogo) + 4 lotes
+    × 5 min = **23 min** de trabajo permitido bajo un plazo de **20**, dentro
+    de un `timeout-minutes` de **27**. `remainingMs` negativo saltaba la
+    espera de rezagados y dejaba el proceso en un `pool.end()` **sin límite**
+    — el tramo que llegaba a 27-28 min y recibía el hard-kill (3 de los 12
+    últimos ticks CO, 25%).
+  - `runWithTimeout` devolvía `perSource: {}` al vencer, así que un rol
+    expirado **borraba del informe las fuentes que sí completó**. Por eso
+    faltaban Computrabajo, Elempleo y Magneto en el run `35031341207`: no
+    estaban rotas, estaban invisibles (confirmado después: 7/5/5 intentos
+    `success` en 24 h).
+  - `EBADENGINE` en cada ejecución: Node 20 frente a `engines.node = 24.18.0`
+    y a los 6 `@supabase/*` que exigen `>=22`. `npm ci` **sí** funcionaba
+    (`added 349 packages … in 10s`): el `|| npm install` era riesgo latente,
+    no daño activo.
+  - Actions pierde ~94% de los disparos (`*/15` → 12 ejecuciones en 47 h).
+    La prueba de que no es configuración propia: `scrape-browser-tick.yml`
+    pide `0 13 */2 * *`, dura 4 min y tiene grupo de concurrencia propio, y
+    aun así dispara entre las 15:40 y las 17:58 UTC. Impacto real acotado —
+    un rol vencido sigue vencido, así que las cadencias de 4-6 h se absorben
+    solas; las víctimas son RemoteOK y GetOnBoard, a 1 h. Ver
+    `docs/adr/0003-scheduler-cadence.md`.
+  - Las 0 filas en `scrape_runs` tras P2 **no eran un defecto**: 40/40
+    ejecuciones recientes usaron el commit base `74f066b`; ninguna había
+    usado todavía el código de P2.
 - Entorno (2026-09-15): los metadatos git de este worktree fueron podados
   por un proceso externo (patrón `git worktree prune` desde WSL, que ve la
   ruta `C:/…` como inexistente) y se recrearon con aprobación. Recomendado:
@@ -236,4 +262,5 @@ rollback.
 |---|---|---|
 | 2026-09-15 | P0 | Commit `a73a85e`. Runner aislado, PostgreSQL desechable, baseline 9 rutas/18 capturas. Gates heredados documentados (35 tsc / 33 lint, 0 nuevos). |
 | 2026-09-15 | P1 | Commit `d03b7a5`. Sitemap en streaming (lotes de 250, backpressure, 50k máx., 1 descarga concurrente, timeouts 10s/30s, cancelación de cursor, 503 seguro). 100k filas sintéticas, ~34 MB heap extra, ~304 MB RSS. tsc 29 heredados / lint 27 heredados, 0 nuevos. |
+| 2026-09-15 | P3 | Implementada, **sin desplegar**. `FetchContext` opcional (deadline + `AbortSignal` + presupuesto) cableado solo en los puntos compartidos — adaptadores sin tocar, heredan la cancelación en la frontera del wrapper; instrumentación por adaptador queda para P4/P5. Presupuesto **derivado** del plazo global con reserva de cierre fuera del reparto (`tick-budget.ts`), cierre en 5 pasos todos acotados (`pool.end()` con tope y salida explícita), `scrape_leases` aditiva con reclamación atómica en una sentencia + latido reutilizando el de P2. Tabla propia y no columnas en `role_source_runs` porque `markRoleForImmediateRescan` borra las filas de ese rol y se llevaría el lease por delante (EXE-008 lo prueba). Roles vencidos ya informan lo completado (EXE-009). Workflows a Node 24 y `npm ci` sin fallback; cron a `*/30` como experimento con revisión el 2026-09-22. EXE-001…010 trazados. Gates: unit 12/12 + 11/11, integración completa (OBS-001…012 + EXE), baseline y build ✅, tsc **29** / eslint **295** = línea base heredada, **0 nuevos**. Migración aplicada solo a base desechable; la real sigue sin migrar. Pendiente arrastrado: `OPS_ADMIN_TOKEN` en `.env.example` (ruta denegada a agentes, la añade el usuario). |
 | 2026-09-15 | P2 | Commit `74bbe7a`. `scrape_runs`/`source_attempts` aditivos (RLS + `REVOKE`); `RunRecorder` clasifica cada intento con señales reales (circuito abierto, deny, reintentos agotados, errores tragados, credencial ausente, rechazo por validación) — ningún fallo como éxito vacío; latido 60 s, reconciliación a `interrupted` (10 min) y derivación en lectura; rezagados → `timeout` sin sobrescritura; retención 30 d; `/api/runs` desde Postgres (forma compatible, paginado, sin datos operativos, `503` ante fallo) y `/api/admin/runs` con `OPS_ADMIN_TOKEN` fail-closed. Tick de navegador incluido. OBS-001…012 en integración; unit 34/34, integración 6/6, baseline y build en verde. tsc 29 / eslint 295 heredados (alcance corregido, ver hallazgos), 0 nuevos. Migración aplicada en la base real el 2026-09-15 con autorización explícita del usuario (corrida dos veces, idempotente; verificado: ambas tablas con RLS activo, 0 grants a `anon`/`authenticated`, tablas vacías, corpus intacto — 66.529 vacantes / 53 usuarios / 6 transacciones / 35 roles antes y después). Sin push ni despliegue: el código sigue solo en la rama local, así que las tablas están creadas pero todavía nadie las escribe. Pendiente de publicación: p95 de `/api/runs` no medido; `OPS_ADMIN_TOKEN` por documentar en `.env.example` (denegado a agentes). |

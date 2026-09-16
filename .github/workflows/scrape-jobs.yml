@@ -2,7 +2,16 @@ name: Job Radar Scraper Tick
 
 on:
   schedule:
-    - cron: "*/15 * * * *" # Executes every 15 minutes at $0 USD cost (public repo)
+    # P3 (2026-09-15): bajado de */15 a */30 como EXPERIMENTO medible, no
+    # como arreglo conocido. Actions entrega ~6 ticks/día pida lo que pida
+    # este cron (12 ejecuciones en 47 h frente a las 188 solicitadas), y el
+    # browser-tick — 4 min, grupo de concurrencia propio, cron diario —
+    # dispara con 3-5 h de retraso, así que el retraso no lo causa nuestra
+    # configuración. Hipótesis: pedir 96 disparos/día es parte de lo que
+    # hace que GitHub despriorice este repositorio. No se pierde cadencia
+    # real al bajarlo. Se mide con scrape_runs a los 7 días; si no mejora,
+    # se revierte esta línea y se escala a docs/adr/0003-scheduler-cadence.md.
+    - cron: "*/30 * * * *" # $0 USD en repositorio público
   workflow_dispatch:
 
 # If a tick is still running when the next 15-min trigger fires (e.g. some
@@ -31,12 +40,12 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
 
       - name: Install Dependencies
         run: |
           cd job-radar-apify
-          npm ci || npm install
+          npm ci
 
       - name: Run Scraper Tick
         env:

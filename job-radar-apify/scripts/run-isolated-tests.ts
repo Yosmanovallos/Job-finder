@@ -12,8 +12,8 @@ import { buildTestEnvironment, validateTestEnvironment } from "../tests/test-saf
 const root = fileURLToPath(new URL("../", import.meta.url));
 const postgresImage = "postgres@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685";
 const suites: Record<string, string[]> = {
-  unit: ["validate-test-safety.test.ts", "validate-dashboard-filters.ts", "validate-role-matching.ts", "validate-run-telemetry.test.ts"],
-  integration: ["validate-isolated-database.ts", "validate-job-pagination.ts", "validate-seo-job-pages.ts", "validate-companies-search.ts", "validate-sitemap-streaming.ts", "validate-run-observability.ts"],
+  unit: ["validate-test-safety.test.ts", "validate-dashboard-filters.ts", "validate-role-matching.ts", "validate-run-telemetry.test.ts", "validate-fetch-context.test.ts"],
+  integration: ["validate-isolated-database.ts", "validate-job-pagination.ts", "validate-seo-job-pages.ts", "validate-companies-search.ts", "validate-sitemap-streaming.ts", "validate-run-observability.ts", "validate-execution-deadlines.ts"],
   sitemap: ["validate-sitemap-streaming.ts"],
   observability: ["validate-run-observability.ts"],
   pagination: ["validate-job-pagination.ts"],

@@ -4,8 +4,9 @@ import { markRoleSourceRun } from "../db/scheduler-repository.js";
 import { generateRoleKeywordsWithAI } from "../ai-role-agent.js";
 import { DEFAULT_COUNTRY, resolveJobCountry } from "../countries/index.js";
 import { executeWithResilience } from "../engine/resilient-fetch.js";
+import { BUDGET_ESTIMATES, hasBudget, isCancelled, type FetchContext } from "../engine/fetch-context.js";
 import { jitterDelay } from "../engine/jitter-delay.js";
-import { RunRecorder, type AttemptHandle, type AttemptStatus } from "../observability/run-telemetry.js";
+import { RunRecorder, reportSourceSignal, type AttemptHandle, type AttemptStatus } from "../observability/run-telemetry.js";
 import { runListingAttempt } from "./listing-attempt.js";
 
 // Bounds how many detail pages get fetched per adapter per role per tick
@@ -36,6 +37,14 @@ interface WorkerJobOptions {
   /** P2 run telemetry. Optional: without it, attempts are still classified
    * in memory (perSource[].status) but nothing is persisted. */
   recorder?: RunRecorder;
+  /** P3 deadline/cancellation. Without it, behavior is unchanged. */
+  ctx?: FetchContext;
+  /** P3 (EXE-009): when the caller owns this map, whatever a role completed
+   * before its deadline survives the role timing out. Previously the caller
+   * discarded the whole result on timeout, which erased completed sources
+   * from the report — that is why Computrabajo/Elempleo/Magneto went missing
+   * from run 35031341207's summary. */
+  perSourceSink?: Record<string, SourceRunResult>;
 }
 
 export interface SourceRunResult {
@@ -102,8 +111,9 @@ export class ScrapeWorker {
     let totalJobs = 0;
     let savedCount = 0;
     let duplicateCount = 0;
-    const perSource: Record<string, SourceRunResult> = {};
+    const perSource: Record<string, SourceRunResult> = options.perSourceSink ?? {};
     const recorder = options.recorder ?? RunRecorder.disabled();
+    const ctx = options.ctx;
 
     // Saved per-adapter, immediately after each fetch — not batched until the
     // whole role finishes. A role needing all 12 sources can take 10-15+ min
@@ -114,6 +124,15 @@ export class ScrapeWorker {
     // unfinished part — this way, whatever already fetched is already safely
     // in Postgres by the time anything might cut the process off.
     for (const adapter of adapters) {
+      // P3 (EXE-003): stop the loop at a source boundary — the cheapest
+      // possible place to stop, since nothing has been fetched yet. The
+      // remaining sources simply stay due and the next tick takes them.
+      if (!hasBudget(ctx, BUDGET_ESTIMATES.sourceListing)) {
+        console.warn(
+          `⏱️ [ScrapeWorker] Sin presupuesto para ${adapter.name} en "${roleName}" — no se inicia (queda vencida para el próximo tick).`
+        );
+        continue;
+      }
       const attemptRef: { id?: string } = {};
       const listingStatus = () => (attemptRef.id ? recorder.statusOf(attemptRef.id) : undefined);
       try {
@@ -126,7 +145,8 @@ export class ScrapeWorker {
             stampCountry: (job) => {
               job.country = resolveJobCountry(job, country);
             },
-            attemptRef
+            attemptRef,
+            ctx
           },
           () => adapter.fetch(keywordsToUse, dateRange)
         );
@@ -138,9 +158,13 @@ export class ScrapeWorker {
         // Separate attempt, after the listing is already persisted: a slow or
         // blocked detail host shows up as its own outcome instead of hiding
         // a healthy listing (or vice versa).
-        if (adapter.fetchDetail && listing.insertedJobs.length > 0) {
+        // Detail enrichment is explicitly optional work on top of a job that
+        // is already saved and visible (see MAX_DETAIL_FETCHES_PER_ADAPTER_PER_ROLE),
+        // so it is the first thing to give up when the budget is thin — never
+        // at the cost of the listing that already landed.
+        if (adapter.fetchDetail && listing.insertedJobs.length > 0 && hasBudget(ctx, BUDGET_ESTIMATES.detailFetch)) {
           await recorder.trackAttempt({ source: adapter.name, role: roleName, stage: "detail" }, (attempt) =>
-            this.enrichNewJobs(adapter, listing.insertedJobs, attempt)
+            this.enrichNewJobs(adapter, listing.insertedJobs, attempt, ctx)
           );
         }
 
@@ -180,7 +204,8 @@ export class ScrapeWorker {
   private async enrichNewJobs(
     adapter: SourceAdapter,
     insertedJobs: InsertedJobRef[],
-    attempt: AttemptHandle
+    attempt: AttemptHandle,
+    ctx?: FetchContext
   ): Promise<void> {
     const slice = insertedJobs.slice(0, MAX_DETAIL_FETCHES_PER_ADAPTER_PER_ROLE);
     let obtained = 0;
@@ -195,9 +220,19 @@ export class ScrapeWorker {
     // retest moments later succeeded where the in-tick attempt didn't. This
     // doesn't fix a code bug, it just stops piling detail requests directly
     // on top of a host that may still be warm from the search burst.
-    await jitterDelay(3000, 6000);
+    await jitterDelay(3000, 6000, ctx);
     for (let i = 0; i < slice.length; i++) {
-      if (i > 0) await jitterDelay();
+      // P3 (EXE-003/EXE-004): re-checked every iteration, not just once —
+      // a detail batch is up to 8 fetches with jitter between them, easily
+      // several minutes. Whatever was already enriched stays enriched; the
+      // rest is simply not attempted.
+      if (!hasBudget(ctx, BUDGET_ESTIMATES.detailFetch)) {
+        attempt.setCounters({ filtered: insertedJobs.length - i });
+        reportSourceSignal("deadline_exceeded");
+        break;
+      }
+      if (i > 0) await jitterDelay(1000, 3000, ctx);
+      if (isCancelled(ctx)) break;
       const ref = slice[i];
       try {
         // executeWithResilience's contract is `fetcher: () => Promise<T[]>`
@@ -207,7 +242,7 @@ export class ScrapeWorker {
         const [detail] = await executeWithResilience(`${adapter.name}-detail`, async () => {
           const result = await adapter.fetchDetail!(ref.url);
           return result ? [result] : [];
-        });
+        }, 3, ctx);
         if (detail) {
           await updateJobDetail(ref.id, {
             description: detail.description,

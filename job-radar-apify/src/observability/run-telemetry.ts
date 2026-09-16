@@ -41,11 +41,13 @@ export interface SignalTally {
   retries_exhausted: number;
   misconfigured: number;
   swallowed_error: number;
+  /** P3: work refused or cut short because the tick's deadline ran out. */
+  deadline_exceeded: number;
 }
 export type SourceSignalKind = keyof SignalTally;
 
 export function emptySignalTally(): SignalTally {
-  return { request: 0, circuit_open: 0, blocked: 0, retries_exhausted: 0, misconfigured: 0, swallowed_error: 0 };
+  return { request: 0, circuit_open: 0, blocked: 0, retries_exhausted: 0, misconfigured: 0, swallowed_error: 0, deadline_exceeded: 0 };
 }
 
 const attemptContext = new AsyncLocalStorage<SignalTally>();
@@ -101,6 +103,10 @@ function negativeSignal(signals: SignalTally): Classification<AttemptStatus> | n
   if (signals.blocked > 0) return { status: "blocked", reason: "http_deny" };
   if (signals.retries_exhausted > 0) return { status: "failed", reason: "retries_exhausted" };
   if (signals.swallowed_error > 0) return { status: "failed", reason: "swallowed_error" };
+  // P3: ranked below real failures (a source that was blocked was blocked —
+  // the deadline is not the interesting fact) but above circuit_open, since
+  // running out of budget is a live outcome and an open circuit is a skip.
+  if (signals.deadline_exceeded > 0) return { status: "timeout", reason: "deadline_exceeded" };
   if (signals.circuit_open > 0) return { status: "skipped", reason: "circuit_open" };
   return null;
 }
@@ -317,6 +323,13 @@ export interface RunRecorderOptions {
   env?: NodeJS.ProcessEnv;
   heartbeatIntervalMs?: number;
   drainTimeoutMs?: number;
+  /**
+   * P3: runs on every heartbeat tick, alongside the run's own heartbeat.
+   * A callback (rather than importing the lease module here) keeps
+   * observability from depending on coordination — and means a failing
+   * lease refresh can never interfere with telemetry. Must not throw.
+   */
+  onHeartbeat?: (runId: string) => void;
 }
 
 export class RunRecorder {
@@ -350,8 +363,18 @@ export class RunRecorder {
     };
     recorder.enqueue("insertRun", (store) => store.insertRun(record), true);
     await recorder.drain(Math.min(recorder.drainTimeoutMs, TELEMETRY_QUERY_TIMEOUT_MS));
+    const onHeartbeat = options.onHeartbeat;
     recorder.heartbeat = setInterval(
-      () => recorder.enqueue("heartbeatRun", (store) => store.heartbeatRun(recorder.runId)),
+      () => {
+        recorder.enqueue("heartbeatRun", (store) => store.heartbeatRun(recorder.runId));
+        if (onHeartbeat) {
+          try {
+            onHeartbeat(recorder.runId);
+          } catch {
+            // Never let a coordination failure disturb telemetry.
+          }
+        }
+      },
       options.heartbeatIntervalMs ?? HEARTBEAT_INTERVAL_MS
     );
     recorder.heartbeat.unref();

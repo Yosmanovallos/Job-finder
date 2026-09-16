@@ -4,6 +4,12 @@ Requisitos observables. Cada ID se traza a escenarios, pruebas
 (`tests/validate-fetch-context.test.ts` = unitaria,
 `tests/validate-execution-deadlines.ts` = integración) y resultado.
 
+Gates ejecutados (PostgreSQL 16 desechable, runner aislado, sin tocar
+producción): unitarias 12/12 y 11/11 (P2 intacto) · integración completa
+(OBS-001…012 + EXE-003/005/006/007/008/009) · baseline 9 rutas · build ✅ ·
+`tsc` **29** y `eslint` **295** — idénticos a la línea base heredada, **0
+errores nuevos**.
+
 Delta: solo comportamiento que cambia respecto de la base. La
 clasificación de intentos de P2 (OBS-001…012) se mantiene intacta y sirve
 de instrumento de medida.
@@ -23,7 +29,7 @@ más 6 paquetes `@supabase/*` que exigen `>=22.0.0`, en cada ejecución.
 `npm ci` ya funcionaba (`added 349 packages … in 10s`): el fallback era
 riesgo latente, no daño activo.
 
-**Resultado:** _(pendiente)_
+**Resultado:** ✅ Los 3 workflows de scraping pasan a Node 24 (alineado con `engines.node = 24.18.0`) y a `npm ci` sin fallback. Pendiente de confirmar en Actions tras el despliegue: el EBADENGINE solo desaparece cuando el runner ejecuta el workflow nuevo.
 
 ## EXE-002 — El presupuesto de trabajo cabe dentro del plazo
 
@@ -38,7 +44,7 @@ plazo global, nunca al revés.
 permitido bajo `OVERALL_DEADLINE_MS` de **20 min**. `remainingMs` negativo
 → la espera de rezagados se salta entera.
 
-**Resultado:** _(pendiente)_
+**Resultado:** ✅ Unitaria: `planTickBudget` garantiza por construcción `catálogo + lotes × techo ≤ presupuesto de trabajo`, y la reserva de cierre queda fuera del reparto. Verificado además que un lote nunca recibe más de lo que queda del presupuesto de trabajo, para 5 valores de tiempo transcurrido.
 
 ## EXE-003 — Vencido el plazo, no empieza trabajo nuevo
 
@@ -51,7 +57,7 @@ una página más, ni un reintento más.
 - Escenario: plazo vence entre listado y detalle → el listado ya guardado
   persiste, el detalle no se inicia.
 
-**Resultado:** _(pendiente)_
+**Resultado:** ✅ Unitaria: contexto vencido → `hasBudgetFor` falso incluso para trabajo gratuito; contexto vivo con 5 s rechaza una fuente estimada en 30 s. Integración: con el plazo ya vencido no se inicia ninguna fuente (0 vacantes, 0 entradas en el informe). Sin contexto, comportamiento idéntico al anterior a P3.
 
 ## EXE-004 — Las esperas no sobreviven al plazo
 
@@ -64,7 +70,7 @@ el final.
 - Escenario: plazo vence durante el enfriamiento de 3-6 s previo al
   detalle → no se solicita ningún detalle.
 
-**Resultado:** _(pendiente)_
+**Resultado:** ✅ Unitaria: un backoff de 9 s bajo un plazo de 120 ms termina en <1 s y no se reintenta. Una espera dentro del presupuesto sí espera y no cancela el contexto. Sin contexto, se duerme como antes.
 
 ## EXE-005 — Cancelar nunca pierde lo ya obtenido *(riesgo principal)*
 
@@ -87,7 +93,7 @@ de un intento de P2.
 incidente de pérdida de datos (2026-07-25, citado en `scrape-worker.ts`).
 Una cancelación ingenua lo reintroduce.
 
-**Resultado:** _(pendiente)_
+**Resultado:** ✅ Integración: con presupuesto para una sola fuente, las 3 vacantes de la primera se persisten íntegras y la segunda no se inicia (`perSource.Magneto === undefined` — no se inventa un resultado). Unitaria: el orden observado es `fetch → persist-begin → persist-end` incluso con el plazo vencido a mitad de la escritura, y la siguiente fuente queda como `not-started`.
 
 ## EXE-006 — El proceso termina por su cuenta
 
@@ -104,7 +110,7 @@ el cierre del pool.
 a los 27-28 min. El run 35031341207 agotó los 262 s completos de gracia
 (22:46:52 → 22:51:14) sin que los rezagados terminaran.
 
-**Resultado:** _(pendiente)_
+**Resultado:** ✅ Unitaria: el temporizador del propio contexto está `unref`'d — comprobado sobre los handles activos del proceso — así que el mecanismo del plazo no puede ser lo que impida salir. Integración: la ejecución se cierra sola y libera sus leases. En el tick: cierre en 5 pasos, todos acotados, incluido `pool.end()` con tope de 10 s y salida explícita.
 
 ## EXE-007 — Reclamación atómica de rol/fuente
 
@@ -119,7 +125,7 @@ error.
 - Escenario: tabla sin migrar → se concede con aviso; la coordinación
   nunca impide que se scrapee.
 
-**Resultado:** _(pendiente)_
+**Resultado:** ✅ Integración: de dos reclamaciones concurrentes del mismo par gana exactamente una; un lease vivo no es robable; uno caducado se recupera sin intervención; el latido extiende solo los del propio `run_id`. Bloque de esquema aditivo, idempotente (aplicado dos veces) y con RLS activo. Sin la tabla migrada, se concede con aviso y el scraping continúa.
 
 ## EXE-008 — El rescan manual no invalida un lease activo
 
@@ -135,7 +141,7 @@ hace `DELETE FROM role_source_runs WHERE role_name = $1`. Guardar el lease
 en esa tabla lo expondría a ese borrado — es la razón de que sea una tabla
 aparte.
 
-**Resultado:** _(pendiente)_
+**Resultado:** ✅ Integración: tras `markRoleForImmediateRescan`, la fila de cadencia desaparece pero el lease sobrevive, y otra ejecución no puede reclamar el par. Es la prueba directa de por qué la tabla es independiente.
 
 ## EXE-009 — Un rol vencido informa lo que sí completó
 
@@ -149,7 +155,7 @@ vencimiento siguen apareciendo en el resumen y en la telemetría de P2.
 faltaban **Computrabajo, Elempleo y Magneto** porque `runWithTimeout`
 devuelve `perSource: {}` al vencer.
 
-**Resultado:** _(pendiente)_
+**Resultado:** ✅ Integración: la fuente completada antes del corte sigue en el informe (`perSource.Torre.fetched === 3`). Antes de P3 ese mapa volvía vacío al vencer el rol.
 
 ## EXE-010 — La pérdida de disparos queda registrada y medida
 
@@ -166,4 +172,4 @@ dura 4 min, grupo de concurrencia propio, y dispara entre las 15:40 y las
 porque un rol vencido sigue vencido; las víctimas reales son RemoteOK y
 GetOnBoard, a 1 h.
 
-**Resultado:** _(pendiente)_
+**Resultado:** ✅ Registrado en `docs/adr/0003-scheduler-cadence.md` con la evidencia y la consulta de medición sobre `scrape_runs`. Cron bajado a `*/30` como experimento con revisión el 2026-09-22.

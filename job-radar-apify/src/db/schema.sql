@@ -498,6 +498,40 @@ ALTER TABLE scrape_runs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE source_attempts ENABLE ROW LEVEL SECURITY;
 -- END p2-run-observability
 
+-- BEGIN p3-execution-deadlines
+-- 13. Tabla `scrape_leases` (P3, openspec/changes/p3-execution-deadlines):
+-- reclamación atómica de un par (rol, fuente) para que dos ticks solapados
+-- nunca scrapeen lo mismo a la vez.
+--
+-- Tabla propia y NO columnas en `role_source_runs`, por un motivo concreto:
+-- markRoleForImmediateRescan() (src/server.ts, endpoint autenticado de
+-- rescan) borra por completo las filas de `role_source_runs` de ese rol.
+-- Un lease
+-- guardado ahí desaparecería con un rescan manual en pleno scrape, dejando el par
+-- reclamable por un segundo tick mientras el primero sigue trabajando —
+-- exactamente la carrera que el lease existe para evitar. Además
+-- `role_source_runs` aloja el centinela `__global__`, cuya semántica de
+-- last_run_at no debe perturbarse al reclamar.
+--
+-- Un proceso muerto no libera nada: para eso está expires_at, refrescado por
+-- el mismo latido de 60 s de scrape_runs (P2). No hace falta reconciliación
+-- aparte.
+CREATE TABLE IF NOT EXISTS scrape_leases (
+    role_name    VARCHAR(255) NOT NULL,
+    source_name  VARCHAR(100) NOT NULL,
+    run_id       UUID NOT NULL REFERENCES scrape_runs(id) ON DELETE CASCADE,
+    country      VARCHAR(8)  NOT NULL,
+    acquired_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    heartbeat_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    expires_at   TIMESTAMPTZ NOT NULL,
+    PRIMARY KEY (role_name, source_name)
+);
+CREATE INDEX IF NOT EXISTS idx_scrape_leases_expiry ON scrape_leases (expires_at);
+CREATE INDEX IF NOT EXISTS idx_scrape_leases_run ON scrape_leases (run_id);
+
+ALTER TABLE scrape_leases ENABLE ROW LEVEL SECURITY;
+-- END p3-execution-deadlines
+
 -- =============================================================================
 -- ROW LEVEL SECURITY: every read/write from this app goes through the `pool`
 -- (direct `pg` connection as the `postgres` role, which has BYPASSRLS — see
@@ -544,5 +578,6 @@ ALTER TABLE user_ai_credentials ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON jobs, search_roles, users, social_posts, transactions,
   role_source_runs, source_circuit_state, indexing_queue, company_reputation,
   company_reputation_alias, cv_profiles, cv_generations, llm_response_cache,
-  llm_usage_ledger, user_ai_credentials, scrape_runs, source_attempts
+  llm_usage_ledger, user_ai_credentials, scrape_runs, source_attempts,
+  scrape_leases
   FROM anon, authenticated;
