@@ -9,7 +9,8 @@
 # cron via ENABLE_CRON) and caused repeated out-of-memory crashes that took
 # down login/dashboard/checkout along with the scraper (2026-07-25, see
 # job-radar-apify/docs/BACKLOG.md). Scraping now runs entirely out-of-process
-# via .github/workflows/scrape-jobs.yml (GitHub Actions, every 15 min),
+# via .github/workflows/scrape-jobs.yml (GitHub Actions; cron */30 desde P3,
+# aunque Actions entrega bastante menos — ver docs/adr/0003-scheduler-cadence.md),
 # writing to the same Postgres this service reads from. This web service only
 # ever serves the site and reads the DB — it must never import queue/scheduler.
 

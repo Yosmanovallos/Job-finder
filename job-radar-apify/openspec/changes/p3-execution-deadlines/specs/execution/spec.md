@@ -38,7 +38,17 @@ más 6 paquetes `@supabase/*` que exigen `>=22.0.0`, en cada ejecución.
 `npm ci` ya funcionaba (`added 349 packages … in 10s`): el fallback era
 riesgo latente, no daño activo.
 
-**Resultado:** ✅ Los 3 workflows de scraping pasan a Node 24 (alineado con `engines.node = 24.18.0`) y a `npm ci` sin fallback. Pendiente de confirmar en Actions tras el despliegue: el EBADENGINE solo desaparece cuando el runner ejecuta el workflow nuevo.
+**Resultado:** 🟡 **Parcial, por decisión de secuenciación.** `npm ci` sin
+fallback: ✅ aplicado en los 3 workflows (hoy `npm ci` ya funcionaba —
+`added 349 packages … in 10s` —, así que el cambio convierte un fallo
+silencioso futuro en uno visible, sin alterar nada hoy). Node 24: **no
+aplicado todavía**; los workflows siguen en 20 y el `EBADENGINE` persiste.
+Motivo: el salto de runtime cambia el comportamiento de red de
+`got-scraping`/`playwright`/undici contra las fuentes reales, que ninguna
+prueba local puede verificar, así que se despliega por separado y con su
+propio canario en vez de mezclarlo con los plazos de P3 (aprobado por el
+usuario, 2026-09-15). El requisito queda abierto hasta ese segundo
+despliegue.
 
 ## EXE-002 — El presupuesto de trabajo cabe dentro del plazo
 

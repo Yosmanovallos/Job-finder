@@ -52,7 +52,11 @@ despliega sin aprobación explícita del usuario.
 - [x] `scripts/run-scrape-tick.ts` — presupuesto derivado (§4), cierre
       acotado (§5), reclamación por fuente (§6).
 - [x] `.github/workflows/{scrape-jobs,scrape-jobs-ve,scrape-browser-tick}.yml`
-      — Node 24, `npm ci` sin fallback, cron `*/30` (experimento §9).
+      — `npm ci` sin fallback y cron `*/30` (experimento §9).
+- [ ] **Segundo despliegue:** Node 20 → 24 en los 3 workflows. Separado a
+      propósito del merge de P3 (decisión del usuario, 2026-09-15): es el
+      único cambio con riesgo real para producción y merece su propio
+      canario. Comparar de nuevo `source_attempts` fuente por fuente.
 - [x] `docs/adr/` — ADR de cadencia: evidencia de pérdida de disparos,
       recomendación de scheduler gestionado, pendiente de coste aprobado.
 

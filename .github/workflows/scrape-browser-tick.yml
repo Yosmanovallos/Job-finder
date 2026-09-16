@@ -36,7 +36,14 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "24"
+          # P3: se mantiene en 20 DELIBERADAMENTE por ahora. La app declara
+          # engines.node = 24.18.0 y los 6 @supabase/* exigen >=22, así que
+          # cada ejecución emite EBADENGINE (y Actions avisa de que Node 20
+          # está deprecado). El salto a 24 cambia el comportamiento de red de
+          # got-scraping/playwright/undici contra las fuentes reales, algo que
+          # ninguna prueba local puede verificar, así que se sube por separado
+          # y con su propio canario — no mezclado con los plazos de P3.
+          node-version: "20"
 
       - name: Install Dependencies
         run: |
