@@ -10,6 +10,7 @@
  * Uso:
  *   npx tsx scripts/verify-p3-deadlines.ts
  *   npx tsx scripts/verify-p3-deadlines.ts --limit 10
+ *   npx tsx scripts/verify-p3-deadlines.ts --no-durations
  */
 import dotenv from "dotenv";
 import { pool } from "../src/db/client.js";
@@ -18,6 +19,9 @@ dotenv.config();
 
 const limitIndex = process.argv.indexOf("--limit");
 const limit = limitIndex >= 0 ? Number(process.argv[limitIndex + 1]) : 6;
+// Las duraciones salen por defecto porque son la base para recalibrar
+// SOURCE_LISTING_ESTIMATE_MS; `--no-durations` las omite.
+const showDurations = !process.argv.includes("--no-durations");
 
 interface RunRow {
   id: string;
@@ -42,6 +46,34 @@ async function main(): Promise<void> {
       LIMIT $1`,
     [limit]
   );
+
+  // Seguridad de la tabla de coordinación: mismo criterio que P2 aplica a
+  // scrape_runs/source_attempts. RLS activo y CERO permisos para los roles
+  // públicos de Supabase — la clave anon del navegador nunca debe poder
+  // leer ni escribir quién está scrapeando qué.
+  const leases = await pool.query<{ relrowsecurity: boolean }>(
+    `SELECT relrowsecurity FROM pg_class WHERE relname = 'scrape_leases'`
+  );
+  if (leases.rowCount === 0) {
+    console.log("ℹ️  scrape_leases no existe todavía: claimLease concede con aviso y el scraping sigue igual.");
+    console.log("   Aplicar con: npx tsx scripts/migrate.ts\n");
+  } else {
+    const grants = await pool.query<{ total: string }>(
+      `SELECT COUNT(*) AS total FROM information_schema.role_table_grants
+        WHERE grantee IN ('anon', 'authenticated') AND table_name = 'scrape_leases'`
+    );
+    const held = await pool.query<{ total: string; expired: string }>(
+      `SELECT COUNT(*) AS total,
+              COUNT(*) FILTER (WHERE expires_at < NOW()) AS expired
+         FROM scrape_leases`
+    );
+    const grantCount = Number(grants.rows[0]?.total ?? "0");
+    console.log(`${leases.rows[0].relrowsecurity ? "✅" : "❌"} scrape_leases: RLS ${leases.rows[0].relrowsecurity ? "activo" : "INACTIVO"}`);
+    console.log(`${grantCount === 0 ? "✅" : "❌"} scrape_leases: ${grantCount} permisos para anon/authenticated`);
+    // Un lease caducado que sobreviva indica que nadie lo liberó y que su
+    // dueño murió: normal de forma puntual, sospechoso si se acumulan.
+    console.log(`ℹ️  Leases vivos: ${held.rows[0].total} (${held.rows[0].expired} caducados sin liberar)\n`);
+  }
 
   console.log("Ejecuciones (más reciente primero):");
   console.log("  fecha              país commit   estado / motivo                  dur    nuevas");
@@ -102,7 +134,7 @@ async function main(): Promise<void> {
     }
   }
 
-  await reportDurations();
+  if (showDurations) await reportDurations();
 
   await pool.end();
 }
@@ -113,9 +145,11 @@ main().catch(async (err) => {
   process.exit(1);
 });
 
-// Duración real por fuente — base para calibrar BUDGET_ESTIMATES, que P3
-// dejó explícitamente como primera aproximación y no como constante
-// derivada. Se invoca con --durations.
+// Duración real por fuente — base para recalibrar
+// SOURCE_LISTING_ESTIMATE_MS (src/engine/fetch-context.ts). La primera
+// versión de P3 usaba una constante única de 30s que resultó errónea por
+// hasta 10x; estos son los números con los que se corrigió, y con los que
+// deben ajustarse en el futuro en vez de a ojo.
 export async function reportDurations(): Promise<void> {
   const rows = await pool.query<{ source_name: string; n: string; p50: number; p95: number; max: number }>(
     `SELECT source_name,
