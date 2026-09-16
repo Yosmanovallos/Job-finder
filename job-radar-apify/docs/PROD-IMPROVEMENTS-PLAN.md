@@ -30,7 +30,7 @@ mejoras de SEO/UX/seguridad/observabilidad.
 | P1 | Hotfix sitemap: streaming, memoria acotada | ✅ Done | `d03b7a5` | `openspec/changes/archive/p1-sitemap-streaming/` |
 | P2 | Observabilidad: `ScrapeRun`/`SourceAttempt`, estados clasificados, `/api/runs` | ✅ Done | `74bbe7a` | `openspec/changes/archive/p2-run-observability/` |
 | P3 | Timeouts efectivos, cancelación, cadencia, leases | ✅ Done | `58098d8` | `openspec/changes/archive/p3-execution-deadlines/` |
-| P4 | Contrato `SourceFetchResult`, transporte/proxy por política | ⬜ Pendiente | — | — |
+| P4 | Contrato `SourceFetchResult`, transporte/proxy por política | 🔵 Spec draft | — | `openspec/changes/p4-source-contract/` |
 | P5 | Recuperación de adaptadores (una fuente por entrega) | ⬜ Pendiente | — | — |
 | P6 | Cola persistente de enriquecimiento + calidad de datos | ⬜ Pendiente | — | — |
 | P7 | Coherencia CO/VE, remoto, catálogo comercial | ⬜ Pendiente | — | — |
