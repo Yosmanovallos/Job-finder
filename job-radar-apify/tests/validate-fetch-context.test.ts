@@ -7,6 +7,9 @@ import {
   hasBudget,
   isCancelled,
   sleepWithContext,
+  estimateListingMs,
+  whenAborted,
+  SOURCE_LISTING_ESTIMATE_MS,
   type FetchContext
 } from "../src/engine/fetch-context.js";
 import { planTickBudget } from "../src/queue/tick-budget.js";
@@ -177,4 +180,44 @@ test("EXE-005: an expired context still reports what was already obtained", () =
   assert.equal(isCancelled(ctx), true);
   assert.equal(obtained, 40);
   ctx.dispose();
+});
+
+/**
+ * Regresión del 2026-09-16 (run 35049467975, `cancelled` a los 27m21s).
+ * Un `adapter.fetch()` no recibe el signal — recorre sus variantes de
+ * keyword por dentro — así que esperarlo sin límite dejaba al tick a merced
+ * del adaptador más lento y el cierre no llegaba a ejecutarse nunca.
+ */
+test("EXE-006: esperar una unidad que ignora el signal nunca bloquea el cierre", async () => {
+  const ctx = createFetchContext(120);
+  // Simula adapter.fetch(): no conoce el contexto y tarda mucho más que el plazo.
+  const stubborn = new Promise<string>((resolve) => setTimeout(() => resolve("tarde"), 5_000).unref?.());
+
+  const startedAt = Date.now();
+  const finished = await Promise.race([stubborn.then(() => true), whenAborted(ctx).then(() => false)]);
+  const elapsed = Date.now() - startedAt;
+
+  assert.equal(finished, false, "el plazo debe ganar a la unidad que lo ignora");
+  assert.ok(elapsed < 1_000, `esperó ${elapsed}ms — el cierre seguiría siendo inalcanzable`);
+  ctx.dispose();
+});
+
+test("EXE-006: sin contexto, whenAborted no interfiere", async () => {
+  const quick = new Promise<boolean>((resolve) => setTimeout(() => resolve(true), 30));
+  assert.equal(await Promise.race([quick, whenAborted(undefined).then(() => false)]), true);
+});
+
+test("EXE-002: las estimaciones por fuente salen de medidas, no de una constante", () => {
+  // La constante única de 30s daba por buena una fuente que tarda minutos:
+  // así se arrancaban listados sin posibilidad de terminar.
+  assert.ok(estimateListingMs("Elempleo") > 100_000, "Elempleo mide ~118s de mediana");
+  assert.ok(estimateListingMs("Torre") < estimateListingMs("LinkedIn"), "Torre es medible más rápida que LinkedIn");
+  assert.equal(estimateListingMs("FuenteQueNoExiste"), 60_000, "una fuente sin medir usa el valor por defecto");
+
+  // Ninguna estimación debe superar el techo de un lote, o esa fuente no
+  // arrancaría jamás — que es peor que arrancarla y abandonarla.
+  const maxBatchMs = 225_000;
+  for (const [source, ms] of Object.entries(SOURCE_LISTING_ESTIMATE_MS)) {
+    assert.ok(ms < maxBatchMs, `${source} (${ms}ms) no cabría nunca en un lote y quedaría en inanición`);
+  }
 });

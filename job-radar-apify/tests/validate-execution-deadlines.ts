@@ -29,7 +29,7 @@ process.env.NOTION_DATABASE_ID = "p3-synthetic-notion-database";
 const { ScrapeWorker } = await import("../src/queue/scrape-worker.js");
 const { RunRecorder } = await import("../src/observability/run-telemetry.js");
 const { createPgRunStore } = await import("../src/db/run-repository.js");
-const { BUDGET_ESTIMATES, createFetchContext } = await import("../src/engine/fetch-context.js");
+const { estimateListingMs, createFetchContext } = await import("../src/engine/fetch-context.js");
 const { claimLease, refreshLeases, releaseLease, releaseRunLeases } = await import("../src/db/scrape-leases.js");
 const { markRoleForImmediateRescan, markRoleSourceRun } = await import("../src/db/scheduler-repository.js");
 const { planTickBudget } = await import("../src/queue/tick-budget.js");
@@ -192,9 +192,10 @@ try {
     assert.ok(plan.globalCatalogMs + plan.batchCount * plan.maxPerBatchMs <= plan.workMs);
 
     const perSource: Record<string, SourceRunResult> = {};
-    // Only 300ms of slack above one source's estimate: the first source fits,
-    // and the time it actually spends is what pushes the second below the bar.
-    const ctx = createFetchContext(BUDGET_ESTIMATES.sourceListing + 300);
+    // Presupuesto para Torre (la estimación MEDIDA más barata, 26s) más un
+    // pequeño margen: Torre arranca, y lo que realmente consume deja a
+    // Magneto (53s medidos) por debajo del listón.
+    const ctx = createFetchContext(estimateListingMs("Torre") + 300);
     const before = await pool.query(`SELECT COUNT(*)::int AS n FROM jobs`);
 
     await worker.processRoleJob({
@@ -206,8 +207,8 @@ try {
       perSourceSink: perSource
     });
 
-    assert.equal(ctx.hasBudgetFor(BUDGET_ESTIMATES.sourceListing), false,
-      "after the first source there must be no room left for another");
+    assert.equal(ctx.hasBudgetFor(estimateListingMs("Magneto")), false,
+      "tras la primera fuente no debe quedar sitio para la siguiente");
 
     const after = await pool.query(`SELECT COUNT(*)::int AS n FROM jobs`);
     assert.equal(after.rows[0].n - before.rows[0].n, 3,

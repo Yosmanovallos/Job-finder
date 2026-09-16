@@ -102,6 +102,8 @@ async function main(): Promise<void> {
     }
   }
 
+  await reportDurations();
+
   await pool.end();
 }
 
@@ -110,3 +112,26 @@ main().catch(async (err) => {
   await pool.end();
   process.exit(1);
 });
+
+// Duración real por fuente — base para calibrar BUDGET_ESTIMATES, que P3
+// dejó explícitamente como primera aproximación y no como constante
+// derivada. Se invoca con --durations.
+export async function reportDurations(): Promise<void> {
+  const rows = await pool.query<{ source_name: string; n: string; p50: number; p95: number; max: number }>(
+    `SELECT source_name,
+            COUNT(*)::text AS n,
+            PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY duration_ms)::int AS p50,
+            PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY duration_ms)::int AS p95,
+            MAX(duration_ms)::int AS max
+       FROM source_attempts
+      WHERE stage = 'listing' AND duration_ms IS NOT NULL
+        AND started_at > NOW() - INTERVAL '7 days'
+      GROUP BY 1 ORDER BY p95 DESC NULLS LAST`
+  );
+  console.log("\nDuración real del listado por fuente (7 d):");
+  console.log("  fuente             n     p50      p95      max");
+  for (const r of rows.rows) {
+    const s = (ms: number) => `${(ms / 1000).toFixed(1)}s`.padStart(8);
+    console.log(`  ${r.source_name.padEnd(17)} ${r.n.padStart(3)} ${s(r.p50)} ${s(r.p95)} ${s(r.max)}`);
+  }
+}

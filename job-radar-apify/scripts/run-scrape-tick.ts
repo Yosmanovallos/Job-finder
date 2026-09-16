@@ -21,7 +21,7 @@ import {
   purgeOldJobs
 } from "../src/db/scheduler-repository.js";
 import { pool } from "../src/db/client.js";
-import { createFetchContext, isCancelled, type FetchContext } from "../src/engine/fetch-context.js";
+import { createFetchContext, isCancelled, whenAborted, type FetchContext } from "../src/engine/fetch-context.js";
 import { planTickBudget, type TickBudgetPlan } from "../src/queue/tick-budget.js";
 import { claimLease, refreshLeases, releaseLease, releaseRunLeases } from "../src/db/scrape-leases.js";
 
@@ -168,8 +168,22 @@ async function runRoleWithBudget(
   // to finish before the pool closes (EXE-005).
   trackedPromises.push(workPromise);
 
-  const result = await workPromise;
-  const timedOut = isCancelled(roleCtx);
+  // Acotado a propósito (2026-09-16, run 35049467975): esperar el
+  // workPromise sin límite dejaba al tick a merced del adaptador más lento.
+  // Un `adapter.fetch()` recorre por dentro ~15-20 variantes de keyword y NO
+  // recibe el signal — con Elempleo en 118s de mediana y picos de 300s, una
+  // sola fuente puede comerse el presupuesto entero, y el cierre no llegaba
+  // a ejecutarse nunca: Actions mataba el proceso a los 27 min.
+  //
+  // Abandonar aquí es seguro ahora y no lo era antes de P3: lo ya obtenido
+  // se guardó por adaptador, `perSource` lo conserva, el promise sigue en
+  // trackedPromises para su gracia acotada, y el cierre termina con salida
+  // explícita. Lo que se pierde es lo que ese fetch llevara acumulado en
+  // memoria sin devolver — inevitable hasta que los adaptadores acepten el
+  // signal por dentro (P4/P5).
+  const finished = await Promise.race([workPromise.then(() => true), whenAborted(roleCtx).then(() => false)]);
+  const result = finished ? await workPromise : null;
+  const timedOut = !finished || isCancelled(roleCtx);
   roleCtx.dispose();
 
   // Released as soon as the role is done, not deferred to teardown: the next
@@ -330,8 +344,9 @@ async function runGlobalCatalogWithBudget(
   });
   trackedPromises.push(workPromise);
 
-  const result = await workPromise;
-  if (isCancelled(ctx)) {
+  const finished = await Promise.race([workPromise.then(() => true), whenAborted(ctx).then(() => false)]);
+  const result = finished ? await workPromise : null;
+  if (!finished || isCancelled(ctx)) {
     console.warn(
       `⏱️ [Tick] Catálogo global agotó su presupuesto (${Math.round(budgetMs / 1000)}s) — lo ya guardado queda persistido; el resto lo recoge el próximo tick.`
     );
@@ -425,6 +440,19 @@ async function main() {
   console.log(
     `⏱️ [Tick] Presupuesto: ${Math.round(plan.workMs / 1000)}s de trabajo + ${Math.round(plan.reserveMs / 1000)}s de cierre (total ${Math.round(plan.totalMs / 1000)}s).`
   );
+
+  // Última red (EXE-006). Todo lo de arriba ya está acotado, pero un fallo
+  // como el del 2026-09-16 — una espera sin límite — no debe poder volver a
+  // terminar en hard-kill de Actions: pase lo que pase, el proceso sale por
+  // su cuenta antes del `timeout-minutes` del workflow. `unref` para que el
+  // propio vigilante nunca sea lo que mantiene vivo el proceso.
+  const watchdog = setTimeout(() => {
+    console.error(
+      `🚨 [Tick] Vigilante: ${Math.round(plan.totalMs / 1000)}s agotados sin llegar al cierre ordenado. Se sale de forma explícita — lo guardado por adaptador ya está en Postgres.`
+    );
+    process.exit(0);
+  }, plan.totalMs);
+  watchdog.unref?.();
 
   const recorder = await RunRecorder.start({
     workflow: "scrape-tick",
@@ -539,6 +567,7 @@ async function main() {
     console.warn(`⚠️ [Tick] El pool no cerró en ${POOL_CLOSE_TIMEOUT_MS / 1000}s — se sale de forma explícita (lo guardado ya está guardado).`);
     process.exit(0);
   }
+  clearTimeout(watchdog);
   console.log(`✅ [Tick] Finalizado en ${Math.round((Date.now() - startedAt) / 1000)}s.`);
 }
 

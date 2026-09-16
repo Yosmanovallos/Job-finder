@@ -4,7 +4,7 @@ import { markRoleSourceRun } from "../db/scheduler-repository.js";
 import { generateRoleKeywordsWithAI } from "../ai-role-agent.js";
 import { DEFAULT_COUNTRY, resolveJobCountry } from "../countries/index.js";
 import { executeWithResilience } from "../engine/resilient-fetch.js";
-import { BUDGET_ESTIMATES, hasBudget, isCancelled, type FetchContext } from "../engine/fetch-context.js";
+import { BUDGET_ESTIMATES, estimateListingMs, hasBudget, isCancelled, type FetchContext } from "../engine/fetch-context.js";
 import { jitterDelay } from "../engine/jitter-delay.js";
 import { RunRecorder, reportSourceSignal, type AttemptHandle, type AttemptStatus } from "../observability/run-telemetry.js";
 import { runListingAttempt } from "./listing-attempt.js";
@@ -127,7 +127,11 @@ export class ScrapeWorker {
       // P3 (EXE-003): stop the loop at a source boundary — the cheapest
       // possible place to stop, since nothing has been fetched yet. The
       // remaining sources simply stay due and the next tick takes them.
-      if (!hasBudget(ctx, BUDGET_ESTIMATES.sourceListing)) {
+      // Estimación POR FUENTE, medida (ver SOURCE_LISTING_ESTIMATE_MS): la
+      // constante única de 30s daba por buena una fuente que en realidad
+      // tarda 2-5 min, así que se arrancaban listados sin ninguna
+      // posibilidad de terminar dentro del plazo.
+      if (!hasBudget(ctx, estimateListingMs(adapter.name))) {
         console.warn(
           `⏱️ [ScrapeWorker] Sin presupuesto para ${adapter.name} en "${roleName}" — no se inicia (queda vencida para el próximo tick).`
         );

@@ -1,5 +1,5 @@
 import { saveJobs, type InsertedJobRef } from "../db/job-repository.js";
-import { BUDGET_ESTIMATES, hasBudget, type FetchContext } from "../engine/fetch-context.js";
+import { estimateListingMs, hasBudget, type FetchContext } from "../engine/fetch-context.js";
 import { reportSourceSignal, type RunRecorder } from "../observability/run-telemetry.js";
 import type { Job } from "../sources/types.js";
 
@@ -42,7 +42,7 @@ export async function runListingAttempt(
     // P3 (EXE-003/EXE-005): the ONLY budget check in this function, and it
     // sits before the fetch. Everything past this line either hasn't fetched
     // anything yet (nothing to lose) or is already persisting (must finish).
-    if (!hasBudget(options.ctx, BUDGET_ESTIMATES.sourceListing)) {
+    if (!hasBudget(options.ctx, estimateListingMs(options.source))) {
       reportSourceSignal("deadline_exceeded");
       attempt.setCounters({ received: 0, valid: 0, filtered: 0, new: 0, duplicate: 0 });
       return { fetched: 0, savedCount: 0, duplicateCount: 0, insertedJobs: [] };

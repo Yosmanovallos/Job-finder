@@ -169,6 +169,67 @@ export function sleepWithContext(ms: number, ctx?: FetchContext): Promise<void> 
 }
 
 /**
+ * Resolves when `ctx` gives up. Without a context it never resolves, which
+ * makes `Promise.race([work, whenAborted(ctx)])` a no-op for unbudgeted
+ * callers — exactly the pre-P3 behavior.
+ *
+ * This is the safety net that makes an optimistic estimate safe: the budget
+ * check decides whether a unit is WORTH starting, and this decides that the
+ * tick can always stop waiting for one. Without it, a single adapter whose
+ * internal keyword fan-out runs long blocks the tick past its deadline with
+ * no way out — measured in production on 2026-09-16 (run 35049467975), where
+ * Magneto was still searching 27 minutes in and the job was hard-killed
+ * before teardown ever ran.
+ */
+export function whenAborted(ctx?: FetchContext): Promise<void> {
+  if (!ctx) return new Promise<void>(() => {});
+  if (ctx.signal.aborted) return Promise.resolve();
+  return new Promise<void>((resolve) => {
+    ctx.signal.addEventListener("abort", () => resolve(), { once: true });
+  });
+}
+
+/**
+ * Measured listing duration per source (p50 over 7 days of `source_attempts`,
+ * 2026-09-16). Used to decide whether a source is worth STARTING.
+ *
+ * Deliberately p50 and not p95: the estimate only needs to be a reasonable
+ * guess, because `whenAborted` guarantees the tick can abandon an overrun.
+ * Using p95 here would be self-defeating — Elempleo's p95 (278s) exceeds a
+ * whole batch budget (~225s), so it would never start again at all.
+ *
+ * Re-measure with `scripts/verify-p3-deadlines.ts --durations` rather than
+ * adjusting these by feel.
+ */
+export const SOURCE_LISTING_ESTIMATE_MS: Record<string, number> = {
+  Elempleo: 118_000,
+  LinkedIn: 81_000,
+  "LinkedIn-VE": 58_000,
+  Computrabajo: 75_000,
+  "Computrabajo-VE": 75_000,
+  Magneto: 53_000,
+  WeRemoto: 79_000,
+  "Glassdoor-CO": 53_000,
+  "Glassdoor-VE": 40_000,
+  "Indeed-CO": 47_000,
+  "Indeed-VE": 39_000,
+  Torre: 26_000,
+  WorkanaV2: 39_000,
+  GetOnBoard: 11_000,
+  RemoteOK: 2_000,
+  Remotive: 1_000,
+  Jooble: 1_000,
+  "Jooble-VE": 1_000
+};
+
+/** Conservative default for a source with no measurement yet. */
+export const DEFAULT_LISTING_ESTIMATE_MS = 60_000;
+
+export function estimateListingMs(sourceName: string): number {
+  return SOURCE_LISTING_ESTIMATE_MS[sourceName] ?? DEFAULT_LISTING_ESTIMATE_MS;
+}
+
+/**
  * Rough per-unit cost estimates used by `hasBudgetFor` checks. Deliberately
  * conservative: the cost of skipping a source that would have fit is one
  * cadence window (it stays due, the next tick takes it), while the cost of
@@ -176,8 +237,14 @@ export function sleepWithContext(ms: number, ctx?: FetchContext): Promise<void> 
  * the deadline — the exact thing that caused the hard-kills.
  */
 export const BUDGET_ESTIMATES = {
-  /** One source's full keyword fanout for a role. */
-  sourceListing: 30_000,
+  /**
+   * Fallback for callers without a source name. Per-source measured values
+   * live in SOURCE_LISTING_ESTIMATE_MS — the original flat 30s here was a
+   * guess, and production data showed it was wrong by up to 10x (Elempleo
+   * p50 118s, LinkedIn 81s), which is how sources got started with no chance
+   * of finishing.
+   */
+  sourceListing: DEFAULT_LISTING_ESTIMATE_MS,
   /** One detail page plus its jitter delay. */
   detailFetch: 8_000,
   /** One retry attempt plus its backoff. */
