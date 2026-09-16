@@ -87,20 +87,45 @@ despliega sin aprobación explícita del usuario.
       Referencia previa sin P2: run `35031341207` (22:30 UTC, `74f066b`) —
       185 nuevas, 1901 duplicadas, 7 fuentes informadas, 262 s de gracia
       agotados y Computrabajo/Elempleo/Magneto ausentes del informe.
-- [ ] Tras el merge: lanzamiento manual y comparación de `source_attempts`
-      fuente por fuente. Atención especial al salto Node 20 → 24
-      (`got-scraping`, `playwright`, defaults TLS de undici).
-- [ ] Verificar: ningún `cancelled`, duración < 20 min, Computrabajo /
-      Elempleo / Magneto presentes en el informe.
+- [x] Tras el merge: lanzamiento manual (`35046815422`, `58098d8`) y
+      comparación fuente por fuente con `scripts/verify-p3-deadlines.ts`
+      (solo lectura, reutilizable para el canario de Node 24):
+
+      | Fuente | Antes `5d41861` | Después `58098d8` |
+      |---|---|---|
+      | Computrabajo | success/ok (8) | success/ok (22) |
+      | Elempleo | success/ok (12) | success/ok (32) |
+      | LinkedIn | success/ok (79) | success/ok (139) |
+      | Torre | success/ok (61) | success/ok (72) |
+      | Magneto | success/ok (19) | success/ok (20) |
+      | GetOnBoard | success/ok (24) | success/ok (24) |
+      | RemoteOK | success/ok (1) | success/ok (1) |
+      | WorkanaV2 | ausente | success/ok (57) |
+
+      **Cero regresiones:** ninguna fuente pasa de `success` a
+      `blocked`/`empty` ni desaparece. El salto Node 20 → 24 NO entra en
+      este despliegue, así que este canario aísla P3.
+- [x] Verificar: canario `success` (ningún `cancelled`), **18m34s** < 20 min,
+      y Computrabajo / Elempleo / Magneto presentes en el informe.
+      **Matiz honesto:** el paso de `timeout` a `partial` NO es atribuible
+      solo a P3 — la ejecución de las 00:47, con código pre-P3, también salió
+      `partial` en 14m48s, así que las 23:28 (`timeout`, 20m04s) era el peor
+      caso, no el invariable. Con una sola ejecución lo demostrado es que P3
+      no rompe nada y que el tick termina por su cuenta dentro del
+      presupuesto. Que el `timeout` desaparezca de forma sostenida requiere
+      varios días de `scrape_runs`.
+      Los conteos tampoco son comparables como volumen: cada tick procesa los
+      roles vencidos en ese momento. La señal limpia es el **estado** por
+      fuente, no la cifra.
 
 ## 5. Publicación
 
-- [ ] Gates en verde y OK explícito del usuario.
-- [ ] Subir el commit de documentación pendiente (`6de3abe`) con el primer
+- [x] Gates en verde y OK explícito del usuario (condicionado a no dañar producción; ver decisión de separar Node 24).
+- [x] Subido el commit de documentación pendiente (`6de3abe`) con el primer
       push de la fase.
-- [ ] Merge fast-forward a main → Render despliega (~60 s).
-- [ ] Lanzamiento manual del tick y verificación del §4.
-- [ ] Archivar el cambio en `openspec/changes/archive/` y actualizar
+- [x] Merge fast-forward a main (`5d41861..58098d8`, 25 archivos, +2167/−176). Render desplegado y sano: `/api/health`, `/api/runs` y `/` en 200.
+- [x] Lanzamiento manual del tick y verificación del §4.
+- [x] Archivado en `openspec/changes/archive/` y actualizado
       `docs/PROD-IMPROVEMENTS-PLAN.md` (estado, commit, historial).
-- [ ] Anotar el experimento de cadencia `*/30` con fecha de revisión a 7
-      días. Si no mejora, revertir y escalar al ADR.
+- [x] Experimento de cadencia `*/30` anotado con revisión el **2026-09-22**.
+      Si no mejora, revertir (una línea por workflow) y escalar al ADR 0003.
