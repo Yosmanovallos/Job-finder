@@ -50,7 +50,12 @@ jobs:
           # verificar. Verificar con scripts/verify-p3-deadlines.ts: una fuente
           # que pase de success a blocked/empty es este salto, no P3. Revertir
           # es cambiar esta línea de vuelta a "20".
-          node-version: "24"
+          # Versión EXACTA, no "24": package.json fija engines.node en
+          # 24.18.0 (un pin exacto, no un rango), así que pedir "24" trae
+          # 24.20.0 y el propio paquete sigue emitiendo EBADENGINE. Fijarla
+          # aquí honra la declaración existente en vez de relajarla, y de
+          # paso hace la instalación reproducible entre ejecuciones.
+          node-version: "24.18.0"
 
       - name: Install Dependencies
         run: |
