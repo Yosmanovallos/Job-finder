@@ -77,6 +77,21 @@ de él **antes** del fetch. Una vez que `attempt.setPhase("persist")` se
 ejecutó, no hay más comprobaciones hasta que el persist retorna. Esta
 asimetría es deliberada y está cubierta por EXE-005.
 
+### 3.1 Estimadores de coste — valores iniciales, no constantes derivadas
+
+`BUDGET_ESTIMATES` (`sourceListing` 30 s, `detailFetch` 8 s, `retry` 12 s)
+decide qué **no** se inicia. Son una primera aproximación conservadora, a
+calibrar con los datos reales de `source_attempts` (P2 ya registra duración
+por intento), no valores deducidos de nada.
+
+Consecuencia que conviene tener presente: con menos de 30 s de presupuesto
+restante ninguna fuente arranca, y como el techo por lote ronda los 4 min,
+**la última fuente de la lista de un rol es sistemáticamente la más
+propensa a quedarse fuera**. Es el comportamiento buscado (queda vencida y
+la toma el siguiente tick), pero si una fuente concreta aparece siempre al
+final del orden de adaptadores podría pasar hambre entre ticks. Vigilar con
+`source_attempts` y, si ocurre, rotar el orden o bajar el estimador.
+
 ## 4. Presupuesto coherente
 
 El reparto actual permite 23 min de trabajo bajo un plazo de 20. Se
@@ -167,6 +182,16 @@ RETURNING run_id
 error. El `WHERE` sobre `DO UPDATE` es lo que hace atómica la reclamación:
 PostgreSQL evalúa la fila bloqueada, no una leída antes.
 
+- **Reclamación perezosa.** Se reclama cuando el rol **arranca**, dentro de
+  `runRoleWithBudget`, no por adelantado para los 8 candidatos. Reclamar
+  antes dejaría a los roles que el presupuesto nunca alcanza reteniendo un
+  lease el resto del proceso; y si el proceso muere antes del cierre —
+  justamente el escenario que motiva esta fase — quedarían bloqueados
+  durante el TTL (~10 min). Eso sería **peor que no reclamar**: sin P3 un
+  rol no alcanzado simplemente seguía vencido. Además saca de la ventana de
+  trabajo hasta 8×N viajes secuenciales a la base antes del primer scrape.
+- **Liberación inmediata.** Cada rol libera sus pares al terminar, no en el
+  cierre, para que el siguiente tick pueda tomarlos sin esperar el TTL.
 - **Latido:** reutiliza el de `RunRecorder` (60 s, P2). Al latir la
   ejecución, se refrescan los leases de ese `run_id`.
 - **Liberación:** `DELETE` al terminar la fuente, en `finally`. Un proceso
@@ -201,6 +226,20 @@ informa — pero es lo que hace medible el antes/después de esta fase.
   fallo visible.
 - `timeout-minutes: 27` se mantiene: con el cierre acotado deja de ser la
   vía normal de terminar y vuelve a ser el último recurso que debía ser.
+
+**El primer tick tras el merge es el canario del salto de runtime.** Todos
+los gates locales corrieron ya sobre Node 24.18.0, así que prueban que el
+*código* funciona en 24 — no que `got-scraping`, `playwright` y los
+defaults de TLS de undici se comporten igual **contra las fuentes reales**
+en 24. Eso es comportamiento de red, invisible para cualquier suite local.
+La línea base contra la que comparar (`35035795482`, Node 20) es:
+Computrabajo 7 · Elempleo 5 (+1 timeout) · Magneto 5 · LinkedIn 1 · Torre 1,
+todas `success/ok`. Una fuente que pase a `blocked`/`empty` es el salto de
+Node, no P3.
+
+`scrape-browser-tick.yml` también pasa a Node 24 y **no se ha ejercitado en
+esta sesión**: corre cada 2 días con Playwright y proxy residencial, así que
+su resultado no se verá aquí. Queda explícitamente sin verificar.
 
 **Riesgo del salto 20 → 24:** `got-scraping`, `playwright` y los defaults
 de TLS de undici cambian de comportamiento entre mayores de Node. Mitigado

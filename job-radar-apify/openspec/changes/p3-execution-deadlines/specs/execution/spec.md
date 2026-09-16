@@ -10,6 +10,15 @@ producción): unitarias 12/12 y 11/11 (P2 intacto) · integración completa
 `tsc` **29** y `eslint` **295** — idénticos a la línea base heredada, **0
 errores nuevos**.
 
+**Extensión del contrato de P2:** P3 añade la señal `deadline_exceeded` a
+`SignalTally`, de modo que la tabla señal→estado de **OBS-003** (capacidad
+archivada `p2-run-observability`) gana una fila:
+`deadline_exceeded → timeout / deadline_exceeded`. Se ordena por debajo de
+los fallos reales (una fuente bloqueada estaba bloqueada; el plazo no es el
+dato interesante) y por encima de `circuit_open` (quedarse sin presupuesto
+es un desenlace vivo; un circuito abierto es una omisión). Las pruebas de
+P2 siguen pasando sin cambios.
+
 Delta: solo comportamiento que cambia respecto de la base. La
 clasificación de intentos de P2 (OBS-001…012) se mantiene intacta y sirve
 de instrumento de medida.

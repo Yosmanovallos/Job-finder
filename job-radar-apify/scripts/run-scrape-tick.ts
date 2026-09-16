@@ -95,7 +95,7 @@ interface RoleResult {
 
 interface RoleItem {
   roleName: string;
-  adapters: SourceAdapter[];
+  sourceNames: string[];
 }
 
 /**
@@ -114,10 +114,37 @@ async function runRoleWithBudget(
   parentCtx: FetchContext,
   budgetMs: number,
   trackedPromises: Promise<any>[],
-  recorder: RunRecorder
+  recorder: RunRecorder,
+  runId: string
 ): Promise<RoleResult> {
-  const { roleName, adapters } = item;
+  const { roleName } = item;
   const roleCtx = parentCtx.child(budgetMs);
+
+  // P3 (EXE-007): claimed HERE, when the role actually starts — not upfront
+  // in main() for every candidate. Claiming early would leave roles that the
+  // budget never reaches holding a lease for the rest of the process, and a
+  // process killed before teardown would leave them claim-blocked for the
+  // lease TTL (~10 min). That would be strictly worse than the pre-P3
+  // behavior, where an unreached role was simply still due. It also keeps up
+  // to 8xN sequential round-trips out of the work budget.
+  const claimed: string[] = [];
+  for (const sourceName of item.sourceNames) {
+    if (!adapterByName.has(sourceName)) continue;
+    if (await claimLease({ roleName, sourceName, runId, country: TICK_COUNTRY, budgetMs })) {
+      claimed.push(sourceName);
+    } else {
+      console.log(`🔒 [Tick] ${roleName}/${sourceName} lo tiene otra ejecución en curso — se omite sin error.`);
+    }
+  }
+
+  const adapters = claimed
+    .map((name) => adapterByName.get(name))
+    .filter((a): a is SourceAdapter => !!a);
+
+  if (adapters.length === 0) {
+    roleCtx.dispose();
+    return { roleName, savedCount: 0, duplicateCount: 0, perSource: {}, timedOut: false };
+  }
   // Owned by this function, mutated by the worker as each source completes,
   // so a timeout can never erase finished work from the report.
   const perSource: Record<string, SourceRunResult> = {};
@@ -145,6 +172,12 @@ async function runRoleWithBudget(
   const timedOut = isCancelled(roleCtx);
   roleCtx.dispose();
 
+  // Released as soon as the role is done, not deferred to teardown: the next
+  // tick can take these pairs immediately instead of waiting out the TTL.
+  for (const sourceName of claimed) {
+    await releaseLease(roleName, sourceName, runId);
+  }
+
   if (timedOut) {
     console.warn(
       `⏱️ [Tick] Rol "${roleName}" agotó su presupuesto (${Math.round(budgetMs / 1000)}s) — ${Object.keys(perSource).length} fuente(s) completadas se conservan; el resto queda vencido para el próximo tick.`
@@ -169,7 +202,8 @@ async function runBatched(
   plan: TickBudgetPlan,
   startedAt: number,
   trackedPromises: Promise<any>[],
-  recorder: RunRecorder
+  recorder: RunRecorder,
+  runId: string
 ): Promise<RoleResult[]> {
   const results: RoleResult[] = [];
   const batches: RoleItem[][] = [];
@@ -190,7 +224,7 @@ async function runBatched(
       break;
     }
     const batchResults = await Promise.all(
-      batches[b].map((item) => runRoleWithBudget(item, parentCtx, budgetMs, trackedPromises, recorder))
+      batches[b].map((item) => runRoleWithBudget(item, parentCtx, budgetMs, trackedPromises, recorder, runId))
     );
     results.push(...batchResults);
   }
@@ -430,39 +464,21 @@ async function main() {
       .slice(0, MAX_ROLES_PER_RUN)
       .map(([roleName, sourceNames]) => ({ roleName, sourceNames }));
 
-    // P3 (EXE-007): claim before working. A pair another live run already
-    // holds is dropped from this tick's list without error — it stays due.
-    const items: RoleItem[] = [];
-    let skippedByLease = 0;
-    for (const candidate of candidates) {
-      const claimedSources: string[] = [];
-      for (const sourceName of candidate.sourceNames) {
-        if (!adapterByName.has(sourceName)) continue;
-        const claimed = await claimLease({
-          roleName: candidate.roleName,
-          sourceName,
-          runId: recorder.runId,
-          country: TICK_COUNTRY,
-          budgetMs: plan.maxPerBatchMs
-        });
-        if (claimed) claimedSources.push(sourceName);
-        else skippedByLease++;
-      }
-      const adapters = claimedSources
-        .map((name) => adapterByName.get(name))
-        .filter((a): a is SourceAdapter => !!a);
-      if (adapters.length > 0) items.push({ roleName: candidate.roleName, adapters });
-    }
-
-    if (skippedByLease > 0) {
-      console.log(`🔒 [Tick] ${skippedByLease} par(es) rol/fuente los tiene otra ejecución en curso — se omiten sin error.`);
-    }
+    // Leases are claimed lazily, inside runRoleWithBudget, when each role
+    // actually starts — see the comment there for why claiming upfront would
+    // be worse than not claiming at all.
+    const items: RoleItem[] = candidates
+      .map((candidate) => ({
+        roleName: candidate.roleName,
+        sourceNames: candidate.sourceNames.filter((name) => adapterByName.has(name))
+      }))
+      .filter((item) => item.sourceNames.length > 0);
 
     console.log(
       `🕒 [Tick] ${due.size} roles con fuentes vencidas — procesando ${items.length} (tope ${MAX_ROLES_PER_RUN}/tick, el resto se recoge en el próximo).`
     );
 
-    results.push(...(await runBatched(items, rootCtx, plan, startedAt, trackedPromises, recorder)));
+    results.push(...(await runBatched(items, rootCtx, plan, startedAt, trackedPromises, recorder, recorder.runId)));
   }
 
   if (globalResult) results.push(globalResult);
