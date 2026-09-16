@@ -53,10 +53,11 @@ despliega sin aprobación explícita del usuario.
       acotado (§5), reclamación por fuente (§6).
 - [x] `.github/workflows/{scrape-jobs,scrape-jobs-ve,scrape-browser-tick}.yml`
       — `npm ci` sin fallback y cron `*/30` (experimento §9).
-- [ ] **Segundo despliegue:** Node 20 → 24 en los 3 workflows. Separado a
-      propósito del merge de P3 (decisión del usuario, 2026-09-15): es el
-      único cambio con riesgo real para producción y merece su propio
-      canario. Comparar de nuevo `source_attempts` fuente por fuente.
+- [x] **Segundo despliegue:** Node 20 → 24 en los 3 workflows, separado a
+      propósito del merge de P3 (decisión del usuario, 2026-09-15). Incluye
+      `scrape-browser-tick.yml`, lanzado a mano para no esperar a su cron de
+      2 días. Comparado con `scripts/verify-p3-deadlines.ts`; revertir es
+      cambiar una línea por workflow.
 - [x] `docs/adr/` — ADR de cadencia: evidencia de pérdida de disparos,
       recomendación de scheduler gestionado, pendiente de coste aprobado.
 

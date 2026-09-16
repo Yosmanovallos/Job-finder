@@ -38,17 +38,15 @@ más 6 paquetes `@supabase/*` que exigen `>=22.0.0`, en cada ejecución.
 `npm ci` ya funcionaba (`added 349 packages … in 10s`): el fallback era
 riesgo latente, no daño activo.
 
-**Resultado:** 🟡 **Parcial, por decisión de secuenciación.** `npm ci` sin
-fallback: ✅ aplicado en los 3 workflows (hoy `npm ci` ya funcionaba —
-`added 349 packages … in 10s` —, así que el cambio convierte un fallo
-silencioso futuro en uno visible, sin alterar nada hoy). Node 24: **no
-aplicado todavía**; los workflows siguen en 20 y el `EBADENGINE` persiste.
-Motivo: el salto de runtime cambia el comportamiento de red de
-`got-scraping`/`playwright`/undici contra las fuentes reales, que ninguna
-prueba local puede verificar, así que se despliega por separado y con su
-propio canario en vez de mezclarlo con los plazos de P3 (aprobado por el
-usuario, 2026-09-15). El requisito queda abierto hasta ese segundo
-despliegue.
+**Resultado:** ✅ **Completo, en dos despliegues.** `npm ci` sin fallback y
+plazos de P3 en `58098d8` (2026-09-16); Node 20 → 24 en un segundo
+despliegue propio, separado a petición del usuario porque es el único
+cambio con riesgo real para producción: altera el comportamiento de red de
+`got-scraping`/`playwright`/undici contra las fuentes reales, y eso ninguna
+prueba local puede verificar. Verificado con su propio canario y
+`scripts/verify-p3-deadlines.ts`. `npm ci` ya funcionaba antes del cambio
+(`added 349 packages … in 10s`), así que quitar el fallback no altera nada
+hoy: convierte un fallo silencioso futuro en uno visible.
 
 ## EXE-002 — El presupuesto de trabajo cabe dentro del plazo
 

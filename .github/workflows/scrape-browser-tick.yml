@@ -36,14 +36,17 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          # P3: se mantiene en 20 DELIBERADAMENTE por ahora. La app declara
-          # engines.node = 24.18.0 y los 6 @supabase/* exigen >=22, así que
-          # cada ejecución emite EBADENGINE (y Actions avisa de que Node 20
-          # está deprecado). El salto a 24 cambia el comportamiento de red de
-          # got-scraping/playwright/undici contra las fuentes reales, algo que
-          # ninguna prueba local puede verificar, así que se sube por separado
-          # y con su propio canario — no mezclado con los plazos de P3.
-          node-version: "20"
+          # Alineado con engines.node = 24.18.0 (y con los 6 @supabase/*, que
+          # exigen >=22): en Node 20 cada ejecución emitía EBADENGINE y Actions
+          # ya avisaba de que 20 está deprecado.
+          #
+          # Se subió SOLO, separado del despliegue de P3 (2026-09-16), porque
+          # cambia el comportamiento de red de got-scraping/playwright/undici
+          # contra las fuentes reales y eso ninguna prueba local puede
+          # verificar. Verificar con scripts/verify-p3-deadlines.ts: una fuente
+          # que pase de success a blocked/empty es este salto, no P3. Revertir
+          # es cambiar esta línea de vuelta a "20".
+          node-version: "24"
 
       - name: Install Dependencies
         run: |
