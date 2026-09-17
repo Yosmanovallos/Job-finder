@@ -1,7 +1,30 @@
 # P4 — Contrato de fuentes y transporte
 
-**Estado:** borrador de propuesta. Requiere aprobación + `design.md` +
-`tasks.md` + spec delta antes de implementar (próxima sesión).
+**Estado:** propuesta aprobada con condiciones (2026-09-16). `design.md`,
+`tasks.md` y `specs/sources/spec.md` escritos. Implementación en espera de
+la revisión de la lista de archivos por el usuario.
+
+> **Dos correcciones que impuso la medición.** Este borrador se escribió
+> antes de consultar `source_attempts`. Los datos del 2026-09-16 (7 días)
+> contradicen dos afirmaciones de más abajo; se corrigen aquí en vez de
+> dejarlas en pie:
+>
+> 1. **No hay agotamiento de presupuesto.** «Datos que conviene reunir ANTES
+>    de diseñar» daba por hecho que habría fuentes quedándose sin
+>    presupuesto y que eso ordenaría la adopción. Medido: **0 listados
+>    omitidos** en 7 días, con 17 fuentes. El orden de adopción sale del
+>    fallo concentrado en la etapa de **detalle** — ver `design.md` §1.2.
+> 2. **Los circuitos ya están separados.** El punto «un circuito por fuente,
+>    compartido entre listado y detalle» es inexacto: `source_circuit_state`
+>    se indexa por `source_name` y la ruta de detalle pasa
+>    `${adapter.name}-detail`, así que son filas distintas. Lo compartido es
+>    la **política** (`FAILURE_THRESHOLD`, `DEGRADED_TIMEOUT_MS`), y eso es
+>    lo que P4 parametriza — ver `design.md` §1.4.
+>
+> El hallazgo principal de la fase no está en este borrador porque la
+> medición lo destapó después: **el circuito de detalle no puede abrirse**
+> (`fetchDetail() === null` → `[]` → `recordSuccess`). Trazado como
+> **SRC-003**, con prueba en la tabla real de producción.
 
 ## Problema
 
@@ -22,11 +45,13 @@ Consecuencias concretas ya medidas, no supuestas:
   en `KNOWN_SOURCES`. Visible desde P2 como
   `failed / all_rejected_by_validation`, confirmado en todas las
   ejecuciones del 2026-09-15/16.
-- **Un circuito por fuente, compartido entre listado y detalle**: un bloqueo
-  en las páginas de detalle abre el circuito del listado sano de la misma
-  fuente, y viceversa (`executeWithResilience(`${adapter.name}-detail`)`
-  mitiga esto a medias usando otro nombre, pero la política sigue siendo
-  única).
+- ~~**Un circuito por fuente, compartido entre listado y detalle**~~
+  **Corregido por medición:** las filas ya están separadas (`X` vs
+  `X-detail`). Lo compartido es la política (`FAILURE_THRESHOLD = 3`,
+  `DEGRADED_TIMEOUT_MS = 30 min`), que es constante de módulo para ambas
+  etapas. Y por debajo hay algo peor, que este borrador no vio: **el
+  circuito de detalle nunca llega a abrirse**, porque un detalle nulo se
+  contabiliza como éxito (SRC-003).
 - **`Retry-After` no se respeta** en ninguna ruta.
 - **`[key: string]: any` en `Job`** deja pasar cualquier campo sin tipo.
 
@@ -84,6 +109,12 @@ cuáles solo están vacías** — que es lo que debe priorizar el orden de
 adopción, en vez de la intuición. También permite calibrar
 `BUDGET_ESTIMATES` (P3 los dejó como primera aproximación explícita, no
 como constantes derivadas).
+
+**Ejecutado el 2026-09-16** con `scripts/verify-p4-source-contract.ts`
+(solo lectura). Respuesta: ninguna fuente se queda sin presupuesto, el fallo
+está entero en la etapa de detalle, y `BUDGET_ESTIMATES.detailFetch = 8000`
+resulta estar **bien** (p95 medido 5816 ms, máximo 7312 ms) — se queda como
+está, ahora verificado. Detalle completo en `design.md` §1.
 
 ## Gates
 

@@ -2,6 +2,7 @@ import { saveJobs, type InsertedJobRef } from "../db/job-repository.js";
 import { estimateListingMs, hasBudget, type FetchContext } from "../engine/fetch-context.js";
 import { reportSourceSignal, type RunRecorder } from "../observability/run-telemetry.js";
 import type { Job } from "../sources/types.js";
+import type { SourceFetchResult } from "../sources/fetch-result.js";
 
 // Shared by ScrapeWorker, the global-catalog step and the browser tick
 // (P2). Kept out of scrape-worker.ts on purpose: importing that module pulls
@@ -34,7 +35,7 @@ export interface ListingAttemptOptions {
 export async function runListingAttempt(
   recorder: RunRecorder,
   options: ListingAttemptOptions,
-  fetchJobs: () => Promise<Job[]>
+  fetchJobs: () => Promise<Job[] | SourceFetchResult<Job>>
 ): Promise<ListingOutcome> {
   return recorder.trackAttempt({ source: options.source, role: options.role, stage: "listing" }, async (attempt) => {
     if (options.attemptRef) options.attemptRef.id = attempt.id;
@@ -48,8 +49,39 @@ export async function runListingAttempt(
       return { fetched: 0, savedCount: 0, duplicateCount: 0, insertedJobs: [] };
     }
 
-    const results = await fetchJobs();
-    const fetched = Array.isArray(results) ? results.length : 0;
+    // P4 (SRC-002): a migrated adapter returns a stated outcome, an
+    // unmigrated one returns an array. The union is discriminated HERE, at a
+    // single call site, which is what lets the other 16 adapters stay
+    // untouched — a union on the adapter interface itself would have forced
+    // every one of them to change.
+    const raw = await fetchJobs();
+    const isResult = !Array.isArray(raw);
+    const results: Job[] = isResult ? raw.data : raw;
+    if (isResult) {
+      // Feed the stated outcome into P2's signal vocabulary so the attempt is
+      // classified from what the source SAID, instead of from what its empty
+      // array seemed to imply.
+      switch (raw.outcome) {
+        case "blocked":
+          reportSourceSignal("blocked");
+          break;
+        case "misconfigured":
+          reportSourceSignal("misconfigured");
+          break;
+        case "timeout":
+          reportSourceSignal("deadline_exceeded");
+          break;
+        case "rate_limited":
+        case "quota_exhausted":
+        case "schema_changed":
+        case "failed":
+          reportSourceSignal("retries_exhausted");
+          break;
+        default:
+          break;
+      }
+    }
+    const fetched = results.length;
     attempt.setCounters({ received: fetched, valid: 0, filtered: 0, new: 0, duplicate: 0 });
     for (const job of results) options.stampCountry(job);
     if (fetched === 0) return { fetched, savedCount: 0, duplicateCount: 0, insertedJobs: [] };

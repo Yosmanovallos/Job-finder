@@ -31,6 +31,7 @@ import { execSync } from "child_process";
 import fs from "fs";
 import path from "path";
 import os from "os";
+import { MisconfiguredTransportError, resolveTransport } from "./transport.js";
 
 const LIB_CACHE = path.join(os.homedir(), ".cache", "job-radar-chromium-libs");
 const REQUIRED_DEBS = [
@@ -90,21 +91,36 @@ function parseProxyUrl(proxyUrl: string) {
 let sharedBrowser: Browser | null = null;
 
 /**
+ * Which policy entry the shared browser resolves its transport from. The
+ * browser route is only ever used by Glassdoor and Indeed, and all four of
+ * their entries declare the same proxy transport, so any of them answers the
+ * question "does this route need the proxy?" identically.
+ */
+const DEFAULT_BROWSER_SOURCE = "Glassdoor-CO";
+
+/**
  * Lazily launches one shared browser instance for the whole process — each
  * `chromium.launch()` starts a real Chromium process (expensive), so a
  * multi-URL scraper run (Glassdoor's city queries, for instance) reuses one
  * browser across pages/contexts instead of launching N of them.
  * `closeBrowser()` must be called once at the end of the run.
  */
-async function getBrowser(): Promise<Browser> {
+async function getBrowser(browserSource: string = DEFAULT_BROWSER_SOURCE): Promise<Browser> {
   if (sharedBrowser) return sharedBrowser;
 
-  const proxyUrl = process.env.WEBSHARE_PROXY_URL;
-  if (!proxyUrl) {
-    throw new Error(
-      "[browser-fetch] WEBSHARE_PROXY_URL not set — required for browser-based scraping (Glassdoor/Indeed are Cloudflare-blocked from datacenter IPs without a residential proxy)."
+  // P4 (SRC-006): the transport comes from the source's declared policy, not
+  // from reading the environment at the point of use. Behavior is unchanged
+  // for the browser route (it has always required the proxy); what changes is
+  // that a missing credential now raises a CLASSIFIED error, so the attempt
+  // is recorded as `misconfigured` instead of as an anonymous failure.
+  const transport = resolveTransport(browserSource, "listing");
+  if (transport.kind !== "proxy" || !transport.proxyUrl) {
+    throw new MisconfiguredTransportError(
+      browserSource,
+      "la ruta de navegador requiere proxy residencial (Glassdoor/Indeed están bloqueados por Cloudflare desde IPs de datacenter)."
     );
   }
+  const proxyUrl = transport.proxyUrl;
 
   const libDir = ensureChromiumLibs();
   sharedBrowser = await chromium.launch({

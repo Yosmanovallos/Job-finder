@@ -1,9 +1,11 @@
-import { allAdapters, Job, SourceAdapter } from "../sources/index.js";
+import { allAdapters, Job, JobDetail, SourceAdapter } from "../sources/index.js";
 import { updateJobDetail, InsertedJobRef } from "../db/job-repository.js";
 import { markRoleSourceRun } from "../db/scheduler-repository.js";
 import { generateRoleKeywordsWithAI } from "../ai-role-agent.js";
 import { DEFAULT_COUNTRY, resolveJobCountry } from "../countries/index.js";
-import { executeWithResilience } from "../engine/resilient-fetch.js";
+import { executeWithResilienceResult } from "../engine/resilient-fetch.js";
+import { emptyResult, successResult, type JobDetailResult } from "../sources/detail-result.js";
+import { circuitKeyFor } from "../sources/source-policy.js";
 import { BUDGET_ESTIMATES, estimateListingMs, hasBudget, isCancelled, type FetchContext } from "../engine/fetch-context.js";
 import { jitterDelay } from "../engine/jitter-delay.js";
 import { RunRecorder, reportSourceSignal, type AttemptHandle, type AttemptStatus } from "../observability/run-telemetry.js";
@@ -152,7 +154,13 @@ export class ScrapeWorker {
             attemptRef,
             ctx
           },
-          () => adapter.fetch(keywordsToUse, dateRange)
+          // Prefer the P4 contract when the adapter provides it; otherwise
+          // the historical one. This single line is the whole of "gradual
+          // adoption" at the call site.
+          () =>
+            adapter.fetchResult
+              ? adapter.fetchResult(keywordsToUse, dateRange, ctx)
+              : adapter.fetch(keywordsToUse, dateRange)
         );
         totalJobs += listing.fetched;
         savedCount += listing.savedCount;
@@ -239,14 +247,25 @@ export class ScrapeWorker {
       if (isCancelled(ctx)) break;
       const ref = slice[i];
       try {
-        // executeWithResilience's contract is `fetcher: () => Promise<T[]>`
-        // (shared with the reputation pipeline) — fetchDetail returns a
-        // single object or null, so it's wrapped/unwrapped at this call
-        // site rather than changing that shared function's contract.
-        const [detail] = await executeWithResilience(`${adapter.name}-detail`, async () => {
-          const result = await adapter.fetchDetail!(ref.url);
-          return result ? [result] : [];
-        }, 3, ctx);
+        // P4 (SRC-003): the detail fetch reports its own outcome instead of
+        // collapsing into an array. This is the phase's headline fix — the
+        // old shape was `return result ? [result] : []`, and an empty array
+        // reached `recordSuccess`, wiping the circuit's failure counter. The
+        // live table proved the damage: not one `-detail` row had ever been
+        // created, while Computrabajo spent 102 detail pages for 0 results.
+        // Now a missing detail is `empty` (neutral for the circuit) and only
+        // a real fault increments it.
+        const outcome = await executeWithResilienceResult<Partial<JobDetail>>(
+          circuitKeyFor(adapter.name, "detail"),
+          "detail",
+          async (): Promise<JobDetailResult> => {
+            const result = await adapter.fetchDetail!(ref.url);
+            return result ? successResult(result) : emptyResult();
+          },
+          3,
+          ctx
+        );
+        const detail = outcome.data[0];
         if (detail) {
           await updateJobDetail(ref.id, {
             description: detail.description,

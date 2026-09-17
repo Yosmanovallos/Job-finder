@@ -1,3 +1,6 @@
+import type { FetchContext } from "../engine/fetch-context.js";
+import type { SourceFetchResult } from "./fetch-result.js";
+
 export interface Job {
   jobId: string;
   title: string;
@@ -46,7 +49,32 @@ export type JobDetail = Pick<
 
 export interface SourceAdapter {
   readonly name: string;
+  /**
+   * Historical contract. Still what all unmigrated adapters implement, and
+   * still what every existing caller can rely on.
+   */
   fetch(keywords: string[], dateRange?: string): Promise<Job[]>;
+  /**
+   * P4 contract (openspec/changes/p4-source-contract, spec SRC-002). When an
+   * adapter provides this, the caller prefers it and learns WHY a fetch
+   * produced nothing; when it does not, the caller falls back to `fetch` and
+   * wraps the array with `liftJobArray`.
+   *
+   * Deliberately an OPTIONAL EXTRA METHOD rather than a union return type on
+   * `fetch`. A union would force every call site to discriminate and would
+   * raise new `tsc` errors across the 16 adapters that have not migrated —
+   * exactly what the phase's "0 new errors" gate forbids. With an optional
+   * method those 16 satisfy the interface without changing a character, and
+   * the discrimination lives in one place (the wrapper).
+   *
+   * A migrated adapter keeps `fetch` as a one-line delegation, so nothing
+   * that already called it has to change.
+   */
+  fetchResult?(
+    keywords: string[],
+    dateRange?: string,
+    ctx?: FetchContext
+  ): Promise<SourceFetchResult<Job>>;
   // Optional: fetches the rich detail for ONE job's own page. Only called by
   // ScrapeWorker for jobs that were genuinely new this tick (never on every
   // re-scrape — see saveJobs()/updateJobDetail() in job-repository.ts), so a
