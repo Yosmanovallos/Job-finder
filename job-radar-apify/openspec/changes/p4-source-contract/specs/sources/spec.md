@@ -67,6 +67,18 @@ la migración adaptador por adaptador es de P5.
 - Escenario: `executeWithResilience` conserva su firma `Promise<T[]>` y la
   tubería de reputación (que la comparte) no requiere ningún cambio.
 
+**Qué demuestra y qué no demuestra el adaptador migrado.** Torre ejercita el
+**mecanismo**: implementa `fetchResult`, el worker lo prefiere, y los otros
+16 conviven sin cambiar. Lo que Torre **no** puede demostrar todavía es
+clasificación más rica, porque `scrapeTorre` (en `src/index.ts`) se traga
+tanto una respuesta HTTP no-ok como cualquier excepción y devuelve `[]` en
+ambos casos. Mientras esa función no distinga, el adaptador migrado no tiene
+nada más fino que informar — y el envoltorio no debe inventarlo.
+
+Que ese `[]` deje de reiniciar el circuito ya es una mejora real (SRC-003),
+pero convertirlo en `blocked` exige tocar `scrapeTorre`, que es reparación de
+adaptador y por tanto **P5**.
+
 **Verificación:** unitaria (envoltorio y equivalencia de clasificación) +
 integración (ejecución mixta: 1 migrado + 16 sin migrar) + canario (las
 fuentes sin migrar no cambian de estado ni pierden volumen).
@@ -258,9 +270,32 @@ P5, una fuente por entrega (AGENTS.md ground rule #1). Aquí solo se garantiza
 que el desenlace sea legible. Jooble queda registrado como **input de P5** en
 el plan maestro.
 
-**Verificación:** unitaria (clasificación) + medición en producción con
+**Qué ruta cubre esto hoy, dicho con precisión.** El caso lo clasifica la
+contabilidad de intentos de **P2** (`classifyAttempt` sobre los contadores
+que `saveJobs` rellena tras validar), y esa ruta **no cambia en P4**: sigue
+produciendo `failed / all_rejected_by_validation` para Jooble, igual que
+antes.
+
+La ruta equivalente *dentro del contrato* existe
+(`classifyFetchResult` tiene la rama `received > 0 && valid === 0`) pero
+**todavía no es alcanzable para un adaptador sin migrar**: `liftJobArray`
+fija `valid = data.length`, es decir, idéntico a `received`, porque la
+validación ocurre después, en `saveJobs`. Un adaptador sin migrar no sabe
+cuántas de sus vacantes sobrevivirán, así que el envoltorio no se lo puede
+inventar — la misma regla que en SRC-002.
+
+En consecuencia, el enunciado de la fase «ninguna fuente puede volver a
+comunicar un fallo como éxito vacío, **por tipo y no por heurística**» se
+cumple hoy para los fallos de transporte (SRC-001/003) y **sigue siendo
+heurístico, vía contadores de P2, para el rechazo por validación**. Deja de
+serlo cuando un adaptador migrado informe contadores posteriores a la
+validación, que es trabajo de P5.
+
+**Verificación:** unitaria (la clasificación, llamando directamente a
+`classifyFetchResult`) + medición en producción con
 `verify-p4-source-contract.ts` (el caso ya está ocurriendo; no hay que
-provocarlo).
+provocarlo). **No** hay verificación por la ruta del envoltorio, porque esa
+ruta no existe todavía — dicho aquí en lugar de dejarlo implícito.
 
 ---
 

@@ -146,10 +146,23 @@ La regla de P3, sin excepciones: **un `success` no leído no es evidencia.**
 - [ ] `scripts/verify-p4-source-contract.ts` antes y después, fuente por
       fuente: ninguna pasa de `success` a `blocked`/`empty`, ningún volumen
       de listado cae.
-- [ ] **SRC-003, evidencia obligatoria:** comprobar si aparece
-      `Computrabajo-detail` en `source_circuit_state`, o si sus intentos
-      pasan a `empty` de forma consistente. Cualquiera de los dos vale; que
-      todo siga indistinguible de «va bien», no.
+- [ ] **SRC-003, evidencia obligatoria — en su forma falsable.** Leer el log
+      y contar los fallos **reales** de detalle (excepción, deny, 429) de la
+      ejecución. Después, decir cuál de los dos casos se dio:
+      - hubo ≥1 fallo real → la fila `<fuente>-detail` **debe existir** en
+        `source_circuit_state` con `failures ≥ 1`;
+      - no hubo ninguno → la fila sigue **legítimamente ausente** y el
+        requisito se cierra con la prueba de integración, no con el canario.
+
+      **Lo esperable es el segundo caso, y no es un fallo del canario.** El
+      umbral es 3 y se incrementa una vez por *llamada*, no por reintento, así
+      que abrir el circuito exige tres páginas de detalle que fallen de verdad
+      contra la misma fuente en un mismo tick. Los fallos de detalle de
+      Computrabajo son mayoritariamente `empty/no_detail` (12 de 24 intentos),
+      que ahora son correctamente **neutros**. Leer la ausencia de la fila
+      como un problema sería malinterpretar un resultado correcto.
+      Lo único que refutaría el requisito: ≥1 fallo real en el log **y** sin
+      fila.
 - [ ] Declarar explícitamente la cobertura: **~13 de 17**. Glassdoor-CO/VE e
       Indeed-CO/VE tienen n=1 y viven en `scrape-browser-tick.yml` (cada 2
       días, sin verificar desde P3). **No** reportar «17/17 en verde».
