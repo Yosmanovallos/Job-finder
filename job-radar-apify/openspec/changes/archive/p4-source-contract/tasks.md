@@ -210,20 +210,36 @@ la tasa por rol:
 - [x] SRC-005 y SRC-006 se cierran con prueba unitaria, no con canario, tal
       como la spec declaró por adelantado.
 
-## 6. Cierre
+## 6. Cierre (✅ completo, 2026-09-17)
 
-- [ ] Presentar los resultados del canario al usuario.
-- [ ] **Esperar su OK explícito.** El merge a `main` no ocurre antes.
-- [ ] Merge fast-forward a `main`; Render auto-despliega.
-- [ ] Verificación post-despliegue (canario + lectura de log otra vez).
-- [ ] Archivar el cambio en `openspec/changes/archive/p4-source-contract/`.
-- [ ] Actualizar `docs/PROD-IMPROVEMENTS-PLAN.md`: fila de estado de P4 y
-      entrada en la bitácora.
-- [ ] Registrar como **input de P5**: Jooble ausente de `KNOWN_SOURCES`
-      (14 recibidas → 0 válidas) y el orden de adopción derivado del fallo de
-      detalle — Computrabajo (102→0) → Computrabajo-VE (22→0) →
-      LinkedIn/LinkedIn-VE → resto.
-- [ ] Recordar, sin hacerlos, los pendientes que no son de esta fase:
-      revisión del cron `*/30` el 2026-09-22 (ADR 0003), recalibración de
-      `SOURCE_LISTING_ESTIMATE_MS` (datos de hoy en `design.md` §1.7),
-      `OPS_ADMIN_TOKEN` en `.env.example` de `main`.
+- [x] Resultados de los canarios presentados al usuario.
+- [x] OK explícito recibido antes del merge.
+- [x] Fast-forward a `main`: `6ba16ea..634a358`, **sin forzar**. Comprobado
+      antes con `merge-base --is-ancestor` que `main` no había avanzado.
+- [x] Verificación post-despliegue:
+  - [x] `/api/runs` responde el contrato nuevo (`runs`/`count`/`nextCursor`,
+        con `attempts`, `status`, `reason` por ejecución) y
+        `/api/admin/runs` sigue dando **401** sin token.
+  - [x] Tercer tick desde `main` (`35175143321`, commit `634a358`): cierre
+        ordenado en **818 s**, 9 roles, `Timeouts: 1`, **0** menciones de
+        Circuit Breaker, **0** fallos de detalle, **0** errores no
+        controlados. Log leído entero, no solo el código de salida.
+  - [x] `verify-p4-source-contract.ts` por fuente: las 6 fuentes del tick en
+        `success` con `valid == received` (Computrabajo 373/373, Elempleo
+        78/78, GetOnBoard 15/15, Magneto 60/60, RemoteOK 1/1, WorkanaV2
+        72/72). Computrabajo detalle en `empty,partial` (70/1): la separación
+        entre vacío real y parcial se mantiene tras el despliegue.
+- [x] Cambio archivado en `openspec/changes/archive/p4-source-contract/`.
+- [x] `docs/PROD-IMPROVEMENTS-PLAN.md`: fila P4 a ✅ Done con `634a358` y
+      entrada de bitácora con los tres límites documentados.
+- [x] Registrado como input de P5 (borrador en
+      `openspec/changes/p5-adapter-recovery/`): Jooble ausente de
+      `KNOWN_SOURCES`, el orden de adopción por fallo de detalle, y los tres
+      límites heredados.
+- [x] **Pendiente observado de P4, declarado y NO dado por cubierto:**
+      Glassdoor-CO/VE e Indeed-CO/VE siguen sin verificar hasta que corra
+      `scrape-browser-tick.yml` (cada 2 días).
+- [x] Pendientes que no son de esta fase, solo recordados: revisión del cron
+      `*/30` el 2026-09-22 (ADR 0003), recalibración de
+      `SOURCE_LISTING_ESTIMATE_MS` (datos en `design.md` §1.7),
+      `OPS_ADMIN_TOKEN` en `.env.example` de `main` (lo tiene el usuario).
