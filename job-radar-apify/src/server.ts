@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { randomUUID } from "node:crypto";
+import { brotliCompress, constants as zlibConstants, gzip } from "node:zlib";
 import dotenv from "dotenv";
 import {
   getJobsPage,
@@ -135,6 +136,81 @@ const PORT = process.env.PORT || 3000;
 const MAX_CONCURRENT_SITEMAP_STREAMS = 1;
 const SITEMAP_MAX_DURATION_MS = 30_000;
 let activeSitemapStreams = 0;
+
+const MIN_COMPRESSIBLE_BYTES = 1024;
+const COMPRESSIBLE_CONTENT_TYPE = /^(?:text\/|application\/(?:javascript|json|xml))/i;
+const STATIC_FILE_CACHE = new Map<string, Buffer>();
+const ENCODED_STATIC_CACHE = new Map<string, Promise<Buffer>>();
+
+type SupportedContentEncoding = "br" | "gzip";
+
+function acceptedContentEncoding(req: http.IncomingMessage): SupportedContentEncoding | null {
+  const accepted = String(req.headers["accept-encoding"] || "")
+    .toLowerCase()
+    .split(",")
+    .map((value) => value.trim().split(";")[0]);
+  if (accepted.includes("br")) return "br";
+  if (accepted.includes("gzip")) return "gzip";
+  return null;
+}
+
+function compressBody(body: Buffer, encoding: SupportedContentEncoding): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const done = (error: Error | null, result: Buffer) => (error ? reject(error) : resolve(result));
+    if (encoding === "br") {
+      brotliCompress(body, { params: { [zlibConstants.BROTLI_PARAM_QUALITY]: 4 } }, done);
+      return;
+    }
+    gzip(body, { level: 6 }, done);
+  });
+}
+
+async function sendBody(
+  req: http.IncomingMessage,
+  res: http.ServerResponse,
+  status: number,
+  headers: http.OutgoingHttpHeaders,
+  body: string | Buffer,
+  staticCacheKey?: string
+): Promise<void> {
+  const rawBody = Buffer.isBuffer(body) ? body : Buffer.from(body, "utf8");
+  const contentType = String(headers["Content-Type"] || headers["content-type"] || "");
+  const encoding =
+    rawBody.length >= MIN_COMPRESSIBLE_BYTES && COMPRESSIBLE_CONTENT_TYPE.test(contentType)
+      ? acceptedContentEncoding(req)
+      : null;
+  let responseBody = rawBody;
+  const responseHeaders: http.OutgoingHttpHeaders = { ...headers };
+
+  if (encoding) {
+    try {
+      const cacheKey = staticCacheKey ? `${staticCacheKey}:${encoding}` : null;
+      let compressed = cacheKey ? ENCODED_STATIC_CACHE.get(cacheKey) : undefined;
+      if (!compressed) {
+        compressed = compressBody(rawBody, encoding);
+        if (cacheKey) ENCODED_STATIC_CACHE.set(cacheKey, compressed);
+      }
+      responseBody = await compressed;
+      responseHeaders["Content-Encoding"] = encoding;
+      responseHeaders.Vary = "Accept-Encoding";
+    } catch (error) {
+      if (staticCacheKey) ENCODED_STATIC_CACHE.delete(`${staticCacheKey}:${encoding}`);
+      console.warn("[server] No se pudo comprimir una respuesta; se enviará sin comprimir.", error);
+    }
+  }
+
+  responseHeaders["Content-Length"] = String(responseBody.length);
+  res.writeHead(status, responseHeaders);
+  res.end(req.method === "HEAD" ? undefined : responseBody);
+}
+
+async function readStaticFile(filePath: string): Promise<Buffer> {
+  const cached = STATIC_FILE_CACHE.get(filePath);
+  if (cached) return cached;
+  const content = await fs.promises.readFile(filePath);
+  STATIC_FILE_CACHE.set(filePath, content);
+  return content;
+}
 
 function writeWithBackpressure(
   res: http.ServerResponse,
@@ -423,6 +499,27 @@ async function handleRequest(
   const requestStartedAt = Date.now();
   const clientIp = getClientIp(req);
 
+  // Production is behind Render's edge. Hashed Vite assets are immutable,
+  // while public HTML can be shared briefly without making vacancies stale.
+  // Personalized APIs must never enter a shared cache.
+  if (method === "GET" || method === "HEAD") {
+    if (pathname.startsWith("/assets/")) {
+      res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    } else if (pathname.startsWith("/api/")) {
+      res.setHeader("Cache-Control", "private, no-store");
+    } else if (pathname.startsWith("/sitemap")) {
+      res.setHeader(
+        "Cache-Control",
+        "public, max-age=300, s-maxage=900, stale-while-revalidate=900"
+      );
+    } else {
+      res.setHeader(
+        "Cache-Control",
+        "public, max-age=0, s-maxage=300, stale-while-revalidate=600"
+      );
+    }
+  }
+
   // Minimal structured request/security log — one JSON line per response,
   // to stdout (Render and most hosts capture that as searchable logs with
   // no extra service needed). 401/403 flag auth-bypass attempts; a 404 on
@@ -554,8 +651,11 @@ async function handleRequest(
     // A manual role filter (checked in FilterBar) is an explicit, stronger
     // signal than the soft onboarding preference — only reorder by
     // preference when the caller didn't already filter by role themselves.
-    res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(
+    await sendBody(
+      req,
+      res,
+      200,
+      { "Content-Type": "application/json" },
       JSON.stringify({
         jobs: page,
         count: page.length,
@@ -1932,8 +2032,7 @@ async function handleRequest(
           .replace("</head>", `  <meta name="robots" content="noindex">\n</head>`);
       }
 
-      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-      res.end(indexHtml);
+      await sendBody(req, res, 200, { "Content-Type": "text/html; charset=utf-8" }, indexHtml);
       return;
     }
 
@@ -2010,8 +2109,7 @@ async function handleRequest(
         .replace(/<title>[\s\S]*?<\/title>/, `<title>${escapeHtml(title)}</title>`)
         .replace(/<meta[^>]*name=["']robots["'][^>]*>/i, "")
         .replace("</head>", `  <meta name="robots" content="noindex">\n</head>`);
-      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-      res.end(indexHtml);
+      await sendBody(req, res, 200, { "Content-Type": "text/html; charset=utf-8" }, indexHtml);
       return;
     }
 
@@ -2065,8 +2163,7 @@ async function handleRequest(
         `  <script type="application/ld+json">${escapeJsonForScriptTag(jobPosting)}</script>\n</head>`
       );
 
-    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-    res.end(indexHtml);
+    await sendBody(req, res, 200, { "Content-Type": "text/html; charset=utf-8" }, indexHtml);
     return;
   }
 
@@ -2191,8 +2288,7 @@ async function handleRequest(
           `<meta name="twitter:description" content="${escapeHtml(meta.description)}" />`
         );
 
-      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-      res.end(indexHtml);
+      await sendBody(req, res, 200, { "Content-Type": "text/html; charset=utf-8" }, indexHtml);
       return;
     }
 
@@ -2309,8 +2405,7 @@ async function handleRequest(
         `<meta name="twitter:description" content="${escapeHtml(meta.description)}" />`
       );
 
-    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-    res.end(indexHtml);
+    await sendBody(req, res, 200, { "Content-Type": "text/html; charset=utf-8" }, indexHtml);
     return;
   }
 
@@ -2487,8 +2582,7 @@ async function handleRequest(
       `  <script>window.__SSR_JOBS__=${ssrJobsPayload};</script>\n</head>`
     );
 
-    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-    res.end(indexHtml);
+    await sendBody(req, res, 200, { "Content-Type": "text/html; charset=utf-8" }, indexHtml);
     return;
   }
 
@@ -2505,8 +2599,7 @@ async function handleRequest(
       "https://buscotrabajo.co/sitemap-jobs.xml",
       "https://buscotrabajo.co/sitemap-categories.xml"
     ]);
-    res.writeHead(200, { "Content-Type": "application/xml; charset=utf-8" });
-    res.end(xml);
+    await sendBody(req, res, 200, { "Content-Type": "application/xml; charset=utf-8" }, xml);
     return;
   }
 
@@ -2523,8 +2616,13 @@ async function handleRequest(
       res.end("Server Error: build not found");
       return;
     }
-    res.writeHead(200, { "Content-Type": "application/xml; charset=utf-8" });
-    res.end(staticSitemap);
+    await sendBody(
+      req,
+      res,
+      200,
+      { "Content-Type": "application/xml; charset=utf-8" },
+      staticSitemap
+    );
     return;
   }
 
@@ -2606,8 +2704,7 @@ async function handleRequest(
     // Static taxonomy (CITY_OPTIONS + DEFAULT_ROLES_200) — no DB query
     // needed, unlike sitemap-jobs.xml above.
     const xml = buildCategoriesSitemapXml();
-    res.writeHead(200, { "Content-Type": "application/xml; charset=utf-8" });
-    res.end(xml);
+    await sendBody(req, res, 200, { "Content-Type": "application/xml; charset=utf-8" }, xml);
     return;
   }
 
@@ -2695,8 +2792,7 @@ async function handleRequest(
         );
     }
 
-    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-    res.end(indexHtml);
+    await sendBody(req, res, 200, { "Content-Type": "text/html; charset=utf-8" }, indexHtml);
     return;
   }
 
@@ -2724,20 +2820,26 @@ async function handleRequest(
 
   const contentType = mimeTypes[ext] || "text/plain";
 
-  fs.readFile(filePath, (err, content) => {
-    if (err) {
-      if (err.code === "ENOENT") {
-        res.writeHead(404, { "Content-Type": "text/html" });
-        res.end("<h1>404 Not Found</h1>");
-      } else {
-        res.writeHead(500);
-        res.end(`Server Error: ${err.code}`);
-      }
+  try {
+    const content = await readStaticFile(filePath);
+    await sendBody(
+      req,
+      res,
+      200,
+      { "Content-Type": contentType },
+      content,
+      pathname.startsWith("/assets/") ? filePath : undefined
+    );
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === "ENOENT") {
+      res.writeHead(404, { "Content-Type": "text/html" });
+      res.end("<h1>404 Not Found</h1>");
     } else {
-      res.writeHead(200, { "Content-Type": contentType });
-      res.end(content, "utf-8");
+      res.writeHead(500);
+      res.end(`Server Error: ${code || "UNKNOWN"}`);
     }
-  });
+  }
 }
 
 server.listen(PORT, () => {

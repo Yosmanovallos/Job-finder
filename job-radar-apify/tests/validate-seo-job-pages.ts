@@ -541,6 +541,17 @@ async function runHttpTests() {
     const dashboardRes = await fetch(`${BASE_URL}/dashboard`);
     const dashboardHtml = await dashboardRes.text();
     const dashboardJobLinks = (dashboardHtml.match(/href="\/empleos\//g) || []).length;
+    const dashboardCacheControl = dashboardRes.headers.get("cache-control") || "";
+    check(
+      dashboardCacheControl.includes("s-maxage=300"),
+      "/dashboard permite caché corta en el edge sin volver obsoletas las vacantes.",
+      `/dashboard no declara la caché compartida esperada: "${dashboardCacheControl}".`
+    );
+    check(
+      ["br", "gzip"].includes(dashboardRes.headers.get("content-encoding") || ""),
+      "/dashboard se comprime antes de salir del servicio web.",
+      "/dashboard salió sin Content-Encoding br/gzip."
+    );
     check(
       dashboardJobLinks > 0,
       `/dashboard incluye ${dashboardJobLinks} links reales a /empleos/ directamente en el HTML crudo.`,
@@ -574,6 +585,39 @@ async function runHttpTests() {
         check(false, "", "window.__SSR_JOBS__ no es JSON válido.");
       }
     }
+
+    const entryAssetPath = dashboardHtml.match(
+      /<script[^>]+type=["']module["'][^>]+src=["']([^"']+\.js)["']/
+    )?.[1];
+    check(
+      !!entryAssetPath,
+      "/dashboard referencia un bundle JS versionado.",
+      "No se encontró el bundle JS principal en el HTML de /dashboard."
+    );
+    if (entryAssetPath) {
+      const assetRes = await fetch(`${BASE_URL}${entryAssetPath}`, {
+        headers: { "Accept-Encoding": "br, gzip" }
+      });
+      const assetCacheControl = assetRes.headers.get("cache-control") || "";
+      check(
+        assetCacheControl.includes("max-age=31536000") && assetCacheControl.includes("immutable"),
+        "Los assets con hash se sirven con caché inmutable de un año.",
+        `El asset ${entryAssetPath} no tiene caché inmutable: "${assetCacheControl}".`
+      );
+      check(
+        ["br", "gzip"].includes(assetRes.headers.get("content-encoding") || ""),
+        "El bundle JS se sirve comprimido desde el origen.",
+        `El asset ${entryAssetPath} salió sin Content-Encoding br/gzip.`
+      );
+    }
+
+    const jobsHeadersRes = await fetch(`${BASE_URL}/api/jobs?country=CO&limit=1`);
+    const jobsCacheControl = jobsHeadersRes.headers.get("cache-control") || "";
+    check(
+      jobsCacheControl.includes("private") && jobsCacheControl.includes("no-store"),
+      "/api/jobs nunca entra en una caché compartida.",
+      `/api/jobs no declara private, no-store: "${jobsCacheControl}".`
+    );
 
     // /ve/dashboard (2026-08-04 fix): previously had NO SSR branch at all —
     // fell through to the static index.html fallback, so its raw HTML

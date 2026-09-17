@@ -107,6 +107,10 @@ export default function Dashboard() {
   // Guards the fetch effect against a stale response landing after a newer
   // filter change already started a fresh request (fast typing/clicking).
   const requestIdRef = useRef(0);
+  // Keep the 24 SSR jobs visible while an authenticated default view is
+  // refreshed. Session restoration used to erase useful content and show a
+  // spinner for the entire /api/jobs round trip.
+  const hasHydratedInitialPageRef = useRef(false);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(filters.search), SEARCH_DEBOUNCE_MS);
@@ -175,24 +179,29 @@ export default function Dashboard() {
     // (e.g. a filter change re-running this effect).
     const ssrJobs = (window as any).__SSR_JOBS__;
     delete (window as any).__SSR_JOBS__;
-    if (
-      ssrJobs &&
-      ssrJobs.country === country &&
-      !accessToken &&
-      filterKey === JSON.stringify(EMPTY_FILTERS)
-    ) {
+    const isDefaultFilterRequest = filterKey === JSON.stringify(EMPTY_FILTERS);
+    const hasMatchingSsrPage = ssrJobs && ssrJobs.country === country && isDefaultFilterRequest;
+    if (hasMatchingSsrPage) {
       setJobs(Array.isArray(ssrJobs.jobs) ? ssrJobs.jobs : []);
       setTotal(ssrJobs.total || 0);
       setHasMore(!!ssrJobs.hasMore);
       setLoadError(null);
       setIsLoading(false);
-      return;
+      hasHydratedInitialPageRef.current = true;
+      // Anonymous SSR is already authoritative. Signed-in users refresh in
+      // the background for tier masking and preferred-role ordering.
+      if (!accessToken) return;
     }
 
-    setIsLoading(true);
+    const preserveHydratedPage =
+      !!accessToken && isDefaultFilterRequest && hasHydratedInitialPageRef.current;
+    setIsLoading(!preserveHydratedPage);
     setLoadError(null);
     setLoadMoreError(false);
-    setJobs([]);
+    if (!preserveHydratedPage) {
+      hasHydratedInitialPageRef.current = false;
+      setJobs([]);
+    }
 
     const headers: Record<string, string> = {};
     if (accessToken) headers["Authorization"] = `Bearer ${accessToken}`;
@@ -207,9 +216,11 @@ export default function Dashboard() {
         setJobs(Array.isArray(data.jobs) ? data.jobs : []);
         setTotal(data.total || 0);
         setHasMore(!!data.hasMore);
+        hasHydratedInitialPageRef.current = true;
       })
       .catch(() => {
         if (myRequestId !== requestIdRef.current) return;
+        if (preserveHydratedPage) return;
         setJobs([]);
         setTotal(0);
         setHasMore(false);
