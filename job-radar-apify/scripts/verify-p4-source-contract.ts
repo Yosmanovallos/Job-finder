@@ -189,6 +189,50 @@ async function main(): Promise<void> {
     `GLOBAL  intentos=${g.attempts}  p50=${g.p50}ms  p95=${g.p95}ms  max=${g.max_ms}ms`
   );
 
+  // Comparación por ejecución: totales por fuente en los últimos N ticks CO.
+  // Necesaria para el canario, porque el número de vacantes de una fuente
+  // depende de cuántos roles le tocaron por cadencia en ese tick — comparar
+  // dos ticks sin ver los roles lleva a leer una diferencia de cadencia como
+  // una regresión.
+  const runsIndex = process.argv.indexOf("--runs");
+  if (runsIndex >= 0) {
+    const n = Number(process.argv[runsIndex + 1] ?? 4);
+    const runs = await pool.query(
+      `SELECT id, git_sha, started_at, status, reason
+         FROM scrape_runs
+        WHERE workflow = 'scrape-tick' AND country = 'CO' AND is_test = FALSE
+        ORDER BY started_at DESC LIMIT $1`,
+      [n]
+    );
+    console.log(`\n── Totales por fuente en los últimos ${n} ticks CO ──`);
+    for (const run of runs.rows) {
+      const per = await pool.query(
+        `SELECT source_name, stage,
+                COUNT(*)::int AS attempts,
+                COUNT(DISTINCT role_name)::int AS roles,
+                STRING_AGG(DISTINCT status, ',' ORDER BY status) AS statuses,
+                SUM(COALESCE(received_count, 0))::int AS received,
+                SUM(COALESCE(valid_count, 0))::int AS valid
+           FROM source_attempts WHERE run_id = $1
+          GROUP BY 1, 2 ORDER BY 2, 1`,
+        [run.id]
+      );
+      console.log(
+        `\n  ${new Date(run.started_at).toISOString().slice(0, 16)}  ${run.git_sha?.slice(0, 7) ?? "—"}  ${run.status}/${run.reason ?? "—"}`
+      );
+      console.log(
+        "    " + pad("FUENTE", 18) + pad("ETAPA", 13) + pad("INT", 5) +
+          pad("ROLES", 7) + pad("RECIB", 8) + pad("VÁLID", 8) + "ESTADOS"
+      );
+      for (const r of per.rows) {
+        console.log(
+          "    " + pad(r.source_name, 18) + pad(r.stage, 13) + pad(r.attempts, 5) +
+            pad(r.roles, 7) + pad(r.received, 8) + pad(r.valid, 8) + r.statuses
+        );
+      }
+    }
+  }
+
   await pool.end();
 }
 

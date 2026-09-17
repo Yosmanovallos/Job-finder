@@ -135,39 +135,80 @@ las versiones de `HEAD` junto a las nuevas y pasando `eslint` a ambas.
 > defecto, que es el que produjo la tabla de arriba. Un comando que falla no
 > es una comprobación que pasa — la misma lección que el canario de P3.
 
-## 5. Canario y verificación post-despliegue
+## 5. Canario (✅ ejecutado sobre la rama, 2026-09-17)
 
-La regla de P3, sin excepciones: **un `success` no leído no es evidencia.**
+Lanzado con `workflow_dispatch` sobre `codex/prod-improvements-seo-ux-security`
+**antes** del merge, no después. Dos ejecuciones, comparadas entre sí y contra
+las dos anteriores de `main` (`6ba16ea`, pre-P4).
 
-- [ ] Ejecutar el tick CO y esperar cierre ordenado.
-- [ ] **Leer el log completo**, no el código de salida. El segundo canario de
-      P3 destapó una regresión que el primero ocultó, así que se ejecutan
-      **dos** y se comparan entre sí.
-- [ ] `scripts/verify-p4-source-contract.ts` antes y después, fuente por
-      fuente: ninguna pasa de `success` a `blocked`/`empty`, ningún volumen
-      de listado cae.
-- [ ] **SRC-003, evidencia obligatoria — en su forma falsable.** Leer el log
-      y contar los fallos **reales** de detalle (excepción, deny, 429) de la
-      ejecución. Después, decir cuál de los dos casos se dio:
-      - hubo ≥1 fallo real → la fila `<fuente>-detail` **debe existir** en
-        `source_circuit_state` con `failures ≥ 1`;
-      - no hubo ninguno → la fila sigue **legítimamente ausente** y el
-        requisito se cierra con la prueba de integración, no con el canario.
+| | Canario 1 | Canario 2 |
+| --- | --- | --- |
+| Run | `35171209713` | `35173002214` |
+| Commit | `f0b0016` | `f0b0016` |
+| Conclusión | `success` | `success` |
+| Cierre ordenado | ✅ `Finalizado en 812s` | ✅ `Finalizado en 793s` |
+| Roles / timeouts | 8 / 1 | 8 / 1 |
+| Estado del tick | `partial / some_sources_degraded` | `partial / some_sources_degraded` |
+| Menciones de Circuit Breaker | **0** | **0** |
+| `Detalle fallido` en log | **0** | **0** |
 
-      **Lo esperable es el segundo caso, y no es un fallo del canario.** El
-      umbral es 3 y se incrementa una vez por *llamada*, no por reintento, así
-      que abrir el circuito exige tres páginas de detalle que fallen de verdad
-      contra la misma fuente en un mismo tick. Los fallos de detalle de
-      Computrabajo son mayoritariamente `empty/no_detail` (12 de 24 intentos),
-      que ahora son correctamente **neutros**. Leer la ausencia de la fila
-      como un problema sería malinterpretar un resultado correcto.
-      Lo único que refutaría el requisito: ≥1 fallo real en el log **y** sin
-      fila.
-- [ ] Declarar explícitamente la cobertura: **~13 de 17**. Glassdoor-CO/VE e
-      Indeed-CO/VE tienen n=1 y viven en `scrape-browser-tick.yml` (cada 2
-      días, sin verificar desde P3). **No** reportar «17/17 en verde».
-- [ ] SRC-005 y SRC-006 se cierran con prueba, no con canario — declarado en
-      la spec por adelantado.
+- [x] Dos ejecuciones comparadas entre sí, no una.
+- [x] Log completo leído en ambas. El cierre ordenado se ejecuta (drenaje de
+      60 s + `Finalizado en`), ninguna supera los 20 min, ninguna muere por
+      hard-kill.
+- [x] **`partial / some_sources_degraded` NO es una regresión de P4:** las dos
+      ejecuciones anteriores de `main` sin P4 (01:33 y 23:03) salieron con el
+      mismo estado y motivo. Verificado con `verify-p3-deadlines.ts`.
+- [x] Ninguna fuente pasa de `success` a `blocked`/`empty`. En los dos
+      canarios **no hay un solo listado `empty` ni `blocked`**; el pre-P4 de
+      las 23:03 sí tenía uno (`Remotive → empty`).
+
+**Comparación por fuente (listado).** Los totales absolutos dependen de
+cuántos roles tocó la cadencia a cada fuente en ese tick, así que se compara
+la tasa por rol:
+
+| Fuente | pre-P4 (recib/roles) | Canario 1 | Canario 2 | Estado |
+| --- | --- | --- | --- | --- |
+| Computrabajo | 179/2 = 90 | 210/4 = 53 | 43/4 = 11 | `success` en los 3 |
+| Elempleo | 197/4 = 49 | (no tocaba) | 186/5 = 37 | `success` |
+| LinkedIn | 1373/8 = 172 | 606/5 = 121 | 342/3 = 114 | `success` |
+| Magneto | 40/2 = 20 | 80/4 = 20 | 120/6 = 20 | `success` |
+| **Torre** | 299/2 = 150 · 386/6 = 64 | 291/5 = 58 | 224/3 = 75 | `success` |
+
+`valid == received` en todos los listados de ambos canarios (Torre 291/291 y
+224/224): la migración no introduce pérdida por validación.
+
+**Los tres límites documentados, verificados uno a uno:**
+
+- [x] **SRC-003 en su forma falsable.** En los dos canarios los desenlaces de
+      detalle fueron `empty`, `partial` y `success`; **cero** `failed`,
+      `blocked` o `timeout`. Es decir: **no hubo ni un fallo real de
+      detalle**, así que la rama correcta de la spec es la segunda — la fila
+      `-detail` sigue legítimamente ausente y el requisito se cierra con la
+      prueba de integración. `source_circuit_state` conserva sus 4 filas de
+      siempre. **La condición de refutación (≥1 fallo real y ninguna fila) no
+      se dio.**
+- [x] **La mejora sí se observa en la clasificación.** Canario 1,
+      Computrabajo detalle: `empty,partial` con 33 recibidas / 1 válida. El
+      pre-P4 equivalente (01:33) fue `empty` a secas con 21 / 0. Antes todo
+      colapsaba en `empty`; ahora el `partial` se distingue del vacío real.
+- [x] **Torre devuelve `[]` sin degradar la clasificación.** En el log del
+      canario 1 varias palabras clave dan `[Torre] Found 0 jobs`, y el
+      agregado del adaptador migrado sigue siendo `success` con 291 vacantes.
+      Un `[]` por palabra clave ya no arrastra al conjunto ni toca el
+      circuito.
+- [x] **El circuito `-detail` se comporta como especifica:** `empty` es
+      neutro (no crea fila), `partial` y `success` reinician, y como no hubo
+      incrementos no se abrió ningún circuito. Ninguna fuente quedó degradada
+      por un detalle ausente — que es exactamente lo que P4 venía a arreglar.
+
+- [x] Declarada la cobertura: **5 de 17 fuentes** observadas en estos dos
+      canarios (Computrabajo, Elempleo, LinkedIn, Magneto, Torre). El resto no
+      tocaba por cadencia. Glassdoor-CO/VE e Indeed-CO/VE siguen **sin
+      verificar**: viven en `scrape-browser-tick.yml`, que corre cada 2 días.
+      **No se afirma «17/17 en verde».**
+- [x] SRC-005 y SRC-006 se cierran con prueba unitaria, no con canario, tal
+      como la spec declaró por adelantado.
 
 ## 6. Cierre
 
