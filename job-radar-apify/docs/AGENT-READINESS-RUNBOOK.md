@@ -37,8 +37,8 @@ Los estándares Agent Skills, WebMCP, DNS-AID, MCP Server Card, Content Signals 
 | Content Signals | Fail | draft expirado + convención Cloudflare | postura conservadora | ARE-011 | Pendiente |
 | API Catalog | Fail HTML | RFC 9727/RFC 9264 | linkset JSON exacto | ARE-010 | Pendiente |
 | OAuth discovery | Fail | RFC 8414/OIDC | No aplicar: no AS para agentes | ARE-018 | N/A |
-| Protected Resource | Fail | RFC 9728 | No aplicar: API agente pública | ARE-018 | N/A |
-| Auth.md | Fail | propuesta WorkOS | No aplicar: sin registro agente | ARE-018 | N/A |
+| Protected Resource | Fail | RFC 9728 | `/.well-known/oauth-protected-resource`, `resource` = origen | ARE-019 | Implementado 2026-09-18 |
+| Auth.md | Fail | propuesta WorkOS | `/auth.md` autocontenido, sin registro de agentes | ARE-019 | Implementado 2026-09-18 |
 | MCP card | Fail | SEP-2127/ext experimental + scanner | tarjeta de endpoint real | ARE-013 | Pendiente |
 | MCP runtime | No detectado | MCP 2025-06-18 | Streamable HTTP real | ARE-012 | Pendiente |
 | Agent Skills | Fail | draft v0.2.0 | index + digest real | ARE-014 | Pendiente |
@@ -48,9 +48,31 @@ Los estándares Agent Skills, WebMCP, DNS-AID, MCP Server Card, Content Signals 
 | Web Bot Auth | Neutral/HTML | Cloudflare experimental | No aplicar: sin firma saliente | ARE-018 | N/A |
 | Commerce | Neutral | Scanner `isCommerce=false` | No implementar | ARE-018 | N/A |
 
+## OAuth: por qué publicamos RFC 9728 y no OIDC Discovery
+
+`verifySession` (`src/auth/verify-session.ts`) valida tokens Bearer reales emitidos por el proveedor OIDC gestionado de Supabase, así que BuscoTrabajo **sí** es un resource server y RFC 9728 aplica de verdad. `/.well-known/oauth-protected-resource` declara `resource` = `https://buscotrabajo.co` (RFC 9728 §3.3: el identificador debe ser idéntico a aquel en el que se insertó el sufijo well-known; servido en la raíz, va sin componente de ruta) y nombra al emisor en `authorization_servers`.
+
+BuscoTrabajo **no** es un authorization server y por eso `/.well-known/openid-configuration` y `/.well-known/oauth-authorization-server` devuelven 404 a propósito, con aserción en las pruebas. RFC 8414 §3.3 y OIDC Discovery §4.3 exigen que el `issuer` del documento sea idéntico al identificador desde el que se descargó; un documento servido en `buscotrabajo.co` que declarase el issuer de Supabase **debe ser rechazado** por todo cliente conforme, de modo que sería a la vez falso e inútil. Los metadatos reales del emisor viven en `https://wneeisleyngulowfcicp.supabase.co/auth/v1/.well-known/openid-configuration` (verificado en vivo: `authorization_endpoint`, `token_endpoint`, `jwks_uri`, `userinfo_endpoint`, `grant_types_supported`).
+
+El check `oauthDiscovery` de IsItAgentReady sólo puede aprobarse si `buscotrabajo.co` es su propio issuer. Ninguna opción legítima lo consigue: el dominio personalizado de Supabase (add-on de pago) movería el issuer a un subdominio, no a la raíz escaneada, y construir un authorization server propio está expresamente prohibido por el encargo. Queda como no-pase documentado, no como pendiente.
+
+Pendiente opcional: añadir `WWW-Authenticate: Bearer resource_metadata="…"` a las ~18 respuestas 401 de `src/server.ts` (RFC 9728 §5.1, opcional para el escáner). Se omitió para no tocar rutas privadas de cuenta/CV en este cambio.
+
 ## DNS-AID
 
-No publicar registros hasta validar la sintaxis final con el proveedor y contar con autorización. El draft activo es `draft-mozleywilliams-dnsop-dnsaid-02`, expira 2026-11-28 y no tiene estatus de RFC. El destino será exclusivamente el MCP/A2A/índice realmente desplegado en `buscotrabajo.co`; no se inventarán hosts, claves o endpoints. Registrar aquí el valor exacto aplicado, TTL, estado DNSSEC y consultas DoH cuando exista acceso.
+Draft activo `draft-mozleywilliams-dnsop-dnsaid-02` (expira 2026-11-28, sin estatus de RFC). El skill del escáner exige registros **SVCB o HTTPS** en ServiceMode bajo `_agents`; el §4 del draft menciona TXT sólo como fallback explícitamente indeseable y **sin formato de RDATA definido**, y el §5.9 difiere a trabajo futuro la variante TXT en JSON. No existe formato contra el que implementar, así que no se inventa uno para disparar `txtIndexEntryCount`.
+
+Bloqueo real y concreto: `buscotrabajo.co` usa los nameservers de GoDaddy (`ns39/ns40.domaincontrol.com`) y **la gestión DNS de GoDaddy no ofrece los tipos SVCB/HTTPS ni DNSSEC** para esta zona (`DS` vacío, `AD=false` en las consultas DoH). La zona actual es mínima: `A buscotrabajo.co → 216.24.57.1` (Render), `CNAME www → job-radar-apify.onrender.com`, un TXT de verificación de Google y **ningún registro MX**.
+
+Por tanto el desbloqueo requiere una decisión del propietario: mover los nameservers a un proveedor con soporte SVCB + DNSSEC (Cloudflare DNS lo hace en su plan gratuito, sin coste adicional y sin tocar Render). Al no haber MX, una migración de zona no pone en riesgo el correo. Registros a publicar una vez tomada la decisión, apuntando sólo a endpoints ya desplegados:
+
+```dns
+_mcp._agents.buscotrabajo.co.   3600 IN SVCB 1 buscotrabajo.co. alpn="mcp,h2" port=443 mandatory=alpn,port
+_a2a._agents.buscotrabajo.co.   3600 IN SVCB 1 buscotrabajo.co. alpn="a2a,h2" port=443 mandatory=alpn,port
+_index._agents.buscotrabajo.co. 3600 IN SVCB 1 buscotrabajo.co. alpn="h2" port=443 mandatory=alpn,port
+```
+
+Registrar aquí el valor exacto aplicado, TTL, estado DNSSEC y las consultas DoH de verificación cuando exista acceso autorizado a la zona.
 
 ## Rendimiento protegido
 
@@ -78,6 +100,16 @@ Antes de commit/push/deploy: diff completo, cero CV Generator, cero cambios de p
 
 Rollback: revertir el commit de esta fase. No hay migraciones ni datos persistentes. Los recursos experimentales pueden retirarse por módulo/ruta sin afectar dashboard, autenticación, pagos o scraping.
 
+## Ciclo 2 — 2026-09-18 (PRM + auth.md)
+
+Rescaneo de partida vía `POST https://isitagentready.com/api/scan`: nivel 5 (Agent-Native), 4 fallos — `discoverability.dnsAid`, `discovery.oauthDiscovery`, `discovery.oauthProtectedResource`, `discovery.authMd`. `botAccessControl.webBotAuth` y los cinco checks de commerce siguen en `neutral` (no puntúan).
+
+Implementado en este ciclo: `/.well-known/oauth-protected-resource` (RFC 9728) y `/auth.md` autocontenido. Ambos son estáticos y se sirven desde `handleAgentReadinessRoute`, antes del fallback SPA; no consultan la base de datos y no tocan el LRU/SWR de `/dashboard`.
+
+Verificación local sin Docker: el suite aislado exige Postgres en contenedor y Docker no está disponible en esta máquina, así que los dos recursos nuevos se validaron contra un servidor HTTP real montando sólo sus handlers — status, `Content-Type`, CORS, `resource` = origen, `authorization_servers`, `bearer_methods_supported`, H1 `auth.md`, ausencia de `undefined` — y se comprobó en vivo que el documento del emisor declara exactamente el `issuer` que publicamos. `npx tsc --noEmit` no añade ningún error en los tres archivos tocados (el resto es la línea base heredada del repo).
+
+Techo alcanzable tras este ciclo: `oauthProtectedResource` y `authMd` deberían pasar; `dnsAid` depende de la decisión de nameservers y `oauthDiscovery` es un no-pase por diseño. El 100/100 de IsItAgentReady no es alcanzable sin publicar metadatos de authorization server falsos.
+
 ## Resultado final
 
-Pendiente de implementación, despliegue y rescaneos. Esta sección debe registrar scores, URLs canónicas de reportes, commit desplegado, estado Render, costos/planes verificados, métricas antes/después y bloqueos externos.
+Registrar aquí, tras cada despliegue: scores, URLs canónicas de reportes, commit desplegado, estado Render, costos/planes verificados, métricas antes/después y bloqueos externos.

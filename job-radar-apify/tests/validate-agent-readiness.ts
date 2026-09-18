@@ -164,7 +164,33 @@ async function main(): Promise<void> {
     assert.equal(a2a.body.result.kind, "message");
     assert.equal(a2a.body.result.parts[0].data.jobs.length, 1);
 
-    for (const pathname of ["/.well-known/openid-configuration", "/.well-known/oauth-authorization-server", "/.well-known/oauth-protected-resource", "/auth.md", "/.well-known/http-message-signatures-directory"]) {
+    // RFC 9728: el resource identifier debe ser idéntico a aquel en el que se
+    // insertó el sufijo well-known. Servido en la raíz => origen sin ruta.
+    const protectedResource = await json("/.well-known/oauth-protected-resource");
+    assert.equal(protectedResource.response.status, 200);
+    assert.match(protectedResource.response.headers.get("content-type") || "", /^application\/json/);
+    assert.equal(protectedResource.response.headers.get("access-control-allow-origin"), "*");
+    assert.equal(protectedResource.body.resource, "https://buscotrabajo.co");
+    assert.deepEqual(protectedResource.body.authorization_servers, [
+      "https://wneeisleyngulowfcicp.supabase.co/auth/v1"
+    ]);
+    assert.deepEqual(protectedResource.body.bearer_methods_supported, ["header"]);
+    assert.ok(Array.isArray(protectedResource.body.scopes_supported));
+
+    const authMd = await fetch(`${base}/auth.md`);
+    assert.equal(authMd.status, 200);
+    assert.match(authMd.headers.get("content-type") || "", /^text\/markdown; charset=utf-8/);
+    const authMdBody = await authMd.text();
+    // El detector del escáner exige un H1 que contenga "auth.md".
+    assert.match(authMdBody, /^# .*auth\.md/m);
+    assert.ok(authMdBody.includes("/.well-known/oauth-protected-resource"));
+    // Honestidad: no hay registro de agentes, y el documento debe decirlo.
+    assert.ok(authMdBody.includes("No existe registro de agentes"));
+    assert.ok(!/client registration \(RFC 7591\) disponible/i.test(authMdBody));
+
+    // No publicamos metadatos de authorization server: el issuer no es nuestro
+    // (RFC 8414 §3.3 / OIDC Discovery §4.3). Deben seguir devolviendo 404.
+    for (const pathname of ["/.well-known/openid-configuration", "/.well-known/oauth-authorization-server", "/.well-known/http-message-signatures-directory"]) {
       assert.equal((await fetch(`${base}${pathname}`)).status, 404, pathname);
     }
 

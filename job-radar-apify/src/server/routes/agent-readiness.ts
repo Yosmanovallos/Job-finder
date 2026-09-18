@@ -5,10 +5,12 @@ import {
   AGENT_SKILL_ARTIFACTS,
   AGENT_SKILLS_INDEX,
   AI_CATALOG,
+  AUTH_MD,
   API_CATALOG,
   DISCOVERY_LINKS,
   LLMS_TXT,
   MCP_SERVER_CARD,
+  OAUTH_PROTECTED_RESOURCE,
   OPENAPI_DOCUMENT,
   PUBLIC_PAGES,
   SITE_ORIGIN,
@@ -67,6 +69,7 @@ const skillsIndexBody = JSON.stringify(AGENT_SKILLS_INDEX);
 const aiCatalogBody = JSON.stringify(AI_CATALOG);
 const mcpCardBody = JSON.stringify(MCP_SERVER_CARD);
 const a2aCardBody = JSON.stringify(A2A_AGENT_CARD);
+const oauthProtectedResourceBody = JSON.stringify(OAUTH_PROTECTED_RESOURCE);
 
 const toolSchemas: Record<string, Record<string, unknown>> = {
   search_jobs: {
@@ -350,6 +353,14 @@ export async function handleAgentReadinessRoute(
   }
   if (pathname === "/.well-known/api-catalog" && (method === "GET" || method === "HEAD")) {
     await sendBody(req, res, 200, { ...discoveryHeaders, "Content-Type": 'application/linkset+json; profile="https://www.rfc-editor.org/info/rfc9727"', Link: DISCOVERY_LINKS }, apiCatalogBody, "api-catalog");
+    return true;
+  }
+  if (pathname === "/.well-known/oauth-protected-resource" && (method === "GET" || method === "HEAD")) {
+    await sendBody(req, res, 200, discoveryHeaders, oauthProtectedResourceBody, "oauth-protected-resource");
+    return true;
+  }
+  if (pathname === "/auth.md" && (method === "GET" || method === "HEAD")) {
+    await sendBody(req, res, 200, { "Content-Type": "text/markdown; charset=utf-8", "Access-Control-Allow-Origin": "*", "Cache-Control": "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400" }, AUTH_MD, "auth.md");
     return true;
   }
   const machineResources: Record<string, string> = {
