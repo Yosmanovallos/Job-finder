@@ -72,6 +72,7 @@ const NAVIGATION_JUNK = {
 
 function base(overrides: Partial<ReadinessInput> = {}): ReadinessInput {
   return {
+    source: "Elempleo",
     title: "Analista de Datos",
     company: "Banco Ejemplo S.A.",
     location: "Bogotá, D.C., Colombia",
@@ -97,7 +98,7 @@ function asStoredPage(input: ReadinessInput): SeoJob {
     location: input.location ?? "",
     url: input.url ?? "",
     dateText: "",
-    source: "Elempleo",
+    source: input.source ?? "Elempleo",
     publishedAt: input.publishedAt ? String(input.publishedAt) : undefined,
     country: input.country ?? null,
     description: input.description ?? undefined,
@@ -186,6 +187,20 @@ const FIXTURES: Record<string, { input: ReadinessInput; ready: boolean; reason?:
     input: base({ location: "Santiago, Chile", country: "CO" }),
     ready: false,
     reason: "LOCATION_COUNTRY_CONFLICT"
+  },
+  "rich Workana project remains blocked pending source classification": {
+    input: base({ source: "Workana", location: "Buenos Aires, Argentina", country: null }),
+    ready: false,
+    reason: "SOURCE_REQUIRES_JOB_CLASSIFICATION"
+  },
+  "rich non-Workana contractor can qualify": {
+    input: base({ source: "Elempleo", location: "Buenos Aires, Argentina", country: null }),
+    ready: true
+  },
+  "Magneto country-only location remains blocked": {
+    input: base({ source: "Magneto", location: "Colombia", country: "CO" }),
+    ready: false,
+    reason: "MISSING_LOCATION"
   }
 };
 

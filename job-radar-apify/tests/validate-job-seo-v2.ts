@@ -15,13 +15,15 @@ import "./require-isolated-database.js";
 import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
 import path from "node:path";
-import { readFile } from "node:fs/promises";
+import { mkdtemp, readFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { pool } from "../src/db/client.js";
 import { saveJobs } from "../src/db/job-repository.js";
 import {
   claimDueDetailJobs,
   DETAIL_BACKOFF_MS,
+  mutateReadinessRelevantJobs,
   recordDetailOutcome,
   refreshGoogleReadiness
 } from "../src/db/job-readiness-repository.js";
@@ -125,6 +127,11 @@ function runScript(script: string, args: string[]): Promise<{ code: number; outp
   });
 }
 
+async function snapshotPath(label: string): Promise<string> {
+  const directory = await mkdtemp(path.join(tmpdir(), "job-seo-v2-snapshot-"));
+  return path.join(directory, `${label}.json`);
+}
+
 interface PageFacts {
   status: number;
   indexable: boolean;
@@ -199,6 +206,12 @@ async function assertConsumersAgree(id: string, expectedReady: boolean, label: s
   assert.doesNotMatch(block!, /\bDROP\b|\bTRUNCATE\b|DELETE FROM|ALTER TABLE (?!jobs |indexing_queue )/i, "block must be purely additive");
   await pool.query(block!);
   await pool.query(block!);
+  const migrationDry = await runScript("migrate-job-seo-v2.ts", []);
+  assert.equal(migrationDry.code, 0, migrationDry.output);
+  const migrationApply = await runScript("migrate-job-seo-v2.ts", ["--apply"]);
+  assert.equal(migrationApply.code, 0, migrationApply.output);
+  const migrationRerun = await runScript("migrate-job-seo-v2.ts", ["--apply"]);
+  assert.equal(migrationRerun.code, 0, migrationRerun.output);
   console.log("✅ [schema] job-seo-v2 block is additive and idempotent (applied twice on top of the runner's copy).");
 }
 
@@ -232,6 +245,55 @@ try {
   assert.equal(fullPosting.validThrough, undefined, "no synthetic validThrough");
   assert.equal(fullPosting.jobLocation?.address.addressCountry, "CO");
   assert.ok((await page(fullId)).html.includes(fullPosting.description), "JSON-LD description is the visible description");
+
+  // --- 3b. Every readiness-relevant administrative mutation is atomic -------
+  const mutationId = await saveOne(job({ title: "Especialista de Operaciones", description: RICH, requirements: RICH_REQ }));
+  const beforeCountryHash = (await row(mutationId)).content_hash;
+  const blockedCountry = await mutateReadinessRelevantJobs([
+    { id: mutationId, patch: { country: "VE" } }
+  ]);
+  assert.equal(blockedCountry[0]?.outcome?.ready, false);
+  const countryBlocked = await row(mutationId);
+  assert.ok(countryBlocked.seo_reasons.includes("LOCATION_COUNTRY_CONFLICT"));
+  assert.notEqual(countryBlocked.content_hash, beforeCountryHash, "country changes the persisted content hash");
+  assert.deepEqual(await updatedRows(mutationId), [{ status: "superseded", priority: 2 }], "ready to non-ready supersedes pending update");
+  await assertConsumersAgree(mutationId, false, "country conflict after shared mutation");
+
+  const restoredCountry = await mutateReadinessRelevantJobs([
+    { id: mutationId, patch: { country: "CO" } }
+  ]);
+  assert.equal(restoredCountry[0]?.outcome?.notified, "content_changed");
+  assert.deepEqual(await updatedRows(mutationId), [
+    { status: "superseded", priority: 2 },
+    { status: "pending", priority: 3 }
+  ], "previously-ready recovery is a meaningful update");
+
+  const changedEmployment = await mutateReadinessRelevantJobs([
+    { id: mutationId, patch: { employment_type: "Temporal" } }
+  ], { contentObtained: true });
+  assert.equal(changedEmployment[0]?.outcome?.notified, "content_changed");
+  assert.equal((await updatedRows(mutationId)).filter((item) => item.status === "pending").length, 1, "one pending update remains idempotent");
+
+  await mutateReadinessRelevantJobs([{ id: mutationId, patch: { is_active: false } }]);
+  const inactive = await row(mutationId);
+  assert.equal(inactive.seo_ready, false);
+  assert.ok(inactive.seo_reasons.includes("INACTIVE"));
+  assert.equal((await updatedRows(mutationId)).filter((item) => item.status === "pending").length, 0, "deactivation supersedes pending updates");
+
+  const unreadyId = await saveOne(job({ title: "Coordinador de Operaciones", location: "Bogotá", country: null, description: RICH, requirements: RICH_REQ }));
+  assert.equal((await row(unreadyId)).seo_ready, false);
+  const firstReady = await mutateReadinessRelevantJobs([{ id: unreadyId, patch: { country: "CO" } }]);
+  assert.equal(firstReady[0]?.outcome?.notified, "first_ready");
+  assert.deepEqual(await updatedRows(unreadyId), [{ status: "pending", priority: 2 }], "not-ready to ready uses newly-ready priority");
+  await assertConsumersAgree(unreadyId, true, "country completion after shared mutation");
+
+  const workanaId = await saveOne(job({ title: "Consultor Independiente", source: "Workana", description: RICH, requirements: RICH_REQ }));
+  assert.ok((await row(workanaId)).seo_reasons.includes("SOURCE_REQUIRES_JOB_CLASSIFICATION"));
+  await assertConsumersAgree(workanaId, false, "rich Workana remains user-visible but not SEO-ready");
+
+  const magnetoCountryOnlyId = await saveOne(job({ title: "Analista de Inventarios", location: "Colombia", country: "CO", description: RICH, requirements: RICH_REQ }));
+  assert.ok((await row(magnetoCountryOnlyId)).seo_reasons.includes("MISSING_LOCATION"));
+  await assertConsumersAgree(magnetoCountryOnlyId, false, "Magneto country-only location");
 
   // --- 4. Thin new job from a detail-capable source → PENDING, nothing for Google
   const thinId = await saveOne(job({ title: "Asesor Comercial", source: "LinkedIn" }));
@@ -422,8 +484,15 @@ try {
   assert.equal(report.examined, unclassifiedBefore);
   assert.ok(report.perSource.Torre.remoteAmbiguity >= 1);
 
-  const applied = await runScript("classify-job-readiness.ts", ["--apply", "--json"]);
+  const classifierWithoutSnapshot = await runScript("classify-job-readiness.ts", ["--apply", "--json"]);
+  assert.notEqual(classifierWithoutSnapshot.code, 0, "classifier apply refuses to write without a pre-write snapshot");
+  assert.equal(Number((await pool.query(`SELECT COUNT(*) FROM jobs WHERE detail_status IS NULL`)).rows[0].count), unclassifiedBefore, "missing snapshot leaves legacy rows unchanged");
+  const classifierSnapshot = await snapshotPath("classify");
+  const applied = await runScript("classify-job-readiness.ts", ["--apply", "--json", `--snapshot-out=${classifierSnapshot}`]);
   assert.equal(applied.code, 0, applied.output);
+  const classifierBackup = JSON.parse(await readFile(classifierSnapshot, "utf8"));
+  assert.equal(classifierBackup.version, 1);
+  assert.ok(classifierBackup.jobs.every((snapshotRow: Record<string, unknown>) => !Object.hasOwn(snapshotRow, "description")), "snapshot excludes source descriptions");
   const byTitle = Object.fromEntries(
     (await pool.query(`SELECT title, detail_status, seo_ready, content_updated_at, seo_ready_at FROM jobs WHERE title LIKE 'Legacy %'`)).rows.map((r) => [r.title, r])
   );
@@ -440,7 +509,7 @@ try {
     0,
     "backlog rows are never claimed by the tick's drain (historical backfill needs authorization)"
   );
-  const rerun = await runScript("classify-job-readiness.ts", ["--apply", "--json"]);
+  const rerun = await runScript("classify-job-readiness.ts", ["--apply", "--json", `--snapshot-out=${await snapshotPath("classify-rerun")}`]);
   assert.equal(JSON.parse(rerun.output.slice(rerun.output.indexOf("{"))).examined, 0, "classification is idempotent");
   const legacyRichId = legacy.rows.find((r) => r.kind === "Legacy Rico")!.id;
   assert.equal((await updatedRows(legacyRichId)).length, 0, "classification never enqueues by itself");
@@ -481,7 +550,10 @@ try {
   for (const metric of ["pending_total", "pending_updated", "pending_deleted", "updated_target_exists", "updated_target_404", "updated_target_410", "updated_target_seo_ready", "updated_target_not_seo_ready", "pending_duplicates"]) {
     assert.ok(cleanupDry.output.includes(metric), `dry-run reports ${metric}`);
   }
-  const cleanupApply = await runScript("cleanup-indexing-queue.ts", ["--apply"]);
+  const cleanupWithoutSnapshot = await runScript("cleanup-indexing-queue.ts", ["--apply"]);
+  assert.notEqual(cleanupWithoutSnapshot.code, 0, "cleanup apply refuses to write without a pre-write snapshot");
+  assert.deepEqual(await snapshot(), beforeRows, "missing cleanup snapshot leaves queue unchanged");
+  const cleanupApply = await runScript("cleanup-indexing-queue.ts", ["--apply", `--snapshot-out=${await snapshotPath("cleanup")}`]);
   assert.equal(cleanupApply.code, 0, cleanupApply.output);
   assert.equal(Number((await pool.query(`SELECT COUNT(*) FROM indexing_queue`)).rows[0].count), totalBefore, "no queue row is ever deleted");
   const state = async (url: string, type: string) =>
@@ -501,6 +573,10 @@ try {
     [goneUrl]
   );
   assert.equal(Number(pendingUpdatedForMissing.rows[0].count), 0, "a stale update is never converted into a deletion");
+  const queueIndexDry = await runScript("finalize-job-seo-v2-queue-index.ts", []);
+  assert.equal(queueIndexDry.code, 0, queueIndexDry.output);
+  const queueIndexApply = await runScript("finalize-job-seo-v2-queue-index.ts", ["--apply"]);
+  assert.equal(queueIndexApply.code, 0, queueIndexApply.output);
   const uniqueIndex = await pool.query(`SELECT 1 FROM pg_indexes WHERE indexname = 'uq_indexing_queue_pending_url_type'`);
   assert.equal(uniqueIndex.rowCount, 1, "idempotency index exists once duplicates are gone");
   console.log("✅ [cleanup] dry-run read-only; apply supersedes (never deletes, never converts to DELETE) and re-prioritizes.");
