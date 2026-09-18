@@ -179,6 +179,12 @@ async function assertConsumersAgree(id: string, expectedReady: boolean, label: s
   const locs = await sitemapLocs();
   const url = buildJobUrl({ jobId: id, title: current.title, location: current.location });
   const queued = (await updatedRows(id)).filter((r) => r.status === "pending" || r.status === "sent");
+  // ADR 0004: an expired API window is "resolved" too — the sitemap is the fallback.
+  const expired = await pool.query(
+    `SELECT 1 FROM indexing_queue WHERE job_id = $1 AND notification_type = 'URL_UPDATED' AND superseded_reason = 'api_window_expired'`,
+    [id]
+  );
+  const resolved = queued.length + (expired.rowCount ?? 0);
   assert.equal(facts.status, 200, `${label}: user-visible page must be 200`);
   assert.ok(facts.applyLink, `${label}: source link must be in the raw HTML`);
   assert.equal(facts.indexable, expectedReady, `${label}: robots`);
@@ -186,7 +192,7 @@ async function assertConsumersAgree(id: string, expectedReady: boolean, label: s
   assert.equal(facts.jobPosting !== null, expectedReady, `${label}: JobPosting`);
   assert.equal(locs.includes(url), expectedReady, `${label}: sitemap membership`);
   if (!expectedReady) assert.equal(queued.length, 0, `${label}: URL_UPDATED must never be queued for a non-ready job`);
-  else assert.ok(queued.length >= 1, `${label}: a ready job has its URL_UPDATED`);
+  else assert.ok(resolved >= 1, `${label}: a ready job has its URL_UPDATED (or an expired API window)`);
   // Brief §15: the raw server-rendered HTML (no hydration, no login) carries
   // the title, the source's own description, source attribution and the
   // apply path — for every user-visible job, ready or not.
@@ -474,18 +480,65 @@ try {
   assert.deepEqual(priorities, [...priorities].sort((a, b) => a - b), "priority lanes first");
   assert.deepEqual(await checkIndexingTarget({ url: "https://buscotrabajo.co/empleos/00000000-0000-4000-8000-000000000000/x", notification_type: "URL_UPDATED", job_id: null }), { send: false, reason: "target_missing" });
 
-  // --- 17. Purge → legitimate URL_DELETED (lane 1), pending UPDATED superseded, 410
+  // --- 17. Purge of a job Google never received through the API (ADR 0004, D2):
+  // tombstone recorded but born terminal (no delete quota); 410 + sitemap removal
+  // still express the expiry; the pending update is superseded.
   const purgedUrl = buildJobUrl({ jobId: thinId, title: (await row(thinId)).title, location: (await row(thinId)).location });
+  assert.ok((await sitemapLocs()).includes(purgedUrl), "ready job is in the sitemap before expiry");
   await pool.query(`UPDATE jobs SET last_seen_at = NOW() - INTERVAL '31 days' WHERE id = $1`, [thinId]);
   assert.ok((await purgeOldJobs()) >= 1);
   const deleted = await pool.query(`SELECT notification_type, status, priority, superseded_reason FROM indexing_queue WHERE url = $1 ORDER BY notification_type`, [purgedUrl]);
   assert.deepEqual(deleted.rows, [
-    { notification_type: "URL_DELETED", status: "pending", priority: 1, superseded_reason: null },
+    { notification_type: "URL_DELETED", status: "superseded", priority: 4, superseded_reason: "delete_not_api_notified" },
     { notification_type: "URL_UPDATED", status: "superseded", priority: 2, superseded_reason: "target_deleted" }
   ]);
   assert.ok(await wasJobPurged(thinId));
   assert.equal((await fetch(`${BASE}${new URL(purgedUrl).pathname}`)).status, 410);
-  console.log("✅ [expiry] purge keeps the 410 tombstone, queues URL_DELETED in lane 1 and supersedes the pending update.");
+  assert.ok(!(await sitemapLocs()).includes(purgedUrl), "expired job leaves the sitemap");
+  console.log("✅ [expiry] never-API-notified purge: 410 tombstone + sitemap removal, no delete quota spent.");
+
+  // --- 17b. API-notified job later purged → one sendable URL_DELETED ------------
+  const notifiedId = await saveOne(job({ title: "Jefe de Bodega", description: RICH, requirements: RICH_REQ }));
+  const notifiedUrl = buildJobUrl({ jobId: notifiedId, title: "Jefe de Bodega", location: (await row(notifiedId)).location });
+  await pool.query(`UPDATE indexing_queue SET status = 'sent', sent_at = NOW() WHERE job_id = $1 AND status = 'pending'`, [notifiedId]);
+  await pool.query(`UPDATE jobs SET last_seen_at = NOW() - INTERVAL '31 days' WHERE id = $1`, [notifiedId]);
+  await purgeOldJobs();
+  await purgeOldJobs();
+  const notifiedDelete = await pool.query(
+    `SELECT status, priority FROM indexing_queue WHERE url = $1 AND notification_type = 'URL_DELETED'`, [notifiedUrl]);
+  assert.deepEqual(notifiedDelete.rows, [{ status: "pending", priority: 1 }], "API-notified removal → exactly one eligible delete");
+  assert.deepEqual(await checkIndexingTarget({ url: notifiedUrl, notification_type: "URL_DELETED", job_id: notifiedId }), { send: true });
+  assert.deepEqual(
+    await checkIndexingTarget({ url: purgedUrl, notification_type: "URL_DELETED", job_id: thinId }),
+    { send: false, reason: "delete_not_api_notified" },
+    "pre-send check never spends quota on a never-notified delete"
+  );
+  console.log("✅ [expiry] API-notified purge → one URL_DELETED in the delete lane; pre-send check enforces D2.");
+
+  // --- 17c. API window (ADR 0004): a missed acceleration falls back to the sitemap
+  const staleId = await saveOne(job({ title: "Analista Contable", description: RICH, requirements: RICH_REQ }));
+  await pool.query(`UPDATE jobs SET created_at = NOW() - INTERVAL '10 days', content_updated_at = NOW() - INTERVAL '10 days' WHERE id = $1`, [staleId]);
+  const staleUrl = buildJobUrl({ jobId: staleId, title: "Analista Contable", location: (await row(staleId)).location });
+  assert.deepEqual(
+    await checkIndexingTarget({ url: staleUrl, notification_type: "URL_UPDATED", job_id: staleId }),
+    { send: false, reason: "api_window_expired" }
+  );
+  for (let run = 0; run < 2; run++) {
+    const tick = await runScript("backfill-indexing-queue.ts", []);
+    assert.equal(tick.code, 0, tick.output);
+  }
+  const staleRows = await pool.query(
+    `SELECT status, superseded_reason FROM indexing_queue WHERE job_id = $1 AND notification_type = 'URL_UPDATED'`, [staleId]);
+  assert.deepEqual(staleRows.rows, [{ status: "superseded", superseded_reason: "api_window_expired" }], "expired once, never resurrected by the hourly reconcile");
+  await refreshGoogleReadiness(staleId);
+  await enqueueIndexingNotifications([{ url: staleUrl, type: "URL_UPDATED", jobId: staleId, contentHash: (await row(staleId)).content_hash, priority: 2 }]);
+  assert.equal((await updatedRows(staleId)).length, 1, "the same expired version is never re-queued by any producer");
+  assert.equal((await row(staleId)).seo_ready, true, "an expired API opportunity never touches readiness");
+  await assertConsumersAgree(staleId, true, "API window expired (still indexable, JobPosting, in sitemap)");
+  const reopened = await mutateReadinessRelevantJobs([{ id: staleId, patch: { employment_type: "Temporal" } }], { contentObtained: true });
+  assert.equal(reopened[0]?.outcome?.notified, "content_changed", "a meaningful change opens a new window");
+  assert.deepEqual((await updatedRows(staleId)).map((r) => r.status), ["superseded", "pending"]);
+  console.log("✅ [window] expired acceleration: closed once, not resurrected, page stays ready; a real change re-opens it.");
 
   // --- 18. Reconcile never enqueues non-ready jobs --------------------------------
   const reconcile = await runScript("backfill-indexing-queue.ts", []);

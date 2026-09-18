@@ -12,6 +12,14 @@
  *     or sent URL_UPDATED carrying their content_hash) get one URL_UPDATED in
  *     the lowest send lane. Non-ready rows are never enqueued.
  *
+ * ADR 0004 adds two bounded closing steps and one guard:
+ *  0b. pending URL_UPDATED whose version left the 7-day API window → closed
+ *      'api_window_expired' (the page stays ready/indexable/in the sitemap);
+ *  0c. pending URL_DELETED for URLs never notified through the API → closed
+ *      'delete_not_api_notified' (the 410 tombstone is kept);
+ *  2. only versions inside the window are (re)queued, and a version whose
+ *     window already expired is never resurrected.
+ *
  * Only writes jobs' readiness columns (via the evaluator) and indexing_queue.
  * Safe to re-run: step 2 is idempotent by (job, content_hash).
  *
@@ -21,7 +29,13 @@
 import dotenv from "dotenv";
 import { pool } from "../src/db/client.js";
 import { refreshGoogleReadiness } from "../src/db/job-readiness-repository.js";
-import { enqueueIndexingNotifications, INDEXING_PRIORITY } from "../src/db/indexing-repository.js";
+import {
+  API_WINDOW_EXPIRED,
+  DELETE_NOT_API_NOTIFIED,
+  enqueueIndexingNotifications,
+  INDEXING_PRIORITY,
+  withinApiWindowSql
+} from "../src/db/indexing-repository.js";
 import { buildJobUrl } from "../src/lib/job-seo.js";
 import { seoReadySql } from "../src/lib/google-job-readiness.js";
 
@@ -31,6 +45,8 @@ const DRY_RUN = process.argv.includes("--dry-run");
 /** Per run. At 200 sends/day the lowest lane never needs more than this per hour. */
 const RECONCILE_EVALUATE_LIMIT = 500;
 const RECONCILE_ENQUEUE_LIMIT = 200;
+/** Per run: closing rows is cheap, but every loop here is bounded. */
+const RECONCILE_CLOSE_LIMIT = 20_000;
 
 async function main() {
   // 0. Time passes without a write event (a source validThrough expires, a
@@ -55,6 +71,42 @@ async function main() {
     console.log(`🔧 [reconcile] ${superseded.rowCount ?? 0} URL_UPDATED pendientes superseded (destino ya no apto).`);
   }
 
+  // 0b/0c (ADR 0004): close what the Indexing API should no longer spend
+  // quota on. Terminal, history kept, never deleted; bounded per run.
+  const closers: Array<{ label: string; reason: string; sql: string }> = [
+    {
+      label: "URL_UPDATED fuera de la ventana de la API",
+      reason: API_WINDOW_EXPIRED,
+      sql: `SELECT q.id FROM indexing_queue q JOIN jobs j ON j.id = q.job_id
+            WHERE q.status = 'pending' AND q.notification_type = 'URL_UPDATED' AND NOT (${withinApiWindowSql("j")})
+            LIMIT ${RECONCILE_CLOSE_LIMIT}`
+    },
+    {
+      label: "URL_DELETED de URLs nunca notificadas por la API",
+      reason: DELETE_NOT_API_NOTIFIED,
+      sql: `SELECT q.id FROM indexing_queue q
+            WHERE q.status = 'pending' AND q.notification_type = 'URL_DELETED'
+              AND NOT EXISTS (
+                SELECT 1 FROM indexing_queue s
+                WHERE s.notification_type = 'URL_UPDATED' AND s.status = 'sent'
+                  AND (s.url = q.url OR (q.job_id IS NOT NULL AND s.job_id = q.job_id)))
+            LIMIT ${RECONCILE_CLOSE_LIMIT}`
+    }
+  ];
+  for (const closer of closers) {
+    if (DRY_RUN) {
+      const n = await pool.query(`SELECT COUNT(*) AS n FROM (${closer.sql}) c`);
+      console.log(`🔧 [reconcile] ${n.rows[0].n} ${closer.label} (dry-run).`);
+      continue;
+    }
+    const closed = await pool.query(
+      `UPDATE indexing_queue u SET status = 'superseded', superseded_at = NOW(), superseded_reason = $1
+       WHERE u.status = 'pending' AND u.id IN (${closer.sql})`,
+      [closer.reason]
+    );
+    console.log(`🔧 [reconcile] ${closed.rowCount ?? 0} ${closer.label} → ${closer.reason}.`);
+  }
+
   const unevaluated = await pool.query<{ id: string }>(
     `SELECT id FROM jobs
      WHERE is_active = TRUE AND detail_status IS NOT NULL AND seo_evaluated_at IS NULL
@@ -76,10 +128,11 @@ async function main() {
     `SELECT j.id, j.title, j.location, j.content_hash
      FROM jobs j
      WHERE ${seoReadySql("j")}
+       AND ${withinApiWindowSql("j")}
        AND NOT EXISTS (
          SELECT 1 FROM indexing_queue q
          WHERE q.notification_type = 'URL_UPDATED'
-           AND q.status IN ('pending', 'sent')
+           AND (q.status IN ('pending', 'sent') OR (q.status = 'superseded' AND q.superseded_reason = '${API_WINDOW_EXPIRED}'))
            AND q.job_id = j.id
            AND q.content_hash IS NOT DISTINCT FROM j.content_hash
        )

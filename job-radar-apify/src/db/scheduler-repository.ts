@@ -1,6 +1,6 @@
 import { pool } from "./client.js";
 import { buildJobUrl, isPubliclyDescribable } from "../lib/job-seo.js";
-import { enqueueIndexingNotifications, INDEXING_PRIORITY } from "./indexing-repository.js";
+import { apiNotifiedUrls, DELETE_NOT_API_NOTIFIED, enqueueIndexingNotifications, INDEXING_PRIORITY } from "./indexing-repository.js";
 
 /**
  * Idempotent upsert of the known role list into `search_roles` — safe to
@@ -145,7 +145,7 @@ export async function markGlobalSourceRun(sourceName: string): Promise<void> {
 export async function purgeOldJobs(): Promise<number> {
   const result = await pool.query(
     `DELETE FROM jobs WHERE last_seen_at < NOW() - INTERVAL '30 days'
-     RETURNING id, title, company, location, url, source, published_at, seo_ready_at`
+     RETURNING id, title, company, location, url, source, published_at`
   );
 
   const deleted = result.rows
@@ -157,36 +157,41 @@ export async function purgeOldJobs(): Promise<number> {
       url: row.url,
       source: row.source,
       publishedAt: row.published_at,
-      dateText: "",
-      everSeoReady: row.seo_ready_at !== null
+      dateText: ""
     }))
     .filter(isPubliclyDescribable);
 
   if (deleted.length > 0) {
     try {
       const urls = deleted.map((job) => buildJobUrl(job));
-      // Job SEO V2: a removal is always recorded (it is also the 410
-      // tombstone), but it only takes the top send lane when Google could
-      // actually know the page — it was Google-ready at some point, or an
-      // URL_UPDATED for it was really sent. Any still-pending URL_UPDATED for
-      // the same URL is now pointless: superseded, never sent, history kept.
-      const notified = await pool.query<{ url: string }>(
-        `SELECT DISTINCT url FROM indexing_queue
-         WHERE url = ANY($1::text[]) AND notification_type = 'URL_UPDATED' AND status = 'sent'`,
-        [urls]
-      );
-      const notifiedUrls = new Set(notified.rows.map((row) => row.url));
+      // ADR 0004 (delete policy D2): a removal is always recorded — the row
+      // is the 410 tombstone — but it only takes delete quota when Google
+      // received this URL through the Indexing API (a URL_UPDATED really
+      // sent). Every other removal is fully expressed by 410 + sitemap
+      // removal, so its row is born terminal ('delete_not_api_notified').
+      // Any still-pending URL_UPDATED for the same URL is now pointless:
+      // superseded, never sent, history kept.
+      const notifiedUrls = await apiNotifiedUrls(pool, urls, deleted.map((job) => job.jobId));
+      const pairs = deleted.map((job, index) => ({ job, url: urls[index] }));
+      const sendable = pairs.filter(({ url }) => notifiedUrls.has(url));
+      const tombstoneOnly = pairs.filter(({ url }) => !notifiedUrls.has(url));
       await enqueueIndexingNotifications(
-        deleted.map((job, index) => ({
-          url: urls[index],
-          type: "URL_DELETED" as const,
-          jobId: job.jobId,
-          priority:
-            job.everSeoReady || notifiedUrls.has(urls[index])
-              ? INDEXING_PRIORITY.deleted
-              : INDEXING_PRIORITY.reconcile
-        }))
+        sendable.map(({ job, url }) => ({ url, type: "URL_DELETED" as const, jobId: job.jobId, priority: INDEXING_PRIORITY.deleted }))
       );
+      if (tombstoneOnly.length > 0) {
+        await pool.query(
+          `INSERT INTO indexing_queue (url, notification_type, status, priority, job_id, superseded_at, superseded_reason)
+           SELECT t.url, 'URL_DELETED', 'superseded', $3, t.job_id, NOW(), $4
+           FROM unnest($1::text[], $2::uuid[]) AS t(url, job_id)
+           WHERE NOT EXISTS (SELECT 1 FROM indexing_queue q WHERE q.url = t.url AND q.notification_type = 'URL_DELETED')`,
+          [
+            tombstoneOnly.map(({ url }) => url),
+            tombstoneOnly.map(({ job }) => job.jobId),
+            INDEXING_PRIORITY.reconcile,
+            DELETE_NOT_API_NOTIFIED
+          ]
+        );
+      }
       await pool.query(
         `UPDATE indexing_queue SET status = 'superseded', superseded_at = NOW(), superseded_reason = 'target_deleted'
          WHERE status = 'pending' AND notification_type = 'URL_UPDATED' AND url = ANY($1::text[])`,

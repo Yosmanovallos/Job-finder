@@ -12,7 +12,7 @@ import { buildTestEnvironment, validateTestEnvironment } from "../tests/test-saf
 const root = fileURLToPath(new URL("../", import.meta.url));
 const postgresImage = "postgres@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685";
 const suites: Record<string, string[]> = {
-  unit: ["validate-google-readiness.test.ts", "validate-test-safety.test.ts", "validate-stale-cache.test.ts", "validate-dashboard-filters.ts", "validate-role-matching.ts", "validate-run-telemetry.test.ts", "validate-fetch-context.test.ts", "validate-source-contract.test.ts", "validate-agent-readiness.test.ts"],
+  unit: ["validate-google-readiness.test.ts", "validate-indexing-scheduler.test.ts", "validate-test-safety.test.ts", "validate-stale-cache.test.ts", "validate-dashboard-filters.ts", "validate-role-matching.ts", "validate-run-telemetry.test.ts", "validate-fetch-context.test.ts", "validate-source-contract.test.ts", "validate-agent-readiness.test.ts"],
   integration: ["validate-isolated-database.ts", "validate-job-pagination.ts", "validate-seo-job-pages.ts", "validate-companies-search.ts", "validate-sitemap-streaming.ts", "validate-run-observability.ts", "validate-execution-deadlines.ts", "validate-source-contract.ts", "validate-agent-readiness.ts", "validate-job-seo-v2.ts"],
   sitemap: ["validate-sitemap-streaming.ts"],
   observability: ["validate-run-observability.ts"],
@@ -21,7 +21,7 @@ const suites: Record<string, string[]> = {
   companies: ["validate-companies-search.ts"],
   baseline: ["validate-public-baseline.ts"],
   "agent-readiness": ["validate-agent-readiness.test.ts", "validate-agent-readiness.ts"],
-  "job-seo": ["validate-google-readiness.test.ts", "validate-job-seo-v2.ts"]
+  "job-seo": ["validate-google-readiness.test.ts", "validate-indexing-scheduler.test.ts", "validate-job-seo-v2.ts"]
 };
 const selection = process.argv[2] || "unit";
 if (!Object.hasOwn(suites, selection) || process.argv.slice(3).some((arg) => arg !== "--dry-run")) {

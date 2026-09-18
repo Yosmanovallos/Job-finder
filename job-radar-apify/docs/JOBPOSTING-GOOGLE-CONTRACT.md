@@ -35,7 +35,7 @@ Otherwise the page still serves 200 with visible content and the source link, bu
 | `jobLocationType` | `TELECOMMUTE` **only** if 100% remote | Any bare "Remoto" location, incl. Torre rows with no location (F6) | Emit only when the source explicitly marks the job fully remote (JSON-LD `TELECOMMUTE`, API `remote: true`). "No location" is not remote. Hybrid is never TELECOMMUTE. |
 | `applicantLocationRequirements` | For TELECOMMUTE: **at least one eligible country is required** (or `jobLocation` country) | Defaults to Colombia (fabricated, F6) | Only countries the source names. **Remote job with no source-stated country and no `jobLocation` → not eligible for JobPosting.** |
 | `employmentType` | Recommended; fixed enum | Reverse map of the Spanish label ✓ | Keep; only source-stated values. Workana "Proyecto"/"Por hora" have no mapping → omitted ✓. Never inferred from the title. |
-| `validThrough` | Required **if** the job has an expiration; "if you do not know when the job will expire, do not include this property" | `published_at + 30 d`: false for 14,500 live pages (F5) | **Omit** unless a source supplies a real expiration (no parser reads one today; adding one is a Phase D/E extraction item). Expiry is signaled by 410 + URL_DELETED instead. |
+| `validThrough` | Required **if** the job has an expiration; "if you do not know when the job will expire, do not include this property" | `published_at + 30 d`: false for 14,500 live pages (F5) | **Omit** unless a source supplies a real expiration (no parser reads one today; adding one is a Phase D/E extraction item). Expiry is signaled by 410 + removal from the job sitemap instead; URL_DELETED only accelerates it for URLs Google received through the Indexing API (ADR 0004). |
 | `baseSalary` | Recommended; "as provided by the employer… **Only employers can provide baseSalary**" | Not emitted ✓ | **Do not emit.** BuscoTrabajo is a third party. Keep the salary visible when the source published it. Workana budgets are shown as "Presupuesto", not salary. |
 | `directApply` | Only if a short on-site application exists | Not emitted ✓ | Keep omitted: we send users to the source. |
 | `identifier` | Recommended | `{name: source, value: our uuid}` | `value` should be the **source's** job id when known (it is the employer/source identifier); omit otherwise. |
@@ -65,8 +65,16 @@ boilerplate on 66k pages.
 
 ## 6. Expiration (rule M): preserved
 
-`purgeOldJobs()` → URL_DELETED → `wasJobPurged()` 410 tombstone stays as is. Phase G makes the queue
+`purgeOldJobs()` → URL_DELETED row → `wasJobPurged()` 410 tombstone stays as is. Phase G makes the queue
 coalesce UPDATED/DELETED per URL (F7: 39,298 URLs have both today).
+
+**ADR 0004 (`docs/adr/0004-indexing-api-notification-policy.md`).** The source of truth for expiry is 410
+plus removal from the job sitemap (and hence no JobPosting). The Indexing API only accelerates it:
+URL_DELETED is sendable only for URLs whose URL_UPDATED was really sent through the API. Every other
+removal still writes its tombstone row, born terminal (`superseded` / `delete_not_api_notified`), so the
+410 is unchanged. A URL_UPDATED is sendable for 7 days from discovery or from the last real content
+change. After that it is closed as `api_window_expired`, which never changes readiness, robots, JobPosting
+or the sitemap.
 
 ## 7. Test matrix (Phase D)
 

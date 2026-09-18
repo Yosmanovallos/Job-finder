@@ -13,13 +13,14 @@ import dotenv from "dotenv";
 import { pool } from "../src/db/client.js";
 import {
   getIndexingBudgetRemaining,
-  getPendingIndexingBatch,
+  getPendingIndexingLanes,
   markIndexingSent,
   markIndexingFailed,
   markIndexingSuperseded,
   checkIndexingTarget
 } from "../src/db/indexing-repository.js";
 import { publishUrlNotification } from "../src/lib/google-indexing.js";
+import { DEFAULT_SCHEDULER, planIndexingSends } from "../src/lib/indexing-scheduler.js";
 
 dotenv.config();
 
@@ -56,8 +57,13 @@ async function main() {
   const CONSECUTIVE_FAILURE_LIMIT = 5;
   let stop = false;
 
+  // ADR 0004: the day's budget is shared by lane (new-ready 50% / API-notified
+  // deletes 50%, unused share spills new → delete → content → reconcile), so
+  // neither new jobs nor deletes can starve the other. Rows the pre-send check
+  // closes free their slot, so the remaining budget is planned again.
   while (!stop && sent + failed < budget && scanned < MAX_SCANNED_PER_RUN) {
-    const batch = await getPendingIndexingBatch(Math.min(500, MAX_SCANNED_PER_RUN - scanned));
+    const lanes = await getPendingIndexingLanes(Math.min(500, MAX_SCANNED_PER_RUN - scanned));
+    const batch = planIndexingSends(lanes, budget - sent - failed, DEFAULT_SCHEDULER, Date.now() / 3_600_000);
     if (batch.length === 0) break;
     for (const row of batch) {
       if (sent + failed >= budget) break;
