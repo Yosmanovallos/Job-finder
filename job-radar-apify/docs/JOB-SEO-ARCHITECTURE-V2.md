@@ -120,8 +120,8 @@ Google (page updated 2026-09-08) **requires** at least one eligible country for 
 remote job whose source states no eligible country cannot truthfully carry JobPosting at all.
 
 **F7 — The Indexing API queue spends almost all quota on dead URLs.** 98,529 pending URL_UPDATED
-(oldest 2026-07-30) plus 41,921 pending URL_DELETED sit in a FIFO drained at 200/day, which is a
-~490-day backlog. Every one of the last 24 h's 200 sends came from the single 2026-07-30 backfill
+(oldest 2026-07-30) plus 41,921 pending URL_DELETED sit in a FIFO drained at 200/day, which is ~490 days for
+the URL_UPDATED rows alone and ~700 days for the full 140,450-row backlog. Every one of the last 24 h's 200 sends came from the single 2026-07-30 backfill
 batch, and **152 of the 200 (76%) targeted jobs that no longer exist** (they return 410). 39,298 URLs
 carry both an UPDATED and a DELETED row. A job that becomes READY tomorrow would wait behind 98k rows,
 so Phase C's "enqueue on READY" acceptance **cannot be observed end-to-end** until the queue is fixed.
@@ -225,7 +225,7 @@ one eligibility module instead of scattered checks.
 | `description_fetched_at` | *(exists, unused)* | Reused as "detail content obtained at". No new column. |
 | `description_source` | `VARCHAR(20)` | `listing` / `detail`: provenance of the text. |
 | `content_hash` | `VARCHAR(64)` | SHA-256 of normalized description+requirements+employment+salary+location. Drives Phase G re-notification and `<lastmod>`. |
-| `content_updated_at` | `TIMESTAMPTZ` | Real content-change time for `<lastmod>` (Phase F). |
+| `content_updated_at` | `TIMESTAMPTZ` | Real content-change time for `<lastmod>` (Phase F). **Stays NULL for legacy rows classified from stored text** (the change time is unknown). Phase F omits `<lastmod>` when NULL, with no fallback to `published_at` and never the classification run time. |
 | `seo_ready_at` | `TIMESTAMPTZ` | First READY transition. `UPDATE … WHERE seo_ready_at IS NULL RETURNING` = exactly-once enqueue. |
 
 Indexes: partial `(detail_next_attempt_at) WHERE detail_status IN ('pending','retry')` and partial
@@ -247,8 +247,9 @@ the gate would read NULL everywhere and drop every JobPosting at once.
 
 **Tests (isolated runner, `test:unit` / `test:integration` + new `test:job-completeness`):** fixtures
 for full description, Torre tagline, LinkedIn chrome sample (F4), captcha page, cookie banner,
-title-only, truncated "…", duplicated blocks, BuscoTrabajo boilerplate. Plus TS↔SQL predicate parity
-and a classification script dry-run over a seeded DB.
+title-only, truncated "…", duplicated blocks, BuscoTrabajo boilerplate. These are pure functions in the
+**`unit`** suite (offline, no DB). TS↔SQL predicate parity and the classification dry-run need Postgres,
+so they go in **`integration`** (disposable DB). No test touches production.
 
 ### Phase C — Mandatory detail enrichment for new jobs (session after B)
 
@@ -290,7 +291,10 @@ Classification writes only the new columns. No DELETE anywhere in B/C.
 ## 7. Open decisions for the user (blocking or shaping B/C)
 
 1. **Non-ready pages during migration:** keep them 200 + visible, drop JobPosting (mandatory), add
-   `noindex,follow` (recommended), and remove them from the sitemap. Alternative: keep them indexable
+   `noindex,follow` (recommended), and remove them from the sitemap. Exit path per state: `pending`/`retry`
+   leave through enrichment (Phase C) or backfill (Phase E). `unsupported` leaves **only** when that source
+   gains a detail adapter, so Torre (6,050), Glassdoor (2,400) and Indeed (339), about 8,800 pages plus
+   ~190 new rows/day, stay noindex **indefinitely** unless adapters are built. Alternative: keep them indexable
    without JobPosting. Accepted risk either way: JOB_LISTING/JOB_DETAILS impressions from thin pages
    will fall, which is the intent.
 2. **Queue triage (F7)** in Phase C: mark stale URL_UPDATED rows `superseded` in production.
