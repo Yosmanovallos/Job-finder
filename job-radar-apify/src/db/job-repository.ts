@@ -1,16 +1,17 @@
 import crypto from "crypto";
 import dotenv from "dotenv";
 import { pool } from "./client.js";
-import type { Job, JobDetail } from "../sources/types.js";
+import type { Job } from "../sources/types.js";
 import { normalizeJobUrl } from "../sources/types.js";
 import { getCountryConfig } from "../countries/index.js";
 import { saveRunToCache } from "../cache-manager.js";
 import { validateJobs } from "./job-validator.js";
 import { PAYWALL_ENABLED } from "../config.js";
-import { buildJobUrl, isPubliclyDescribable } from "../lib/job-seo.js";
 import { expandRoleWords, getRoleMatchWords, tokenizeJobSearch } from "../lib/job-filters.js";
 import type { JobFilterParams } from "../lib/job-filters.js";
-import { enqueueIndexingNotifications } from "./indexing-repository.js";
+import { initialDetailStatus, refreshGoogleReadiness } from "./job-readiness-repository.js";
+import { sourceSupportsDetail } from "../sources/detail-capability.js";
+import { seoReadySql } from "../lib/google-job-readiness.js";
 import { StaleWhileRevalidateCache } from "../lib/stale-while-revalidate-cache.js";
 
 dotenv.config();
@@ -65,11 +66,11 @@ export async function saveJobs(
 ): Promise<{ savedCount: number; duplicateCount: number; validCount: number; insertedJobs: InsertedJobRef[] }> {
   let savedCount = 0;
   let duplicateCount = 0;
-  // Collected across the loop, enqueued in one batched INSERT after it —
-  // SEO Fase 3 (Google Indexing API), see indexing-repository.ts. Doing
-  // this per-iteration would triple the query count of a loop that already
-  // runs over every scraped job on every 15-min tick.
-  const newlyInsertedUrls: string[] = [];
+  // Job SEO V2: new rows are evaluated by the shared Google readiness gate
+  // right after insert (refreshGoogleReadiness), which is the ONLY path that
+  // may queue URL_UPDATED. A thin row is saved and user-visible, but never
+  // notified — the old "enqueue every describable new row" block is gone.
+  const newlyInsertedIds: string[] = [];
   // Fase de enriquecimiento (fuentes HTML con fetch de detalle) — solo las
   // filas realmente nuevas de esta corrida, nunca las re-vistas. Ver
   // ScrapeWorker.processRoleJob, que es el único consumidor.
@@ -123,11 +124,19 @@ export async function saveJobs(
       continue;
     }
 
+    // Never "public by default" for Google: the detail state is decided at
+    // insert — complete listing text, a pending detail fetch, or unsupported.
+    const initial = initialDetailStatus(job, sourceSupportsDetail(job.source));
     const result = await pool.query(
       `INSERT INTO jobs (url_hash, content_fingerprint, title, company, location, url, source, sources, date_text, published_at, role_origin, country,
-                          description, requirements, technologies, employment_type, salary_min, salary_max, salary_currency, salary_raw, applicant_count)
+                          description, requirements, technologies, employment_type, salary_min, salary_max, salary_currency, salary_raw, applicant_count,
+                          description_source, description_kind, remote_type, applicant_countries, valid_through,
+                          detail_status, detail_last_error, detail_next_attempt_at, description_fetched_at)
        VALUES ($1, $11, $2, $3, $4, $5, $6, jsonb_build_array($10::text), $7, $8, $9, $12,
-               $13, $14::jsonb, $15::jsonb, $16, $17, $18, $19, $20, $21)
+               $13, $14::jsonb, $15::jsonb, $16, $17, $18, $19, $20, $21,
+               CASE WHEN $13::text IS NOT NULL THEN 'listing' END, $22::text, $23::text, $24::jsonb, $25::timestamptz,
+               $26::text, $27::text, CASE WHEN $26::text = 'pending' THEN NOW() END,
+               CASE WHEN $13::text IS NOT NULL THEN NOW() END)
        ON CONFLICT (url_hash) DO UPDATE SET
          sources = CASE
            WHEN jobs.sources @> to_jsonb(EXCLUDED.source::text) THEN jobs.sources
@@ -176,31 +185,33 @@ export async function saveJobs(
         job.salaryMax ?? null,
         job.salaryCurrency ?? null,
         job.salaryRaw ?? null,
-        job.applicantCount ?? null
+        job.applicantCount ?? null,
+        job.description ? job.descriptionKind ?? "full" : null,
+        job.remoteType ?? null,
+        job.applicantCountries && job.applicantCountries.length > 0 ? JSON.stringify(job.applicantCountries) : null,
+        job.validThrough ?? null,
+        initial.status,
+        initial.lastError
       ]
     );
 
     if (result.rows[0]?.inserted) {
       savedCount++;
-      const savedJob = { ...job, jobId: result.rows[0].id, publishedAt };
-      if (isPubliclyDescribable(savedJob)) {
-        newlyInsertedUrls.push(buildJobUrl(savedJob));
-      }
+      newlyInsertedIds.push(result.rows[0].id);
       insertedJobs.push({ id: result.rows[0].id, url: job.url, source: job.source });
     } else {
       duplicateCount++;
     }
   }
 
-  if (newlyInsertedUrls.length > 0) {
+  for (const id of newlyInsertedIds) {
     try {
-      await enqueueIndexingNotifications(
-        newlyInsertedUrls.map((url) => ({ url, type: "URL_UPDATED" as const }))
-      );
+      await refreshGoogleReadiness(id, { contentObtained: true });
     } catch (err) {
-      // Never let an indexing-queue write fail the actual save — jobs are
-      // already committed above, this is a best-effort SEO side-channel.
-      console.warn(`⚠️ [saveJobs] Failed to enqueue indexing notifications:`, err);
+      // Never let the readiness write fail the actual save. The row stays
+      // seo_ready = FALSE (the safe side) and the hourly reconcile
+      // (scripts/backfill-indexing-queue.ts) evaluates it later.
+      console.warn(`⚠️ [saveJobs] Readiness evaluation deferred for a new job:`, (err as Error)?.name, (err as { code?: string })?.code);
     }
   }
 
@@ -229,49 +240,6 @@ export async function saveJobs(
   // validCount: jobs that passed validateJobs — lets run telemetry (P2) tell
   // "source returned nothing" apart from "everything it returned was rejected".
   return { savedCount, duplicateCount, validCount: valid.length, insertedJobs };
-}
-
-/**
- * Writes detail-page enrichment (description, requirements, technologies,
- * employment type, salary fields, applicant count) onto a specific,
- * already-saved row. Only ever called by ScrapeWorker right after
- * saveJobs(), scoped to that call's own insertedJobs — never on a re-scrape
- * of an existing job, so this is the one place besides the original INSERT
- * that can populate these columns, and it only ever targets a row this
- * exact process just created.
- */
-export async function updateJobDetail(id: string, detail: JobDetail): Promise<void> {
-  // COALESCE, not a blind overwrite: the search-results fetch for some
-  // sources (Torre today) already stores description/technologies/
-  // employmentType inline at INSERT time (see saveJobs()). If that same
-  // source ever gets a fetchDetail too, a field this detail fetch didn't
-  // find (passed as NULL below) must keep whatever real value is already
-  // on the row, not erase it.
-  await pool.query(
-    `UPDATE jobs SET
-       description = COALESCE($2, description),
-       requirements = COALESCE($3::jsonb, requirements),
-       technologies = COALESCE($4::jsonb, technologies),
-       employment_type = COALESCE($5, employment_type),
-       salary_min = COALESCE($6, salary_min),
-       salary_max = COALESCE($7, salary_max),
-       salary_currency = COALESCE($8, salary_currency),
-       salary_raw = COALESCE($9, salary_raw),
-       applicant_count = COALESCE($10, applicant_count)
-     WHERE id = $1`,
-    [
-      id,
-      detail.description ?? null,
-      detail.requirements ? JSON.stringify(detail.requirements) : null,
-      detail.technologies ? JSON.stringify(detail.technologies) : null,
-      detail.employmentType ?? null,
-      detail.salaryMin ?? null,
-      detail.salaryMax ?? null,
-      detail.salaryCurrency ?? null,
-      detail.salaryRaw ?? null,
-      detail.applicantCount ?? null
-    ]
-  );
 }
 
 // The active corpus is inherently bounded — `purgeOldJobs` deletes anything
@@ -410,6 +378,8 @@ export interface CanonicalSitemapJob {
   url: string | null;
   publishedAt: string | Date;
   isLocked: boolean;
+  /** Real content-change time; NULL for legacy rows (then <lastmod> is omitted). */
+  contentUpdatedAt: string | Date | null;
 }
 
 export interface SitemapStreamOptions {
@@ -436,6 +406,7 @@ interface SitemapJobRow {
   url: string | null;
   published_at: string | Date;
   is_locked: boolean;
+  content_updated_at: string | Date | null;
 }
 
 /**
@@ -476,15 +447,19 @@ export async function streamCanonicalSitemapJobs(options: SitemapStreamOptions):
     ]);
     await client.query(
       `DECLARE sitemap_jobs_cursor NO SCROLL CURSOR FOR
-       SELECT id, title, company, location, url, published_at,
+       SELECT id, title, company, location, url, published_at, content_updated_at,
               (published_at > NOW() - INTERVAL '48 hours') AS is_locked
        FROM (
          SELECT DISTINCT ON (lower(trim(title)), lower(trim(COALESCE(company, 'confidencial'))), lower(trim(COALESCE(location, CASE country WHEN 'VE' THEN 'venezuela' ELSE 'colombia' END))))
-                id, title, company, location, url, published_at
+                id, title, company, location, url, published_at, content_updated_at,
+                seo_ready, is_active, valid_through
          FROM jobs
          WHERE is_active = TRUE
          ORDER BY lower(trim(title)), lower(trim(COALESCE(company, 'confidencial'))), lower(trim(COALESCE(location, CASE country WHEN 'VE' THEN 'venezuela' ELSE 'colombia' END))), published_at DESC, id DESC
        ) canonical
+       -- Job SEO V2: canonical first, THEN the shared Google gate — a ready
+       -- but non-canonical row can never slip into the sitemap.
+       WHERE ${seoReadySql("canonical")}
        ORDER BY published_at DESC, id DESC
        LIMIT ${limit}`
     );
@@ -504,7 +479,8 @@ export async function streamCanonicalSitemapJobs(options: SitemapStreamOptions):
           location: row.location,
           url: row.url,
           publishedAt: row.published_at,
-          isLocked: row.is_locked
+          isLocked: row.is_locked,
+          contentUpdatedAt: row.content_updated_at
         });
         count += 1;
       }
@@ -907,6 +883,9 @@ export async function getJobById(id: string): Promise<any | null> {
             candidate.description, candidate.requirements, candidate.technologies,
             candidate.employment_type, candidate.salary_min, candidate.salary_max,
             candidate.salary_currency, candidate.salary_raw, candidate.applicant_count,
+            candidate.is_active, candidate.seo_ready, candidate.seo_reasons, candidate.valid_through,
+            candidate.remote_type, candidate.applicant_countries, candidate.description_kind,
+            candidate.content_updated_at,
             (candidate.published_at > NOW() - INTERVAL '48 hours') AS is_locked
      FROM jobs candidate
      WHERE candidate.id = $1 AND candidate.is_active = TRUE
@@ -948,7 +927,17 @@ export async function getJobById(id: string): Promise<any | null> {
     technologies: Array.isArray(row.technologies) ? row.technologies : [],
     employmentType: row.employment_type,
     applicantCount: row.applicant_count,
-    salary: buildSalaryLabel(row)
+    salary: buildSalaryLabel(row),
+    // Job SEO V2: the stored verdict of the shared gate (read through
+    // isGoogleReadyNow), plus the source-stated facts JobPosting may use.
+    isActive: row.is_active !== false,
+    seoReady: row.seo_ready === true,
+    seoReasons: Array.isArray(row.seo_reasons) ? row.seo_reasons : [],
+    validThrough: row.valid_through,
+    remoteType: row.remote_type,
+    applicantCountries: Array.isArray(row.applicant_countries) ? row.applicant_countries : [],
+    descriptionKind: row.description_kind,
+    contentUpdatedAt: row.content_updated_at
   };
 }
 

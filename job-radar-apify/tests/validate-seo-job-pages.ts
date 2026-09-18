@@ -13,7 +13,6 @@ import {
   buildJobPath,
   buildJobUrl,
   buildJobPosting,
-  buildJobDescription,
   buildJobMeta,
   buildJobsSitemapXml,
   buildSitemapIndexXml,
@@ -40,6 +39,7 @@ import {
   wasJobPurged
 } from "../src/db/indexing-repository.js";
 import { pool } from "../src/db/client.js";
+import { refreshGoogleReadiness } from "../src/db/job-readiness-repository.js";
 
 dotenv.config();
 
@@ -95,118 +95,76 @@ function runPureFunctionTests() {
     `escapeJsonForScriptTag() todavía contiene "</script>": ${evilJson}`
   );
 
+  // Job SEO V2 (docs/JOBPOSTING-GOOGLE-CONTRACT.md): the assertions this
+  // block used to make — a synthetic validThrough = published + 30 d, a
+  // BuscoTrabajo template description with company counts, bare "Remoto" →
+  // TELECOMMUTE with a defaulted country, skills/qualifications split from
+  // every list item — are exactly what the V2 contract retires. They are
+  // replaced by their V2 equivalents below; the full per-fixture contract
+  // (and the four-consumer agreement) lives in validate-google-readiness.test.ts.
   const openJob: SeoJob = {
     jobId: "test-open-1",
     title: "Analista de Datos",
     company: "PepsiCo",
     location: "Bogotá",
+    country: "CO",
     url: "https://example.com/job/1",
     dateText: "Hoy",
     source: "LinkedIn",
-    publishedAt: new Date("2026-01-01T00:00:00Z").toISOString()
+    publishedAt: new Date("2026-01-01T00:00:00Z").toISOString(),
+    description:
+      "Buscamos un/a Analista de Datos para el equipo de BI de la compañía.\nSerás responsable de los tableros comerciales y del modelo de datos de ventas.",
+    requirements: ["Manejo de SQL avanzado", "Experiencia con Power BI", "Inglés intermedio"],
+    employmentType: "Tiempo completo",
+    seoReady: true,
+    isActive: true
   };
 
   check(
     isPubliclyDescribable(openJob),
-    "Una vacante con company/location/url presentes se considera públicamente describible.",
+    "Una vacante con company/location/url presentes se considera públicamente describible (visible para el usuario).",
     "isPubliclyDescribable() rechazó una vacante completa."
   );
 
-  const posting = buildJobPosting(openJob);
+  const posting = buildJobPosting(openJob) as any;
   check(
     posting !== null,
-    "buildJobPosting() genera JobPosting para una vacante abierta.",
-    "buildJobPosting() devolvió null para una vacante abierta."
+    "buildJobPosting() genera JobPosting para una vacante apta para Google.",
+    "buildJobPosting() devolvió null para una vacante apta para Google."
   );
   if (posting) {
-    const requiredKeys = [
-      "title",
-      "description",
-      "datePosted",
-      "hiringOrganization",
-      "jobLocation",
-      "validThrough"
-    ];
+    const requiredKeys = ["title", "description", "datePosted", "hiringOrganization", "jobLocation"];
     const missing = requiredKeys.filter((k) => !(k in posting));
     check(
       missing.length === 0,
-      "El JobPosting incluye todos los campos requeridos por Google (title, description, datePosted, hiringOrganization, jobLocation, validThrough).",
+      "El JobPosting incluye los campos requeridos por Google (title, description, datePosted, hiringOrganization, jobLocation).",
       `Faltan campos requeridos por Google en el JobPosting: ${missing.join(", ")}`
     );
     check(
-      new Date((posting as any).validThrough).getTime() >
-        new Date((posting as any).datePosted).getTime(),
-      "validThrough queda después de datePosted (no una fecha ya vencida al momento de generarse).",
-      "validThrough no es posterior a datePosted — el listado nacería ya expirado."
+      !("validThrough" in posting),
+      "Sin vencimiento publicado por la fuente, el JobPosting omite validThrough (ya no se inventa published + 30 días).",
+      "El JobPosting emitió un validThrough sin que la fuente lo publicara."
+    );
+    check(
+      String(posting.description).startsWith("<p>Buscamos") &&
+        String(posting.description).includes("<ul><li>Manejo de SQL avanzado</li>") &&
+        !String(posting.description).includes("Vacante agregada de") &&
+        !String(posting.description).includes("vacantes más activas"),
+      "La descripción del JobPosting es HTML con solo el texto de la fuente — sin plantilla ni conteos de BuscoTrabajo.",
+      `La descripción del JobPosting no es la de la fuente: "${posting.description}"`
+    );
+    check(
+      posting.employmentType === "FULL_TIME" && !("skills" in posting) && !("qualifications" in posting) && !("baseSalary" in posting),
+      "employmentType usa el token schema.org; no se emiten skills/qualifications derivados ni baseSalary.",
+      `JobPosting con campos inesperados: ${JSON.stringify(posting)}`
     );
   }
 
-  // SEO Fase 9 (docs/SEO-PLAN.md §9.3): the JobPosting description must not
-  // read as a low-value-aggregator signal, and must vary with real data
-  // when the caller has it (companyActiveCount, from the in-memory job
-  // list — never a new query, see server.ts).
-  const noContextPosting = buildJobPosting(openJob) as any;
+  const thinJob: SeoJob = { ...openJob, jobId: "test-thin-1", description: undefined, requirements: [], seoReady: false };
   check(
-    !String(noContextPosting.description).includes("no aloja el proceso"),
-    "La descripción del JobPosting ya no incluye la frase autodescriptiva de bajo valor ('BuscoTrabajo no aloja el proceso de aplicación').",
-    "La descripción del JobPosting todavía contiene la frase de bajo valor — content_quality.py de claude-seo la marca como señal de agregador."
-  );
-  check(
-    !String(noContextPosting.description).includes("vacantes más activas"),
-    "Sin companyActiveCount, la descripción no inventa un conteo de otras vacantes de la empresa.",
-    "La descripción mencionó un conteo de vacantes de la empresa sin que el caller lo haya provisto — dato inventado."
-  );
-
-  const withContextPosting = buildJobPosting(openJob, { companyActiveCount: 4 }) as any;
-  check(
-    String(withContextPosting.description).includes("PepsiCo tiene 3 vacantes más activas en BuscoTrabajo"),
-    "Con companyActiveCount=4 (incluyendo esta vacante), la descripción menciona las otras 3 reales.",
-    `companyActiveCount no se reflejó como se esperaba en: "${withContextPosting.description}"`
-  );
-
-  const singleOtherPosting = buildJobPosting(openJob, { companyActiveCount: 2 }) as any;
-  check(
-    String(singleOtherPosting.description).includes("1 vacante más activa en BuscoTrabajo") &&
-      !String(singleOtherPosting.description).includes("1 vacante más activas"),
-    "Singular/plural correcto cuando solo hay 1 otra vacante de la misma empresa.",
-    `Singular/plural incorrecto en: "${singleOtherPosting.description}"`
-  );
-
-  // Fase 2 del plan de descripciones (2026-08-12): una vacante con
-  // description/requirements/technologies/employmentType reales (lo que
-  // job-repository.ts's getJobs() ya devuelve para las fuentes
-  // enriquecidas) debe reflejarse en el JobPosting real, no solo en la
-  // plantilla genérica. El fixture openJob de arriba nunca tuvo estos
-  // campos, así que ningún test anterior ejercitaba este camino.
-  const enrichedJob: SeoJob = {
-    ...openJob,
-    description: "Buscamos un/a Analista de Datos para el equipo de BI.",
-    requirements: ["Manejo de SQL avanzado", "Experiencia con Power BI"],
-    technologies: ["SQL", "Power BI"],
-    employmentType: "Tiempo completo"
-  };
-  const enrichedDescription = buildJobDescription(enrichedJob);
-  check(
-    enrichedDescription.includes("Buscamos un/a Analista de Datos para el equipo de BI.") &&
-      enrichedDescription.includes("Requisitos: Manejo de SQL avanzado; Experiencia con Power BI."),
-    "buildJobDescription() incluye la descripción real y los requisitos reales cuando existen.",
-    `buildJobDescription() no reflejó los campos reales: "${enrichedDescription}"`
-  );
-
-  const enrichedPosting = buildJobPosting(enrichedJob) as any;
-  check(
-    enrichedPosting?.skills === "SQL, Power BI" &&
-      enrichedPosting?.qualifications === "Manejo de SQL avanzado; Experiencia con Power BI" &&
-      enrichedPosting?.employmentType === "FULL_TIME",
-    "El JobPosting real emite skills/qualifications/employmentType (token schema.org, no la etiqueta en español) cuando la vacante los tiene.",
-    `JobPosting no emitió los campos enriquecidos esperados: skills="${enrichedPosting?.skills}" qualifications="${enrichedPosting?.qualifications}" employmentType="${enrichedPosting?.employmentType}"`
-  );
-
-  const plainPosting = buildJobPosting(openJob) as any;
-  check(
-    !("skills" in plainPosting) && !("qualifications" in plainPosting) && !("employmentType" in plainPosting),
-    "Sin description/requirements/technologies/employmentType reales, el JobPosting no emite esos campos (nunca inventa un valor).",
-    `JobPosting emitió un campo enriquecido sin dato real: skills="${plainPosting?.skills}" qualifications="${plainPosting?.qualifications}" employmentType="${plainPosting?.employmentType}"`
+    buildJobPosting(thinJob) === null && isPubliclyDescribable(thinJob),
+    "Una vacante visible pero no apta para Google (sin descripción) conserva su página pero no emite JobPosting.",
+    "Una vacante no apta para Google emitió JobPosting, o dejó de ser visible."
   );
 
   // Locked (masked) job — same shape maskLockedFields() produces for a
@@ -229,29 +187,23 @@ function runPureFunctionTests() {
     "buildJobPosting() generó un JobPosting para una vacante bloqueada."
   );
 
-  // SEO fix (2026-08-04, seo-schema audit): a bare "Remoto"/"Remote"
-  // location has no real city for addressLocality — must use
-  // jobLocationType: "TELECOMMUTE" instead, never jobLocation with an
-  // invalid place name. "Remoto - Bogotá"-style locations (a real city
-  // still present) must keep the normal jobLocation branch unchanged.
-  const bareRemoteJob: SeoJob = { ...openJob, location: "Remoto", country: "VE" };
-  const bareRemotePosting = buildJobPosting(bareRemoteJob) as any;
+  // Remote: "Remoto" text alone is not evidence. Only a source-stated 100%
+  // remote job with source-stated eligible countries gets TELECOMMUTE; the
+  // country is never defaulted from the tick that discovered the job.
+  const bareRemoteJob: SeoJob = { ...openJob, location: "Remoto", country: null, seoReady: false };
   check(
-    bareRemotePosting.jobLocationType === "TELECOMMUTE" &&
-      bareRemotePosting.applicantLocationRequirements?.["@type"] === "Country" &&
-      bareRemotePosting.applicantLocationRequirements?.name === "Venezuela" &&
-      !("jobLocation" in bareRemotePosting),
-    "Una vacante 100% remota (location='Remoto', sin ciudad) emite jobLocationType TELECOMMUTE + applicantLocationRequirements, no un jobLocation inválido.",
-    `JobPosting de una vacante bare-remote no tiene la forma esperada: ${JSON.stringify(bareRemotePosting)}`
+    buildJobPosting(bareRemoteJob) === null,
+    "location='Remoto' sin evidencia de la fuente no emite JobPosting (ni TELECOMMUTE con un país supuesto).",
+    "Una vacante 'Remoto' sin evidencia emitió JobPosting."
   );
-
-  const remoteWithCityJob: SeoJob = { ...openJob, location: "Remoto - Bogotá" };
-  const remoteWithCityPosting = buildJobPosting(remoteWithCityJob) as any;
+  const statedRemoteJob: SeoJob = { ...openJob, location: "Remoto", country: null, remoteType: "fully_remote", applicantCountries: ["VE"] };
+  const statedRemotePosting = buildJobPosting(statedRemoteJob) as any;
   check(
-    remoteWithCityPosting.jobLocation?.address?.addressLocality === "Remoto - Bogotá" &&
-      !("jobLocationType" in remoteWithCityPosting),
-    "Una vacante 'Remoto - Bogotá' (ciudad real presente) mantiene el jobLocation normal, no se trata como TELECOMMUTE.",
-    `JobPosting de una vacante remoto-con-ciudad no tiene la forma esperada: ${JSON.stringify(remoteWithCityPosting)}`
+    statedRemotePosting?.jobLocationType === "TELECOMMUTE" &&
+      statedRemotePosting.applicantLocationRequirements?.[0]?.name === "Venezuela" &&
+      !("jobLocation" in statedRemotePosting),
+    "Una vacante 100% remota según la fuente, con país elegible declarado, emite TELECOMMUTE + ese país.",
+    `JobPosting remoto con forma inesperada: ${JSON.stringify(statedRemotePosting)}`
   );
 
   const adversarialJob: SeoJob = { ...openJob, title: `</script><script>alert(1)</script>` };
@@ -293,11 +245,11 @@ function runPureFunctionTests() {
   );
 
   // --- Sitemap (Fase 2) ---
-  const sitemapXml = buildJobsSitemapXml([openJob, lockedJob]);
+  const sitemapXml = buildJobsSitemapXml([openJob, lockedJob, thinJob]);
   check(
-    sitemapXml.includes(openJob.jobId) && !sitemapXml.includes(lockedJob.jobId),
-    "buildJobsSitemapXml() incluye vacantes públicas y excluye las bloqueadas.",
-    "buildJobsSitemapXml() listó una vacante bloqueada, o no listó la vacante pública."
+    sitemapXml.includes(openJob.jobId) && !sitemapXml.includes(lockedJob.jobId) && !sitemapXml.includes(thinJob.jobId),
+    "buildJobsSitemapXml() incluye solo vacantes aptas para Google (excluye bloqueadas y no aptas).",
+    "buildJobsSitemapXml() listó una vacante bloqueada o no apta, o no listó la apta."
   );
   const sitemapXmlAdversarial = buildJobsSitemapXml([adversarialJob]);
   check(
@@ -457,25 +409,36 @@ function killServerTree(server: ChildProcess): void {
 }
 
 async function runHttpTests() {
-  console.log(
-    `\n--- Parte 2: HTTP real contra el servidor (solo lectura — no escribe en la tabla jobs) ---\n`
-  );
+  console.log(`\n--- Parte 2: HTTP real contra el servidor (base desechable del runner aislado) ---\n`);
 
-  // Deliberately read-only: this suite never calls saveJobs()/clearRepository(),
-  // unlike validate-paywall-auth.ts. There is no separate test database for
-  // this project (see job-repository.ts's clearRepository() comment) — the
-  // same DATABASE_URL backs local dev and prod, so a real fixture job is
-  // picked from whatever's already in the table instead of writing one.
-  // isLocked on the raw getJobs() row just means "<48h old" — that's not
-  // the same as "hidden from an anonymous visitor" (maskLockedFields() also
-  // checks PAYWALL_ENABLED, which is off today, so every job currently
-  // passes regardless of age). Running the exact same masking pipeline the
-  // server route uses is what actually determines whether a page should
-  // exist for it — matching on raw isLocked here would wrongly skip every
-  // fresh job even when the paywall is disabled.
-  const rawJobs = await getJobs(50);
+  // Job SEO V2: the synthetic fixture jobs carry a one-line description, so
+  // they are user-visible but NOT Google-ready. One of them is promoted
+  // through the real gate (a real multi-paragraph description + the shared
+  // evaluator) so the JobPosting/sitemap path is exercised; another stays thin
+  // so the noindex path is too. This runs only against the runner's
+  // disposable PostgreSQL (require-isolated-database), never production.
+  const fixtureRows = await pool.query<{ id: string }>(
+    `SELECT id FROM jobs WHERE is_active AND country = 'CO' AND location = 'Bogotá, Colombia' ORDER BY id LIMIT 2`
+  );
+  const [readyId, thinId] = fixtureRows.rows.map((row) => row.id);
+  if (readyId) {
+    await pool.query(
+      `UPDATE jobs SET description = $2, requirements = $3::jsonb, detail_status = 'complete', description_kind = 'full'
+       WHERE id = $1`,
+      [
+        readyId,
+        "Buscamos analista de datos para el equipo de riesgo.\nConstruirás tableros de seguimiento de cartera y reportes mensuales para el comité.",
+        JSON.stringify(["Profesional en estadística o afines.", "Dos años de experiencia con SQL.", "Power BI."])
+      ]
+    );
+    await refreshGoogleReadiness(readyId, { contentObtained: true });
+  }
+  if (thinId) await refreshGoogleReadiness(thinId);
+
+  const rawJobs = await getJobs(200);
   const visibleJobs = maskLockedFields(rawJobs, "free");
-  const realJob = visibleJobs.find((j) => isPubliclyDescribable(j as SeoJob));
+  const realJob = visibleJobs.find((j) => j.jobId === readyId && isPubliclyDescribable(j as SeoJob));
+  const thinJob = visibleJobs.find((j) => j.jobId === thinId);
 
   if (!realJob) {
     console.warn(
@@ -736,6 +699,27 @@ async function runHttpTests() {
           jobPosting.hiringOrganization?.name === realJob.company,
         "Los datos del JobPosting coinciden con los datos reales de la vacante (nada inventado).",
         "Los datos del JobPosting no coinciden con la vacante real que se pidió."
+      );
+    }
+
+    // Job SEO V2: a user-visible job that fails the Google gate keeps its
+    // 200 page, readable body and source link, but is noindex,follow and has
+    // no JobPosting.
+    check(
+      html.includes("data-apply-link") && !html.includes('name="robots" content="noindex'),
+      "La vacante apta para Google trae el enlace a la fuente en el HTML crudo y es indexable.",
+      "La vacante apta para Google no trae el enlace a la fuente en el HTML crudo, o quedó noindex."
+    );
+    if (thinJob) {
+      const thinRes = await fetch(`${BASE_URL}${buildJobPath(thinJob as SeoJob)}`);
+      const thinHtml = await thinRes.text();
+      check(
+        thinRes.status === 200 &&
+          thinHtml.includes('<meta name="robots" content="noindex,follow">') &&
+          !thinHtml.includes('"@type":"JobPosting"') &&
+          thinHtml.includes("data-apply-link"),
+        "Una vacante visible pero no apta para Google: 200, noindex,follow, sin JobPosting y con enlace a la fuente.",
+        `La vacante no apta respondió ${thinRes.status} o no cumple noindex/sin JobPosting/enlace.`
       );
     }
 

@@ -6,7 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
 import { Pool } from "pg";
-import { getJobsLight, maskLockedFields } from "../src/db/job-repository.js";
+import { maskLockedFields } from "../src/db/job-repository.js";
 import { buildJobsSitemapXml } from "../src/lib/job-seo.js";
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -75,19 +75,54 @@ const server = startServer();
 try {
   await waitForServer(server);
 
-  const legacyJobs = maskLockedFields(await getJobsLight(50_000), "free");
-  const legacyXml = buildJobsSitemapXml(legacyJobs);
+  // Job SEO V2: the stream lists ONLY canonical rows that pass the shared
+  // Google gate (stored verdict), with <lastmod> = real content-change time.
+  // Promote a third of the synthetic fixture; the rest must never appear.
+  await pool.query(
+    `UPDATE jobs SET seo_ready = TRUE, content_updated_at = CASE WHEN id::text < '8' THEN NOW() - INTERVAL '2 hours' END
+     WHERE id IN (SELECT id FROM jobs WHERE NOT seo_ready ORDER BY id LIMIT 40)`
+  );
+  const readyRows = await pool.query(
+    `SELECT id, title, company, location, url, published_at, content_updated_at, country, source
+     FROM jobs WHERE seo_ready AND is_active ORDER BY published_at DESC, id DESC`
+  );
+  const readyJobs = maskLockedFields(
+    readyRows.rows.map((row) => ({
+      jobId: row.id,
+      title: row.title,
+      company: row.company,
+      location: row.location,
+      url: row.url,
+      publishedAt: row.published_at,
+      contentUpdatedAt: row.content_updated_at,
+      country: row.country,
+      source: row.source,
+      dateText: "",
+      seoReady: true,
+      isActive: true
+    })),
+    "free"
+  );
+  const expectedXml = buildJobsSitemapXml(readyJobs);
   const streamedSmall = await fetch(`${baseUrl}/sitemap-jobs.xml`);
   assert.equal(streamedSmall.status, 200);
-  assert.equal(await streamedSmall.text(), legacyXml);
-  console.log("✅ El stream conserva exactamente el XML y la elegibilidad del endpoint anterior.");
+  const streamedSmallXml = await streamedSmall.text();
+  assert.equal(streamedSmallXml, expectedXml);
+  assert.equal((streamedSmallXml.match(/<url>/g) || []).length, readyRows.rowCount);
+  assert.ok((readyRows.rowCount ?? 0) >= 40);
+  const notReady = await pool.query(`SELECT id FROM jobs WHERE NOT seo_ready LIMIT 5`);
+  for (const row of notReady.rows) assert.ok(!streamedSmallXml.includes(row.id), "a non-ready job leaked into the sitemap");
+  const lastmods = (streamedSmallXml.match(/<lastmod>/g) || []).length;
+  const withContentTime = readyRows.rows.filter((row) => row.content_updated_at).length;
+  assert.equal(lastmods, withContentTime, "<lastmod> only where a real content-change time exists");
+  console.log("✅ El stream lista solo vacantes aptas para Google, con <lastmod> real u omitido.");
 
   await pool.query(
-    `INSERT INTO jobs (id, url_hash, title, company, location, country, url, source, sources, published_at)
+    `INSERT INTO jobs (id, url_hash, title, company, location, country, url, source, sources, published_at, seo_ready)
      SELECT md5('p1-large-' || i)::uuid, md5('p1-large-url-' || i),
             'Vacante P1 ' || i, 'Empresa P1 ' || (i % 100), 'Bogotá, Colombia', 'CO',
             'https://example.com/jobs/p1-large-' || i, 'Synthetic', '["Synthetic"]'::jsonb,
-            NOW() - i * INTERVAL '1 second'
+            NOW() - i * INTERVAL '1 second', TRUE
      FROM generate_series(1, 100000) AS i`
   );
   const before = await healthMemory();
@@ -140,5 +175,11 @@ try {
   console.log("✅ Un fallo de PostgreSQL devuelve una respuesta segura y reintentable.");
 } finally {
   server.kill("SIGTERM");
+  // Leave the disposable DB as found for the suites that run after this one
+  // (validate-job-seo-v2.ts sweeps every active row).
+  await pool.query(`DELETE FROM jobs WHERE source = 'Synthetic'`).catch(() => undefined);
+  // Only the rows this suite flipped directly (the real gate always stamps
+  // seo_ready_at; this test's shortcut never does).
+  await pool.query(`UPDATE jobs SET seo_ready = FALSE, content_updated_at = NULL WHERE seo_ready AND seo_ready_at IS NULL`).catch(() => undefined);
   await pool.end();
 }

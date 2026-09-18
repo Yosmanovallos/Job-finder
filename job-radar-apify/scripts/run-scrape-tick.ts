@@ -21,7 +21,8 @@ import {
   purgeOldJobs
 } from "../src/db/scheduler-repository.js";
 import { pool } from "../src/db/client.js";
-import { createFetchContext, isCancelled, whenAborted, type FetchContext } from "../src/engine/fetch-context.js";
+import { BUDGET_ESTIMATES, createFetchContext, hasBudget, isCancelled, whenAborted, type FetchContext } from "../src/engine/fetch-context.js";
+import { drainDetailQueue } from "../src/queue/detail-enrichment.js";
 import { planTickBudget, type TickBudgetPlan } from "../src/queue/tick-budget.js";
 import { claimLease, refreshLeases, releaseLease, releaseRunLeases } from "../src/db/scrape-leases.js";
 
@@ -510,6 +511,30 @@ async function main() {
   }
 
   if (globalResult) results.push(globalResult);
+
+  // Job SEO V2 (phase C): bounded drain of detail rows the in-tick cap left
+  // 'pending', or that are due for a retry. Each country's tick drains only
+  // its own market's adapters (the CO and VE ticks run concurrently), each
+  // capped by its detail policy and stopped by the same deadline. Legacy
+  // 'backlog' rows are never touched here (historical backfill = separate
+  // authorization).
+  if (!isCancelled(rootCtx) && hasBudget(rootCtx, BUDGET_ESTIMATES.detailFetch)) {
+    const marketAdapters = allAdapters.filter((adapter) =>
+      TICK_COUNTRY === "VE" ? adapter.name.endsWith("-VE") : !adapter.name.endsWith("-VE")
+    );
+    try {
+      const drained = await drainDetailQueue(marketAdapters, rootCtx);
+      for (const [name, counters] of Object.entries(drained)) {
+        if (counters.claimed > 0) {
+          console.log(
+            `🧾 [Tick] Detalle ${name}: ${counters.claimed} reclamadas → ${counters.complete} completas, ${counters.rejected} rechazadas, ${counters.retry} reintento, ${counters.noDetail} sin detalle, ${counters.failed} agotadas${counters.stoppedEarly ? " (fuente detenida por política/plazo)" : ""}.`
+          );
+        }
+      }
+    } catch (error) {
+      console.warn("⚠️ [Tick] Drenaje de detalle omitido:", (error as Error)?.name);
+    }
+  }
 
   // Retention cleanup, not ingestion: if the budget is gone it simply waits
   // for the next tick rather than pushing the process past its deadline.

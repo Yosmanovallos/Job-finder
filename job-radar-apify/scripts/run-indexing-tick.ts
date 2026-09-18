@@ -15,7 +15,9 @@ import {
   getIndexingBudgetRemaining,
   getPendingIndexingBatch,
   markIndexingSent,
-  markIndexingFailed
+  markIndexingFailed,
+  markIndexingSuperseded,
+  checkIndexingTarget
 } from "../src/db/indexing-repository.js";
 import { publishUrlNotification } from "../src/lib/google-indexing.js";
 
@@ -40,40 +42,55 @@ async function main() {
     return;
   }
 
-  const batch = await getPendingIndexingBatch(budget);
-  console.log(`📦 [indexing-tick] Draining ${batch.length} pending notification(s)...`);
-
+  // Job SEO V2: every row is checked right before spending quota. A target
+  // that no longer exists, is not Google-ready, is not canonical, or whose
+  // URL changed is marked 'superseded' (terminal, history kept) and does NOT
+  // consume the budget — so the scan continues until the budget is really
+  // used or the bounded scan window runs out.
+  const MAX_SCANNED_PER_RUN = 5_000;
   let sent = 0;
   let failed = 0;
+  let superseded = 0;
+  let scanned = 0;
   let consecutiveFailures = 0;
-  // A misconfigured service account (wrong Search Console permission, bad
-  // key) fails every single request the same way — without this, one run
-  // would burn the whole batch as 403s. 5 in a row is a config problem,
-  // not a per-URL problem; stop and let the next tick retry once it's fixed
-  // instead of hammering Google with requests certain to fail.
   const CONSECUTIVE_FAILURE_LIMIT = 5;
+  let stop = false;
 
-  for (const row of batch) {
-    try {
-      await publishUrlNotification(row.url, row.notification_type);
-      await markIndexingSent(row.id);
-      sent++;
-      consecutiveFailures = 0;
-    } catch (err: any) {
-      await markIndexingFailed(row.id, String(err?.message ?? err));
-      failed++;
-      consecutiveFailures++;
-      console.warn(`   ⚠️ Failed: ${row.url} (${row.notification_type}) — ${err?.message ?? err}`);
+  while (!stop && sent + failed < budget && scanned < MAX_SCANNED_PER_RUN) {
+    const batch = await getPendingIndexingBatch(Math.min(500, MAX_SCANNED_PER_RUN - scanned));
+    if (batch.length === 0) break;
+    for (const row of batch) {
+      if (sent + failed >= budget) break;
+      scanned++;
+      const verdict = await checkIndexingTarget(row);
+      if (!verdict.send) {
+        await markIndexingSuperseded(row.id, verdict.reason);
+        superseded++;
+        continue;
+      }
+      try {
+        await publishUrlNotification(row.url, row.notification_type);
+        await markIndexingSent(row.id);
+        sent++;
+        consecutiveFailures = 0;
+      } catch (err: any) {
+        await markIndexingFailed(row.id, String(err?.message ?? err));
+        failed++;
+        consecutiveFailures++;
+        console.warn(`   ⚠️ Failed: ${row.url} (${row.notification_type}) — ${err?.message ?? err}`);
 
-      if (consecutiveFailures >= CONSECUTIVE_FAILURE_LIMIT) {
-        console.error(
-          `   🛑 ${CONSECUTIVE_FAILURE_LIMIT} failures in a row — stopping this run (likely a config issue, not a per-URL one). Remaining pending rows are untouched.`
-        );
-        break;
+        if (consecutiveFailures >= CONSECUTIVE_FAILURE_LIMIT) {
+          console.error(
+            `   🛑 ${CONSECUTIVE_FAILURE_LIMIT} failures in a row — stopping this run (likely a config issue, not a per-URL one). Remaining pending rows are untouched.`
+          );
+          stop = true;
+          break;
+        }
       }
     }
   }
 
+  console.log(`   Superseded before sending (not sent, no quota used): ${superseded}. Scanned: ${scanned}.`);
   console.log(`✅ [indexing-tick] Done. Sent: ${sent}, Failed: ${failed}.`);
   await pool.end();
 }

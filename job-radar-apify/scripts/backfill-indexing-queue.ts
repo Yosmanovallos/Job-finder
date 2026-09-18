@@ -1,72 +1,110 @@
 /**
- * Reconciliation backfill: enqueues URL_UPDATED for every currently active,
- * publicly-describable job that has no indexing_queue entry at all.
+ * Hourly reconciliation (indexing-tick.yml), rewritten for Job SEO V2.
  *
- * Originally written as a one-off (to cover jobs that predated the
- * indexing_queue system). Now also runs on every indexing-tick.yml cron
- * (SEO-IMPROVEMENT-PLAN.md §1.19) as a self-heal: saveJobs()'s enqueue call
- * is best-effort (wrapped in try/catch, "never let an indexing-queue write
- * fail the actual save" — see job-repository.ts) — if it throws for any
- * transient reason (connection contention, etc.), that tick's newly-saved
- * jobs are saved fine but silently never reach the queue, with nothing to
- * retry them. Confirmed in production 2026-08-10: 2,658 live, complete job
- * pages (94% from one source, clustered in batch-sized timestamp bursts —
- * consistent with occasional whole-batch enqueue failures, not missing
- * data) had zero queue history. This script is the recurring fix: it
- * doesn't matter why a job's enqueue was missed, only that it eventually
- * gets caught the next time this runs.
+ * Before: enqueued URL_UPDATED for EVERY describable active job with no queue
+ * history — which would have undone any publication gate within an hour
+ * (docs/JOB-SEO-ARCHITECTURE-V2.md, finding F8).
  *
- * Only touches indexing_queue — never writes to `jobs`. Safe to re-run:
- * skips any URL already present in the queue (any status), so a run only
- * ever picks up jobs with zero queue history, never duplicates.
+ * Now, two bounded self-heal steps, both through the shared Google gate:
+ *  1. Rows from the new pipeline that were saved but never evaluated (a crash
+ *     between INSERT and refreshGoogleReadiness) are evaluated now.
+ *  2. Google-ready rows whose CURRENT content was never notified (no pending
+ *     or sent URL_UPDATED carrying their content_hash) get one URL_UPDATED in
+ *     the lowest send lane. Non-ready rows are never enqueued.
+ *
+ * Only writes jobs' readiness columns (via the evaluator) and indexing_queue.
+ * Safe to re-run: step 2 is idempotent by (job, content_hash).
  *
  * Manual run:
- *   cd job-radar-apify && npx tsx scripts/backfill-indexing-queue.ts
+ *   cd job-radar-apify && npx tsx scripts/backfill-indexing-queue.ts [--dry-run]
  */
 import dotenv from "dotenv";
 import { pool } from "../src/db/client.js";
-import { getJobs } from "../src/db/job-repository.js";
-import { buildJobUrl, isPubliclyDescribable } from "../src/lib/job-seo.js";
+import { refreshGoogleReadiness } from "../src/db/job-readiness-repository.js";
+import { enqueueIndexingNotifications, INDEXING_PRIORITY } from "../src/db/indexing-repository.js";
+import { buildJobUrl } from "../src/lib/job-seo.js";
+import { seoReadySql } from "../src/lib/google-job-readiness.js";
 
 dotenv.config();
 
+const DRY_RUN = process.argv.includes("--dry-run");
+/** Per run. At 200 sends/day the lowest lane never needs more than this per hour. */
+const RECONCILE_EVALUATE_LIMIT = 500;
+const RECONCILE_ENQUEUE_LIMIT = 200;
+
 async function main() {
-  console.log("🔧 [backfill-indexing-queue] Loading active jobs...");
-  const jobs = await getJobs(50000);
-  console.log(`   Found ${jobs.length} active job(s).`);
-
-  const urls = jobs.filter(isPubliclyDescribable).map((job) => buildJobUrl(job));
-  console.log(`   ${urls.length} are publicly describable (have company/location/url).`);
-
-  const existing = await pool.query(`SELECT url FROM indexing_queue`);
-  const alreadyQueued = new Set(existing.rows.map((r) => r.url));
-
-  const toInsert = urls.filter((url) => !alreadyQueued.has(url));
-  console.log(`   ${toInsert.length} not yet in indexing_queue — enqueueing.`);
-
-  if (toInsert.length === 0) {
-    console.log("   Nothing to do.");
-    await pool.end();
-    return;
+  // 0. Time passes without a write event (a source validThrough expires, a
+  //    job is purged): pending URL_UPDATED rows whose target is no longer an
+  //    active Google-ready job are superseded now, not only at send time.
+  const staleSql = `
+    FROM indexing_queue q
+    LEFT JOIN jobs j ON j.id = q.job_id
+    WHERE q.status = 'pending' AND q.notification_type = 'URL_UPDATED' AND q.job_id IS NOT NULL
+      AND (j.id IS NULL OR NOT ${seoReadySql("j")})`;
+  if (DRY_RUN) {
+    const stale = await pool.query(`SELECT COUNT(*) AS n ${staleSql}`);
+    console.log(`🔧 [reconcile] ${stale.rows[0].n} URL_UPDATED pendientes cuyo destino ya no es apto (dry-run).`);
+  } else {
+    const superseded = await pool.query(
+      `UPDATE indexing_queue u
+       SET status = 'superseded', superseded_at = NOW(),
+           superseded_reason = CASE WHEN stale.job_exists THEN 'target_not_seo_ready' ELSE 'target_missing' END
+       FROM (SELECT q.id, j.id IS NOT NULL AS job_exists ${staleSql}) stale
+       WHERE u.id = stale.id AND u.status = 'pending'`
+    );
+    console.log(`🔧 [reconcile] ${superseded.rowCount ?? 0} URL_UPDATED pendientes superseded (destino ya no apto).`);
   }
 
-  const values: string[] = [];
-  const params: string[] = [];
-  toInsert.forEach((url, i) => {
-    values.push(`($${i + 1}, 'URL_UPDATED')`);
-    params.push(url);
-  });
-
-  await pool.query(`INSERT INTO indexing_queue (url, notification_type) VALUES ${values.join(", ")}`, params);
-  console.log(`✅ [backfill-indexing-queue] Enqueued ${toInsert.length} URL(s).`);
+  const unevaluated = await pool.query<{ id: string }>(
+    `SELECT id FROM jobs
+     WHERE is_active = TRUE AND detail_status IS NOT NULL AND seo_evaluated_at IS NULL
+     ORDER BY created_at DESC LIMIT $1`,
+    [RECONCILE_EVALUATE_LIMIT]
+  );
+  let evaluated = 0;
+  if (!DRY_RUN) {
+    for (const row of unevaluated.rows) {
+      await refreshGoogleReadiness(row.id);
+      evaluated++;
+    }
+  }
   console.log(
-    `   At the default 200/day quota, draining this fully takes ~${Math.ceil(toInsert.length / 200)} days.`
+    `🔧 [reconcile] ${unevaluated.rows.length} fila(s) nuevas sin evaluar${DRY_RUN ? " (dry-run, sin escribir)" : ` → ${evaluated} evaluadas`}.`
   );
 
+  const missing = await pool.query<{ id: string; title: string; location: string | null; content_hash: string | null }>(
+    `SELECT j.id, j.title, j.location, j.content_hash
+     FROM jobs j
+     WHERE ${seoReadySql("j")}
+       AND NOT EXISTS (
+         SELECT 1 FROM indexing_queue q
+         WHERE q.notification_type = 'URL_UPDATED'
+           AND q.status IN ('pending', 'sent')
+           AND q.job_id = j.id
+           AND q.content_hash IS NOT DISTINCT FROM j.content_hash
+       )
+     ORDER BY j.published_at DESC, j.id DESC
+     LIMIT $1`,
+    [RECONCILE_ENQUEUE_LIMIT]
+  );
+  if (!DRY_RUN && missing.rows.length > 0) {
+    await enqueueIndexingNotifications(
+      missing.rows.map((row) => ({
+        url: buildJobUrl({ jobId: row.id, title: row.title, location: row.location }),
+        type: "URL_UPDATED" as const,
+        priority: INDEXING_PRIORITY.reconcile,
+        jobId: row.id,
+        contentHash: row.content_hash
+      }))
+    );
+  }
+  console.log(
+    `✅ [reconcile] ${missing.rows.length} vacante(s) aptas para Google sin notificación de su contenido actual${DRY_RUN ? " (dry-run)" : " → encoladas en prioridad 4"}.`
+  );
   await pool.end();
 }
 
 main().catch((err) => {
-  console.error("❌ [backfill-indexing-queue] Failed:", err);
+  console.error("❌ [reconcile] Failed:", err instanceof Error ? err.name : "Error");
   process.exit(1);
 });

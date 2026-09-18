@@ -1,0 +1,126 @@
+{
+ "perSource": {
+  "Workana": {
+   "active": 4072,
+   "ready": 0,
+   "missingDesc": 17,
+   "invalidDesc": 7,
+   "remoteAmbiguity": 0,
+   "fetchDetail": false
+  },
+  "Torre": {
+   "active": 6050,
+   "ready": 0,
+   "missingDesc": 622,
+   "invalidDesc": 5428,
+   "remoteAmbiguity": 6012,
+   "fetchDetail": false
+  },
+  "Magneto": {
+   "active": 5634,
+   "ready": 1632,
+   "missingDesc": 2450,
+   "invalidDesc": 130,
+   "remoteAmbiguity": 363,
+   "fetchDetail": true
+  },
+  "LinkedIn": {
+   "active": 29350,
+   "ready": 10548,
+   "missingDesc": 17700,
+   "invalidDesc": 1123,
+   "remoteAmbiguity": 0,
+   "fetchDetail": true
+  },
+  "Computrabajo": {
+   "active": 15186,
+   "ready": 1217,
+   "missingDesc": 13956,
+   "invalidDesc": 6,
+   "remoteAmbiguity": 0,
+   "fetchDetail": true
+  },
+  "Elempleo": {
+   "active": 2774,
+   "ready": 2276,
+   "missingDesc": 450,
+   "invalidDesc": 52,
+   "remoteAmbiguity": 0,
+   "fetchDetail": true
+  },
+  "GetOnBoard": {
+   "active": 221,
+   "ready": 0,
+   "missingDesc": 86,
+   "invalidDesc": 1,
+   "remoteAmbiguity": 204,
+   "fetchDetail": false
+  },
+  "WeRemoto": {
+   "active": 300,
+   "ready": 0,
+   "missingDesc": 12,
+   "invalidDesc": 8,
+   "remoteAmbiguity": 288,
+   "fetchDetail": false
+  },
+  "RemoteOK": {
+   "active": 249,
+   "ready": 1,
+   "missingDesc": 1,
+   "invalidDesc": 19,
+   "remoteAmbiguity": 35,
+   "fetchDetail": false
+  },
+  "Glassdoor": {
+   "active": 2400,
+   "ready": 0,
+   "missingDesc": 2400,
+   "invalidDesc": 0,
+   "remoteAmbiguity": 134,
+   "fetchDetail": false
+  },
+  "Indeed": {
+   "active": 339,
+   "ready": 0,
+   "missingDesc": 339,
+   "invalidDesc": 0,
+   "remoteAmbiguity": 17,
+   "fetchDetail": false
+  },
+  "Remotive": {
+   "active": 15,
+   "ready": 2,
+   "missingDesc": 1,
+   "invalidDesc": 1,
+   "remoteAmbiguity": 5,
+   "fetchDetail": false
+  }
+ },
+ "reasons": {
+  "MISSING_LOCATION": 11970,
+  "INVALID_REMOTE_LOCATION": 7058,
+  "DESCRIPTION_SNIPPET": 5428,
+  "DESCRIPTION_TOO_THIN": 5641,
+  "MISSING_DESCRIPTION": 37928,
+  "DESCRIPTION_DUPLICATED_BLOCKS": 308,
+  "DESCRIPTION_NAVIGATION_JUNK": 943,
+  "DESCRIPTION_ERROR_PAGE": 4,
+  "LOCATION_COUNTRY_CONFLICT": 42,
+  "DESCRIPTION_IS_METADATA": 3,
+  "DESCRIPTION_TRUNCATED": 9,
+  "INVALID_TITLE": 1
+ },
+ "totals": {
+  "active": 66590,
+  "ready": 15676,
+  "notReady": 50914
+ },
+ "status": {
+  "complete": 21781,
+  "unsupported": 8942,
+  "backlog": 34556,
+  "rejected": 1311
+ },
+ "generatedAt": "2026-09-18T05:15:24.493Z"
+}

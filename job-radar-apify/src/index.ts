@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import { gotScraping } from "got-scraping";
 import { fileURLToPath } from "url";
 import { htmlEntities, extractStructuredFromHtml, mapEmploymentTypeTag } from "./utils.js";
+import { toCountryCodes } from "./lib/country-codes.js";
 import { saveRunToCache } from "./cache-manager.js";
 import { FetchBlockedError } from "./engine/resilient-fetch.js";
 import { reportSourceSignal } from "./observability/run-telemetry.js";
@@ -78,6 +79,11 @@ export interface Job {
   salaryCurrency?: string;
   salaryRaw?: string;
   applicantCount?: number;
+  // Job SEO V2 — same meaning as in src/sources/types.ts (source-stated only).
+  descriptionKind?: "full" | "snippet";
+  remoteType?: "fully_remote" | "hybrid" | "onsite";
+  applicantCountries?: string[];
+  validThrough?: string;
 }
 
 // Store available database properties
@@ -645,6 +651,14 @@ export async function scrapeTorre(keyword: string): Promise<Job[]> {
             // `tagline` is Torre's own short plain-text summary — not HTML,
             // so no extractStructuredFromHtml needed here.
             description: item.tagline ? htmlEntities(item.tagline).trim() : undefined,
+            // A one-sentence tagline is a teaser, not the posting (Job SEO V2,
+            // docs/JOB-DETAIL-ENRICHMENT.md): stated here so the Google gate
+            // never mistakes it for a complete description.
+            descriptionKind: "snippet",
+            // Only Torre's own flag counts as "fully remote". An empty
+            // `locations` array still shows as "Remoto" in the UI (unchanged
+            // behavior), but it is not source evidence of remote work.
+            remoteType: item.remote === true ? "fully_remote" : undefined,
             technologies: skills.length > 0 ? skills : undefined,
             employmentType: TORRE_COMMITMENT_LABELS[item.commitment as string]
             // item.compensation.data comes back null/hidden on every live
@@ -965,7 +979,10 @@ export async function scrapeWeRemoto(): Promise<Job[]> {
           salaryMax: posting.salaryMax,
           salaryCurrency: posting.salaryCurrency,
           salaryRaw: posting.salaryRaw,
-          applicantCount: posting.applicantCount
+          applicantCount: posting.applicantCount,
+          remoteType: posting.remoteType,
+          applicantCountries: posting.applicantCountries,
+          validThrough: posting.validThrough
         });
       } catch (jobErr: any) {
         console.warn(`[WeRemoto] Failed fetching ${url}:`, jobErr?.message || jobErr);
@@ -1041,6 +1058,20 @@ export async function scrapeGetOnBoard(): Promise<Job[]> {
         // strings yet. Left out rather than guessed; attrs.description and
         // the numeric salary/applications fields ARE plain values.
         const { description, requirements } = extractStructuredFromHtml(attrs.description || "");
+        // Job SEO V2: GetOnBoard's own modality field (confirmed live
+        // 2026-09-18: "fully_remote" | "remote_local" | "hybrid" | "no_remote").
+        // "remote_local" (remote, but restricted to an unstated local area) is
+        // left unset — its eligible geography is not in the payload, and
+        // `countries` can literally be ["Remote"], which is not a country.
+        const remoteType =
+          attrs.remote_modality === "fully_remote"
+            ? ("fully_remote" as const)
+            : attrs.remote_modality === "hybrid"
+              ? ("hybrid" as const)
+              : attrs.remote_modality === "no_remote"
+                ? ("onsite" as const)
+                : undefined;
+        const applicantCountries = remoteType === "fully_remote" ? toCountryCodes(countries) : [];
 
         jobs.push({
           jobId: item.id,
@@ -1057,7 +1088,9 @@ export async function scrapeGetOnBoard(): Promise<Job[]> {
           requirements: requirements.length > 0 ? requirements : undefined,
           salaryMin: typeof attrs.min_salary === "number" ? attrs.min_salary : undefined,
           salaryMax: typeof attrs.max_salary === "number" ? attrs.max_salary : undefined,
-          applicantCount: typeof attrs.applications_count === "number" ? attrs.applications_count : undefined
+          applicantCount: typeof attrs.applications_count === "number" ? attrs.applications_count : undefined,
+          remoteType,
+          applicantCountries: applicantCountries.length > 0 ? applicantCountries : undefined
         });
       }
     }
@@ -1324,6 +1357,8 @@ export async function scrapeJooble(locationQuery: string = "co"): Promise<Job[]>
         // (e.g. "$25 - $40 per hour"), `type` is often empty for a given
         // listing — used only when present, never guessed.
         description: item.snippet ? htmlEntities(item.snippet).trim() : undefined,
+        // Jooble's `snippet` is a search-result excerpt, never the full posting.
+        descriptionKind: "snippet",
         salaryRaw: typeof item.salary === "string" && item.salary.trim() ? item.salary.trim() : undefined,
         employmentType: item.type ? htmlEntities(item.type).trim() || undefined : undefined
       });

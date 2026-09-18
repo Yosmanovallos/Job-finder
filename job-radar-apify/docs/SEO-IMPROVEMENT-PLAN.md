@@ -1257,6 +1257,14 @@ La prueba `test:job-pagination` es de solo lectura. Las pruebas SEO que
 insertan filas temporales no se ejecutan contra la base compartida sin
 autorización explícita.
 
+### 1.23 Job SEO V2 — fases A a D (2026-09-17/18, rama local `feat/job-seo-v2`, sin desplegar)
+
+Fuente de verdad: `docs/JOB-SEO-ARCHITECTURE-V2.md` (+ `JOB-DETAIL-ENRICHMENT.md`,
+`JOBPOSTING-GOOGLE-CONTRACT.md`, `SEARCH-CONSOLE-BASELINE-2026-09.md`). Cambia el modelo de
+publicación: una vacante visible ya no es automáticamente candidata para Google. Pendiente antes de
+declararlo listo en producción: migración autorizada, clasificación, despliegue, limpieza de la cola,
+`/seo drift compare` y Rich Results Test (§8 de la arquitectura).
+
 ## 2. Primer paso al reiniciar sesión: baseline de `seo-drift`
 
 Antes de cualquier fase nueva de la tabla de abajo, capturar un baseline

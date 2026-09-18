@@ -1,25 +1,15 @@
-import { allAdapters, Job, JobDetail, SourceAdapter } from "../sources/index.js";
-import { updateJobDetail, InsertedJobRef } from "../db/job-repository.js";
+import { allAdapters, SourceAdapter } from "../sources/index.js";
 import { markRoleSourceRun } from "../db/scheduler-repository.js";
 import { generateRoleKeywordsWithAI } from "../ai-role-agent.js";
 import { DEFAULT_COUNTRY, resolveJobCountry } from "../countries/index.js";
-import { executeWithResilienceResult } from "../engine/resilient-fetch.js";
-import { emptyResult, successResult, type JobDetailResult } from "../sources/detail-result.js";
-import { circuitKeyFor } from "../sources/source-policy.js";
-import { BUDGET_ESTIMATES, estimateListingMs, hasBudget, isCancelled, type FetchContext } from "../engine/fetch-context.js";
-import { jitterDelay } from "../engine/jitter-delay.js";
-import { RunRecorder, reportSourceSignal, type AttemptHandle, type AttemptStatus } from "../observability/run-telemetry.js";
+import { enrichInsertedJobs } from "./detail-enrichment.js";
+import { BUDGET_ESTIMATES, estimateListingMs, hasBudget, type FetchContext } from "../engine/fetch-context.js";
+import { RunRecorder, type AttemptStatus } from "../observability/run-telemetry.js";
 import { runListingAttempt } from "./listing-attempt.js";
 
-// Bounds how many detail pages get fetched per adapter per role per tick
-// (AGENTS.md #12 — no unbounded loop). A role can produce dozens of new
-// jobs from one HTML source; fetching a detail page for every single one,
-// every 15-min tick, across ~200+ roles would multiply request volume far
-// past what a source's rate limiting/bot detection tolerates. Detail
-// enrichment is a nice-to-have on top of a job that's already saved and
-// visible — capping it just means some new jobs keep showing without the
-// rich card until a later, less busy moment (never a data-loss concern).
-const MAX_DETAIL_FETCHES_PER_ADAPTER_PER_ROLE = 8;
+// Detail pages per adapter per role per tick are bounded by the source's
+// detail policy (source-policy.ts, default 8 — AGENTS.md #12); see
+// src/queue/detail-enrichment.ts.
 
 interface WorkerJobOptions {
   roleName: string;
@@ -171,13 +161,21 @@ export class ScrapeWorker {
         // blocked detail host shows up as its own outcome instead of hiding
         // a healthy listing (or vice versa).
         // Detail enrichment is explicitly optional work on top of a job that
-        // is already saved and visible (see MAX_DETAIL_FETCHES_PER_ADAPTER_PER_ROLE),
+        // is already saved and visible (cap: detail policy, see detail-enrichment.ts),
         // so it is the first thing to give up when the budget is thin — never
         // at the cost of the listing that already landed.
+        // Job SEO V2: goes through the persistent detail state machine, so a
+        // row the cap or the budget leaves out stays 'pending' and the tick's
+        // drain step (or a later tick) picks it up — no longer lost.
         if (adapter.fetchDetail && listing.insertedJobs.length > 0 && hasBudget(ctx, BUDGET_ESTIMATES.detailFetch)) {
-          await recorder.trackAttempt({ source: adapter.name, role: roleName, stage: "detail" }, (attempt) =>
-            this.enrichNewJobs(adapter, listing.insertedJobs, attempt, ctx)
-          );
+          await recorder.trackAttempt({ source: adapter.name, role: roleName, stage: "detail" }, async (attempt) => {
+            await enrichInsertedJobs(
+              adapter,
+              listing.insertedJobs.map((ref) => ref.id),
+              attempt,
+              ctx
+            );
+          });
         }
 
         await markRoleSourceRun(roleName, adapter.name);
@@ -202,93 +200,5 @@ export class ScrapeWorker {
       duplicateCount,
       perSource
     };
-  }
-
-  /**
-   * Fetches detail-page enrichment for a bounded slice of this adapter's
-   * newly-inserted rows only (never a re-scrape — see saveJobs()). Wrapped
-   * in executeWithResilience per job so a source's detail pages tripping
-   * its bot detection registers on that source's own circuit breaker, same
-   * as its search-results fetch — a detail-page block doesn't silently
-   * retry forever, and one job's failure never stops the rest of the
-   * batch (each iteration has its own try/catch).
-   */
-  private async enrichNewJobs(
-    adapter: SourceAdapter,
-    insertedJobs: InsertedJobRef[],
-    attempt: AttemptHandle,
-    ctx?: FetchContext
-  ): Promise<void> {
-    const slice = insertedJobs.slice(0, MAX_DETAIL_FETCHES_PER_ADAPTER_PER_ROLE);
-    let obtained = 0;
-    let failed = 0;
-    // received = new rows eligible for detail; filtered = left out by the cap.
-    attempt.setCounters({ received: insertedJobs.length, filtered: insertedJobs.length - slice.length, valid: 0, failed: 0 });
-    // Cool-down before the first detail request: confirmed live (2026-08-11)
-    // that starting detail fetches immediately after a source's search
-    // phase (which can already be 20-30+ requests across keyword variants,
-    // e.g. Computrabajo's translate.goog proxy) measurably raises the null
-    // rate on the very next requests against the same host — a same-URL
-    // retest moments later succeeded where the in-tick attempt didn't. This
-    // doesn't fix a code bug, it just stops piling detail requests directly
-    // on top of a host that may still be warm from the search burst.
-    await jitterDelay(3000, 6000, ctx);
-    for (let i = 0; i < slice.length; i++) {
-      // P3 (EXE-003/EXE-004): re-checked every iteration, not just once —
-      // a detail batch is up to 8 fetches with jitter between them, easily
-      // several minutes. Whatever was already enriched stays enriched; the
-      // rest is simply not attempted.
-      if (!hasBudget(ctx, BUDGET_ESTIMATES.detailFetch)) {
-        attempt.setCounters({ filtered: insertedJobs.length - i });
-        reportSourceSignal("deadline_exceeded");
-        break;
-      }
-      if (i > 0) await jitterDelay(1000, 3000, ctx);
-      if (isCancelled(ctx)) break;
-      const ref = slice[i];
-      try {
-        // P4 (SRC-003): the detail fetch reports its own outcome instead of
-        // collapsing into an array. This is the phase's headline fix — the
-        // old shape was `return result ? [result] : []`, and an empty array
-        // reached `recordSuccess`, wiping the circuit's failure counter. The
-        // live table proved the damage: not one `-detail` row had ever been
-        // created, while Computrabajo spent 102 detail pages for 0 results.
-        // Now a missing detail is `empty` (neutral for the circuit) and only
-        // a real fault increments it.
-        const outcome = await executeWithResilienceResult<Partial<JobDetail>>(
-          circuitKeyFor(adapter.name, "detail"),
-          "detail",
-          async (): Promise<JobDetailResult> => {
-            const result = await adapter.fetchDetail!(ref.url);
-            return result ? successResult(result) : emptyResult();
-          },
-          3,
-          ctx
-        );
-        const detail = outcome.data[0];
-        if (detail) {
-          await updateJobDetail(ref.id, {
-            description: detail.description,
-            requirements: detail.requirements,
-            technologies: detail.technologies,
-            employmentType: detail.employmentType,
-            salaryMin: detail.salaryMin,
-            salaryMax: detail.salaryMax,
-            salaryCurrency: detail.salaryCurrency,
-            salaryRaw: detail.salaryRaw,
-            applicantCount: detail.applicantCount
-          });
-          obtained++;
-          attempt.setCounters({ valid: obtained });
-        }
-      } catch (err: any) {
-        console.warn(
-          `⚠️ [ScrapeWorker] Detalle fallido para ${adapter.name} (${ref.url}):`,
-          err?.message || err
-        );
-        failed++;
-        attempt.setCounters({ failed });
-      }
-    }
   }
 }

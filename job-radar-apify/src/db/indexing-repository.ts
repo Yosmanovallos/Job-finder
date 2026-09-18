@@ -1,36 +1,82 @@
+import type { PoolClient } from "pg";
 import { pool } from "./client.js";
 import { NotificationType } from "../lib/google-indexing.js";
-import { buildJobUrlPrefix } from "../lib/job-seo.js";
+import { buildJobUrl, buildJobUrlPrefix } from "../lib/job-seo.js";
+import { canonicalSql, seoReadySql } from "../lib/google-job-readiness.js";
 
 // Google's default Indexing API quota (Search Console-verified project,
 // no quota increase requested). Budget is derived from what's actually
 // `sent` in the last 24h in the DB, not an in-memory counter — the drain
-// script (scripts/run-indexing-tick.ts) runs every 15 min via GitHub
-// Actions cron, so an in-memory/per-invocation cap would reset every time
-// and blow through the real daily limit.
+// script (scripts/run-indexing-tick.ts) runs on a GitHub Actions cron, so an
+// in-memory/per-invocation cap would reset every time and blow through the
+// real daily limit.
 export const DAILY_INDEXING_QUOTA = 200;
+
+/**
+ * Send order (Job SEO V2). Lower sends first; ties oldest-first, so nothing
+ * inside a lane starves (the FIFO lesson of SEO-IMPROVEMENT-PLAN §1.20).
+ * 5 is the column default: every row enqueued before this ordering existed.
+ */
+export const INDEXING_PRIORITY = {
+  deleted: 1,
+  newlyReady: 2,
+  contentUpdate: 3,
+  reconcile: 4,
+  legacy: 5
+} as const;
 
 export interface IndexingQueueEntry {
   url: string;
   type: NotificationType;
+  priority?: number;
+  jobId?: string | null;
+  contentHash?: string | null;
 }
 
-// Batched single INSERT, called once after saveJobs()'s per-job loop —
-// not per-iteration, to avoid tripling that loop's query count.
-export async function enqueueIndexingNotifications(entries: IndexingQueueEntry[]): Promise<void> {
+type Queryable = Pick<PoolClient, "query">;
+
+/**
+ * Idempotent enqueue: at most one pending row per (url, type). A second
+ * request for a URL already pending only raises its priority (never lowers
+ * it) — so repeated rediscovery of an unchanged job never grows the queue.
+ * Works whether or not uq_indexing_queue_pending_url_type exists yet (see
+ * schema.sql's job-seo-v2 block).
+ */
+export async function enqueueIndexingNotificationsWith(db: Queryable, entries: IndexingQueueEntry[]): Promise<void> {
   if (entries.length === 0) return;
-
-  const values: string[] = [];
-  const params: string[] = [];
-  entries.forEach((entry, i) => {
-    values.push(`($${i * 2 + 1}, $${i * 2 + 2})`);
-    params.push(entry.url, entry.type);
-  });
-
-  await pool.query(
-    `INSERT INTO indexing_queue (url, notification_type) VALUES ${values.join(", ")}`,
-    params
+  const urls = entries.map((entry) => entry.url);
+  const types = entries.map((entry) => entry.type);
+  const priorities = entries.map((entry) => entry.priority ?? INDEXING_PRIORITY.reconcile);
+  const jobIds = entries.map((entry) => entry.jobId ?? null);
+  const hashes = entries.map((entry) => entry.contentHash ?? null);
+  await db.query(
+    `WITH input AS (
+       SELECT DISTINCT ON (url, type) url, type, priority, job_id, content_hash
+       FROM unnest($1::text[], $2::text[], $3::int[], $4::uuid[], $5::text[]) AS t(url, type, priority, job_id, content_hash)
+       ORDER BY url, type, priority ASC
+     ), raised AS (
+       UPDATE indexing_queue q
+       SET priority = LEAST(q.priority, i.priority),
+           job_id = COALESCE(q.job_id, i.job_id),
+           content_hash = COALESCE(i.content_hash, q.content_hash)
+       FROM input i
+       WHERE q.status = 'pending' AND q.url = i.url AND q.notification_type = i.type
+       RETURNING q.url
+     )
+     INSERT INTO indexing_queue (url, notification_type, priority, job_id, content_hash)
+     SELECT i.url, i.type, i.priority, i.job_id, i.content_hash
+     FROM input i
+     WHERE NOT EXISTS (
+       SELECT 1 FROM indexing_queue q
+       WHERE q.status = 'pending' AND q.url = i.url AND q.notification_type = i.type
+     )
+     ON CONFLICT DO NOTHING`,
+    [urls, types, priorities, jobIds, hashes]
   );
+}
+
+export async function enqueueIndexingNotifications(entries: IndexingQueueEntry[]): Promise<void> {
+  await enqueueIndexingNotificationsWith(pool, entries);
 }
 
 // Counts 'failed' attempts too, not just 'sent' — Google's quota is
@@ -38,7 +84,8 @@ export async function enqueueIndexingNotifications(entries: IndexingQueueEntry[]
 // also stamps sent_at as "attempted at" so a misconfigured service account
 // (e.g. wrong Search Console permission) can't burn through 200 real
 // requests as silent 403s while this budget check still reads 200/200
-// remaining and the next run tries all 200 again.
+// remaining and the next run tries all 200 again. 'superseded' rows were
+// never sent, so they never count.
 export async function getIndexingBudgetRemaining(): Promise<number> {
   const result = await pool.query(
     `SELECT COUNT(*) AS attempted_today FROM indexing_queue
@@ -52,29 +99,19 @@ export interface PendingIndexingRow {
   id: string;
   url: string;
   notification_type: NotificationType;
+  job_id: string | null;
+  priority: number;
 }
 
-// Newest first, not FIFO: a one-time backfill of ~10,170 existing jobs sits
-// in this table alongside real-time entries from tonight's scrape. FIFO
-// would bury every fresh URL_UPDATED — the entire reason the Indexing API
-// is worth using, hours instead of weeks — behind ~51 days of backfill.
-// Backfill rows losing their place in line costs nothing: they're already
-// discoverable via sitemap-jobs.xml regardless of when this table sends them.
+// Priority lane first, then oldest-first inside the lane. Oldest-first (not
+// newest-first) is kept deliberately: confirmed 2026-08-10 that LIFO let a
+// continuous stream of new arrivals starve everything already waiting.
 export async function getPendingIndexingBatch(limit: number): Promise<PendingIndexingRow[]> {
   if (limit <= 0) return [];
-  // FIFO (oldest first), not LIFO. Confirmed empirically 2026-08-10 against
-  // production: with the queue holding 30k+ pending rows and new jobs
-  // enqueuing continuously (a scrape tick every 15 min), a newest-first
-  // order lets a fast-enough stream of new arrivals permanently starve
-  // anything already waiting — two real, still-live job pages sat pending
-  // since 2026-07-31 and 2026-08-02 respectively, never once reaching the
-  // front. Oldest-first guarantees every entry eventually gets its turn,
-  // and spends the daily quota on the notifications that have been waiting
-  // longest rather than always the newest arrival.
   const result = await pool.query(
-    `SELECT id, url, notification_type FROM indexing_queue
+    `SELECT id, url, notification_type, job_id, priority FROM indexing_queue
      WHERE status = 'pending'
-     ORDER BY created_at ASC
+     ORDER BY priority ASC, created_at ASC, id ASC
      LIMIT $1`,
     [limit]
   );
@@ -82,9 +119,7 @@ export async function getPendingIndexingBatch(limit: number): Promise<PendingInd
 }
 
 export async function markIndexingSent(id: string): Promise<void> {
-  await pool.query(`UPDATE indexing_queue SET status = 'sent', sent_at = NOW() WHERE id = $1`, [
-    id
-  ]);
+  await pool.query(`UPDATE indexing_queue SET status = 'sent', sent_at = NOW() WHERE id = $1`, [id]);
 }
 
 // sent_at doubles as "attempted at" here (see getIndexingBudgetRemaining) —
@@ -96,14 +131,58 @@ export async function markIndexingFailed(id: string, error: string): Promise<voi
   );
 }
 
+/** Terminal, non-sendable, history kept. Only ever from 'pending'. */
+export async function markIndexingSuperseded(id: string, reason: string): Promise<void> {
+  await pool.query(
+    `UPDATE indexing_queue SET status = 'superseded', superseded_at = NOW(), superseded_reason = $2
+     WHERE id = $1 AND status = 'pending'`,
+    [id, reason.slice(0, 40)]
+  );
+}
+
+const JOB_ID_IN_URL = /\/empleos\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\//i;
+
+export function jobIdFromUrl(url: string): string | null {
+  return JOB_ID_IN_URL.exec(url)?.[1] ?? null;
+}
+
+export type TargetVerdict = { send: true } | { send: false; reason: string };
+
+/**
+ * Last check before spending quota. URL_UPDATED is sent only when the target
+ * is, right now, an active, canonical, Google-ready job whose current URL is
+ * this exact URL (a title edit changes the slug). URL_DELETED is sent only
+ * when the job no longer exists as an active page.
+ */
+export async function checkIndexingTarget(row: Pick<PendingIndexingRow, "url" | "notification_type" | "job_id">): Promise<TargetVerdict> {
+  const jobId = row.job_id ?? jobIdFromUrl(row.url);
+  if (!jobId) return { send: false, reason: "unparseable_target" };
+  const result = await pool.query<{ id: string; title: string; location: string | null; ready: boolean; canonical: boolean }>(
+    `SELECT j.id, j.title, j.location, ${seoReadySql("j")} AS ready,
+            ${canonicalSql("j")} AS canonical
+     FROM jobs j WHERE j.id = $1 AND j.is_active = TRUE`,
+    [jobId]
+  );
+  const job = result.rows[0];
+  if (row.notification_type === "URL_DELETED") {
+    return job ? { send: false, reason: "target_still_exists" } : { send: true };
+  }
+  if (!job) return { send: false, reason: "target_missing" };
+  if (!job.canonical) return { send: false, reason: "target_non_canonical" };
+  if (!job.ready) return { send: false, reason: "target_not_seo_ready" };
+  if (buildJobUrl({ jobId: job.id, title: job.title, location: job.location }) !== row.url) {
+    return { send: false, reason: "url_changed" };
+  }
+  return { send: true };
+}
+
 // SEO Fase 5 (docs/SEO-PLAN.md §5.6): once a job row is gone,
 // purgeOldJobs() (scheduler-repository.ts) is the only place its URL is
 // ever known — but it already writes that URL into a URL_DELETED row here
-// before losing it. Reusing that as a tombstone (LIKE 'prefix%', a
-// right-anchored wildcard so the idx_indexing_queue_url_prefix index
-// below actually gets used, not a full scan) means /empleos/:id/:slug can
+// before losing it. Reusing that as a tombstone means /empleos/:id/:slug can
 // tell "this id existed and expired" apart from "this id never existed"
-// without a new table or column.
+// without a new table or column. Any status counts (a superseded duplicate
+// URL_DELETED still proves the job existed).
 export async function wasJobPurged(jobId: string): Promise<boolean> {
   const result = await pool.query(
     `SELECT 1 FROM indexing_queue WHERE notification_type = 'URL_DELETED' AND url LIKE $1 LIMIT 1`,

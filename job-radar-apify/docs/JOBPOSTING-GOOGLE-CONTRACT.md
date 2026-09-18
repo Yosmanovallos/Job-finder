@@ -3,20 +3,25 @@
 **Authority:** Google Search Central, "Job posting (JobPosting) structured data", page last updated
 **2026-09-08**, re-read 2026-09-18. Where Google and this repo disagree, Google wins. Where Google
 allows something but our data cannot back it truthfully, we omit it (AGENTS.md #5).
-Implementation owner: **Phase D**. Current emitter: `buildJobPosting()` in `src/lib/job-seo.ts:267`.
+**Implemented locally in Phase D (2026-09-18, not deployed):** `buildJobPosting()`,
+`renderJobDescriptionHtml()`, `buildJobPageBody()` in `src/lib/job-seo.ts`; eligibility from the shared
+evaluator `src/lib/google-job-readiness.ts`. Deviations from the table below, decided while
+implementing: `identifier` is omitted (we don't hold the employer's own id); a physical location needs
+a source-stated locality (country-only such as "Colombia" is not emitted — open decision); Workana
+stays ineligible (its location is the client's country).
 
 ## 1. Eligibility (emit JobPosting at all?)
 
 Emit exactly one JobPosting **only** when all hold:
 
 1. Single-job page, canonical, active. Today ✓: only `/empleos/:id` emits it.
-2. `isSeoReady(row)`: `detail_status = 'ready'` (validated source description, JOB-DETAIL-ENRICHMENT §3).
+2. The stored verdict of `evaluateGoogleJobReadiness()` (`jobs.seo_ready`, read via `isGoogleReadyNow()`/`seoReadySql()`).
 3. Required fields truthfully available (§2). If one is missing, emit nothing (no partial JobPosting).
 4. There is a way to apply: a working source URL **reachable by the visitor**. Google: "We don't
    allow job postings that don't have a way to apply". See §4 and open decision F11.
 5. The description is readable without login. Today ✓.
 
-Otherwise the page still serves 200 with visible content, but no JobPosting and (proposed) `noindex,follow`.
+Otherwise the page still serves 200 with visible content and the source link, but no JobPosting and `noindex,follow` (approved).
 
 ## 2. Properties
 
@@ -46,9 +51,8 @@ string appears in the SSR body.
 ## 4. Application path (rule N)
 
 - Raw SSR HTML must contain the source link (today it exists only after hydration, F11).
-- Anonymous visitors currently hit a login-only modal before the source link. Google does not forbid a
-  login to **apply**, but "a way to apply" must exist for the visitor. **User decision required**: make
-  the modal skippable ("Continuar a {source}") or keep it. Recommendation: skippable.
+- Approved and implemented: the lead-capture modal is optional — "Continuar a la oferta original en
+  {source}" is its first action — and the source link is in the raw server-rendered HTML.
 - Link health: the scraper's `last_seen_at` is the existing liveness signal; dead source links are
   covered by purge → 410.
 

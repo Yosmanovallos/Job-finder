@@ -12,19 +12,20 @@ import { buildTestEnvironment, validateTestEnvironment } from "../tests/test-saf
 const root = fileURLToPath(new URL("../", import.meta.url));
 const postgresImage = "postgres@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685";
 const suites: Record<string, string[]> = {
-  unit: ["validate-test-safety.test.ts", "validate-stale-cache.test.ts", "validate-dashboard-filters.ts", "validate-role-matching.ts", "validate-run-telemetry.test.ts", "validate-fetch-context.test.ts", "validate-source-contract.test.ts", "validate-agent-readiness.test.ts"],
-  integration: ["validate-isolated-database.ts", "validate-job-pagination.ts", "validate-seo-job-pages.ts", "validate-companies-search.ts", "validate-sitemap-streaming.ts", "validate-run-observability.ts", "validate-execution-deadlines.ts", "validate-source-contract.ts", "validate-agent-readiness.ts"],
+  unit: ["validate-google-readiness.test.ts", "validate-test-safety.test.ts", "validate-stale-cache.test.ts", "validate-dashboard-filters.ts", "validate-role-matching.ts", "validate-run-telemetry.test.ts", "validate-fetch-context.test.ts", "validate-source-contract.test.ts", "validate-agent-readiness.test.ts"],
+  integration: ["validate-isolated-database.ts", "validate-job-pagination.ts", "validate-seo-job-pages.ts", "validate-companies-search.ts", "validate-sitemap-streaming.ts", "validate-run-observability.ts", "validate-execution-deadlines.ts", "validate-source-contract.ts", "validate-agent-readiness.ts", "validate-job-seo-v2.ts"],
   sitemap: ["validate-sitemap-streaming.ts"],
   observability: ["validate-run-observability.ts"],
   pagination: ["validate-job-pagination.ts"],
   seo: ["validate-seo-job-pages.ts"],
   companies: ["validate-companies-search.ts"],
   baseline: ["validate-public-baseline.ts"],
-  "agent-readiness": ["validate-agent-readiness.test.ts", "validate-agent-readiness.ts"]
+  "agent-readiness": ["validate-agent-readiness.test.ts", "validate-agent-readiness.ts"],
+  "job-seo": ["validate-google-readiness.test.ts", "validate-job-seo-v2.ts"]
 };
 const selection = process.argv[2] || "unit";
 if (!Object.hasOwn(suites, selection) || process.argv.slice(3).some((arg) => arg !== "--dry-run")) {
-  throw new Error("[P0] Suite inválida. Usa unit, integration, sitemap, observability, pagination, seo, companies, baseline o agent-readiness; --dry-run es opcional.");
+  throw new Error("[P0] Suite inválida. Usa unit, integration, sitemap, observability, pagination, seo, companies, baseline, agent-readiness o job-seo; --dry-run es opcional.");
 }
 
 function docker(args: string[], env: NodeJS.ProcessEnv): string {
@@ -147,6 +148,14 @@ async function main(): Promise<void> {
       }
       if (!ready) throw new Error("[P0] PostgreSQL desechable no inició dentro del presupuesto.");
       await pool.query(await readFile(path.join(root, "tests/fixtures/production-baseline.sql"), "utf8"));
+      // Job SEO V2: production runs with this additive block applied (it is
+      // migrated before the code that reads it is deployed), so every suite
+      // gets the same post-migration schema. Its own suite re-applies it to
+      // prove idempotency.
+      const schema = await readFile(path.join(root, "src/db/schema.sql"), "utf8");
+      const seoBlock = /-- BEGIN job-seo-v2\r?\n([\s\S]*?)-- END job-seo-v2/.exec(schema)?.[1];
+      if (!seoBlock) throw new Error("[P0] schema.sql no contiene el bloque job-seo-v2.");
+      await pool.query(seoBlock);
       await pool.query("INSERT INTO test_sandbox (run_id) VALUES ($1)", [runId]);
       await pool.end();
       pool = undefined;

@@ -306,8 +306,9 @@ export const JobDetailPanel: React.FC<JobDetailPanelProps> = ({
         )}
 
         <p className="text-xs text-muted-foreground mt-5">
-          La descripción completa y el formulario de aplicación están en la página de {job.source} —
-          el botón de arriba te lleva directo.
+          {job.description
+            ? `La postulación se hace en ${job.source} — el botón de arriba te lleva directo a la oferta original.`
+            : `La fuente no publicó una descripción que podamos mostrar; el detalle completo y la postulación están en ${job.source}.`}
         </p>
       </div>
     </div>

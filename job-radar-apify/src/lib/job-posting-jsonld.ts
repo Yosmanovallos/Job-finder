@@ -1,5 +1,6 @@
 import { extractStructuredFromHtml, htmlEntities } from "../utils.js";
 import { JobDetail } from "../sources/types.js";
+import { toCountryCodes } from "./country-codes.js";
 
 // Google for Jobs requires site owners to embed a schema.org `JobPosting`
 // <script type="application/ld+json"> block on every job detail page — a
@@ -103,6 +104,36 @@ function buildJobDetail(node: any): Partial<JobDetail> {
   }
   const currency = node.baseSalary?.currency || node.salaryCurrency;
   if (typeof currency === "string" && currency.trim()) detail.salaryCurrency = currency.trim();
+
+  // Job SEO V2: remote modality and eligibility only as the source published
+  // them. TELECOMMUTE is schema.org's "fully remote" marker; eligible
+  // countries come from applicantLocationRequirements (Country or
+  // AdministrativeArea, single or array) and are normalized to ISO-2 — an
+  // unrecognized name is dropped, never guessed.
+  const locationType = Array.isArray(node.jobLocationType) ? node.jobLocationType : [node.jobLocationType];
+  if (locationType.some((value: unknown) => typeof value === "string" && value.trim().toUpperCase() === "TELECOMMUTE")) {
+    detail.remoteType = "fully_remote";
+    const requirements = Array.isArray(node.applicantLocationRequirements)
+      ? node.applicantLocationRequirements
+      : node.applicantLocationRequirements
+        ? [node.applicantLocationRequirements]
+        : [];
+    const countries = toCountryCodes(
+      requirements.map((requirement: unknown) =>
+        typeof requirement === "string"
+          ? requirement
+          : requirement && typeof requirement === "object"
+            ? (requirement as { name?: unknown }).name
+            : undefined
+      )
+    );
+    if (countries.length > 0) detail.applicantCountries = countries;
+  }
+
+  // Only the source's own expiration. Unparseable -> omitted.
+  if (typeof node.validThrough === "string" && Number.isFinite(new Date(node.validThrough).getTime())) {
+    detail.validThrough = new Date(node.validThrough).toISOString();
+  }
 
   return detail;
 }

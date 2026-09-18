@@ -56,7 +56,7 @@ ALTER TABLE jobs ALTER COLUMN location DROP DEFAULT;
 -- saveJobs() (job-repository.ts) SOLO en el INSERT de una fila nueva
 -- (para las fuentes que ya traen el dato en su propia respuesta — Torre/
 -- RemoteOK/Remotive/GetOnBoard) o el enriquecimiento post-insert de
--- ScrapeWorker vía updateJobDetail() (para LinkedIn/Computrabajo/Magneto,
+-- ScrapeWorker vía recordDetailOutcome() (job-readiness-repository.ts; LinkedIn/Computrabajo/Magneto/Elempleo,
 -- que necesitan un fetch aparte a la página de detalle) — nunca en el
 -- UPDATE de una fila ya existente, así una vacante vieja jamás se
 -- "completa" retroactivamente con datos que no vinieron con ella
@@ -531,6 +531,90 @@ CREATE INDEX IF NOT EXISTS idx_scrape_leases_run ON scrape_leases (run_id);
 
 ALTER TABLE scrape_leases ENABLE ROW LEVEL SECURITY;
 -- END p3-execution-deadlines
+
+-- BEGIN job-seo-v2
+-- Job SEO V2, fases B/C/D (docs/JOB-SEO-ARCHITECTURE-V2.md). Puramente
+-- aditivo e idempotente; tests/validate-job-seo-v2.ts lo aplica dos veces.
+--
+-- Dos conceptos separados a propósito, nunca un único "publicado":
+--   * visible para el usuario = is_active (sin cambios: toda vacante activa
+--     conserva su página 200, su enlace a la fuente y su lugar en el dashboard);
+--   * apta para Google = seo_ready, escrito SOLO por evaluateGoogleJobReadiness()
+--     (src/lib/google-job-readiness.ts). robots, JobPosting, sitemap e Indexing
+--     API leen esta misma decisión — no hay cuatro definiciones de "suficiente".
+--
+-- detail_status: 'pending' | 'retry' | 'no_detail' | 'failed' | 'unsupported'
+--   | 'complete' | 'rejected' | 'backlog'. NULL = fila legada aún sin clasificar
+--   (scripts/classify-job-readiness.ts). 'backlog' = legada sin descripción de
+--   una fuente con fetchDetail: NUNCA la toma el drenaje del tick; solo el
+--   backfill histórico, que requiere autorización aparte.
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS detail_status VARCHAR(20);
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS detail_attempts SMALLINT NOT NULL DEFAULT 0;
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS detail_next_attempt_at TIMESTAMPTZ;
+-- Clase de error o código de rechazo, nunca un mensaje crudo (regla de P4).
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS detail_last_error VARCHAR(100);
+-- Ya existe en producción (bloque de detalle, nunca escrita hasta ahora):
+-- repetida aquí para que este bloque sea autosuficiente. Ahora = cuándo se
+-- obtuvo el texto de la fuente.
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS description_fetched_at TIMESTAMPTZ;
+-- 'listing' | 'detail': de dónde salió el texto guardado en description.
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS description_source VARCHAR(20);
+-- 'full' | 'snippet': lo declara el adaptador (Torre tagline, Jooble snippet).
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS description_kind VARCHAR(20);
+-- 'fully_remote' | 'hybrid' | 'onsite'. NULL = la fuente no lo dijo. Nunca se
+-- deduce del texto "Remoto" ni del tick que descubrió la vacante.
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS remote_type VARCHAR(20);
+-- ISO 3166-1 alpha-2 de los países que la FUENTE declara elegibles.
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS applicant_countries JSONB;
+-- Vencimiento publicado por la fuente. NULL = desconocido (se omite validThrough).
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS valid_through TIMESTAMPTZ;
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS seo_ready BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS seo_reasons JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS seo_evaluated_at TIMESTAMPTZ;
+-- Primera transición a apta. `WHERE seo_ready_at IS NULL` = URL_UPDATED una sola vez.
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS seo_ready_at TIMESTAMPTZ;
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS content_hash VARCHAR(64);
+-- Cambio real de contenido. NULL en filas legadas (fecha desconocida): el
+-- sitemap omite <lastmod> en vez de inventarlo.
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS content_updated_at TIMESTAMPTZ;
+
+CREATE INDEX IF NOT EXISTS idx_jobs_detail_due
+  ON jobs (detail_next_attempt_at) WHERE detail_status IN ('pending', 'retry');
+CREATE INDEX IF NOT EXISTS idx_jobs_seo_ready
+  ON jobs (published_at DESC, id DESC) WHERE seo_ready = TRUE AND is_active = TRUE;
+
+-- indexing_queue: estados 'pending' | 'sent' | 'failed' | 'superseded'.
+-- 'superseded' es terminal y no enviable: conserva el historial en vez de borrarlo.
+-- priority: 1 = URL_DELETED legítimo, 2 = recién apta, 3 = cambio real de una
+-- ya apta, 4 = reconciliación/histórico, 5 = fila anterior a este bloque.
+ALTER TABLE indexing_queue ADD COLUMN IF NOT EXISTS job_id UUID;
+ALTER TABLE indexing_queue ADD COLUMN IF NOT EXISTS priority SMALLINT NOT NULL DEFAULT 5;
+ALTER TABLE indexing_queue ADD COLUMN IF NOT EXISTS content_hash VARCHAR(64);
+ALTER TABLE indexing_queue ADD COLUMN IF NOT EXISTS superseded_at TIMESTAMPTZ;
+ALTER TABLE indexing_queue ADD COLUMN IF NOT EXISTS superseded_reason VARCHAR(40);
+CREATE INDEX IF NOT EXISTS idx_indexing_queue_send_order
+  ON indexing_queue (priority, created_at) WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS idx_indexing_queue_job ON indexing_queue (job_id) WHERE job_id IS NOT NULL;
+-- Lookups by URL (idempotent enqueue, purge supersession, queue cleanup).
+CREATE INDEX IF NOT EXISTS idx_indexing_queue_url_type ON indexing_queue (url, notification_type);
+
+-- Idempotencia: una sola notificación pendiente por (url, tipo). Producción
+-- tiene hoy duplicados pendientes, así que el índice único solo se crea cuando
+-- ya no quedan (después de scripts/cleanup-indexing-queue.ts --apply); hasta
+-- entonces el INSERT ... WHERE NOT EXISTS del código da la misma garantía
+-- para las filas nuevas. Re-ejecutar este bloque es seguro en ambos estados.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'uq_indexing_queue_pending_url_type')
+     AND NOT EXISTS (
+       SELECT 1 FROM indexing_queue WHERE status = 'pending'
+       GROUP BY url, notification_type HAVING COUNT(*) > 1
+     ) THEN
+    CREATE UNIQUE INDEX uq_indexing_queue_pending_url_type
+      ON indexing_queue (url, notification_type) WHERE status = 'pending';
+  END IF;
+END $$;
+-- END job-seo-v2
 
 -- =============================================================================
 -- ROW LEVEL SECURITY: every read/write from this app goes through the `pool`

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Mail, Check, X } from "lucide-react";
+import { Mail, Check, X, ArrowUpRight } from "lucide-react";
 import { Job } from "../sources/types.js";
 import { useAuth } from "../auth/auth-provider.js";
 import { translateAuthError } from "../lib/auth-error-messages.js";
@@ -78,8 +78,23 @@ export function ApplyGateModal({ job, onClose }: ApplyGateModalProps) {
           {job.title}
         </h2>
         <p className="text-sm text-muted-foreground mb-6">
-          {job.company || "Confidencial"} · Crea tu cuenta gratis, sin tarjeta.
+          {job.company || "Confidencial"} · Crea tu cuenta gratis, sin tarjeta — o sigue directo a la
+          oferta original.
         </p>
+
+        {/* Job SEO V2: lead capture is OPTIONAL. Continuing to the original
+            posting never requires an account (Google JobPosting: every
+            posting needs a way to apply). Plain link to the source — nothing
+            is submitted on the visitor's behalf. */}
+        {job.url && (
+          <Button asChild size="lg" className="w-full mb-3 font-mono">
+            <a href={job.url} target="_blank" rel="nofollow noopener noreferrer" onClick={onClose}>
+              Continuar a la oferta original en {job.source} <ArrowUpRight className="h-4 w-4" />
+            </a>
+          </Button>
+        )}
+
+        <p className="text-xs text-ink-faint text-center mb-3">o crea tu cuenta para guardarla y recibir alertas</p>
 
         {error && (
           <p className="text-xs text-destructive font-mono mb-4">{error}</p>

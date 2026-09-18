@@ -1,7 +1,8 @@
 # Job SEO Architecture V2 — BuscoTrabajo
 
-**Status:** Phase A (architecture + live read-only inventory) — **complete, awaiting approval
-before Phase B.** No application code, schema or production data was changed in Phase A.
+**Status:** Phase A complete (approved 2026-09-18). **Phases B + C + D implemented locally on
+`feat/job-seo-v2`, all isolated gates green, NOT deployed, NOT migrated, production queue NOT
+cleaned** — see §8. P5 and historical backfill not started (require authorization).
 
 | | |
 |---|---|
@@ -288,16 +289,82 @@ Classification writes only the new columns. No DELETE anywhere in B/C.
   to diagnose and there are few enough to submit by hand if the API fails.
 - JobPosting for Workana freelance projects (budget ≠ salary; eligibility of project gigs): Phase D.
 
-## 7. Open decisions for the user (blocking or shaping B/C)
+## 7. Decisions (approved 2026-09-18)
 
-1. **Non-ready pages during migration:** keep them 200 + visible, drop JobPosting (mandatory), add
-   `noindex,follow` (recommended), and remove them from the sitemap. Exit path per state: `pending`/`retry`
-   leave through enrichment (Phase C) or backfill (Phase E). `unsupported` leaves **only** when that source
-   gains a detail adapter, so Torre (6,050), Glassdoor (2,400) and Indeed (339), about 8,800 pages plus
-   ~190 new rows/day, stay noindex **indefinitely** unless adapters are built. Alternative: keep them indexable
-   without JobPosting. Accepted risk either way: JOB_LISTING/JOB_DETAILS impressions from thin pages
-   will fall, which is the intent.
-2. **Queue triage (F7)** in Phase C: mark stale URL_UPDATED rows `superseded` in production.
-3. **Apply gate (F11):** keep the mandatory login modal before the source link, or let anonymous users
-   continue to the source (the modal becomes optional). Google §N / §19 favors the latter.
-4. **Roadmap:** approve running B/C/D ahead of P5, and record it in PROD-IMPROVEMENTS-PLAN.
+1. Non-compliant real jobs stay USER_VISIBLE (200, readable body, source link, dashboard) but are
+   out of the Google corpus: `noindex,follow`, no JobPosting, no sitemap entry, no URL_UPDATED.
+   USER_VISIBLE (`is_active`) and GOOGLE_READY (`seo_ready`) are separate columns and concepts.
+2. Indexing queue: clean with explicit state transitions (`superseded`, never DELETE, never an
+   UPDATE turned into a DELETE); dry-run first; send order 1 legit deletions → 2 newly ready →
+   3 meaningful updates.
+3. Lead capture is optional: the modal offers "Continuar a la oferta original"; the source link is
+   in the server-rendered HTML.
+4. Order: B → C → D, then P5 (Computrabajo detail), then — with separate authorization — the
+   historical backfill.
+
+## 8. Implementation record — phases B + C + D (local, 2026-09-18)
+
+### What changed
+
+| Area | Change | Files |
+|---|---|---|
+| Contract (B) | One evaluator `evaluateGoogleJobReadiness()` → `{ready, reasons[], qualitySignals, location}`; deterministic description rules with reason codes; stored verdict read by all four consumers through `isGoogleReadyNow()` / `seoReadySql()` | `src/lib/google-job-readiness.ts`, `src/lib/job-description-quality.ts`, `src/lib/country-codes.ts` |
+| Schema (B) | Additive `-- BEGIN job-seo-v2` block (jobs: detail state, provenance, remote evidence, source `valid_through`, `seo_ready*`, `content_hash`, `content_updated_at`; indexing_queue: `job_id`, `priority`, `content_hash`, `superseded_*`, indexes, conditional unique index) | `src/db/schema.sql` |
+| Persistence (B/C) | `refreshGoogleReadiness()` stores the verdict and enqueues URL_UPDATED in the same transaction only on a real transition; supersedes pending updates when a job stops being ready; detail state machine with bounded backoff; SKIP LOCKED claims with a lease | `src/db/job-readiness-repository.ts` |
+| New-job pipeline (C) | `saveJobs()` decides the detail state at insert and never enqueues thin rows; in-tick detail slice + bounded end-of-tick drain per market; adapters declare `descriptionKind`/`remoteType`/`applicantCountries`/`validThrough` only when the source states them | `src/db/job-repository.ts`, `src/queue/detail-enrichment.ts`, `src/queue/scrape-worker.ts`, `scripts/run-scrape-tick.ts`, `src/index.ts`, `src/lib/job-posting-jsonld.ts`, `src/sources/*` |
+| Indexing API (C) | Priority lanes, idempotent enqueue, pre-send target check (superseded rows use no quota), purge prioritizes deletions Google knew about, hourly reconcile only for Google-ready rows | `src/db/indexing-repository.ts`, `src/db/scheduler-repository.ts`, `scripts/run-indexing-tick.ts`, `scripts/backfill-indexing-queue.ts` |
+| JobPosting + page (D) | HTML description from one renderer (`<p>/<ul>/<li>` only) shared by JSON-LD and the visible body; no synthetic `validThrough`, no invented remote country, no `baseSalary`/`identifier`/`skills`/`qualifications`; `noindex,follow` for non-ready; full SSR body with source link; sitemap filtered by the gate with real-or-omitted `<lastmod>` | `src/lib/job-seo.ts`, `src/server.ts`, `src/db/job-repository.ts` |
+| Apply path (D) | Optional lead capture; "Continuar a la oferta original" in the modal; honest footer copy | `src/components/ApplyGateModal.tsx`, `src/components/JobDetailPanel.tsx` |
+| Tooling | `jobs:classify-readiness` (legacy classification + read-only candidate report), `seo:cleanup-indexing-queue` (dry-run/--apply), `test:job-seo` | `scripts/classify-job-readiness.ts`, `scripts/cleanup-indexing-queue.ts`, `package.json` |
+
+### Expected production effect (read-only estimate, same evaluator, 2026-09-18)
+
+[`seo-baseline/2026-09-18-readiness-estimate.json`](seo-baseline/2026-09-18-readiness-estimate.json):
+**15,676 / 66,590 (23.5%) Google-ready**; 50,914 stay user-visible but `noindex,follow`.
+Ready by source: LinkedIn 10,548 · Elempleo 2,276 · Magneto 1,632 · Computrabajo 1,217 ·
+Remotive 2 · RemoteOK 1 · all others 0. Detail status after classification: complete 21,781 ·
+backlog 34,556 · unsupported 8,942 · rejected 1,311. Top reasons: MISSING_DESCRIPTION 37,928 ·
+MISSING_LOCATION 11,970 · INVALID_REMOTE_LOCATION 7,058 · DESCRIPTION_TOO_THIN 5,641 ·
+DESCRIPTION_SNIPPET 5,428 · DESCRIPTION_NAVIGATION_JUNK 943 · DESCRIPTION_DUPLICATED_BLOCKS 308.
+The sitemap drops from 50,000 (truncated) to ≈15.7k complete entries, so truncation disappears as a
+consequence and sharding (Phase F) is no longer urgent.
+
+### Migration plan (NOT executed — requires explicit authorization per step)
+
+1. Review the `job-seo-v2` block diff. All `ADD COLUMN` statements use constant defaults, which are
+   metadata-only on PG 15. There are 4 `CREATE INDEX` (on ~66k jobs and ~150k queue rows, seconds of
+   write lock). The unique queue index is skipped because production has pending duplicates.
+2. `scripts/migrate.ts` (idempotent; applies the whole `schema.sql`), run from the main checkout's
+   `job-radar-apify` with the worktree's script path (the `.env` pattern already in use).
+3. `npm run jobs:classify-readiness` (dry-run) → review → `-- --apply`. Old code is still live and
+   ignores the columns.
+4. Deploy (fast-forward `main`, Render auto-deploy).
+5. `jobs:classify-readiness -- --apply` again. It is idempotent and picks up rows the old code
+   inserted between steps 3 and 4.
+6. `npm run seo:cleanup-indexing-queue` (dry-run, optionally `-- --http-sample=20`) → review →
+   `-- --apply`. The apply also creates the unique index.
+7. Verify: `/sitemap-jobs.xml` 200 + valid XML, 5 ready and 5 non-ready sample pages (robots, JSON-LD,
+   apply link), Rich Results Test on 3, `/seo drift compare` against the baseline URLs.
+
+### Rollback
+
+Revert the merge commit. The old code ignores every new column (defaults are harmless) and old
+queue readers select only `pending` (they skip `superseded`). The unique index is compatible with
+the old enqueue paths (they never insert a second pending row for the same URL+type); if needed:
+`DROP INDEX uq_indexing_queue_pending_url_type`. No data is deleted anywhere, so there is nothing to
+restore; superseded queue rows keep their full history.
+
+### Known limitations / decisions still open
+
+- **Country-only locations** (e.g. Magneto "Colombia", 1,262 rows) are not Google-ready:
+  `addressCountry` alone is allowed by Google, but "Colombia" doesn't say where the employee reports
+  to work (it may be nationwide or remote). Kept conservative; relaxing it is a one-line rule change
+  if approved.
+- **Workana** (4,072) is never ready: its `location` is the client's country on freelance projects,
+  and its `salary_raw` is a project budget. It stays excluded until a Phase D follow-up decides
+  JobPosting eligibility for project gigs.
+- **GetOnBoard** sends only `attrs.description` (the API also has `functions`, `desirable`,
+  `benefits`), and `remote_local` has no stated geography → P5.
+- **Legacy remote rows** have no stored remote evidence → not ready. New WeRemoto/GetOnBoard/
+  JSON-LD rows carry it and can become ready.
+- **`datePosted`** still falls back to scrape time when a source gives no date (86 rows).

@@ -10,7 +10,6 @@ import {
   getJobById,
   getActiveCompanyNames,
   searchActiveCompanies,
-  countCanonicalJobsByCompany,
   maskLockedFields,
   updateUserName,
   updateUserPreferredRoles,
@@ -34,7 +33,8 @@ import {
   isPubliclyDescribable,
   buildJobMeta,
   buildJobPosting,
-  buildJobDescription,
+  buildJobPageBody,
+  isGoogleEligiblePage,
   buildJobPath,
   buildJobSitemapEntry,
   JOBS_SITEMAP_HEADER,
@@ -285,14 +285,6 @@ async function attachReputation<T extends { company: string | null }>(
   }));
 }
 
-// GET /api/companies/search backing (Fase E4) — "Confidencial"/"Empresa
-// confidencial" are the fallback placeholders many sources use for an
-// undisclosed employer (~1,536 postings combined in the real corpus), never
-// a real company, so they're excluded before counting the same way
-// getComputrabajoDiscoveryCandidates() already excludes "Confidencial".
-// company_reputation_alias's exact-string convention applies here too — no
-// fuzzy merge of near-duplicate names (regla 5 de AGENTS.md).
-const COMPANY_SEARCH_EXCLUDED = new Set(["Confidencial", "Empresa confidencial"]);
 
 // Mirrors ReputationBadges.tsx's SOURCE_LABELS exactly (that file's own
 // comment: "Text attribution only, never a source's logo" — none of these
@@ -2158,20 +2150,6 @@ async function handleRequest(
     }
 
     const [visible] = maskLockedFields([job], tier);
-    // Free uniqueness signal for the JobPosting description (SEO Fase 9,
-    // docs/SEO-PLAN.md §9.3): the count is computed by a scalar canonical SQL
-    // query, never by loading or retaining the full job corpus in Node.
-    // Never for "Confidencial"/"Empresa confidencial" (COMPANY_SEARCH_EXCLUDED,
-    // §78 above): those are undisclosed-employer placeholders shared by
-    // thousands of unrelated postings, not one company — counting them would
-    // fabricate a claim like "Confidencial tiene 2366 vacantes más activas"
-    // (confirmed live via Search Console's Soft 404 report, 2026-08-09: this
-    // exact pattern is what made real, non-thin job pages read as templated
-    // near-duplicates to Google).
-    const companyActiveCount =
-      job.company && !COMPANY_SEARCH_EXCLUDED.has(job.company)
-        ? await countCanonicalJobsByCompany(job.company)
-        : undefined;
 
     let indexHtml: string;
     try {
@@ -2199,23 +2177,18 @@ async function handleRequest(
     }
 
     const meta = buildJobMeta(visible);
-    const jobPosting = buildJobPosting(visible, { companyActiveCount });
-
-    // SEO fix (2026-08-04): this branch only ever rewrote <head> tags —
-    // <div id="app"> stayed empty until React hydrated, so a crawler that
-    // reads raw HTML (Googlebot's first, non-JS pass) saw a titled page with
-    // zero body content and no <h1> at all, on the single highest-volume
-    // page pattern in the site (~22k job pages). Mirrors the same "real
-    // facts already computed above, embedded as plain HTML" pattern the
-    // category branch (7b-cat) and /dashboard (7c) already use — same
-    // buildJobDescription() call already used for the JobPosting JSON-LD
-    // above, so this can never say something different from the structured
-    // data next to it.
-    const jobDetailSnippet = `<h1>${escapeHtml(visible.title)}</h1>\n<p>${escapeHtml(buildJobDescription(visible, { companyActiveCount }))}</p>`;
-    indexHtml = indexHtml.replace(
-      '<div id="app"></div>',
-      `<div id="app">${jobDetailSnippet}</div>`
-    );
+    // Job SEO V2: USER_VISIBLE and GOOGLE_READY are separate. Every visible
+    // job gets the same readable body with the source link in raw HTML; the
+    // stored verdict of the shared gate (isGoogleEligiblePage) alone decides
+    // robots and JobPosting — the same verdict the sitemap and the Indexing
+    // API read, so the four consumers can never disagree.
+    const googleReady = isGoogleEligiblePage(visible);
+    const jobPosting = googleReady ? buildJobPosting(visible) : null;
+    indexHtml = indexHtml.replace('<div id="app"></div>', `<div id="app">${buildJobPageBody(visible)}</div>`);
+    indexHtml = indexHtml.replace(/<meta[^>]*name=["']robots["'][^>]*>/i, "");
+    if (!googleReady || !jobPosting) {
+      indexHtml = indexHtml.replace("</head>", `  <meta name="robots" content="noindex,follow">\n</head>`);
+    }
 
     indexHtml = indexHtml
       .replace(/<title>[\s\S]*?<\/title>/, `<title>${escapeHtml(meta.title)}</title>`)
@@ -2245,7 +2218,7 @@ async function handleRequest(
       )
       .replace(
         "</head>",
-        `  <script type="application/ld+json">${escapeJsonForScriptTag(jobPosting)}</script>\n</head>`
+        jobPosting ? `  <script type="application/ld+json">${escapeJsonForScriptTag(jobPosting)}</script>\n</head>` : "</head>"
       );
 
     await sendBody(req, res, 200, { "Content-Type": "text/html; charset=utf-8" }, indexHtml);
@@ -2749,7 +2722,7 @@ async function handleRequest(
         },
         onJob: async (job) => {
           const [visibleJob] = maskLockedFields([job], "free");
-          const entry = buildJobSitemapEntry(visibleJob);
+          const entry = buildJobSitemapEntry({ ...visibleJob, contentUpdatedAt: job.contentUpdatedAt });
           if (!entry) return;
           await writeWithBackpressure(
             res,

@@ -27,6 +27,16 @@ export interface Job {
   salaryCurrency?: string;
   salaryRaw?: string;
   applicantCount?: number;
+  // Job SEO V2 (docs/JOB-DETAIL-ENRICHMENT.md). All optional and all
+  // source-stated only — an adapter that doesn't know leaves them unset.
+  /** "snippet" when the text is a teaser field (Torre tagline, Jooble snippet), never a full description. */
+  descriptionKind?: "full" | "snippet";
+  /** Only when the source explicitly says so (JSON-LD TELECOMMUTE, API remote modality). */
+  remoteType?: "fully_remote" | "hybrid" | "onsite";
+  /** ISO-2 codes of the countries the source declares eligible. */
+  applicantCountries?: string[];
+  /** The source's own expiration date (JSON-LD validThrough). Never a retention date. */
+  validThrough?: string;
   [key: string]: any;
 }
 
@@ -45,6 +55,9 @@ export type JobDetail = Pick<
   | "salaryCurrency"
   | "salaryRaw"
   | "applicantCount"
+  | "remoteType"
+  | "applicantCountries"
+  | "validThrough"
 >;
 
 export interface SourceAdapter {
@@ -77,7 +90,7 @@ export interface SourceAdapter {
   ): Promise<SourceFetchResult<Job>>;
   // Optional: fetches the rich detail for ONE job's own page. Only called by
   // ScrapeWorker for jobs that were genuinely new this tick (never on every
-  // re-scrape — see saveJobs()/updateJobDetail() in job-repository.ts), so a
+  // re-scrape — see saveJobs() and src/queue/detail-enrichment.ts), so a
   // source without this simply never gets the extra request. Returns null
   // (not a partial/guessed object) when the detail page didn't yield
   // anything usable.

@@ -2,21 +2,26 @@ import type { Job } from "../sources/types.js";
 import { getModalityLabel, CITY_OPTIONS } from "./job-filters.js";
 import { DEFAULT_ROLES_200 } from "../queue/scheduler.js";
 import { getCountryConfig, DEFAULT_COUNTRY } from "../countries/index.js";
-import { extractTechnologies } from "./extract-technologies.js";
+import { isGoogleReadyNow, resolveGoogleLocation } from "./google-job-readiness.js";
+import { countryNameFor } from "./country-codes.js";
 
 export const SITE_URL = "https://buscotrabajo.co";
-// jobs older than this are purged from the DB (see job-repository.ts's
-// getJobs() comment) — a real, system-derived upper bound on how long this
-// listing can possibly still be active here, used for JobPosting's required
-// `validThrough` since we don't have the source's actual application
-// deadline. Never invents a fact we don't have; states one we do.
-const MAX_LISTING_AGE_DAYS = 30;
+// Job SEO V2 (docs/JOBPOSTING-GOOGLE-CONTRACT.md): there is deliberately no
+// "listing age" constant any more. JobPosting.validThrough used to be
+// published_at + 30 days, which is a retention window, not the employer's
+// expiration — it put an already-past date on ~14,500 live pages
+// (docs/SEARCH-CONSOLE-BASELINE-2026-09.md). Only a source-stated
+// expiration is emitted now; expiry is otherwise signaled by 410 + URL_DELETED.
 
 export type SeoJob = Job & {
   isLocked?: boolean;
   alsoIn?: string[];
   sources?: string[];
   role_origin?: string;
+  /** Stored verdict of the shared Google gate (jobs.seo_ready). */
+  seoReady?: boolean;
+  isActive?: boolean;
+  contentUpdatedAt?: string | Date | null;
 };
 
 export interface SitemapJobInput {
@@ -134,84 +139,90 @@ export function isPubliclyDescribable(
   return Boolean(job.company && job.location && job.url);
 }
 
-// Real, variable facts only — never invented prose. Draws on the same
-// fields the UI already shows (JobDetailPanel/JobCard), so a crawler never
-// sees a claim a real visitor wouldn't also see.
-export interface JobDescriptionContext {
-  // Count of other active jobs at the same company, computed by the caller
-  // from the same getJobsCached() list already loaded for this request (no
-  // new query — see server.ts). Real, per-company, varies naturally across
-  // the corpus instead of every page sharing one template — the enrichment
-  // docs/SEO-PLAN.md §5.2/§9.3 flagged as the durable fix for thin/near-
-  // duplicate JobPosting descriptions at this scale. Omitted (not 0) for
-  // callers without that context (e.g. isolated unit tests) — 0 would
-  // falsely claim "no other jobs here" for a company we simply didn't check.
-  companyActiveCount?: number;
+// --- One content model, two outputs (Job SEO V2) -----------------------------
+//
+// renderJobDescriptionHtml() is the ONLY producer of the job description HTML.
+// The same string is placed in the visible server-rendered body and in
+// JobPosting.description, so structured data can never say something the
+// page doesn't. Inputs are the normalized, tag-free storage fields; every
+// string is escaped and the only tags ever emitted are <p>, <ul>, <li> — no
+// source HTML is ever echoed, so there is nothing for a hostile source to inject.
+
+export function renderJobDescriptionHtml(job: Pick<Job, "description" | "requirements">): string {
+  const paragraphs = (job.description || "")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => `<p>${escapeHtml(line)}</p>`);
+  const items = (job.requirements || [])
+    .map((item) => (item || "").trim())
+    .filter(Boolean)
+    .map((item) => `<li>${escapeHtml(item)}</li>`);
+  return [...paragraphs, ...(items.length > 0 ? [`<ul>${items.join("")}</ul>`] : [])].join("");
 }
 
-export function buildJobDescription(job: SeoJob, context: JobDescriptionContext = {}): string {
-  const parts: string[] = [];
+/** True when this job may appear in Google's corpus: user-visible AND the shared gate passed. */
+export function isGoogleEligiblePage(job: SeoJob): boolean {
+  return isPubliclyDescribable(job) && isGoogleReadyNow(job);
+}
+
+function safeHttpUrl(value: string | null | undefined): string | null {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" || url.protocol === "http:" ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+function formatPublishedDate(value: string | Date | undefined): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return null;
+  return date.toLocaleDateString("es-CO", { day: "numeric", month: "long", year: "numeric", timeZone: "America/Bogota" });
+}
+
+function remoteLabel(job: SeoJob): string | null {
+  if (job.remoteType === "fully_remote") return "Remoto (100%)";
+  if (job.remoteType === "hybrid") return "Híbrido";
+  return getModalityLabel(job.location);
+}
+
+/**
+ * Server-rendered body of a job page. Readable without login or JavaScript,
+ * with the original source link in the raw HTML (never only after hydration).
+ * Rendered for every user-visible job, Google-ready or not — readiness only
+ * decides robots/JobPosting, never what a visitor can read or where they apply.
+ */
+export function buildJobPageBody(job: SeoJob): string {
   const fallbackLocation = getCountryConfig(job.country).name;
-  parts.push(
-    `${job.title} en ${job.company || "una empresa confidencial"}, ${job.location || fallbackLocation}.`
-  );
+  const facts: string[] = [];
+  if (job.company) facts.push(`<li>Empresa: ${escapeHtml(job.company)}</li>`);
+  facts.push(`<li>Ubicación: ${escapeHtml(job.location || fallbackLocation)}</li>`);
+  const modality = remoteLabel(job);
+  if (modality) facts.push(`<li>Modalidad: ${escapeHtml(modality)}</li>`);
+  const eligible = (job.remoteType === "fully_remote" ? job.applicantCountries || [] : [])
+    .map((code) => countryNameFor(code) || code)
+    .filter(Boolean);
+  if (eligible.length > 0) facts.push(`<li>Candidatos desde: ${escapeHtml(eligible.join(", "))}</li>`);
+  const published = formatPublishedDate(job.publishedAt);
+  if (published) facts.push(`<li>Publicada: ${escapeHtml(published)}</li>`);
+  if (job.employmentType) facts.push(`<li>Tipo de empleo: ${escapeHtml(job.employmentType)}</li>`);
+  if (job.salary) facts.push(`<li>Salario: ${escapeHtml(String(job.salary))}</li>`);
+  facts.push(`<li>Fuente: ${escapeHtml(job.source)}</li>`);
 
-  const modality = getModalityLabel(job.location);
-  if (modality) parts.push(`Modalidad: ${modality}.`);
+  const description = renderJobDescriptionHtml(job);
+  const descriptionBlock = description
+    ? `<section data-job-description><h2>Descripción de la vacante</h2>${description}</section>`
+    : `<p>La fuente original no publicó una descripción que podamos mostrar. Consulta el detalle completo en ${escapeHtml(job.source)}.</p>`;
+  // Only a real http(s) URL becomes a link — never javascript:/data: etc.,
+  // even if something upstream let one through.
+  const apply = safeHttpUrl(job.url)
+    ? `<p><a data-apply-link href="${escapeHtml(safeHttpUrl(job.url)!)}" target="_blank" rel="nofollow noopener noreferrer">Ver la oferta original y aplicar en ${escapeHtml(job.source)}</a></p>`
+    : "";
 
-  // Real scraped description/requirements — only a fraction of jobs have
-  // these today (job-repository.ts's detail-enrichment, capped per source
-  // per tick), so this stays a fallback-safe conditional exactly like every
-  // other block here: present, use it; absent, the rest of this function
-  // still produces the same generic-but-truthful sentence it always did.
-  // Multi-line job.description is pushed as-is — this string ends up both
-  // inside a plain (non-`pre`) <p> in server.ts's SSR snippet, where a
-  // browser collapses \n to whitespace on render, and as JobPosting's
-  // `description` (schema.org Text — internal newlines are harmless there
-  // too), so no line-break handling is needed here.
-  if (job.description) parts.push(job.description);
-  if (job.requirements && job.requirements.length > 0) {
-    parts.push(`Requisitos: ${job.requirements.join("; ")}.`);
-  }
-
-  // Same real timestamp already used for JobPosting's datePosted below —
-  // stated here as visible text too, not just buried in JSON-LD. A real
-  // publish date in the visible content is a documented recency/freshness
-  // signal for both traditional E-E-A-T and AI-citation eligibility
-  // (SEO-IMPROVEMENT-PLAN.md §1.12) — never a fabricated "last updated"
-  // claim, just this job's own already-known `publishedAt`.
-  if (job.publishedAt) {
-    const publishedLabel = new Date(job.publishedAt).toLocaleDateString("es-CO", {
-      day: "numeric",
-      month: "long",
-      year: "numeric"
-    });
-    parts.push(`Publicado el ${publishedLabel}.`);
-  }
-
-  // "- 1" excludes this job itself from its own count.
-  const otherAtCompany = (context.companyActiveCount ?? 0) - 1;
-  if (job.company && otherAtCompany > 0) {
-    parts.push(
-      `${job.company} tiene ${otherAtCompany} vacante${otherAtCompany === 1 ? "" : "s"} más activa${otherAtCompany === 1 ? "" : "s"} en BuscoTrabajo.`
-    );
-  }
-
-  const otherSources = (job.alsoIn || (job.sources || []).filter((s) => s !== job.source)).filter(
-    Boolean
-  );
-  if (otherSources.length > 0) {
-    parts.push(`También publicada en: ${otherSources.join(", ")}.`);
-  }
-
-  // Factual (where to apply), not self-deprecating — states the same real
-  // fact as before (BuscoTrabajo aggregates, doesn't host applications)
-  // without the "we add no value" framing that content_quality.py (claude-seo)
-  // and Google's scaled-content-abuse policy both read as a low-value-
-  // aggregator signal. See docs/SEO-PLAN.md §9.3.
-  parts.push(`Vacante agregada de ${job.source}. Aplica directamente en la página de ${job.source}.`);
-
-  return parts.join(" ");
+  return `<article><h1>${escapeHtml(job.title)}</h1>\n<ul>${facts.join("")}</ul>\n${apply}\n${descriptionBlock}\n${apply}</article>`;
 }
 
 export interface JobMeta {
@@ -231,22 +242,10 @@ export function buildJobMeta(job: SeoJob): JobMeta {
   };
 }
 
-// A `location` that's ONLY the remote marker ("Remoto"/"Remote", no city
-// attached) has nothing real to put in jobLocation.address.addressLocality
-// — schema.org's PostalAddress expects an actual place name, and Google's
-// JobPosting rich-result guidance (developers.google.com/search/docs/
-// appearance/structured-data/job-posting#job-location) says to use
-// jobLocationType: "TELECOMMUTE" instead for exactly this case. A location
-// that ALSO names a real city ("Remoto - Bogotá", "Híbrido - Medellín")
-// keeps the normal jobLocation branch below — that IS real, useful place
-// info, not a placeholder, so it's left alone.
-const BARE_REMOTE_RE = /^(remoto|remote)$/i;
-
 // Reverse of job-posting-jsonld.ts's SCHEMA_EMPLOYMENT_TYPE_LABELS (Spanish
-// display label -> schema.org's own enum token). Kept as its own small,
-// fixed table here rather than importing the other module's — one 7-entry
-// map isn't worth a cross-module dependency for a single lookup, and this
-// direction (label -> token) is only ever needed here, for JSON-LD output.
+// display label -> schema.org's own enum token). Labels with no schema.org
+// equivalent (Workana "Proyecto"/"Por hora") map to nothing and are omitted —
+// never guessed, never inferred from the title.
 const EMPLOYMENT_TYPE_LABEL_TO_SCHEMA: Record<string, string> = {
   "Tiempo completo": "FULL_TIME",
   "Medio tiempo": "PART_TIME",
@@ -257,95 +256,54 @@ const EMPLOYMENT_TYPE_LABEL_TO_SCHEMA: Record<string, string> = {
   "Por día": "PER_DIEM"
 };
 
-function isBareRemoteLocation(location: string | undefined | null): boolean {
-  return BARE_REMOTE_RE.test((location || "").trim());
-}
-
-// Returns null for locked/incomplete jobs — callers must not render
-// JobPosting structured data at all in that case (see
-// isPubliclyDescribable), rather than emitting one with null fields.
-export function buildJobPosting(
-  job: SeoJob,
-  context: JobDescriptionContext = {}
-): Record<string, unknown> | null {
-  if (!isPubliclyDescribable(job)) return null;
-
-  const publishedAt = job.publishedAt ? new Date(job.publishedAt) : new Date();
-  const validThrough = new Date(publishedAt.getTime() + MAX_LISTING_AGE_DAYS * 24 * 60 * 60 * 1000);
+/**
+ * Exactly one JobPosting for one Google-ready job page, or null. Every field
+ * is a source-stated fact that the visible body (buildJobPageBody) also shows:
+ *  - title verbatim from the source; description = renderJobDescriptionHtml();
+ *  - TELECOMMUTE only with source evidence of 100% remote AND source-stated
+ *    eligible countries (Google requires one); otherwise a physical address
+ *    split from the source's location text — never a guessed country;
+ *  - validThrough only when the source published an expiration;
+ *  - no baseSalary (Google: "only employers can provide baseSalary"), no
+ *    directApply (applications happen at the source), no identifier (we don't
+ *    hold the employer's own id), no skills/qualifications split from lists.
+ */
+export function buildJobPosting(job: SeoJob): Record<string, unknown> | null {
+  if (!isGoogleEligiblePage(job)) return null;
+  const { location } = resolveGoogleLocation(job);
+  if (!location || !job.publishedAt || !job.company) return null;
 
   const posting: Record<string, unknown> = {
     "@context": "https://schema.org/",
     "@type": "JobPosting",
     title: job.title,
-    description: buildJobDescription(job, context),
-    identifier: {
-      "@type": "PropertyValue",
-      name: job.source,
-      value: job.jobId
-    },
-    datePosted: publishedAt.toISOString(),
-    validThrough: validThrough.toISOString(),
+    description: renderJobDescriptionHtml(job),
+    datePosted: new Date(job.publishedAt).toISOString(),
     hiringOrganization: {
       "@type": "Organization",
       name: job.company
     }
   };
 
-  // skills/qualifications are schema.org Text fields (a string, not an
-  // array) — only added when real data exists, same "present, use it;
-  // absent, omit" rule as the rest of this function.
-  //
-  // Same precedence fix as JobDetailPanel.tsx (2026-08-12): job.technologies
-  // is each source's own raw `skills` field, which for some sources
-  // (confirmed live: Magneto) turned out to be generic category labels
-  // ("Desarrollo de software", "Arquitectura de software") with no relation
-  // to the technologies the posting's own text actually names. extractTechnologies()
-  // only returns catalog names literally present in description/requirements,
-  // so by construction it always matches what the posting really says —
-  // used first, falling back to the source's raw field only when extraction
-  // finds nothing there to work with.
-  const extractedSkills = extractTechnologies(
-    [job.description, ...(job.requirements || [])].filter(Boolean).join("\n")
-  );
-  const skills = extractedSkills.length > 0 ? extractedSkills : job.technologies || [];
-  if (skills.length > 0) posting.skills = skills.join(", ");
-  if (job.requirements && job.requirements.length > 0) {
-    posting.qualifications = job.requirements.join("; ");
-  }
-  // job.employmentType already holds the Spanish display label
-  // (JobDetailPanel's badge — set by job-posting-jsonld.ts's
-  // SCHEMA_EMPLOYMENT_TYPE_LABELS) — schema.org's own employmentType
-  // expects the enum token back ("FULL_TIME", not "Tiempo completo"), so
-  // this reverses that same map rather than emitting the Spanish text into
-  // a field Google's parser expects to be one of a fixed set of values.
-  const employmentTypeToken = job.employmentType
-    ? EMPLOYMENT_TYPE_LABEL_TO_SCHEMA[job.employmentType]
-    : undefined;
+  const employmentTypeToken = job.employmentType ? EMPLOYMENT_TYPE_LABEL_TO_SCHEMA[job.employmentType] : undefined;
   if (employmentTypeToken) posting.employmentType = employmentTypeToken;
 
-  if (isBareRemoteLocation(job.location)) {
+  if (job.validThrough) posting.validThrough = new Date(job.validThrough).toISOString();
+
+  if (location.kind === "remote") {
     posting.jobLocationType = "TELECOMMUTE";
-    // job.country is null for remote postings (schema.sql's convention) —
-    // falls back to CO via getCountryConfig's own default, same assumption
-    // every other caller of getCountryConfig(job.country) already makes,
-    // not a new invention.
-    posting.applicantLocationRequirements = {
+    posting.applicantLocationRequirements = location.countries.map((code) => ({
       "@type": "Country",
-      name: getCountryConfig(job.country).name
-    };
+      name: countryNameFor(code) || code
+    }));
   } else {
-    posting.jobLocation = {
-      "@type": "Place",
-      address: {
-        "@type": "PostalAddress",
-        addressLocality: job.location,
-        // job.country is null for remote postings (schema.sql's convention)
-        // — falls back to CO via getCountryConfig's own default, same
-        // assumption this hardcoded "CO" already made for every job before
-        // the country column existed, not a new invention.
-        addressCountry: getCountryConfig(job.country).code
-      }
+    const address: Record<string, string> = {
+      "@type": "PostalAddress",
+      addressLocality: location.locality,
+      addressCountry: location.country
     };
+    if (location.region) address.addressRegion = location.region;
+    posting.jobLocation = { "@type": "Place", address };
   }
 
   return posting;
@@ -673,12 +631,15 @@ export const JOBS_SITEMAP_HEADER =
   '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n';
 export const JOBS_SITEMAP_FOOTER = "\n</urlset>\n";
 
-export function buildJobSitemapEntry(job: SitemapJobInput): string | null {
+/**
+ * Callers pass rows already filtered by the shared Google gate (the sitemap
+ * SQL applies seoReadySql). <lastmod> is the real content-change time, and is
+ * OMITTED when unknown (legacy rows) — never the regeneration time, never a
+ * stand-in like published_at.
+ */
+export function buildJobSitemapEntry(job: SitemapJobInput & { contentUpdatedAt?: string | Date | null }): string | null {
   if (!isPubliclyDescribable(job)) return null;
-  return xmlUrlEntry(
-    buildJobUrl(job),
-    job.publishedAt ? new Date(job.publishedAt).toISOString() : undefined
-  );
+  return xmlUrlEntry(buildJobUrl(job), job.contentUpdatedAt ? new Date(job.contentUpdatedAt).toISOString() : undefined);
 }
 
 // Callers must pass jobs already sourced from the same deduped view
@@ -690,6 +651,7 @@ export function buildJobSitemapEntry(job: SitemapJobInput): string | null {
 // buildJobPosting() does: a locked job has no real page to list yet.
 export function buildJobsSitemapXml(jobs: SeoJob[]): string {
   const urls = jobs
+    .filter((job) => isGoogleReadyNow(job))
     .map(buildJobSitemapEntry)
     .filter((entry): entry is string => entry !== null)
     .join("\n");

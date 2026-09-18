@@ -1,6 +1,6 @@
 import { pool } from "./client.js";
 import { buildJobUrl, isPubliclyDescribable } from "../lib/job-seo.js";
-import { enqueueIndexingNotifications } from "./indexing-repository.js";
+import { enqueueIndexingNotifications, INDEXING_PRIORITY } from "./indexing-repository.js";
 
 /**
  * Idempotent upsert of the known role list into `search_roles` — safe to
@@ -145,10 +145,10 @@ export async function markGlobalSourceRun(sourceName: string): Promise<void> {
 export async function purgeOldJobs(): Promise<number> {
   const result = await pool.query(
     `DELETE FROM jobs WHERE last_seen_at < NOW() - INTERVAL '30 days'
-     RETURNING id, title, company, location, url, source, published_at`
+     RETURNING id, title, company, location, url, source, published_at, seo_ready_at`
   );
 
-  const deletedUrls = result.rows
+  const deleted = result.rows
     .map((row) => ({
       jobId: row.id,
       title: row.title,
@@ -157,15 +157,40 @@ export async function purgeOldJobs(): Promise<number> {
       url: row.url,
       source: row.source,
       publishedAt: row.published_at,
-      dateText: ""
+      dateText: "",
+      everSeoReady: row.seo_ready_at !== null
     }))
-    .filter(isPubliclyDescribable)
-    .map((job) => buildJobUrl(job));
+    .filter(isPubliclyDescribable);
 
-  if (deletedUrls.length > 0) {
+  if (deleted.length > 0) {
     try {
+      const urls = deleted.map((job) => buildJobUrl(job));
+      // Job SEO V2: a removal is always recorded (it is also the 410
+      // tombstone), but it only takes the top send lane when Google could
+      // actually know the page — it was Google-ready at some point, or an
+      // URL_UPDATED for it was really sent. Any still-pending URL_UPDATED for
+      // the same URL is now pointless: superseded, never sent, history kept.
+      const notified = await pool.query<{ url: string }>(
+        `SELECT DISTINCT url FROM indexing_queue
+         WHERE url = ANY($1::text[]) AND notification_type = 'URL_UPDATED' AND status = 'sent'`,
+        [urls]
+      );
+      const notifiedUrls = new Set(notified.rows.map((row) => row.url));
       await enqueueIndexingNotifications(
-        deletedUrls.map((url) => ({ url, type: "URL_DELETED" as const }))
+        deleted.map((job, index) => ({
+          url: urls[index],
+          type: "URL_DELETED" as const,
+          jobId: job.jobId,
+          priority:
+            job.everSeoReady || notifiedUrls.has(urls[index])
+              ? INDEXING_PRIORITY.deleted
+              : INDEXING_PRIORITY.reconcile
+        }))
+      );
+      await pool.query(
+        `UPDATE indexing_queue SET status = 'superseded', superseded_at = NOW(), superseded_reason = 'target_deleted'
+         WHERE status = 'pending' AND notification_type = 'URL_UPDATED' AND url = ANY($1::text[])`,
+        [urls]
       );
     } catch (err) {
       console.warn(`⚠️ [purgeOldJobs] Failed to enqueue URL_DELETED notifications:`, err);

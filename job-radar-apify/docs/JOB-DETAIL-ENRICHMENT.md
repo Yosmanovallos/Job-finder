@@ -1,28 +1,34 @@
 # Job Detail Enrichment — contract, state machine, source coverage
 
-**Status:** Phase A design (not implemented). Owner phases: B (contract + state), C (new jobs),
-E (historical backfill, **requires explicit authorization**). Parent: [JOB-SEO-ARCHITECTURE-V2.md](JOB-SEO-ARCHITECTURE-V2.md).
+**Status:** B + C implemented locally (2026-09-18, `feat/job-seo-v2`; see JOB-SEO-ARCHITECTURE-V2 §8).
+E (historical backfill) **not started — requires explicit authorization**. Parent: [JOB-SEO-ARCHITECTURE-V2.md](JOB-SEO-ARCHITECTURE-V2.md).
 
 ## 1. Invariant
 
 > A job enters the public SEO corpus (JobPosting, sitemap shard, Indexing API) only after a real,
-> source-derived description has been obtained **and** has passed `evaluateJobDescription()`.
+> source-derived description has been obtained **and** has passed the shared gate `evaluateGoogleJobReadiness()` (which applies `assessDescription()`).
 > Nothing is inferred, generated or completed by AI. Missing is `NULL`, never a guess.
 
 ## 2. State machine (`jobs.detail_status`)
 
 | State | Meaning | Next |
 |---|---|---|
-| `NULL` | Legacy row, not yet classified (only before the Phase B classification run) | → any, via `classify-job-details.ts` |
-| `pending` | New, listing incomplete, adapter has `fetchDetail`, not tried yet | → `ready` / `no_detail` / `retry` / `rejected` |
+| `NULL` | Legacy row, not yet classified (only before the Phase B classification run) | → any, via `scripts/classify-job-readiness.ts` |
+| `pending` | New, listing incomplete, adapter has `fetchDetail`, not tried yet | → `complete` / `retry` / `no_detail` / `rejected` |
 | `retry` | Transient fault (timeout, 5xx, 429, 403, open circuit). `detail_next_attempt_at` set | → same as `pending`; → `failed` at max attempts |
 | `no_detail` | Page fetched, yielded nothing usable (`fetchDetail → null`). Circuit-neutral (P4) | re-tried at most twice more with long backoff (listings sometimes lag) → `failed` |
 | `rejected` | Content obtained but failed the completeness contract (reasons recorded) | terminal until content changes |
 | `unsupported` | No complete listing text and no `fetchDetail` for this source | re-evaluated only when an adapter gains detail support |
 | `failed` | Attempts exhausted | terminal; Phase E may reset with a new budget |
-| `ready` | Validated complete description | `seo_ready_at` stamped once |
+| `complete` | Validated complete description stored | readiness then decided by the shared gate |
+| `backlog` | Legacy row (pre-V2) with no description from a detail-capable source | **never claimed by the tick**; only the Phase E backfill |
 
-Backoff (proposal, Phase B tests pin it): 30 min → 2 h → 8 h → 24 h, `max_attempts = 4`. A 429 with
+As implemented: `no_detail` is recorded as `retry` (`detail_last_error = NO_DETAIL`) until the 2nd
+empty answer, then terminal `no_detail`. An `unsupported` row inserted by an adapter that DOES
+implement `fetchDetail` is promoted to `pending` by the in-tick claim (the adapter is the runtime
+evidence). Google readiness is not a detail state: it lives in `seo_ready` (evaluator verdict).
+
+Backoff (implemented, pinned by tests/validate-job-seo-v2.ts): 30 min → 2 h → 8 h → 24 h, `max_attempts = 4`. A 429 with
 `Retry-After` uses `max(backoff, Retry-After)`, capped by `SourcePolicy.maxRetryAfterMs` for in-tick
 waits and **stored** for anything longer. The job is never hammered.
 
@@ -30,9 +36,9 @@ Transitions are single `UPDATE … WHERE id = $1 AND detail_status IN (…)` sta
 so a crashed tick leaves a row in `pending/retry` and the next tick simply picks it up. The drain
 claims rows with `FOR UPDATE SKIP LOCKED`, so two ticks (CO and VE run concurrently) never double-fetch.
 
-## 3. Completeness contract — `evaluateJobDescription()`
+## 3. Completeness contract — `assessDescription()` (src/lib/job-description-quality.ts)
 
-Deterministic, pure, returns `{ complete: boolean, reasons: string[] }`. It deliberately has **no
+Deterministic, pure, returns `{ ok, reasons[], signals }`; reason codes as implemented: `MISSING_DESCRIPTION`, `DESCRIPTION_SNIPPET`, `DESCRIPTION_IS_METADATA`, `DESCRIPTION_TOO_THIN`, `DESCRIPTION_ERROR_PAGE`, `DESCRIPTION_NAVIGATION_JUNK`, `DESCRIPTION_DUPLICATED_BLOCKS`, `DESCRIPTION_TRUNCATED`, `DESCRIPTION_DUPLICATED_TEMPLATE`, `DESCRIPTION_APPLICATION_ONLY`. It deliberately has **no
 "≥ 300 words" rule**: 150 specific words can pass and 900 words of navigation fail. Checks, in order:
 
 | # | Rule | Rejects | Evidence it is needed |
@@ -57,7 +63,7 @@ generic-word lesson from role matching: sample the matches, don't trust the tota
 ```
 source HTML / JSON-LD / API text   (untrusted)
   → extractStructuredFromHtml()     already strips ALL tags → plain text lines + list items
-  → evaluateJobDescription()        (new)
+  → assessDescription() via evaluateGoogleJobReadiness()
   → stored: description (text, \n-separated), requirements (JSON string[])
   → renderJobDescriptionHtml()      (new, Phase D): escapeHtml every string, emit only <p>, <ul>, <li>
        ├─ SSR visible body
@@ -66,7 +72,7 @@ source HTML / JSON-LD / API text   (untrusted)
 
 No source HTML is ever stored or echoed. The output tag allow-list is fixed in code (`p`, `ul`, `li`),
 so there is no sanitizer to configure or bypass. F12's mislabeling (every `<li>` → "Requisitos") is
-fixed in Phase D by rendering lists under a neutral heading unless the source labeled the section.
+fixed in the server-rendered body and JSON-LD (lists sit inside a neutral "Descripción de la vacante" section). The hydrated React panel still titles them "Requisitos" — same text, different label; relabeling the client is a P10/UX follow-up.
 
 ## 5. Source coverage for detail (Phase A snapshot)
 
