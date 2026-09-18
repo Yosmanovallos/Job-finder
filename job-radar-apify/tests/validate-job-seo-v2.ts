@@ -541,6 +541,8 @@ try {
        ($6, 'URL_DELETED', 'pending', NOW() - INTERVAL '3 days', NULL)`,
     [legacyRichUrl, glassUrl, goneUrl, goneNotifiedUrl, staleSlugUrl, glassUrl]
   );
+  const finalizerWithDuplicates = await runScript("finalize-job-seo-v2-queue-index.ts", []);
+  assert.notEqual(finalizerWithDuplicates.code, 0, "queue-index finalizer fails closed while pending duplicates exist");
   const totalBefore = Number((await pool.query(`SELECT COUNT(*) FROM indexing_queue`)).rows[0].count);
   const snapshot = async () => (await pool.query(`SELECT id, status, priority FROM indexing_queue ORDER BY id`)).rows;
   const beforeRows = await snapshot();
