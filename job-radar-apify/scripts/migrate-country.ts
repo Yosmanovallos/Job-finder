@@ -27,11 +27,14 @@
 import dotenv from "dotenv";
 import { pool } from "../src/db/client.js";
 import { ALWAYS_REMOTE_SOURCES } from "../src/countries/index.js";
+import { mutateReadinessRelevantJobs } from "../src/db/job-readiness-repository.js";
 
 dotenv.config();
+const APPLY = process.argv.includes("--apply");
+const BATCH_SIZE = 500;
 
 async function main() {
-  console.log("🔧 [migrate-country] Starting migration...\n");
+  console.log(`🔧 [migrate-country] ${APPLY ? "APPLY" : "DRY-RUN (sin escrituras)"}...\n`);
 
   const alwaysRemoteSources = Array.from(ALWAYS_REMOTE_SOURCES);
 
@@ -50,14 +53,26 @@ async function main() {
   );
   console.log(`📊 Detected as remote (source-based or location-based, will stay country IS NULL): ${remoteBefore.rows[0].total}`);
 
-  const result = await pool.query(
-    `UPDATE jobs SET country = 'CO'
+  const candidates = await pool.query<{ id: string }>(
+    `SELECT id FROM jobs
      WHERE country IS NULL
        AND NOT (source = ANY($1))
-       AND NOT (lower(COALESCE(location, '')) LIKE '%remoto%' OR lower(COALESCE(location, '')) LIKE '%remote%')`,
+       AND NOT (lower(COALESCE(location, '')) LIKE '%remoto%' OR lower(COALESCE(location, '')) LIKE '%remote%')
+     ORDER BY id`,
     [alwaysRemoteSources]
   );
-  console.log(`✅ Backfilled country='CO' on ${result.rowCount} rows.\n`);
+  let changed = 0;
+  if (APPLY) {
+    for (let offset = 0; offset < candidates.rows.length; offset += BATCH_SIZE) {
+      const batch = candidates.rows.slice(offset, offset + BATCH_SIZE);
+      const outcomes = await mutateReadinessRelevantJobs(
+        batch.map((row) => ({ id: row.id, patch: { country: "CO" } })),
+        { contentObtained: true }
+      );
+      changed += outcomes.length;
+    }
+  }
+  console.log(`${APPLY ? "✅ Backfilled" : "📋 Would backfill"} country='CO' on ${APPLY ? changed : candidates.rows.length} rows through the readiness mutation path.\n`);
 
   const stillNull = await pool.query(`SELECT COUNT(*) AS total FROM jobs WHERE country IS NULL`);
   const co = await pool.query(`SELECT COUNT(*) AS total FROM jobs WHERE country = 'CO'`);
@@ -71,7 +86,7 @@ async function main() {
   console.log(`   country IS NULL:      ${stillNull.rows[0].total}  (debe coincidir con "detectado como remoto" arriba)`);
   console.log("═══════════════════════════════════════════════════\n");
 
-  if (Number(stillNull.rows[0].total) !== Number(remoteBefore.rows[0].total)) {
+  if (APPLY && Number(stillNull.rows[0].total) !== Number(remoteBefore.rows[0].total)) {
     console.warn(
       "⚠️  El conteo de country IS NULL después no coincide con el de remotos detectado antes. " +
         "Revisar antes de asumir que el backfill quedó correcto (posible fila con country ya seteado desde otra fuente, o edge case de location vacío)."

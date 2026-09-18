@@ -24,11 +24,14 @@
  */
 import dotenv from "dotenv";
 import { pool } from "../src/db/client.js";
+import { mutateReadinessRelevantJobs } from "../src/db/job-readiness-repository.js";
 
 dotenv.config();
+const APPLY = process.argv.includes("--apply");
+const BATCH_SIZE = 500;
 
 async function main() {
-  console.log("🔧 [backfill-workana-country] Starting...\n");
+  console.log(`🔧 [backfill-workana-country] ${APPLY ? "APPLY" : "DRY-RUN (sin escrituras)"}...\n`);
 
   const before = await pool.query(
     `SELECT country, COUNT(*) AS n FROM jobs WHERE source = 'Workana' GROUP BY country ORDER BY n DESC`
@@ -38,10 +41,20 @@ async function main() {
     console.log(`   country=${row.country ?? "NULL"}: ${row.n}`);
   }
 
-  const result = await pool.query(
-    `UPDATE jobs SET country = NULL WHERE source = 'Workana' AND country IS NOT NULL`
+  const candidates = await pool.query<{ id: string }>(
+    `SELECT id FROM jobs WHERE source = 'Workana' AND country IS NOT NULL ORDER BY id`
   );
-  console.log(`\n✅ Cleared country on ${result.rowCount} Workana row(s).\n`);
+  let changed = 0;
+  if (APPLY) {
+    for (let offset = 0; offset < candidates.rows.length; offset += BATCH_SIZE) {
+      const outcomes = await mutateReadinessRelevantJobs(
+        candidates.rows.slice(offset, offset + BATCH_SIZE).map((row) => ({ id: row.id, patch: { country: null } })),
+        { contentObtained: true }
+      );
+      changed += outcomes.length;
+    }
+  }
+  console.log(`\n${APPLY ? "✅ Cleared" : "📋 Would clear"} country on ${APPLY ? changed : candidates.rows.length} Workana row(s) through the readiness mutation path.\n`);
 
   const after = await pool.query(
     `SELECT country, COUNT(*) AS n FROM jobs WHERE source = 'Workana' GROUP BY country ORDER BY n DESC`

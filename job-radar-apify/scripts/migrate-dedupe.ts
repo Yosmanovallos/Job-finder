@@ -9,8 +9,11 @@
 import dotenv from "dotenv";
 import crypto from "crypto";
 import { pool } from "../src/db/client.js";
+import { mutateReadinessRelevantJobs } from "../src/db/job-readiness-repository.js";
 
 dotenv.config();
+const APPLY = process.argv.includes("--apply");
+const BATCH_SIZE = 500;
 
 function computeContentFingerprint(title: string, company: string, location: string): string {
   const normalized = [
@@ -22,14 +25,12 @@ function computeContentFingerprint(title: string, company: string, location: str
 }
 
 async function main() {
-  console.log("🔧 [migrate-dedupe] Starting migration...\n");
+  console.log(`🔧 [migrate-dedupe] ${APPLY ? "APPLY" : "DRY-RUN (sin escrituras)"}...\n`);
 
   // ─── Step 1: Add content_fingerprint column if missing ──────────────
   console.log("📌 Step 1: Adding content_fingerprint column...");
-  await pool.query(`
-    ALTER TABLE jobs ADD COLUMN IF NOT EXISTS content_fingerprint VARCHAR(64)
-  `);
-  console.log("   ✅ Column added (or already existed).\n");
+  if (APPLY) await pool.query(`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS content_fingerprint VARCHAR(64)`);
+  console.log(`   ${APPLY ? "✅ Column ready." : "📋 Column would be ensured."}\n`);
 
   // ─── Step 2: Count current duplicates ────────────────────────────────
   const beforeCount = await pool.query(`SELECT COUNT(*) AS total FROM jobs WHERE is_active = TRUE`);
@@ -58,18 +59,25 @@ async function main() {
 
   // ─── Step 3: Deactivate duplicate rows ──────────────────────────────
   console.log("🧹 Step 3: Deactivating duplicate rows (keeping the oldest per group)...");
-  const deactivated = await pool.query(`
-    UPDATE jobs SET is_active = FALSE
-    WHERE is_active = TRUE
-      AND id NOT IN (
-        SELECT DISTINCT ON (lower(trim(title)), lower(trim(COALESCE(company, 'confidencial'))), lower(trim(COALESCE(location, 'colombia'))))
-          id
-        FROM jobs
-        WHERE is_active = TRUE
-        ORDER BY lower(trim(title)), lower(trim(COALESCE(company, 'confidencial'))), lower(trim(COALESCE(location, 'colombia'))), published_at ASC
-      )
+  const duplicateIds = await pool.query<{ id: string }>(`
+    SELECT id FROM (
+      SELECT id, ROW_NUMBER() OVER (
+        PARTITION BY lower(trim(title)), lower(trim(COALESCE(company, 'confidencial'))), lower(trim(COALESCE(location, 'colombia')))
+        ORDER BY published_at ASC, id ASC
+      ) AS duplicate_rank
+      FROM jobs WHERE is_active = TRUE
+    ) grouped WHERE duplicate_rank > 1 ORDER BY id
   `);
-  console.log(`   ✅ Deactivated ${deactivated.rowCount} duplicate rows.\n`);
+  let deactivated = 0;
+  if (APPLY) {
+    for (let offset = 0; offset < duplicateIds.rows.length; offset += BATCH_SIZE) {
+      const outcomes = await mutateReadinessRelevantJobs(
+        duplicateIds.rows.slice(offset, offset + BATCH_SIZE).map((row) => ({ id: row.id, patch: { is_active: false } }))
+      );
+      deactivated += outcomes.length;
+    }
+  }
+  console.log(`   ${APPLY ? "✅ Deactivated" : "📋 Would deactivate"} ${APPLY ? deactivated : duplicateIds.rows.length} duplicate rows through the readiness mutation path.\n`);
 
   // ─── Step 4: Backfill content_fingerprint on remaining active rows ──
   console.log("🔑 Step 4: Backfilling content_fingerprint on active rows...");
@@ -79,30 +87,23 @@ async function main() {
   `);
 
   let backfilled = 0;
-  for (const row of activeJobs.rows) {
-    const fp = computeContentFingerprint(row.title, row.company, row.location);
-    await pool.query(`UPDATE jobs SET content_fingerprint = $1 WHERE id = $2`, [fp, row.id]);
-    backfilled++;
+  if (APPLY) {
+    for (const row of activeJobs.rows) {
+      const fp = computeContentFingerprint(row.title, row.company, row.location);
+      await pool.query(`UPDATE jobs SET content_fingerprint = $1 WHERE id = $2`, [fp, row.id]);
+      backfilled++;
+    }
   }
   console.log(`   ✅ Backfilled ${backfilled} rows.\n`);
 
   // ─── Step 5: Create unique index ────────────────────────────────────
   console.log("📇 Step 5: Creating unique index on content_fingerprint...");
-  try {
-    await pool.query(`
-      CREATE UNIQUE INDEX IF NOT EXISTS idx_jobs_content_fingerprint
-        ON jobs (content_fingerprint) WHERE content_fingerprint IS NOT NULL AND is_active = TRUE
-    `);
+  if (APPLY) {
+    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_jobs_content_fingerprint
+      ON jobs (content_fingerprint) WHERE content_fingerprint IS NOT NULL AND is_active = TRUE`);
     console.log("   ✅ Index created.\n");
-  } catch (err: any) {
-    // If there are still fingerprint collisions among active rows (shouldn't
-    // happen after Step 3, but just in case), fall back to a non-unique index
-    console.warn(`   ⚠️ Unique index failed (${err.message}). Creating non-unique index instead...`);
-    await pool.query(`
-      CREATE INDEX IF NOT EXISTS idx_jobs_content_fingerprint
-        ON jobs (content_fingerprint) WHERE content_fingerprint IS NOT NULL
-    `);
-    console.log("   ✅ Non-unique index created.\n");
+  } else {
+    console.log("   📋 Index would be ensured after the duplicate check.\n");
   }
 
   // ─── Step 6: Final count ─────────────────────────────────────────────

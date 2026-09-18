@@ -9,7 +9,7 @@ import { validateJobs } from "./job-validator.js";
 import { PAYWALL_ENABLED } from "../config.js";
 import { expandRoleWords, getRoleMatchWords, tokenizeJobSearch } from "../lib/job-filters.js";
 import type { JobFilterParams } from "../lib/job-filters.js";
-import { initialDetailStatus, refreshGoogleReadiness } from "./job-readiness-repository.js";
+import { initialDetailStatus, refreshGoogleReadinessInTransaction } from "./job-readiness-repository.js";
 import { sourceSupportsDetail } from "../sources/detail-capability.js";
 import { seoReadySql } from "../lib/google-job-readiness.js";
 import { StaleWhileRevalidateCache } from "../lib/stale-while-revalidate-cache.js";
@@ -70,7 +70,6 @@ export async function saveJobs(
   // right after insert (refreshGoogleReadiness), which is the ONLY path that
   // may queue URL_UPDATED. A thin row is saved and user-visible, but never
   // notified — the old "enqueue every describable new row" block is gone.
-  const newlyInsertedIds: string[] = [];
   // Fase de enriquecimiento (fuentes HTML con fetch de detalle) — solo las
   // filas realmente nuevas de esta corrida, nunca las re-vistas. Ver
   // ScrapeWorker.processRoleJob, que es el único consumidor.
@@ -127,7 +126,11 @@ export async function saveJobs(
     // Never "public by default" for Google: the detail state is decided at
     // insert — complete listing text, a pending detail fetch, or unsupported.
     const initial = initialDetailStatus(job, sourceSupportsDetail(job.source));
-    const result = await pool.query(
+    const result = await (async () => {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        const inserted = await client.query(
       `INSERT INTO jobs (url_hash, content_fingerprint, title, company, location, url, source, sources, date_text, published_at, role_origin, country,
                           description, requirements, technologies, employment_type, salary_min, salary_max, salary_currency, salary_raw, applicant_count,
                           description_source, description_kind, remote_type, applicant_countries, valid_through,
@@ -193,25 +196,25 @@ export async function saveJobs(
         initial.status,
         initial.lastError
       ]
-    );
+        );
+        if (inserted.rows[0]?.inserted) {
+          await refreshGoogleReadinessInTransaction(client, inserted.rows[0].id, { contentObtained: true });
+        }
+        await client.query("COMMIT");
+        return inserted;
+      } catch (error) {
+        await client.query("ROLLBACK").catch(() => undefined);
+        throw error;
+      } finally {
+        client.release();
+      }
+    })();
 
     if (result.rows[0]?.inserted) {
       savedCount++;
-      newlyInsertedIds.push(result.rows[0].id);
       insertedJobs.push({ id: result.rows[0].id, url: job.url, source: job.source });
     } else {
       duplicateCount++;
-    }
-  }
-
-  for (const id of newlyInsertedIds) {
-    try {
-      await refreshGoogleReadiness(id, { contentObtained: true });
-    } catch (err) {
-      // Never let the readiness write fail the actual save. The row stays
-      // seo_ready = FALSE (the safe side) and the hourly reconcile
-      // (scripts/backfill-indexing-queue.ts) evaluates it later.
-      console.warn(`⚠️ [saveJobs] Readiness evaluation deferred for a new job:`, (err as Error)?.name, (err as { code?: string })?.code);
     }
   }
 

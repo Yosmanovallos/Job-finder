@@ -14,6 +14,7 @@
  */
 import { assessDescription, type DescriptionReason, type DescriptionSignals } from "./job-description-quality.js";
 import { toCountryCode, toCountryCodes } from "./country-codes.js";
+import { getGoogleJobSourcePolicy } from "./google-job-source-policy.js";
 
 export type ReadinessReason =
   | DescriptionReason
@@ -26,11 +27,13 @@ export type ReadinessReason =
   | "LOCATION_COUNTRY_CONFLICT"
   | "INVALID_REMOTE_LOCATION"
   | "MISSING_APPLICATION_URL"
-  | "MISSING_DATE_POSTED";
+  | "MISSING_DATE_POSTED"
+  | "SOURCE_REQUIRES_JOB_CLASSIFICATION";
 
 export type RemoteType = "fully_remote" | "hybrid" | "onsite";
 
 export interface ReadinessInput {
+  source?: string | null;
   title?: string | null;
   company?: string | null;
   location?: string | null;
@@ -123,6 +126,10 @@ export function resolveGoogleLocation(
 
 export function evaluateGoogleJobReadiness(input: ReadinessInput, now: Date = new Date()): ReadinessResult {
   const reasons: ReadinessReason[] = [];
+  const sourcePolicy = getGoogleJobSourcePolicy(input.source);
+  if (sourcePolicy.googleJobsEligibility === "blocked_pending_review" && sourcePolicy.reason) {
+    reasons.push(sourcePolicy.reason);
+  }
   if (input.isActive === false) reasons.push("INACTIVE");
   if (input.isCanonical === false) reasons.push("NON_CANONICAL");
 

@@ -37,7 +37,7 @@ export const NO_DETAIL_MAX_ATTEMPTS = 2;
 /** A claimed row is invisible to other ticks for this long; a crashed tick's rows come back after it. */
 export const DETAIL_CLAIM_LEASE_MS = 10 * 60_000;
 
-export const ROW_COLUMNS = `j.id, j.title, j.company, j.location, j.country, j.url, j.published_at, j.is_active,
+export const ROW_COLUMNS = `j.id, j.title, j.company, j.location, j.country, j.url, j.source, j.published_at, j.is_active,
   j.description, j.requirements, j.employment_type, j.salary_raw, j.salary_min, j.salary_max, j.salary_currency,
   j.description_kind, j.remote_type, j.applicant_countries, j.valid_through,
   j.seo_ready, j.seo_ready_at, j.content_hash`;
@@ -51,6 +51,7 @@ export interface ReadinessRow {
   location: string | null;
   country: string | null;
   url: string | null;
+  source: string | null;
   published_at: string | Date;
   is_active: boolean | null;
   description: string | null;
@@ -78,6 +79,7 @@ export function evaluateRow(row: ReadinessRow, now = new Date()): ReadinessResul
   return evaluateGoogleJobReadiness(
     {
       title: row.title,
+      source: row.source,
       company: row.company,
       location: row.location,
       country: row.country,
@@ -103,6 +105,7 @@ export function evaluateRow(row: ReadinessRow, now = new Date()): ReadinessResul
 export function computeContentHash(row: ReadinessRow): string {
   const payload = JSON.stringify([
     row.title,
+    row.source,
     row.company,
     row.location,
     row.country,
@@ -148,63 +151,107 @@ async function withTransaction<T>(fn: (client: PoolClient) => Promise<T>): Promi
  * caller just wrote real source content, so content_updated_at (the sitemap's
  * <lastmod>) may move — it never moves just because the row was re-evaluated.
  */
-export async function refreshGoogleReadiness(
+export async function refreshGoogleReadinessInTransaction(
+  client: PoolClient,
   jobId: string,
   options: { contentObtained?: boolean; now?: Date } = {}
 ): Promise<RefreshOutcome | null> {
   const now = options.now ?? new Date();
-  return withTransaction(async (client) => {
-    const result = await client.query<ReadinessRow>(
-      `SELECT ${ROW_COLUMNS}, ${IS_CANONICAL_SQL} AS is_canonical FROM jobs j WHERE j.id = $1 FOR UPDATE OF j`,
-      [jobId]
-    );
-    const row = result.rows[0];
-    if (!row) return null;
+  const result = await client.query<ReadinessRow>(
+    `SELECT ${ROW_COLUMNS}, ${IS_CANONICAL_SQL} AS is_canonical FROM jobs j WHERE j.id = $1 FOR UPDATE OF j`,
+    [jobId]
+  );
+  const row = result.rows[0];
+  if (!row) return null;
 
-    const verdict = evaluateRow(row, now);
-    const hash = computeContentHash(row);
-    const hashChanged = row.content_hash !== null && row.content_hash !== hash;
-    const firstReady = verdict.ready && row.seo_ready_at === null;
-    const changedWhileReady = verdict.ready && !firstReady && (hashChanged || row.seo_ready !== true);
+  const verdict = evaluateRow(row, now);
+  const hash = computeContentHash(row);
+  const hashChanged = row.content_hash !== null && row.content_hash !== hash;
+  const firstReady = verdict.ready && row.seo_ready_at === null;
+  const changedWhileReady = verdict.ready && !firstReady && (hashChanged || row.seo_ready !== true);
 
+  await client.query(
+    `UPDATE jobs SET
+       seo_ready = $2::boolean,
+       seo_reasons = $3::jsonb,
+       seo_evaluated_at = $4::timestamptz,
+       seo_ready_at = CASE WHEN $2::boolean AND seo_ready_at IS NULL THEN $4::timestamptz ELSE seo_ready_at END,
+       content_hash = $5::text,
+       content_updated_at = CASE
+         WHEN $6::boolean AND (content_hash IS DISTINCT FROM $5::text OR content_updated_at IS NULL) THEN $4::timestamptz
+         ELSE content_updated_at END
+     WHERE id = $1`,
+    [jobId, verdict.ready, JSON.stringify(verdict.reasons), now, hash, options.contentObtained === true]
+  );
+
+  if (!verdict.ready) {
     await client.query(
-      `UPDATE jobs SET
-         seo_ready = $2::boolean,
-         seo_reasons = $3::jsonb,
-         seo_evaluated_at = $4::timestamptz,
-         seo_ready_at = CASE WHEN $2::boolean AND seo_ready_at IS NULL THEN $4::timestamptz ELSE seo_ready_at END,
-         content_hash = $5::text,
-         content_updated_at = CASE
-           WHEN $6::boolean AND (content_hash IS DISTINCT FROM $5::text OR content_updated_at IS NULL) THEN $4::timestamptz
-           ELSE content_updated_at END
-       WHERE id = $1`,
-      [jobId, verdict.ready, JSON.stringify(verdict.reasons), now, hash, options.contentObtained === true]
+      `UPDATE indexing_queue SET status = 'superseded', superseded_at = $2, superseded_reason = 'target_not_seo_ready'
+       WHERE job_id = $1 AND notification_type = 'URL_UPDATED' AND status = 'pending'`,
+      [jobId, now]
     );
+  }
 
-    // Not ready (any more): a still-pending update for this job must never be
-    // sent. Superseded — terminal, history kept — in the same transaction.
-    if (!verdict.ready) {
-      await client.query(
-        `UPDATE indexing_queue SET status = 'superseded', superseded_at = $2, superseded_reason = 'target_not_seo_ready'
-         WHERE job_id = $1 AND notification_type = 'URL_UPDATED' AND status = 'pending'`,
-        [jobId, now]
+  let notified: RefreshOutcome["notified"] = null;
+  if (firstReady || changedWhileReady) {
+    notified = firstReady ? "first_ready" : "content_changed";
+    await enqueueIndexingNotificationsWith(client, [{
+      url: buildJobUrl({ jobId: row.id, title: row.title, location: row.location }),
+      type: "URL_UPDATED",
+      priority: firstReady ? INDEXING_PRIORITY.newlyReady : INDEXING_PRIORITY.contentUpdate,
+      jobId: row.id,
+      contentHash: hash
+    }]);
+  }
+  return { ready: verdict.ready, reasons: verdict.reasons, notified };
+}
+
+export async function refreshGoogleReadiness(
+  jobId: string,
+  options: { contentObtained?: boolean; now?: Date } = {}
+): Promise<RefreshOutcome | null> {
+  return withTransaction((client) => refreshGoogleReadinessInTransaction(client, jobId, options));
+}
+
+export type ReadinessMutationPatch = Partial<Pick<ReadinessRow,
+  "title" | "company" | "location" | "country" | "url" | "source" | "published_at" |
+  "description" | "requirements" | "employment_type" | "salary_raw" | "salary_min" |
+  "salary_max" | "salary_currency" | "description_kind" | "remote_type" |
+  "applicant_countries" | "valid_through" | "is_active"
+>>;
+
+const MUTABLE_COLUMNS: Record<keyof ReadinessMutationPatch, string> = {
+  title: "title", company: "company", location: "location", country: "country", url: "url", source: "source",
+  published_at: "published_at", description: "description", requirements: "requirements", employment_type: "employment_type",
+  salary_raw: "salary_raw", salary_min: "salary_min", salary_max: "salary_max", salary_currency: "salary_currency",
+  description_kind: "description_kind", remote_type: "remote_type", applicant_countries: "applicant_countries",
+  valid_through: "valid_through", is_active: "is_active"
+};
+
+/**
+ * The only supported write path for readiness-relevant job facts outside an
+ * insert/detail fetch.  It applies the patch and persists the new verdict in
+ * the same transaction; callers cannot leave a committed stale verdict.
+ */
+export async function mutateReadinessRelevantJobs(
+  mutations: Array<{ id: string; patch: ReadinessMutationPatch }>,
+  options: { contentObtained?: boolean; now?: Date } = {}
+): Promise<Array<{ id: string; outcome: RefreshOutcome | null }>> {
+  if (mutations.length > 500) throw new Error("Readiness mutations are bounded to 500 jobs per transaction.");
+  return withTransaction(async (client) => {
+    const outcomes: Array<{ id: string; outcome: RefreshOutcome | null }> = [];
+    for (const mutation of mutations) {
+      const entries = Object.entries(mutation.patch).filter(([, value]) => value !== undefined) as Array<[keyof ReadinessMutationPatch, unknown]>;
+      if (entries.length === 0) throw new Error("A readiness mutation needs at least one field.");
+      const assignments = entries.map(([field], index) => `${MUTABLE_COLUMNS[field]} = $${index + 2}`).join(", ");
+      const values = entries.map(([field, value]) =>
+        field === "requirements" || field === "applicant_countries" ? JSON.stringify(value) : value
       );
+      const changed = await client.query(`UPDATE jobs SET ${assignments} WHERE id = $1 RETURNING id`, [mutation.id, ...values]);
+      if (changed.rowCount === 0) continue;
+      outcomes.push({ id: mutation.id, outcome: await refreshGoogleReadinessInTransaction(client, mutation.id, options) });
     }
-
-    let notified: RefreshOutcome["notified"] = null;
-    if (firstReady || changedWhileReady) {
-      notified = firstReady ? "first_ready" : "content_changed";
-      await enqueueIndexingNotificationsWith(client, [
-        {
-          url: buildJobUrl({ jobId: row.id, title: row.title, location: row.location }),
-          type: "URL_UPDATED",
-          priority: firstReady ? INDEXING_PRIORITY.newlyReady : INDEXING_PRIORITY.contentUpdate,
-          jobId: row.id,
-          contentHash: hash
-        }
-      ]);
-    }
-    return { ready: verdict.ready, reasons: verdict.reasons, notified };
+    return outcomes;
   });
 }
 
@@ -299,7 +346,8 @@ export type DetailOutcome =
 export async function recordDetailOutcome(jobId: string, outcome: DetailOutcome, now = new Date()): Promise<DetailStatus | null> {
   if (outcome.kind === "success") {
     const detail = outcome.detail;
-    const written = await pool.query(
+    return withTransaction(async (client) => {
+    const written = await client.query(
       `UPDATE jobs SET
          description = COALESCE($2::text, description),
          requirements = COALESCE($3::jsonb, requirements),
@@ -348,13 +396,14 @@ export async function recordDetailOutcome(jobId: string, outcome: DetailOutcome,
       descriptionKind: row.description_kind
     });
     const status: DetailStatus = quality.ok ? "complete" : "rejected";
-    await pool.query(`UPDATE jobs SET detail_status = $2, detail_last_error = $3 WHERE id = $1`, [
+    await client.query(`UPDATE jobs SET detail_status = $2, detail_last_error = $3 WHERE id = $1`, [
       jobId,
       status,
       quality.ok ? null : quality.reasons[0]
     ]);
-    await refreshGoogleReadiness(jobId, { contentObtained: true, now });
+    await refreshGoogleReadinessInTransaction(client, jobId, { contentObtained: true, now });
     return status;
+    });
   }
 
   const current = await pool.query<{ detail_attempts: number }>(
