@@ -1,0 +1,98 @@
+{
+ "sent_last24h_target_alive": [
+  {
+   "sent": "200",
+   "target_still_active": "48"
+  }
+ ],
+ "sent_last24h_created_range": [
+  {
+   "min": "2026-07-30T04:40:40.406Z",
+   "max": "2026-07-30T04:40:40.406Z"
+  }
+ ],
+ "pending_updated_by_week": [
+  {
+   "wk": "2026-07-27T05:00:00.000Z",
+   "count": "9726"
+  },
+  {
+   "wk": "2026-08-03T05:00:00.000Z",
+   "count": "15898"
+  },
+  {
+   "wk": "2026-08-10T05:00:00.000Z",
+   "count": "15051"
+  },
+  {
+   "wk": "2026-08-17T05:00:00.000Z",
+   "count": "15582"
+  },
+  {
+   "wk": "2026-08-24T05:00:00.000Z",
+   "count": "12259"
+  },
+  {
+   "wk": "2026-08-31T05:00:00.000Z",
+   "count": "12060"
+  },
+  {
+   "wk": "2026-09-07T05:00:00.000Z",
+   "count": "11509"
+  },
+  {
+   "wk": "2026-09-14T05:00:00.000Z",
+   "count": "6444"
+  }
+ ],
+ "urls_with_both_types": [
+  {
+   "count": "39298"
+  }
+ ],
+ "sample_ids": [
+  {
+   "k": "glassdoor_nodesc",
+   "id": "f313da08-5d62-4e8b-adca-ff577e585539",
+   "title": "AYUDANTE DE MECANCIA / ELECTROMECANICO",
+   "location": "Maracay",
+   "published_at": "2026-09-17T17:22:41.111Z"
+  },
+  {
+   "k": "linkedin_desc_over30d",
+   "id": "c53b3c52-79a0-4f25-a3cd-ee728ab4feda",
+   "title": "Se informa proceso de selección externo para cargo de Técnico Paramédico",
+   "location": "San Juan de Dios, Vargas State, Venezuela",
+   "published_at": "2026-08-16T23:19:12.597Z"
+  },
+  {
+   "k": "torre_remote",
+   "id": "e645a519-507e-48ef-9668-aedb7bd53fa6",
+   "title": "Business Development Executive (North Canterbury) - Sales & Account Management",
+   "location": "Remoto",
+   "published_at": "2026-09-17T22:15:51.000Z"
+  }
+ ],
+ "published_vs_lastseen": [
+  {
+   "live_but_validthrough_past": "986"
+  }
+ ],
+ "workana_salary_sample": [
+  {
+   "salary_raw": "Menos de USD 50",
+   "salary_currency": null,
+   "employment_type": "Proyecto"
+  },
+  {
+   "salary_raw": "Menos de USD 50",
+   "salary_currency": null,
+   "employment_type": "Proyecto"
+  },
+  {
+   "salary_raw": "USD 1.000 - 3.000",
+   "salary_currency": null,
+   "employment_type": "Proyecto"
+  }
+ ]
+}

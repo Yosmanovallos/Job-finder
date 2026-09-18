@@ -1,0 +1,691 @@
+{
+ "totals": [
+  {
+   "total_rows": "66590",
+   "active_rows": "66590"
+  }
+ ],
+ "canonical_summary": [
+  {
+   "canonical_active": "66590",
+   "publicly_describable_today": "66590",
+   "with_description": "28556",
+   "without_description": "38034",
+   "with_requirements": "11984",
+   "with_employment_type": "27537",
+   "with_salary": "9056",
+   "with_remote_or_hybrid_text": "6919",
+   "bare_remote_location": "6918",
+   "confidential_company": "4851",
+   "published_over_30d_ago": "14500",
+   "desc_ge_300_chars": "22001",
+   "desc_lt_300_chars": "6555",
+   "desc_equals_title": "3",
+   "desc_suspicious_tokens": "42",
+   "desc_mentions_buscotrabajo": "0"
+  }
+ ],
+ "by_source": [
+  {
+   "source": "LinkedIn",
+   "n": "29350",
+   "desc": "11650",
+   "desc_pct": "39.7",
+   "desc_p50_chars": 1055,
+   "desc_ge300": "10868",
+   "req": "9307",
+   "emp": "11605",
+   "salary": "83",
+   "remote_txt": "0",
+   "pub_eq_created": "17"
+  },
+  {
+   "source": "Computrabajo",
+   "n": "15186",
+   "desc": "1230",
+   "desc_pct": "8.1",
+   "desc_p50_chars": 1345,
+   "desc_ge300": "1211",
+   "req": "315",
+   "emp": "1227",
+   "salary": "819",
+   "remote_txt": "0",
+   "pub_eq_created": "12"
+  },
+  {
+   "source": "Torre",
+   "n": "6050",
+   "desc": "5428",
+   "desc_pct": "89.7",
+   "desc_p50_chars": 94,
+   "desc_ge300": "0",
+   "req": "0",
+   "emp": "5431",
+   "salary": "0",
+   "remote_txt": "6012",
+   "pub_eq_created": "0"
+  },
+  {
+   "source": "Magneto",
+   "n": "5634",
+   "desc": "3184",
+   "desc_pct": "56.5",
+   "desc_p50_chars": 1288,
+   "desc_ge300": "3099",
+   "req": "1311",
+   "emp": "2565",
+   "salary": "2473",
+   "remote_txt": "363",
+   "pub_eq_created": "0"
+  },
+  {
+   "source": "Workana",
+   "n": "4072",
+   "desc": "4055",
+   "desc_pct": "99.6",
+   "desc_p50_chars": 815,
+   "desc_ge300": "4021",
+   "req": "136",
+   "emp": "4055",
+   "salary": "4055",
+   "remote_txt": "0",
+   "pub_eq_created": "21"
+  },
+  {
+   "source": "Elempleo",
+   "n": "2774",
+   "desc": "2324",
+   "desc_pct": "83.8",
+   "desc_p50_chars": 1080,
+   "desc_ge300": "2192",
+   "req": "543",
+   "emp": "2304",
+   "salary": "1616",
+   "remote_txt": "0",
+   "pub_eq_created": "36"
+  },
+  {
+   "source": "Glassdoor",
+   "n": "2400",
+   "desc": "0",
+   "desc_pct": "0.0",
+   "desc_p50_chars": null,
+   "desc_ge300": "0",
+   "req": "0",
+   "emp": "0",
+   "salary": "0",
+   "remote_txt": "0",
+   "pub_eq_created": "0"
+  },
+  {
+   "source": "Indeed",
+   "n": "339",
+   "desc": "0",
+   "desc_pct": "0.0",
+   "desc_p50_chars": null,
+   "desc_ge300": "0",
+   "req": "0",
+   "emp": "0",
+   "salary": "0",
+   "remote_txt": "17",
+   "pub_eq_created": "0"
+  },
+  {
+   "source": "WeRemoto",
+   "n": "300",
+   "desc": "288",
+   "desc_pct": "96.0",
+   "desc_p50_chars": 1944,
+   "desc_ge300": "284",
+   "req": "12",
+   "emp": "283",
+   "salary": "0",
+   "remote_txt": "288",
+   "pub_eq_created": "0"
+  },
+  {
+   "source": "RemoteOK",
+   "n": "249",
+   "desc": "248",
+   "desc_pct": "99.6",
+   "desc_p50_chars": 1571,
+   "desc_ge300": "244",
+   "req": "163",
+   "emp": "53",
+   "salary": "0",
+   "remote_txt": "35",
+   "pub_eq_created": "0"
+  },
+  {
+   "source": "GetOnBoard",
+   "n": "221",
+   "desc": "135",
+   "desc_pct": "61.1",
+   "desc_p50_chars": 306,
+   "desc_ge300": "68",
+   "req": "185",
+   "emp": "0",
+   "salary": "0",
+   "remote_txt": "204",
+   "pub_eq_created": "0"
+  },
+  {
+   "source": "Remotive",
+   "n": "15",
+   "desc": "14",
+   "desc_pct": "93.3",
+   "desc_p50_chars": 2212,
+   "desc_ge300": "14",
+   "req": "12",
+   "emp": "14",
+   "salary": "10",
+   "remote_txt": "0",
+   "pub_eq_created": "0"
+  }
+ ],
+ "by_country": [
+  {
+   "country": "CO",
+   "n": "49842",
+   "desc": "15831",
+   "desc_pct": "31.8"
+  },
+  {
+   "country": "NULL(remote)",
+   "n": "11215",
+   "desc": "10344",
+   "desc_pct": "92.2"
+  },
+  {
+   "country": "VE",
+   "n": "5533",
+   "desc": "2381",
+   "desc_pct": "43.0"
+  }
+ ],
+ "by_age": [
+  {
+   "age": "a_<2d",
+   "n": "2255",
+   "desc": "891",
+   "desc_pct": "39.5"
+  },
+  {
+   "age": "b_2-7d",
+   "n": "7078",
+   "desc": "3307",
+   "desc_pct": "46.7"
+  },
+  {
+   "age": "c_7-14d",
+   "n": "11737",
+   "desc": "5601",
+   "desc_pct": "47.7"
+  },
+  {
+   "age": "d_14-30d",
+   "n": "31020",
+   "desc": "15660",
+   "desc_pct": "50.5"
+  },
+  {
+   "age": "e_>30d",
+   "n": "14500",
+   "desc": "3097",
+   "desc_pct": "21.4"
+  }
+ ],
+ "by_created_age": [
+  {
+   "first_seen": "a_<2d",
+   "n": "2712",
+   "desc": "1184",
+   "desc_pct": "43.7"
+  },
+  {
+   "first_seen": "b_2-7d",
+   "n": "7487",
+   "desc": "3594",
+   "desc_pct": "48.0"
+  },
+  {
+   "first_seen": "c_7-30d",
+   "n": "42820",
+   "desc": "21240",
+   "desc_pct": "49.6"
+  },
+  {
+   "first_seen": "d_>30d",
+   "n": "13571",
+   "desc": "2538",
+   "desc_pct": "18.7"
+  }
+ ],
+ "by_role_top20": [
+  {
+   "role_origin": "Asesor Comercial",
+   "n": "9903",
+   "desc": "2420",
+   "desc_pct": "24.4"
+  },
+  {
+   "role_origin": "General",
+   "n": "7592",
+   "desc": "4740",
+   "desc_pct": "62.4"
+  },
+  {
+   "role_origin": "AI Engineer",
+   "n": "5307",
+   "desc": "2023",
+   "desc_pct": "38.1"
+  },
+  {
+   "role_origin": "Auxiliar Administrativo",
+   "n": "4900",
+   "desc": "1654",
+   "desc_pct": "33.8"
+  },
+  {
+   "role_origin": "Analista de Logística",
+   "n": "4183",
+   "desc": "1842",
+   "desc_pct": "44.0"
+  },
+  {
+   "role_origin": "Contador Público",
+   "n": "3605",
+   "desc": "1032",
+   "desc_pct": "28.6"
+  },
+  {
+   "role_origin": "Business Analyst",
+   "n": "3177",
+   "desc": "1498",
+   "desc_pct": "47.2"
+  },
+  {
+   "role_origin": "Auxiliar de Enfermería",
+   "n": "3027",
+   "desc": "1271",
+   "desc_pct": "42.0"
+  },
+  {
+   "role_origin": "Analista Jurídico",
+   "n": "2961",
+   "desc": "1308",
+   "desc_pct": "44.2"
+  },
+  {
+   "role_origin": "Arquitecto de Software",
+   "n": "2882",
+   "desc": "1483",
+   "desc_pct": "51.5"
+  },
+  {
+   "role_origin": "Cuidadora de Adultos Mayores",
+   "n": "2283",
+   "desc": "933",
+   "desc_pct": "40.9"
+  },
+  {
+   "role_origin": "Community Manager",
+   "n": "1985",
+   "desc": "793",
+   "desc_pct": "39.9"
+  },
+  {
+   "role_origin": "Data Analyst",
+   "n": "1541",
+   "desc": "680",
+   "desc_pct": "44.1"
+  },
+  {
+   "role_origin": "Ejecutivo de Ventas",
+   "n": "1253",
+   "desc": "440",
+   "desc_pct": "35.1"
+  },
+  {
+   "role_origin": "Data Engineer",
+   "n": "1145",
+   "desc": "686",
+   "desc_pct": "59.9"
+  },
+  {
+   "role_origin": "Diseñador Gráfico",
+   "n": "1060",
+   "desc": "453",
+   "desc_pct": "42.7"
+  },
+  {
+   "role_origin": "Desarrollador Backend",
+   "n": "942",
+   "desc": "549",
+   "desc_pct": "58.3"
+  },
+  {
+   "role_origin": "Ingeniero Civil",
+   "n": "882",
+   "desc": "410",
+   "desc_pct": "46.5"
+  },
+  {
+   "role_origin": "Ingeniero Ambiental",
+   "n": "877",
+   "desc": "406",
+   "desc_pct": "46.3"
+  },
+  {
+   "role_origin": "Desarrollador Java",
+   "n": "706",
+   "desc": "287",
+   "desc_pct": "40.7"
+  }
+ ],
+ "desc_len_buckets": [
+  {
+   "bucket": "0_none",
+   "n": "38034"
+  },
+  {
+   "bucket": "1_<100",
+   "n": "5204"
+  },
+  {
+   "bucket": "2_100-299",
+   "n": "1351"
+  },
+  {
+   "bucket": "3_300-799",
+   "n": "7129"
+  },
+  {
+   "bucket": "4_800-1999",
+   "n": "10473"
+  },
+  {
+   "bucket": "5_2000+",
+   "n": "4399"
+  }
+ ],
+ "detail_fetched_at_usage": [
+  {
+   "with_description_fetched_at": "0"
+  }
+ ],
+ "indexing_queue": [
+  {
+   "notification_type": "URL_DELETED",
+   "status": "pending",
+   "n": "41921",
+   "oldest": "2026-08-24T19:54:50.963Z",
+   "newest": "2026-09-18T01:00:52.569Z"
+  },
+  {
+   "notification_type": "URL_UPDATED",
+   "status": "pending",
+   "n": "98529",
+   "oldest": "2026-07-30T04:40:40.406Z",
+   "newest": "2026-09-18T01:10:05.010Z"
+  },
+  {
+   "notification_type": "URL_UPDATED",
+   "status": "sent",
+   "n": "9400",
+   "oldest": "2026-07-30T04:26:27.601Z",
+   "newest": "2026-08-10T01:01:25.160Z"
+  }
+ ],
+ "indexing_last24h": [
+  {
+   "status": "sent",
+   "count": "200"
+  }
+ ],
+ "indexing_distinct_urls": [
+  {
+   "rows_total": "149850",
+   "distinct_urls": "110526"
+  }
+ ],
+ "detail_attempts_7d": [
+  {
+   "source_name": "Computrabajo",
+   "status": "empty",
+   "attempts": "27",
+   "received": "218",
+   "valid": "0",
+   "failed": "0",
+   "filtered": "67"
+  },
+  {
+   "source_name": "Computrabajo",
+   "status": "partial",
+   "attempts": "14",
+   "received": "187",
+   "valid": "15",
+   "failed": "0",
+   "filtered": "111"
+  },
+  {
+   "source_name": "Computrabajo",
+   "status": "success",
+   "attempts": "3",
+   "received": "4",
+   "valid": "4",
+   "failed": "0",
+   "filtered": "0"
+  },
+  {
+   "source_name": "Computrabajo-VE",
+   "status": "empty",
+   "attempts": "6",
+   "received": "24",
+   "valid": "0",
+   "failed": "0",
+   "filtered": "11"
+  },
+  {
+   "source_name": "Computrabajo-VE",
+   "status": "partial",
+   "attempts": "4",
+   "received": "13",
+   "valid": "5",
+   "failed": "0",
+   "filtered": "0"
+  },
+  {
+   "source_name": "Computrabajo-VE",
+   "status": "success",
+   "attempts": "6",
+   "received": "12",
+   "valid": "12",
+   "failed": "0",
+   "filtered": "0"
+  },
+  {
+   "source_name": "Computrabajo-VE",
+   "status": "timeout",
+   "attempts": "1",
+   "received": "2",
+   "valid": "0",
+   "failed": "0",
+   "filtered": "2"
+  },
+  {
+   "source_name": "Elempleo",
+   "status": "success",
+   "attempts": "22",
+   "received": "100",
+   "valid": "92",
+   "failed": "0",
+   "filtered": "8"
+  },
+  {
+   "source_name": "LinkedIn",
+   "status": "empty",
+   "attempts": "2",
+   "received": "3",
+   "valid": "0",
+   "failed": "0",
+   "filtered": "0"
+  },
+  {
+   "source_name": "LinkedIn",
+   "status": "partial",
+   "attempts": "63",
+   "received": "900",
+   "valid": "294",
+   "failed": "0",
+   "filtered": "472"
+  },
+  {
+   "source_name": "LinkedIn",
+   "status": "success",
+   "attempts": "21",
+   "received": "194",
+   "valid": "120",
+   "failed": "0",
+   "filtered": "74"
+  },
+  {
+   "source_name": "LinkedIn",
+   "status": "timeout",
+   "attempts": "1",
+   "received": "21",
+   "valid": "0",
+   "failed": "0",
+   "filtered": "21"
+  },
+  {
+   "source_name": "LinkedIn-VE",
+   "status": "empty",
+   "attempts": "11",
+   "received": "15",
+   "valid": "0",
+   "failed": "0",
+   "filtered": "0"
+  },
+  {
+   "source_name": "LinkedIn-VE",
+   "status": "partial",
+   "attempts": "27",
+   "received": "158",
+   "valid": "101",
+   "failed": "0",
+   "filtered": "14"
+  },
+  {
+   "source_name": "LinkedIn-VE",
+   "status": "success",
+   "attempts": "25",
+   "received": "61",
+   "valid": "61",
+   "failed": "0",
+   "filtered": "0"
+  },
+  {
+   "source_name": "Magneto",
+   "status": "partial",
+   "attempts": "2",
+   "received": "18",
+   "valid": "8",
+   "failed": "0",
+   "filtered": "8"
+  },
+  {
+   "source_name": "Magneto",
+   "status": "success",
+   "attempts": "17",
+   "received": "159",
+   "valid": "83",
+   "failed": "0",
+   "filtered": "76"
+  },
+  {
+   "source_name": "Magneto",
+   "status": "timeout",
+   "attempts": "1",
+   "received": "7",
+   "valid": "0",
+   "failed": "0",
+   "filtered": "7"
+  }
+ ],
+ "circuit_state": [
+  {
+   "source_name": "Glassdoor",
+   "failures": 0,
+   "open_until": null
+  },
+  {
+   "source_name": "GlassdoorV2",
+   "failures": 1,
+   "open_until": null
+  },
+  {
+   "source_name": "Indeed",
+   "failures": 0,
+   "open_until": null
+  },
+  {
+   "source_name": "Workana",
+   "failures": 2,
+   "open_until": null
+  }
+ ],
+ "new_rows_24h_by_source": [
+  {
+   "source": "LinkedIn",
+   "n": "603",
+   "desc": "232"
+  },
+  {
+   "source": "Glassdoor",
+   "n": "161",
+   "desc": "0"
+  },
+  {
+   "source": "Workana",
+   "n": "139",
+   "desc": "139"
+  },
+  {
+   "source": "Computrabajo",
+   "n": "94",
+   "desc": "10"
+  },
+  {
+   "source": "Magneto",
+   "n": "91",
+   "desc": "24"
+  },
+  {
+   "source": "Elempleo",
+   "n": "80",
+   "desc": "23"
+  },
+  {
+   "source": "Torre",
+   "n": "42",
+   "desc": "42"
+  },
+  {
+   "source": "Indeed",
+   "n": "28",
+   "desc": "0"
+  },
+  {
+   "source": "WeRemoto",
+   "n": "12",
+   "desc": "12"
+  },
+  {
+   "source": "RemoteOK",
+   "n": "3",
+   "desc": "3"
+  }
+ ],
+ "generated_at": "2026-09-18T03:55:31.152Z"
+}
