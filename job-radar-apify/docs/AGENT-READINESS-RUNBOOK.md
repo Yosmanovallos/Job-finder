@@ -110,6 +110,33 @@ Verificación local sin Docker: el suite aislado exige Postgres en contenedor y 
 
 Techo alcanzable tras este ciclo: `oauthProtectedResource` y `authMd` deberían pasar; `dnsAid` depende de la decisión de nameservers y `oauthDiscovery` es un no-pase por diseño. El 100/100 de IsItAgentReady no es alcanzable sin publicar metadatos de authorization server falsos.
 
+## Rescaneo tras el despliegue — 2026-09-18 02:56 UTC (commit `1b86ef1`)
+
+`POST https://isitagentready.com/api/scan` con `format=agent` devuelve **5/5 (Agent-Native)**, el nivel máximo. Pasan 13 de 16 checks puntuables (antes 12).
+
+- `discovery.oauthProtectedResource`: **pass** — "Valid metadata with resource https://buscotrabajo.co and 1 authorization server(s)". El cambio de `resource` a origen sin ruta fue lo que lo validó.
+- `discovery.authMd`: sigue en **fail**, pero ahora por un motivo distinto y diagnosticado: el escáner encuentra `/auth.md` (200, `text/markdown; charset=utf-8`, "Found 1 Auth.md marker"), sigue correctamente el PRM hasta `https://<ref>.supabase.co/.well-known/oauth-authorization-server/auth/v1` y recibe 404, porque Supabase sólo publica OIDC Discovery, no metadatos RFC 8414. Su conclusión es "agent_auth metadata was not found".
+- `discoverability.dnsAid` y `discovery.oauthDiscovery`: sin cambio, ver secciones anteriores.
+
+### Por qué `authMd` no puede pasar honestamente
+
+El check no mide "¿documentas tu autenticación?" sino "¿puede un agente **registrarse y obtener credenciales propias** aquí?". Exige un bloque `agent_auth` con `register_uri` / `identity_endpoint` / `claim_endpoint` publicado en los metadatos del **authorization server**. Hay dos razones independientes por las que no procede:
+
+1. Ese bloque debe vivir en el origen del authorization server, que es Supabase. No controlamos su zona ni sus well-known, y no vamos a publicar metadatos de authorization server propios (ver sección OAuth).
+2. BuscoTrabajo **no emite credenciales de agente**. La superficie para agentes (`/api/v1`, `/mcp`, `/a2a`) es pública, anónima y de solo lectura por diseño; no existe `register_uri`, `identity_endpoint`, `claim_endpoint` ni revocación. Declararlos sería inventar endpoints, justo lo que el encargo prohíbe ("No afirmar que existe registro dinámico si no existe").
+
+La variante autocontenida del skill tampoco aplica: su detector busca un flujo de registro completo, y aquí la respuesta verdadera es que no hay registro alguno. `/auth.md` se mantiene porque es información real y útil para un agente, aunque no dispare el check.
+
+### Techo real de IsItAgentReady
+
+| Check | Estado | Desbloqueo |
+| --- | --- | --- |
+| `dnsAid` | Fail | Decisión del propietario: mover nameservers a un proveedor con SVCB + DNSSEC (Cloudflare gratis). Sin coste, sin MX en riesgo. |
+| `oauthDiscovery` | Fail por diseño | Sólo pasaría si `buscotrabajo.co` fuese su propio issuer OAuth. Falsearlo viola RFC 8414 §3.3. |
+| `authMd` | Fail por diseño | Sólo pasaría con registro de agentes real, que no existe ni se necesita. |
+
+De los tres, únicamente `dnsAid` es corregible sin falsear capacidades. El 100/100 no es alcanzable de forma legítima con la arquitectura actual; el nivel máximo (5/5 Agent-Native) sí, y ya está alcanzado.
+
 ## Resultado final
 
 Registrar aquí, tras cada despliegue: scores, URLs canónicas de reportes, commit desplegado, estado Render, costos/planes verificados, métricas antes/después y bloqueos externos.
