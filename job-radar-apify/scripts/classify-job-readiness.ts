@@ -5,7 +5,7 @@
  *
  *   npx tsx scripts/classify-job-readiness.ts                 # dry-run report (default)
  *   npx tsx scripts/classify-job-readiness.ts --json          # same, machine-readable
- *   npx tsx scripts/classify-job-readiness.ts --apply         # write verdicts
+ *   npx tsx scripts/classify-job-readiness.ts --apply --snapshot-out=<absolute-path> # write verdicts
  *   options: --batch-size=500 (max 2000) --limit=N --source=LinkedIn
  *
  * What --apply writes, per legacy row, and nothing else:
@@ -33,6 +33,7 @@ import {
   type ReadinessRow
 } from "../src/db/job-readiness-repository.js";
 import { sourceSupportsDetail } from "../src/sources/detail-capability.js";
+import { requireAbsoluteSnapshotPath, writeJobSeoV2StateSnapshot } from "../src/db/job-seo-v2-state.js";
 
 dotenv.config();
 
@@ -49,6 +50,7 @@ const JSON_OUTPUT = process.argv.includes("--json");
 const BATCH_SIZE = Math.min(Math.max(Number(flag("batch-size") ?? 500) || 500, 1), 2000);
 const LIMIT = flag("limit") ? Math.max(Number(flag("limit")) || 0, 0) : Infinity;
 const SOURCE = flag("source") ?? null;
+const SNAPSHOT_OUT = flag("snapshot-out");
 
 interface SourceReport {
   active: number;
@@ -90,6 +92,10 @@ function classify(row: LegacyRow): { status: DetailStatus; kind: string | null; 
 }
 
 async function main() {
+  if (APPLY) {
+    const snapshot = await writeJobSeoV2StateSnapshot(requireAbsoluteSnapshotPath(SNAPSHOT_OUT));
+    console.log(`[classify-job-readiness] snapshot: ${snapshot.destination} (${snapshot.jobs} jobs, ${snapshot.pendingQueue} pending queue rows)`);
+  }
   const perSource: Record<string, SourceReport> = {};
   const reasons: Record<string, number> = {};
   let examined = 0;
@@ -99,7 +105,7 @@ async function main() {
   while (examined < LIMIT) {
     const take = Math.min(BATCH_SIZE, LIMIT - examined);
     const result = await pool.query<LegacyRow>(
-      `SELECT ${ROW_COLUMNS}, j.source, ${IS_CANONICAL_SQL} AS is_canonical
+      `SELECT ${ROW_COLUMNS}, ${IS_CANONICAL_SQL} AS is_canonical
        FROM jobs j
        WHERE j.is_active = TRUE AND j.detail_status IS NULL AND j.id > $1
          AND ($3::text IS NULL OR j.source = $3)

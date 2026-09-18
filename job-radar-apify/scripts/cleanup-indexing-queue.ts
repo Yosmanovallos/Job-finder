@@ -5,7 +5,7 @@
  *
  *   npx tsx scripts/cleanup-indexing-queue.ts                      # dry-run (default), read-only
  *   npx tsx scripts/cleanup-indexing-queue.ts --http-sample=20     # + a small real HTTP sample (max 50, 1 req/s)
- *   npx tsx scripts/cleanup-indexing-queue.ts --apply              # perform the transitions below
+ *   npx tsx scripts/cleanup-indexing-queue.ts --apply --snapshot-out=<absolute-path> # perform transitions
  *
  * State transitions (--apply), ALL from status 'pending', nothing deleted:
  *   pending → superseded  'duplicate'              a 2nd+ pending row for the same (url, type); the oldest is kept
@@ -20,7 +20,8 @@
  *   pending (kept)        URL_UPDATED for a Google-ready canonical job at its current URL → priority 4, job_id + content_hash filled
  *   pending (kept)        URL_DELETED, legitimately removed → priority 1 if Google was ever told about the URL
  *                         (a sent URL_UPDATED exists), otherwise priority 4
- * Then creates uq_indexing_queue_pending_url_type (idempotency) if no duplicates remain.
+ * The separately reviewed finalize-job-seo-v2-queue-index.ts command creates
+ * uq_indexing_queue_pending_url_type only after this cleanup proves it safe.
  *
  * Refuses --apply while legacy jobs are unclassified (run classify-job-readiness.ts --apply first):
  * otherwise every URL_UPDATED would be judged against an empty readiness state.
@@ -29,12 +30,14 @@ import dotenv from "dotenv";
 import { pool } from "../src/db/client.js";
 import { canonicalSql, seoReadySql } from "../src/lib/google-job-readiness.js";
 import { buildJobUrl } from "../src/lib/job-seo.js";
+import { requireAbsoluteSnapshotPath, writeJobSeoV2StateSnapshot } from "../src/db/job-seo-v2-state.js";
 
 dotenv.config();
 
 const APPLY = process.argv.includes("--apply");
 const sampleArg = process.argv.find((a) => a.startsWith("--http-sample="));
 const HTTP_SAMPLE = sampleArg ? Math.min(Math.max(Number(sampleArg.split("=")[1]) || 0, 0), 50) : 0;
+const SNAPSHOT_OUT = process.argv.find((a) => a.startsWith("--snapshot-out="))?.slice("--snapshot-out=".length);
 
 // One classification of every pending row, shared by the report and the apply.
 const CLASSIFIED = `
@@ -181,15 +184,6 @@ async function apply() {
         [stale]
       );
     }
-    await client.query(`DO $$
-      BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'uq_indexing_queue_pending_url_type')
-           AND NOT EXISTS (SELECT 1 FROM indexing_queue WHERE status = 'pending'
-                           GROUP BY url, notification_type HAVING COUNT(*) > 1) THEN
-          CREATE UNIQUE INDEX uq_indexing_queue_pending_url_type
-            ON indexing_queue (url, notification_type) WHERE status = 'pending';
-        END IF;
-      END $$;`);
     await client.query("COMMIT");
     return {
       superseded: superseded.rowCount ?? 0,
@@ -217,6 +211,8 @@ async function main() {
     console.table(await httpSample(HTTP_SAMPLE));
   }
   if (APPLY) {
+    const snapshot = await writeJobSeoV2StateSnapshot(requireAbsoluteSnapshotPath(SNAPSHOT_OUT));
+    console.log(`[cleanup-indexing-queue] snapshot: ${snapshot.destination} (${snapshot.jobs} jobs, ${snapshot.pendingQueue} pending queue rows)`);
     const applied = await apply();
     console.log("Aplicado:", applied);
     const after = await report();
