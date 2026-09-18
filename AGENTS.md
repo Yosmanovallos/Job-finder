@@ -128,6 +128,25 @@ pnpm apply:prepare --job <uuid> && pnpm apply:approve --application <uuid>
   historical-test lint failures. Report these separately from new errors;
   do not alter frozen code or suppress checks to claim phase completion.
 
+## Dashboard performance and Render budget — protected production invariant
+
+- Read `job-radar-apify/docs/DASHBOARD-PERFORMANCE-RUNBOOK.md` before changing
+  dashboard SSR, job queries, cache behavior, server startup or Render config.
+- Production baseline is commit `d67fc32`: `/dashboard` must keep its bounded
+  stale-while-revalidate job-page cache and the CO/VE first-page startup warmup.
+  Equivalent measured improvements are allowed; silently removing or weakening
+  these protections is not.
+- Protect first-entry latency. A dashboard change must be checked from a cold
+  process and on a unique URL/edge MISS, not only with a warm browser cache.
+  Compare the result with the runbook baseline and report any regression.
+- Keep `job-radar-apify` on Render Starter (USD 7/month) and
+  `buscotrabajo-social-automation` on Free. Total intended Render spend stays
+  below USD 10/month; do not upgrade, duplicate or add paid services without
+  explicit user approval.
+- Never mix dashboard/performance work with CV Generator work. Start from the
+  current production `origin/main` in an isolated `codex/` worktree and verify
+  the diff contains no CV Generator files before deployment.
+
 ## Package layout
 
 - `packages/config` — Zod env loader, actionable errors.
