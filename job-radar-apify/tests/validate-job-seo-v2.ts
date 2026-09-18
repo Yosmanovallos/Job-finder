@@ -553,7 +553,8 @@ try {
   const cleanupWithoutSnapshot = await runScript("cleanup-indexing-queue.ts", ["--apply"]);
   assert.notEqual(cleanupWithoutSnapshot.code, 0, "cleanup apply refuses to write without a pre-write snapshot");
   assert.deepEqual(await snapshot(), beforeRows, "missing cleanup snapshot leaves queue unchanged");
-  const cleanupApply = await runScript("cleanup-indexing-queue.ts", ["--apply", `--snapshot-out=${await snapshotPath("cleanup")}`]);
+  const cleanupSnapshot = await snapshotPath("cleanup");
+  const cleanupApply = await runScript("cleanup-indexing-queue.ts", ["--apply", `--snapshot-out=${cleanupSnapshot}`]);
   assert.equal(cleanupApply.code, 0, cleanupApply.output);
   assert.equal(Number((await pool.query(`SELECT COUNT(*) FROM indexing_queue`)).rows[0].count), totalBefore, "no queue row is ever deleted");
   const state = async (url: string, type: string) =>
@@ -573,6 +574,15 @@ try {
     [goneUrl]
   );
   assert.equal(Number(pendingUpdatedForMissing.rows[0].count), 0, "a stale update is never converted into a deletion");
+  const cleanupRowsAfterApply = await snapshot();
+  const cleanupRestoreDry = await runScript("restore-job-seo-v2-state.ts", [`--from=${cleanupSnapshot}`]);
+  assert.equal(cleanupRestoreDry.code, 0, cleanupRestoreDry.output);
+  assert.deepEqual(await snapshot(), cleanupRowsAfterApply, "cleanup restore dry-run is read-only");
+  const cleanupRestore = await runScript("restore-job-seo-v2-state.ts", [`--from=${cleanupSnapshot}`, "--apply"]);
+  assert.equal(cleanupRestore.code, 0, cleanupRestore.output);
+  assert.deepEqual(await snapshot(), beforeRows, "queue cleanup snapshot restores every changed pending row");
+  const cleanupReapply = await runScript("cleanup-indexing-queue.ts", ["--apply", `--snapshot-out=${await snapshotPath("cleanup-reapply")}`]);
+  assert.equal(cleanupReapply.code, 0, cleanupReapply.output);
   const queueIndexDry = await runScript("finalize-job-seo-v2-queue-index.ts", []);
   assert.equal(queueIndexDry.code, 0, queueIndexDry.output);
   const queueIndexApply = await runScript("finalize-job-seo-v2-queue-index.ts", ["--apply"]);
@@ -597,6 +607,19 @@ try {
     }
   }
   console.log(`✅ [sweep] ${all.rowCount} active jobs: sitemap membership and pending URL_UPDATED match readiness for every one.`);
+
+  // --- 22. Recovery: classifier snapshot restores its mutable state ------------
+  const classifierRestoreDry = await runScript("restore-job-seo-v2-state.ts", [`--from=${classifierSnapshot}`]);
+  assert.equal(classifierRestoreDry.code, 0, classifierRestoreDry.output);
+  const classifierRestore = await runScript("restore-job-seo-v2-state.ts", [`--from=${classifierSnapshot}`, "--apply"]);
+  assert.equal(classifierRestore.code, 0, classifierRestore.output);
+  const originalLegacyRich = classifierBackup.jobs.find((snapshotRow: Record<string, unknown>) => snapshotRow.id === legacyRichId)!;
+  const restoredLegacyRich = (await pool.query(`SELECT detail_status, seo_ready, seo_reasons, content_hash FROM jobs WHERE id = $1`, [legacyRichId])).rows[0];
+  assert.equal(restoredLegacyRich.detail_status, originalLegacyRich.detail_status, "classifier restore returns detail status to its snapshot value");
+  assert.equal(restoredLegacyRich.seo_ready, originalLegacyRich.seo_ready, "classifier restore returns readiness to its snapshot value");
+  assert.deepEqual(restoredLegacyRich.seo_reasons, originalLegacyRich.seo_reasons, "classifier restore returns reason codes to their snapshot value");
+  assert.equal(restoredLegacyRich.content_hash, originalLegacyRich.content_hash, "classifier restore returns hash to its snapshot value");
+  console.log("✅ [recovery] classifier and queue-cleanup snapshots both restore their captured mutable state.");
 } finally {
   server.kill("SIGTERM");
   await pool.end();
