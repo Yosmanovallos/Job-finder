@@ -62,6 +62,16 @@ No modificar `src/lib/stale-while-revalidate-cache.ts` ni las constantes 5m/6h/6
 
 Ejecutar test dedicado, unit, integration, baseline, SEO, dashboard filters, companies search, build, TypeScript, lint enfocado/global y `git diff --check`. Probar cada ruta con status, Content-Type, CORS, Cache-Control, Vary, cuerpo y schema. Ejecutar MCP initialize/list/call y A2A message/send. Capturar home/trust/docs y verificar ausencia de errores de consola.
 
+## Verificación de producción — 2026-09-18
+
+Los commits `f83ed4a` y `6a9ad44` están integrados en `main` y Render sirve las rutas nuevas. El smoke HTTP verificó HTML sustancial, Markdown y 404 real en ambas variantes, OpenAPI, REST público con catálogo real, llms.txt, robots, API Catalog RFC 9727, ARD, Agent Skills con digests SHA-256, MCP `initialize`/`tools/list`/`tools/call` y A2A `message/send`. La misma URL solicitada primero como HTML y luego como Markdown devolvió las dos variantes correctas con `Cache-Control: private, no-store`, `Vary: Accept, Accept-Encoding` y `cf-cache-status: BYPASS`.
+
+Una URL única de `/dashboard` devolvió `cf-cache-status: MISS` en 316 ms externos. La fase no alteró el LRU/SWR, warmup ni configuración de Render.
+
+IsItAgentReady rescaneó a **73/100 (nivel 5, Agent-Native)**: Discoverability 3/4, Content 1/1, Bot Access Control 2/2 y API/Auth/MCP/Skill Discovery 5/8. Sus únicos fallos son DNS-AID y OAuth/OIDC, OAuth Protected Resource y Auth.md. Los tres últimos no aplican: la API de agentes es pública y no existe un authorization server, registro, emisión, revocación o JWKS reales; publicarlos para subir puntuación sería metadato falso e inseguro.
+
+DNS-AID exige acceso autorizado a la zona de GoDaddy de `buscotrabajo.co`, una decisión explícita de habilitar DNSSEC y valores SVCB/HTTPS validados contra la versión final del draft. No se publicaron registros inventados. Is Agentic recibió una solicitud de rescan, pero seguía mostrando su snapshot previo de 44/100 (01:02 UTC) tras el despliegue; no se presenta como un resultado posterior ni como evidencia de fallo de las rutas que el smoke y el otro escáner comprobaron.
+
 ## Despliegue y rollback
 
 Antes de commit/push/deploy: diff completo, cero CV Generator, cero cambios de planes/servicios. Publicar por el flujo seguro del repo, esperar Render Live, inspeccionar startup y medir dashboard MISS. Rescanear ambos evaluadores hasta que no queden fallos aplicables corregibles.
