@@ -147,6 +147,19 @@ pnpm apply:prepare --job <uuid> && pnpm apply:approve --application <uuid>
   current production `origin/main` in an isolated `codex/` worktree and verify
   the diff contains no CV Generator files before deployment.
 
+## Agent readiness — protected public contract
+
+- Runbook: `job-radar-apify/docs/AGENT-READINESS-RUNBOOK.md`; OpenSpec change:
+  `job-radar-apify/openspec/changes/agent-readiness-100/`.
+- REST, MCP, A2A and WebMCP agent surfaces are public, bounded and read-only.
+  Never add auto-apply, CV, user data, admin access or scraping-on-demand.
+- Keep OpenAPI, docs, llms.txt, API Catalog, Agent Skills digests and ARD in
+  sync with real routes. Do not publish OAuth, Auth.md or Web Bot Auth unless
+  the corresponding real authentication/signing capability exists first.
+- Preserve HTML/Markdown negotiation, real 404s and `Vary: Accept` plus
+  `Accept-Encoding`. Experimental discovery standards must remain isolated,
+  tested and removable without affecting the dashboard.
+
 ## Package layout
 
 - `packages/config` — Zod env loader, actionable errors.

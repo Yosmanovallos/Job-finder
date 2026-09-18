@@ -24,7 +24,9 @@ const resourceLinks = [
   { label: "Preguntas frecuentes", href: "/preguntas" },
   { label: "Cómo funciona", href: "/como-funciona" },
   { label: "Fuentes de datos", href: "/fuentes" },
-  { label: "Guía de inicio rápido", href: "/#hero-demo" }
+  { label: "API y agentes", href: "/docs" },
+  { label: "Acerca de", href: "/about" },
+  { label: "Contacto", href: "/contact" }
 ];
 
 const legalLinks = [

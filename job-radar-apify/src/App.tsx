@@ -19,6 +19,7 @@ import {
 } from "./lib/country-context.js";
 import { AuthProvider } from "./auth/auth-provider.js";
 import RequireAuth from "./auth/require-auth.js";
+import { registerBuscoTrabajoWebMcp } from "./lib/webmcp.js";
 
 // Code-split everything past the landing page — visitors hitting "/" (the
 // most common entrypoint) don't pay for Dashboard/Login/Pricing/Legal JS.
@@ -36,6 +37,7 @@ const Pricing = lazy(() => import("./sections/Pricing.js"));
 const Legal = lazy(() => import("./sections/Legal.js"));
 const Account = lazy(() => import("./sections/Account.js"));
 const AccountAiProviders = lazy(() => import("./sections/AccountAiProviders.js"));
+const PublicInfoPage = lazy(() => import("./sections/PublicInfoPage.js"));
 
 function Landing() {
   // "/" (Colombia, default) vs "/ve" (Venezuela) — same pattern as
@@ -119,6 +121,10 @@ function AppRoutes() {
       <Route path="/legal/privacidad" element={<Legal type="privacidad" />} />
       <Route path="/legal/uso-aceptable" element={<Legal type="uso-aceptable" />} />
       <Route path="/legal/cookies" element={<Legal type="cookies" />} />
+      <Route path="/docs" element={<PublicInfoPage />} />
+      <Route path="/about" element={<PublicInfoPage />} />
+      <Route path="/contact" element={<PublicInfoPage />} />
+      <Route path="/privacy" element={<PublicInfoPage />} />
       <Route
         path="/cuenta"
         element={
@@ -193,6 +199,11 @@ function RouteFallback() {
 }
 
 export default function App() {
+  useEffect(() => {
+    const controller = registerBuscoTrabajoWebMcp();
+    return () => controller?.abort();
+  }, []);
+
   return (
     <AuthProvider>
       <BrowserRouter>

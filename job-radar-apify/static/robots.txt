@@ -1,9 +1,12 @@
 User-agent: *
 Allow: /
+Allow: /api/v1/
 Disallow: /login
 Disallow: /reset-password
 Disallow: /auth/callback
 Disallow: /cuenta
 Disallow: /api/
+Content-Signal: ai-train=no, search=yes, ai-input=yes
 
 Sitemap: https://buscotrabajo.co/sitemap.xml
+Agentmap: https://buscotrabajo.co/.well-known/ai-catalog.json

@@ -18,6 +18,7 @@
     "test:integration": "tsx scripts/run-isolated-tests.ts integration",
     "test:sitemap": "tsx scripts/run-isolated-tests.ts sitemap",
     "test:baseline": "tsx scripts/run-isolated-tests.ts baseline",
+    "test:agent-readiness": "tsx scripts/run-isolated-tests.ts agent-readiness",
     "test:canary:adapters": "tsx tests/validate-adapters.ts",
     "test:adapters": "tsx tests/validate-adapters.ts",
     "test:dedupe": "tsx tests/validate-db-dedupe.ts",

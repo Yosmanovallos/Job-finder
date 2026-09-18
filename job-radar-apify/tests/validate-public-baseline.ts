@@ -32,7 +32,7 @@ async function main(): Promise<void> {
     assert.equal(response.status, 200);
     const data = await response.json() as { jobs: SeoJob[] };
     assert.ok(data.jobs.length > 0, "[P0] Faltan las vacantes sintéticas del baseline.");
-    const routes = ["/", "/ve", "/dashboard", "/ve/dashboard", "/empleos/bogota", "/ve/empleos/project-manager", "/empresas", "/ve/empresas", buildJobPath(data.jobs[0])];
+    const routes = ["/", "/ve", "/dashboard", "/ve/dashboard", "/empleos/bogota", "/ve/empleos/project-manager", "/empresas", "/ve/empresas", "/docs", "/about", "/contact", "/privacy", buildJobPath(data.jobs[0])];
     const snapshots: object[] = [];
     const browser = await chromium.launch({ headless: true });
     try {

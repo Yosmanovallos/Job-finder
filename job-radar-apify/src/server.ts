@@ -105,6 +105,16 @@ import { collectFactIds } from "./cv/factuality.js";
 import { CV_TEMPLATES, DEFAULT_TEMPLATE_ID, getTemplate } from "./cv/templates/registry.js";
 import { handleResumeStudioRoute } from "./server/routes/resume-studio.js";
 import { handleRunsRoute, isRunsRoute } from "./server/routes/runs.js";
+import { handleAgentReadinessRoute, sendStructuredApiError } from "./server/routes/agent-readiness.js";
+import {
+  DISCOVERY_LINKS,
+  NOT_FOUND_HTML,
+  NOT_FOUND_MARKDOWN,
+  getHomeContent,
+  injectPublicContent,
+  renderContentMarkdown,
+  wantsMarkdown
+} from "./lib/agent-readiness.js";
 import { RESUME_STUDIO_ENABLED } from "./config.js";
 import { getProviderRegistry } from "./ai-gateway/registry-instance.js";
 import { getCredentialResolver } from "./ai-gateway/credential-resolver-instance.js";
@@ -136,6 +146,21 @@ const PORT = process.env.PORT || 3000;
 const MAX_CONCURRENT_SITEMAP_STREAMS = 1;
 const SITEMAP_MAX_DURATION_MS = 30_000;
 let activeSitemapStreams = 0;
+const SPA_ROUTES = new Set([
+  "/login",
+  "/reset-password",
+  "/auth/callback",
+  "/pricing",
+  "/legal/terminos",
+  "/legal/privacidad",
+  "/legal/uso-aceptable",
+  "/legal/cookies",
+  "/cuenta",
+  "/cuenta/ai/providers",
+  "/como-funciona",
+  "/fuentes",
+  "/preguntas"
+]);
 
 const MIN_COMPRESSIBLE_BYTES = 1024;
 const COMPRESSIBLE_CONTENT_TYPE = /^(?:text\/|application\/(?:javascript|json|xml))/i;
@@ -165,6 +190,14 @@ function compressBody(body: Buffer, encoding: SupportedContentEncoding): Promise
   });
 }
 
+function mergeVary(existing: string | string[] | number | undefined, value: string): string {
+  const names = `${Array.isArray(existing) ? existing.join(",") : existing || ""},${value}`
+    .split(",")
+    .map((name) => name.trim())
+    .filter(Boolean);
+  return [...new Map(names.map((name) => [name.toLowerCase(), name])).values()].join(", ");
+}
+
 async function sendBody(
   req: http.IncomingMessage,
   res: http.ServerResponse,
@@ -192,7 +225,7 @@ async function sendBody(
       }
       responseBody = await compressed;
       responseHeaders["Content-Encoding"] = encoding;
-      responseHeaders.Vary = "Accept-Encoding";
+      responseHeaders.Vary = mergeVary(responseHeaders.Vary, "Accept-Encoding");
     } catch (error) {
       if (staticCacheKey) ENCODED_STATIC_CACHE.delete(`${staticCacheKey}:${encoding}`);
       console.warn("[server] No se pudo comprimir una respuesta; se enviará sin comprimir.", error);
@@ -555,8 +588,21 @@ async function handleRequest(
   // blocked IP never reaches a route handler at all. Time-boxed and
   // in-memory (see security-monitor.ts) — never a permanent ban list.
   if (isBlocked(clientIp)) {
-    res.writeHead(429, { "Content-Type": "application/json", "Retry-After": "900" });
-    res.end(JSON.stringify({ error: "Demasiadas solicitudes — intenta de nuevo más tarde." }));
+    if (pathname.startsWith("/api/v1/")) {
+      res.setHeader("Retry-After", "900");
+      await sendStructuredApiError(
+        req,
+        res,
+        sendBody,
+        429,
+        "rate_limit_exceeded",
+        "Demasiadas solicitudes.",
+        "Espera 15 minutos antes de volver a intentarlo."
+      );
+    } else {
+      res.writeHead(429, { "Content-Type": "application/json", "Retry-After": "900" });
+      res.end(JSON.stringify({ error: "Demasiadas solicitudes — intenta de nuevo más tarde." }));
+    }
     return;
   }
 
@@ -573,8 +619,34 @@ async function handleRequest(
     !checkRateLimit(clientIp, GENERAL_API_RATE_LIMIT, GENERAL_API_RATE_WINDOW_MS, "general")
   ) {
     recordSuspiciousEvent(clientIp, `rate-limit general ${pathname}`);
-    res.writeHead(429, { "Content-Type": "application/json", "Retry-After": "60" });
-    res.end(JSON.stringify({ error: "Demasiadas solicitudes — intenta de nuevo en un minuto." }));
+    if (pathname.startsWith("/api/v1/")) {
+      res.setHeader("Retry-After", "60");
+      await sendStructuredApiError(
+        req,
+        res,
+        sendBody,
+        429,
+        "rate_limit_exceeded",
+        "Demasiadas solicitudes.",
+        "Espera un minuto antes de volver a intentarlo."
+      );
+    } else {
+      res.writeHead(429, { "Content-Type": "application/json", "Retry-After": "60" });
+      res.end(JSON.stringify({ error: "Demasiadas solicitudes — intenta de nuevo en un minuto." }));
+    }
+    return;
+  }
+
+  if (
+    await handleAgentReadinessRoute(req, res, {
+      pathname,
+      method,
+      parsedUrl,
+      clientIp,
+      loadIndexHtml: async () => (await readStaticFile(path.join(PUBLIC_DIR, "index.html"))).toString("utf8"),
+      sendBody
+    })
+  ) {
     return;
   }
 
@@ -1817,6 +1889,19 @@ async function handleRequest(
     }
   }
 
+  if (pathname.startsWith("/api/")) {
+    await sendStructuredApiError(
+      req,
+      res,
+      sendBody,
+      404,
+      "route_not_found",
+      "La ruta API solicitada no existe.",
+      "Consulta /openapi.json o /docs para ver los endpoints públicos disponibles."
+    );
+    return;
+  }
+
   // 7b. GET /empleos/:id/:slug — server-rendered per-job page for
   // crawlers (SEO Fase 1, ver docs/SEO-PLAN.md). The `:slug` segment is
   // purely decorative for click-through readability; matching is always by
@@ -2716,8 +2801,19 @@ async function handleRequest(
   // hreflang linking the two regional variants at all. This only rewrites
   // <head> tags (title/description/og/canonical/hreflang); it does not
   // attempt full SSR of the landing content (§5.7 risk 2, still open).
-  if ((pathname === "/" || pathname === "/ve") && method === "GET") {
+  if ((pathname === "/" || pathname === "/ve") && (method === "GET" || method === "HEAD")) {
     const isVe = pathname === "/ve";
+    const homeContent = getHomeContent(isVe ? "VE" : "CO");
+    if (wantsMarkdown(req.headers.accept)) {
+      await sendBody(
+        req,
+        res,
+        200,
+        { "Content-Type": "text/markdown; charset=utf-8", Vary: "Accept", Link: DISCOVERY_LINKS },
+        renderContentMarkdown(homeContent)
+      );
+      return;
+    }
     let indexHtml: string;
     try {
       indexHtml = fs.readFileSync(path.join(PUBLIC_DIR, "index.html"), "utf-8");
@@ -2735,12 +2831,7 @@ async function handleRequest(
     // the full landing SSR that risk defers — only the same real <h1> text
     // HeroDemo.tsx already renders client-side, verbatim, so raw HTML and
     // post-hydration DOM never disagree.
-    const heroCountryConfig = getCountryConfig(isVe ? "VE" : "CO");
-    const heroHeading = `Encuentra todas las vacantes de ${heroCountryConfig.name} en un solo lugar`;
-    indexHtml = indexHtml.replace(
-      '<div id="app"></div>',
-      `<div id="app"><h1>${escapeHtml(heroHeading)}</h1></div>`
-    );
+    indexHtml = injectPublicContent(indexHtml, homeContent);
 
     const selfUrl = isVe ? `${SITE_URL}/ve` : `${SITE_URL}/`;
     indexHtml = indexHtml.replace(
@@ -2792,7 +2883,13 @@ async function handleRequest(
         );
     }
 
-    await sendBody(req, res, 200, { "Content-Type": "text/html; charset=utf-8" }, indexHtml);
+    await sendBody(
+      req,
+      res,
+      200,
+      { "Content-Type": "text/html; charset=utf-8", Vary: "Accept", Link: DISCOVERY_LINKS },
+      indexHtml
+    );
     return;
   }
 
@@ -2801,6 +2898,17 @@ async function handleRequest(
   // etc.) — those must serve index.html so React Router can mount and take
   // over, otherwise a refresh or direct link on any non-"/" route 404s.
   const hasFileExtension = path.extname(pathname) !== "";
+  if (!hasFileExtension && !SPA_ROUTES.has(pathname)) {
+    const markdown = wantsMarkdown(req.headers.accept);
+    await sendBody(
+      req,
+      res,
+      404,
+      { "Content-Type": markdown ? "text/markdown; charset=utf-8" : "text/html; charset=utf-8", Vary: "Accept" },
+      markdown ? NOT_FOUND_MARKDOWN : NOT_FOUND_HTML
+    );
+    return;
+  }
   let filePath = path.join(PUBLIC_DIR, hasFileExtension ? pathname : "index.html");
 
   const ext = path.extname(filePath);
