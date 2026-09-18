@@ -194,14 +194,16 @@ export async function refreshGoogleReadinessInTransaction(
 
   let notified: RefreshOutcome["notified"] = null;
   if (firstReady || changedWhileReady) {
-    notified = firstReady ? "first_ready" : "content_changed";
-    await enqueueIndexingNotificationsWith(client, [{
+    // The enqueue itself skips a version Google already received (same job +
+    // content_hash sent), e.g. a ready → not-ready → ready flap.
+    const queued = await enqueueIndexingNotificationsWith(client, [{
       url: buildJobUrl({ jobId: row.id, title: row.title, location: row.location }),
       type: "URL_UPDATED",
       priority: firstReady ? INDEXING_PRIORITY.newlyReady : INDEXING_PRIORITY.contentUpdate,
       jobId: row.id,
       contentHash: hash
     }]);
+    if (queued > 0) notified = firstReady ? "first_ready" : "content_changed";
   }
   return { ready: verdict.ready, reasons: verdict.reasons, notified };
 }

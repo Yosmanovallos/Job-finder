@@ -36,47 +36,77 @@ export interface IndexingQueueEntry {
 type Queryable = Pick<PoolClient, "query">;
 
 /**
- * Idempotent enqueue: at most one pending row per (url, type). A second
- * request for a URL already pending only raises its priority (never lowers
- * it) — so repeated rediscovery of an unchanged job never grows the queue.
+ * Idempotent enqueue: at most one sendable notification per Google-visible
+ * version. Every producer goes through here, so the invariants live here:
+ *
+ * - One pending row per (url, type). A second request for a URL already
+ *   pending only raises its priority (never lowers it) and carries the newer
+ *   content_hash — repeated rediscovery never grows the queue.
+ * - Already sent → nothing: an URL_UPDATED whose (job_id, url, content_hash)
+ *   was already sent successfully, or an URL_DELETED whose url was, is
+ *   skipped. Identity is the hash, not a time cooldown.
+ * - A newer URL_UPDATED for a job supersedes that job's pending URL_UPDATED at
+ *   another url (a title/location edit changes the slug): no obsolete stacking.
+ *
+ * Returns how many entries left a pending row (inserted or raised).
  * Works whether or not uq_indexing_queue_pending_url_type exists yet (see
  * schema.sql's job-seo-v2 block).
  */
-export async function enqueueIndexingNotificationsWith(db: Queryable, entries: IndexingQueueEntry[]): Promise<void> {
-  if (entries.length === 0) return;
+export async function enqueueIndexingNotificationsWith(db: Queryable, entries: IndexingQueueEntry[]): Promise<number> {
+  if (entries.length === 0) return 0;
   const urls = entries.map((entry) => entry.url);
   const types = entries.map((entry) => entry.type);
   const priorities = entries.map((entry) => entry.priority ?? INDEXING_PRIORITY.reconcile);
   const jobIds = entries.map((entry) => entry.jobId ?? null);
   const hashes = entries.map((entry) => entry.contentHash ?? null);
-  await db.query(
+  const result = await db.query<{ n: string }>(
     `WITH input AS (
        SELECT DISTINCT ON (url, type) url, type, priority, job_id, content_hash
        FROM unnest($1::text[], $2::text[], $3::int[], $4::uuid[], $5::text[]) AS t(url, type, priority, job_id, content_hash)
        ORDER BY url, type, priority ASC
+     ), fresh AS (
+       SELECT i.* FROM input i
+       WHERE NOT EXISTS (
+         SELECT 1 FROM indexing_queue s
+         WHERE s.status = 'sent' AND s.url = i.url AND s.notification_type = i.type
+           AND (i.type = 'URL_DELETED'
+                OR (i.job_id IS NOT NULL AND i.content_hash IS NOT NULL
+                    AND s.job_id = i.job_id AND s.content_hash = i.content_hash))
+       )
+     ), obsolete AS (
+       UPDATE indexing_queue q
+       SET status = 'superseded', superseded_at = NOW(), superseded_reason = 'superseded_by_newer'
+       FROM fresh i
+       WHERE q.status = 'pending' AND q.notification_type = 'URL_UPDATED' AND i.type = 'URL_UPDATED'
+         AND i.job_id IS NOT NULL AND q.job_id = i.job_id AND q.url <> i.url
+       RETURNING q.id
      ), raised AS (
        UPDATE indexing_queue q
        SET priority = LEAST(q.priority, i.priority),
            job_id = COALESCE(q.job_id, i.job_id),
            content_hash = COALESCE(i.content_hash, q.content_hash)
-       FROM input i
+       FROM fresh i
        WHERE q.status = 'pending' AND q.url = i.url AND q.notification_type = i.type
        RETURNING q.url
+     ), inserted AS (
+       INSERT INTO indexing_queue (url, notification_type, priority, job_id, content_hash)
+       SELECT i.url, i.type, i.priority, i.job_id, i.content_hash
+       FROM fresh i
+       WHERE NOT EXISTS (
+         SELECT 1 FROM indexing_queue q
+         WHERE q.status = 'pending' AND q.url = i.url AND q.notification_type = i.type
+       )
+       ON CONFLICT DO NOTHING
+       RETURNING 1
      )
-     INSERT INTO indexing_queue (url, notification_type, priority, job_id, content_hash)
-     SELECT i.url, i.type, i.priority, i.job_id, i.content_hash
-     FROM input i
-     WHERE NOT EXISTS (
-       SELECT 1 FROM indexing_queue q
-       WHERE q.status = 'pending' AND q.url = i.url AND q.notification_type = i.type
-     )
-     ON CONFLICT DO NOTHING`,
+     SELECT (SELECT COUNT(*) FROM raised) + (SELECT COUNT(*) FROM inserted) AS n`,
     [urls, types, priorities, jobIds, hashes]
   );
+  return Number(result.rows[0]?.n ?? 0);
 }
 
-export async function enqueueIndexingNotifications(entries: IndexingQueueEntry[]): Promise<void> {
-  await enqueueIndexingNotificationsWith(pool, entries);
+export async function enqueueIndexingNotifications(entries: IndexingQueueEntry[]): Promise<number> {
+  return enqueueIndexingNotificationsWith(pool, entries);
 }
 
 // Counts 'failed' attempts too, not just 'sent' — Google's quota is

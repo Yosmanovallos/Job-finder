@@ -27,7 +27,7 @@ import {
   recordDetailOutcome,
   refreshGoogleReadiness
 } from "../src/db/job-readiness-repository.js";
-import { checkIndexingTarget, getPendingIndexingBatch, wasJobPurged } from "../src/db/indexing-repository.js";
+import { checkIndexingTarget, enqueueIndexingNotifications, getPendingIndexingBatch, wasJobPurged } from "../src/db/indexing-repository.js";
 import { purgeOldJobs } from "../src/db/scheduler-repository.js";
 import { buildJobPath, buildJobUrl, escapeHtml } from "../src/lib/job-seo.js";
 import type { Job } from "../src/sources/types.js";
@@ -373,6 +373,41 @@ try {
   await refreshGoogleReadiness(fullId);
   assert.equal((await updatedRows(fullId)).length, 1, "re-scrape / re-evaluation of unchanged content never enqueues");
 
+  // --- 10b. Inflow: one notification per Google-visible version, ever ---------------
+  const sentHashId = await saveOne(job({ title: "Coordinador de Compras", description: RICH, requirements: RICH_REQ }));
+  const sentHash = (await row(sentHashId)).content_hash;
+  await pool.query(`UPDATE indexing_queue SET status = 'sent', sent_at = NOW() WHERE job_id = $1 AND status = 'pending'`, [sentHashId]);
+  await mutateReadinessRelevantJobs([{ id: sentHashId, patch: { country: "VE" } }]);
+  const backToSent = await mutateReadinessRelevantJobs([{ id: sentHashId, patch: { country: "CO" } }]);
+  assert.equal((await row(sentHashId)).content_hash, sentHash, "flap returns to the exact version already sent");
+  assert.equal(backToSent[0]?.outcome?.notified, null, "a version Google already received is not re-notified");
+  assert.deepEqual(await updatedRows(sentHashId), [{ status: "sent", priority: 2 }], "same job + same content_hash already sent → no new row");
+  const realChange = await mutateReadinessRelevantJobs([{ id: sentHashId, patch: { employment_type: "Medio tiempo" } }], { contentObtained: true });
+  assert.equal(realChange[0]?.outcome?.notified, "content_changed");
+  assert.deepEqual(await updatedRows(sentHashId), [{ status: "sent", priority: 2 }, { status: "pending", priority: 3 }], "a real change after a send → exactly one new row");
+
+  const oldUrl = buildJobUrl({ jobId: sentHashId, title: "Coordinador de Compras", location: (await row(sentHashId)).location });
+  await mutateReadinessRelevantJobs([{ id: sentHashId, patch: { title: "Coordinador de Compras Senior" } }], { contentObtained: true });
+  const byUrl = await pool.query(
+    `SELECT url = $2 AS old_url, status, superseded_reason FROM indexing_queue
+     WHERE job_id = $1 AND notification_type = 'URL_UPDATED' AND status <> 'sent' ORDER BY created_at`,
+    [sentHashId, oldUrl]
+  );
+  assert.deepEqual(byUrl.rows, [
+    { old_url: true, status: "superseded", superseded_reason: "superseded_by_newer" },
+    { old_url: false, status: "pending", superseded_reason: null }
+  ], "a newer version (new slug) supersedes the obsolete pending row instead of stacking");
+
+  const deletedUrl = "https://buscotrabajo.co/empleos/00000000-0000-4000-8000-00000000d1e7/cargo-bogota";
+  await enqueueIndexingNotifications([{ url: deletedUrl, type: "URL_DELETED", priority: 1 }]);
+  await enqueueIndexingNotifications([{ url: deletedUrl, type: "URL_DELETED", priority: 1 }]);
+  await pool.query(`UPDATE indexing_queue SET status = 'sent', sent_at = NOW() WHERE url = $1`, [deletedUrl]);
+  await enqueueIndexingNotifications([{ url: deletedUrl, type: "URL_DELETED", priority: 1 }]);
+  const tombstone = await pool.query(`SELECT status FROM indexing_queue WHERE url = $1`, [deletedUrl]);
+  assert.deepEqual(tombstone.rows, [{ status: "sent" }], "repeated delete of the same URL (pending or already sent) → one row");
+  await pool.query(`DELETE FROM indexing_queue WHERE url = $1`, [deletedUrl]);
+  console.log("✅ [inflow] sent version never re-queued; real change → one row; newer slug supersedes; repeated delete deduped.");
+
   // --- 11. Duplicate by content fingerprint → merged, no second page ---------------
   const dup = await saveJobs([job({ title: "Analista de Riesgo", description: RICH, requirements: RICH_REQ, employmentType: "Tiempo completo", url: "https://other.example.com/same-job", source: "Elempleo" })]);
   assert.equal(dup.savedCount, 0);
@@ -458,7 +493,12 @@ try {
   for (const id of [glassId, torreId, retryId, remoteUnknownId, expiringId]) {
     assert.equal((await updatedRows(id)).filter((r) => r.status === "pending" || r.status === "sent").length, 0, `reconcile queued non-ready ${id}`);
   }
-  console.log("✅ [reconcile] the hourly reconcile never queues a non-ready job.");
+  const queueState = async () => (await pool.query(`SELECT id, status, priority, content_hash FROM indexing_queue ORDER BY id`)).rows;
+  const afterFirstReconcile = await queueState();
+  const reconcileAgain = await runScript("backfill-indexing-queue.ts", []);
+  assert.equal(reconcileAgain.code, 0, reconcileAgain.output);
+  assert.deepEqual(await queueState(), afterFirstReconcile, "hourly reconcile is idempotent");
+  console.log("✅ [reconcile] the hourly reconcile never queues a non-ready job and is idempotent.");
   // The expired job had a URL_UPDATED queued while it was ready. Until the
   // hourly reconcile, that row is pending but can never be sent (pre-send
   // check); after it, the four consumers agree at rest too.
