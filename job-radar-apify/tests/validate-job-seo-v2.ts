@@ -27,7 +27,7 @@ import {
 } from "../src/db/job-readiness-repository.js";
 import { checkIndexingTarget, getPendingIndexingBatch, wasJobPurged } from "../src/db/indexing-repository.js";
 import { purgeOldJobs } from "../src/db/scheduler-repository.js";
-import { buildJobPath, buildJobUrl } from "../src/lib/job-seo.js";
+import { buildJobPath, buildJobUrl, escapeHtml } from "../src/lib/job-seo.js";
 import type { Job } from "../src/sources/types.js";
 import { DETAIL_ADAPTER_NAMES, sourceSupportsDetail } from "../src/sources/detail-capability.js";
 
@@ -180,6 +180,14 @@ async function assertConsumersAgree(id: string, expectedReady: boolean, label: s
   assert.equal(locs.includes(url), expectedReady, `${label}: sitemap membership`);
   if (!expectedReady) assert.equal(queued.length, 0, `${label}: URL_UPDATED must never be queued for a non-ready job`);
   else assert.ok(queued.length >= 1, `${label}: a ready job has its URL_UPDATED`);
+  // Brief §15: the raw server-rendered HTML (no hydration, no login) carries
+  // the title, the source's own description, source attribution and the
+  // apply path — for every user-visible job, ready or not.
+  const body = facts.html.split('<div id="app">')[1] ?? "";
+  assert.ok(body.includes(`<h1>`) && body.includes(escapeHtml(current.title)), `${label}: title in raw HTML`);
+  assert.ok(body.includes(`Fuente: ${escapeHtml(current.source)}`), `${label}: source attribution in raw HTML`);
+  const firstLine = String(current.description ?? "").split("\n")[0]?.trim();
+  if (firstLine) assert.ok(body.includes(escapeHtml(firstLine)), `${label}: source description in raw HTML`);
   console.log(`✅ [consumers] ${label}: ready=${expectedReady} — robots, JobPosting, sitemap and URL_UPDATED agree.`);
 }
 
@@ -389,6 +397,10 @@ try {
     assert.equal((await updatedRows(id)).filter((r) => r.status === "pending" || r.status === "sent").length, 0, `reconcile queued non-ready ${id}`);
   }
   console.log("✅ [reconcile] the hourly reconcile never queues a non-ready job.");
+  // The expired job had a URL_UPDATED queued while it was ready. Until the
+  // hourly reconcile, that row is pending but can never be sent (pre-send
+  // check); after it, the four consumers agree at rest too.
+  await assertConsumersAgree(expiringId, false, "expired job (after the hourly reconcile)");
 
   // --- 19. Legacy classification: dry-run writes nothing, apply is exact and idempotent
   const legacy = await pool.query<{ id: string; kind: string }>(

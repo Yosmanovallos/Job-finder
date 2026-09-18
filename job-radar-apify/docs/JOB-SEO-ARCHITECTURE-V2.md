@@ -368,3 +368,13 @@ restore; superseded queue rows keep their full history.
 - **Legacy remote rows** have no stored remote evidence → not ready. New WeRemoto/GetOnBoard/
   JSON-LD rows carry it and can become ready.
 - **`datePosted`** still falls back to scrape time when a source gives no date (86 rows).
+- **Time-based expiry window:** when a source `validThrough` passes, there is no write event.
+  Every reader flips at once (robots, JobPosting, sitemap), and the pre-send check never spends
+  quota on it. The job's still-pending URL_UPDATED is superseded by the next hourly reconcile, so
+  "not ready with nothing queued" holds at rest within ≤ 1 h.
+- **`seo_ready_at` is never cleared.** A job that was ready (even briefly, never actually notified)
+  and later purged gets its URL_DELETED in lane 1. That's minor quota use, not a correctness issue.
+- **Hydrated panel label:** after React hydrates, list items still show under "Requisitos" (the SSR
+  body and JSON-LD use a neutral section). The text is the same; the label is a P10 follow-up.
+- **EXE-004 (inherited P3 test, untouched):** timing assertion failed 1 time in 6 unit runs on
+  2026-09-18. It's unrelated to these files, and the cause is not established.
