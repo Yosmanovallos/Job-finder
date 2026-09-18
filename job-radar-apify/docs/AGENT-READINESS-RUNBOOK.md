@@ -54,6 +54,8 @@ No publicar registros hasta validar la sintaxis final con el proveedor y contar 
 
 ## Rendimiento protegido
 
+Las respuestas HTML/Markdown negociadas con `Accept` usan `Cache-Control: private, no-store`. Cloudflare no incorpora `Accept` en la clave de caché de este dominio, por lo que conservar una respuesta compartida permitiría que HTML y Markdown se contaminen entre sí aun con `Vary: Accept`. Es contenido estático ligero y no consulta la base; `/dashboard` conserva íntegramente su LRU/SWR y su caché de edge.
+
 No modificar `src/lib/stale-while-revalidate-cache.ts` ni las constantes 5m/6h/64 de `job-repository.ts`. Confirmar proceso frío, warmup CO/VE, timeout máximo 20s, `dashboard_cache_warmed`, URL única con `cf-cache-status: MISS`, duración Render y total externo. Baseline: Render 92/12/9 ms; externo 480/273/273 ms después de `d67fc32`.
 
 ## Verificación local

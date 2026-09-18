@@ -2809,7 +2809,12 @@ async function handleRequest(
         req,
         res,
         200,
-        { "Content-Type": "text/markdown; charset=utf-8", Vary: "Accept", Link: DISCOVERY_LINKS },
+        {
+          "Content-Type": "text/markdown; charset=utf-8",
+          "Cache-Control": "private, no-store",
+          Vary: "Accept",
+          Link: DISCOVERY_LINKS
+        },
         renderContentMarkdown(homeContent)
       );
       return;
@@ -2887,7 +2892,12 @@ async function handleRequest(
       req,
       res,
       200,
-      { "Content-Type": "text/html; charset=utf-8", Vary: "Accept", Link: DISCOVERY_LINKS },
+      {
+        "Content-Type": "text/html; charset=utf-8",
+        "Cache-Control": "private, no-store",
+        Vary: "Accept",
+        Link: DISCOVERY_LINKS
+      },
       indexHtml
     );
     return;
@@ -2904,7 +2914,11 @@ async function handleRequest(
       req,
       res,
       404,
-      { "Content-Type": markdown ? "text/markdown; charset=utf-8" : "text/html; charset=utf-8", Vary: "Accept" },
+      {
+        "Content-Type": markdown ? "text/markdown; charset=utf-8" : "text/html; charset=utf-8",
+        "Cache-Control": "private, no-store",
+        Vary: "Accept"
+      },
       markdown ? NOT_FOUND_MARKDOWN : NOT_FOUND_HTML
     );
     return;

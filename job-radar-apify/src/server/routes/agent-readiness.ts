@@ -369,10 +369,10 @@ export async function handleAgentReadinessRoute(
   const content = PUBLIC_PAGES[pathname];
   if (content && (method === "GET" || method === "HEAD")) {
     if (wantsMarkdown(req.headers.accept)) {
-      await sendBody(req, res, 200, { "Content-Type": "text/markdown; charset=utf-8", Vary: "Accept" }, renderContentMarkdown(content));
+      await sendBody(req, res, 200, { "Content-Type": "text/markdown; charset=utf-8", "Cache-Control": "private, no-store", Vary: "Accept" }, renderContentMarkdown(content));
     } else {
       const indexHtml = injectPublicContent(await context.loadIndexHtml(), content);
-      await sendBody(req, res, 200, { "Content-Type": "text/html; charset=utf-8", Vary: "Accept" }, indexHtml);
+      await sendBody(req, res, 200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "private, no-store", Vary: "Accept" }, indexHtml);
     }
     return true;
   }

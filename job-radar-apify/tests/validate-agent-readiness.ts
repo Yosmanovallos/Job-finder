@@ -38,6 +38,7 @@ async function main(): Promise<void> {
     const homeHtml = await home.text();
     assert.equal(home.status, 200);
     assert.match(home.headers.get("content-type") || "", /^text\/html; charset=utf-8/);
+    assert.match(home.headers.get("cache-control") || "", /no-store/);
     assert.ok(textLength(homeHtml) >= 500);
     assert.equal((homeHtml.match(/<h1\b/g) || []).length, 1);
     assert.match(homeHtml, /href="\/docs"/);
@@ -50,6 +51,7 @@ async function main(): Promise<void> {
     const markdown = await fetch(`${base}/`, { headers: { Accept: "text/markdown", "Accept-Encoding": "gzip" } });
     assert.equal(markdown.status, 200);
     assert.match(markdown.headers.get("content-type") || "", /^text\/markdown; charset=utf-8/);
+    assert.match(markdown.headers.get("cache-control") || "", /no-store/);
     const vary = (markdown.headers.get("vary") || "").toLowerCase();
     assert.ok(vary.includes("accept"));
     assert.ok(vary.includes("accept-encoding"));
