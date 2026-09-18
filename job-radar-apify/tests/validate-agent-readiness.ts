@@ -184,9 +184,13 @@ async function main(): Promise<void> {
     // El detector del escáner exige un H1 que contenga "auth.md".
     assert.match(authMdBody, /^# .*auth\.md/m);
     assert.ok(authMdBody.includes("/.well-known/oauth-protected-resource"));
-    // Honestidad: no hay registro de agentes, y el documento debe decirlo.
-    assert.ok(authMdBody.includes("No existe registro de agentes"));
-    assert.ok(!/client registration \(RFC 7591\) disponible/i.test(authMdBody));
+    assert.ok(authMdBody.includes("https://wneeisleyngulowfcicp.supabase.co/auth/v1"));
+    // Honestidad: BuscoTrabajo no emite credenciales de agente, así que auth.md
+    // no debe anunciar endpoints de registro/claims/revocación inexistentes.
+    assert.match(authMdBody, /no emite credenciales de agente|[Nn]o existe registro de agentes/);
+    for (const forbidden of ["register_uri", "identity_endpoint", "claim_endpoint", "events_endpoint", "agent_auth"]) {
+      assert.ok(!authMdBody.includes(forbidden), `auth.md no debe anunciar ${forbidden}`);
+    }
 
     // No publicamos metadatos de authorization server: el issuer no es nuestro
     // (RFC 8414 §3.3 / OIDC Discovery §4.3). Deben seguir devolviendo 404.

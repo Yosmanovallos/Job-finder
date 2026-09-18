@@ -137,6 +137,18 @@ La variante autocontenida del skill tampoco aplica: su detector busca un flujo d
 
 De los tres, únicamente `dnsAid` es corregible sin falsear capacidades. El 100/100 no es alcanzable de forma legítima con la arquitectura actual; el nivel máximo (5/5 Agent-Native) sí, y ya está alcanzado.
 
+## Notas de verificación y alcance — 2026-09-18
+
+**Is Agentic**: `https://is-agentic.com/scan/buscotrabajo.co` marca **100/100** (snapshot 2026-09-18T02:20:35Z): esenciales 9/9 (80/80 puntos), recomendados 14/21 (15,2/20) y +5 de bonus. Queda superada la lectura obsoleta de 44/100 registrada en el ciclo anterior.
+
+**Score 0-100 de IsItAgentReady**: su API (`/api/scan`) devuelve `level`/`levelName` y el estado de cada check, pero **no** el número sobre 100; esa cifra la calcula el front. Por eso este runbook registra el dato observable — 5/5 Agent-Native, 13 de 16 checks puntuables — y no un porcentaje inferido.
+
+**`scopes_supported` en el PRM**: son los scopes que publica el emisor (Supabase), no scopes que este resource server verifique. `verifySession` acepta cualquier token de usuario válido y resuelve el tier desde Postgres; no hay comprobación de scope por ruta. El campo es opcional en RFC 9728 y se mantiene como información del emisor, no como una capacidad de autorización que no existe.
+
+**Estado de las pruebas**: `tests/validate-agent-readiness.ts` requiere Postgres aislado por Docker (`require-isolated-database.ts`) y Docker no está disponible en esta máquina, así que el archivo **queda pendiente de ejecución completa**. Las aserciones nuevas de `/auth.md` se validaron una a una contra la respuesta real de producción, y las de PRM contra un servidor HTTP local con el cuerpo exportado por `agent-readiness.ts`; `npx tsc --noEmit` no reporta errores en los tres archivos tocados. Quien tenga Docker debe correr `npm run test:agent-readiness` antes del siguiente cambio en este módulo.
+
+**Planes y costos**: el diff de este ciclo son tres archivos de código/pruebas y este documento. No toca `render.yaml`, no crea servicios, no cambia planes ni recursos y no añade procesos permanentes. `job-radar-apify` sigue en Starter USD 7/mes y `buscotrabajo-social-automation` en Free.
+
 ## Resultado final
 
 Registrar aquí, tras cada despliegue: scores, URLs canónicas de reportes, commit desplegado, estado Render, costos/planes verificados, métricas antes/después y bloqueos externos.
