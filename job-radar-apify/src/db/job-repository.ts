@@ -11,6 +11,7 @@ import { buildJobUrl, isPubliclyDescribable } from "../lib/job-seo.js";
 import { expandRoleWords, getRoleMatchWords, tokenizeJobSearch } from "../lib/job-filters.js";
 import type { JobFilterParams } from "../lib/job-filters.js";
 import { enqueueIndexingNotifications } from "./indexing-repository.js";
+import { StaleWhileRevalidateCache } from "../lib/stale-while-revalidate-cache.js";
 
 dotenv.config();
 
@@ -546,10 +547,16 @@ export interface JobsPage {
   total: number;
 }
 
-const JOBS_PAGE_CACHE_TTL_MS = 15_000;
-const JOBS_PAGE_CACHE_MAX_ENTRIES = 16;
-const jobsPageCache = new Map<string, { data: JobsPage; expiresAt: number }>();
-const jobsPagePending = new Map<string, Promise<JobsPage>>();
+// The Render edge keeps public HTML for five minutes. Keeping the underlying
+// projection fresh for the same interval means an edge MISS never has to
+// rebuild the 61k-row canonical set synchronously. After that interval the
+// last successful page remains safe to serve while one background refresh
+// updates it. The cache stays bounded: 64 API-sized pages are only a small
+// fraction of the 512 MB Starter instance and cover the common country,
+// preference and filter combinations without retaining the full corpus.
+const JOBS_PAGE_CACHE_FRESH_MS = 5 * 60_000;
+const JOBS_PAGE_CACHE_STALE_MS = 6 * 60 * 60_000;
+const JOBS_PAGE_CACHE_MAX_ENTRIES = 64;
 
 function cloneJobsPage(page: JobsPage): JobsPage {
   return {
@@ -563,6 +570,18 @@ function cloneJobsPage(page: JobsPage): JobsPage {
     }))
   };
 }
+
+const jobsPageCache = new StaleWhileRevalidateCache<string, JobsPage>({
+  freshForMs: JOBS_PAGE_CACHE_FRESH_MS,
+  staleForMs: JOBS_PAGE_CACHE_STALE_MS,
+  maxEntries: JOBS_PAGE_CACHE_MAX_ENTRIES,
+  clone: cloneJobsPage,
+  onBackgroundRefreshError: () => {
+    // The stale page remains usable; keep the log deliberately free of the
+    // cache key because filters can contain arbitrary user-entered text.
+    console.warn("[jobs-page-cache] Background refresh failed; serving the last valid page.");
+  }
+});
 
 function jobsPageCacheKey(options: JobsPageOptions): string {
   return JSON.stringify({
@@ -713,34 +732,7 @@ function buildJobWhere(filters: JobFilterParams, sql: SqlParts): string[] {
  */
 export async function getJobsPage(options: JobsPageOptions = {}): Promise<JobsPage> {
   const cacheKey = jobsPageCacheKey(options);
-  const cached = jobsPageCache.get(cacheKey);
-  if (cached && cached.expiresAt > Date.now()) {
-    jobsPageCache.delete(cacheKey);
-    jobsPageCache.set(cacheKey, cached);
-    return cloneJobsPage(cached.data);
-  }
-  if (cached) jobsPageCache.delete(cacheKey);
-
-  const existingRequest = jobsPagePending.get(cacheKey);
-  if (existingRequest) return cloneJobsPage(await existingRequest);
-
-  const request = queryJobsPage(options);
-  jobsPagePending.set(cacheKey, request);
-  try {
-    const data = await request;
-    while (jobsPageCache.size >= JOBS_PAGE_CACHE_MAX_ENTRIES) {
-      const oldestKey = jobsPageCache.keys().next().value;
-      if (typeof oldestKey !== "string") break;
-      jobsPageCache.delete(oldestKey);
-    }
-    jobsPageCache.set(cacheKey, {
-      data: cloneJobsPage(data),
-      expiresAt: Date.now() + JOBS_PAGE_CACHE_TTL_MS
-    });
-    return cloneJobsPage(data);
-  } finally {
-    jobsPagePending.delete(cacheKey);
-  }
+  return jobsPageCache.get(cacheKey, () => queryJobsPage(options));
 }
 
 async function queryJobsPage(options: JobsPageOptions): Promise<JobsPage> {

@@ -2842,6 +2842,51 @@ async function handleRequest(
   }
 }
 
+async function warmDashboardFirstPages(): Promise<void> {
+  const startedAt = Date.now();
+  for (const country of ["CO", "VE"] as const) {
+    await getJobsPage({
+      filters: { country },
+      limit: 24,
+      offset: 0,
+      includeDetails: true
+    });
+  }
+  console.log(
+    JSON.stringify({
+      ts: new Date().toISOString(),
+      event: "dashboard_cache_warmed",
+      durationMs: Date.now() - startedAt,
+      countries: ["CO", "VE"]
+    })
+  );
+}
+
+// Render only routes production traffic to a new instance after it starts
+// listening. Warm the two public dashboard projections first so the first
+// visitor after a deploy (or an edge cache MISS) does not pay for the full
+// canonical DISTINCT/COUNT query. Tests use disposable databases and do not
+// need this production readiness step.
+if (!process.env.JOB_RADAR_TEST_MODE) {
+  const warmup = warmDashboardFirstPages();
+  const timeout = new Promise<"timeout">((resolve) => {
+    const timer = setTimeout(() => resolve("timeout"), 20_000);
+    timer.unref();
+  });
+  const outcome = await Promise.race([
+    warmup.then(() => "ready" as const).catch(() => "failed" as const),
+    timeout
+  ]);
+  if (outcome === "timeout") {
+    console.warn("[dashboard-cache] Warmup exceeded 20 seconds; starting while it finishes.");
+    void warmup.catch(() => {
+      console.warn("[dashboard-cache] Warmup failed; the first request will retry normally.");
+    });
+  } else if (outcome === "failed") {
+    console.warn("[dashboard-cache] Warmup failed; the first request will retry normally.");
+  }
+}
+
 server.listen(PORT, () => {
   console.log(`\n==================================================`);
   console.log(`🚀 JOB RADAR DASHBOARD RUNNING AT: http://localhost:${PORT}`);
