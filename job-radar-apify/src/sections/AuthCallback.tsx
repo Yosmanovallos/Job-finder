@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../auth/auth-provider.js";
 import { RoleOnboardingModal } from "../components/RoleOnboardingModal.js";
+import { trackEvent } from "../lib/analytics.js";
 
 // Dedicated landing spot for the Google OAuth redirect AND the email
 // confirmation link — supabase-js exchanges the code/hash for a session
@@ -26,7 +27,13 @@ export default function AuthCallback() {
     return (
       <RoleOnboardingModal
         onDone={async (roles) => {
-          await saveProfileRoles(roles);
+          const result = await saveProfileRoles(roles);
+          if (!result.error) {
+            trackEvent("onboarding_complete", {
+              role_count: roles.length,
+              skipped: roles.length === 0
+            });
+          }
           navigate(returnTo, { replace: true });
         }}
       />

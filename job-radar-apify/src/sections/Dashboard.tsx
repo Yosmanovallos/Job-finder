@@ -12,6 +12,7 @@ import { FilterBar, FilterState, EMPTY_FILTERS } from "../components/FilterBar.j
 import { StatsBar } from "../components/StatsBar.js";
 import { useAuth } from "../auth/auth-provider.js";
 import { usePageMeta } from "../lib/use-page-meta.js";
+import { jobAnalyticsParams, trackEvent } from "../lib/analytics.js";
 import { getCityOptionsForCountry } from "../lib/job-filters.js";
 import { getCountryConfig } from "../countries/index.js";
 import { Input } from "../components/ui/input.js";
@@ -489,7 +490,13 @@ export default function Dashboard() {
                   href={applyContinueJob.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  onClick={() => setApplyContinueJob(null)}
+                  onClick={() => {
+                    trackEvent(
+                      "outbound_apply",
+                      jobAnalyticsParams(applyContinueJob, "post_signup")
+                    );
+                    setApplyContinueJob(null);
+                  }}
                 >
                   Continuar a la vacante <ArrowUpRight className="h-3.5 w-3.5" />
                 </a>

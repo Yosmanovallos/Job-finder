@@ -16,16 +16,35 @@
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <link rel="canonical" href="https://buscotrabajo.co/" />
     <link rel="api-catalog" href="https://buscotrabajo.co/.well-known/api-catalog" />
-    <link rel="service-desc" href="https://buscotrabajo.co/openapi.json" type="application/vnd.oai.openapi+json;version=3.1" />
+    <link
+      rel="service-desc"
+      href="https://buscotrabajo.co/openapi.json"
+      type="application/vnd.oai.openapi+json;version=3.1"
+    />
     <link rel="service-doc" href="https://buscotrabajo.co/docs" />
 
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-QV1E0K4KZF"></script>
     <script>
       window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-      gtag('config', 'G-QV1E0K4KZF');
+      function gtag() {
+        dataLayer.push(arguments);
+      }
+      gtag("js", new Date());
+      const campaign = new URLSearchParams();
+      for (const key of ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term"]) {
+        const value = new URLSearchParams(window.location.search).get(key);
+        if (value) campaign.set(key, value.slice(0, 100));
+      }
+      const safeLocation =
+        window.location.origin +
+        window.location.pathname +
+        (campaign.size ? "?" + campaign.toString() : "");
+      gtag("config", "G-QV1E0K4KZF", {
+        page_location: safeLocation,
+        page_path: window.location.pathname,
+        page_title: document.title
+      });
     </script>
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -37,7 +56,10 @@
 
     <meta property="og:type" content="website" />
     <meta property="og:locale" content="es_CO" />
-    <meta property="og:title" content="BuscoTrabajo — Vacantes de Empleo en Colombia, Todas en un Solo Lugar" />
+    <meta
+      property="og:title"
+      content="BuscoTrabajo — Vacantes de Empleo en Colombia, Todas en un Solo Lugar"
+    />
     <meta
       property="og:description"
       content="Escaneamos varios portales de empleo en Colombia y LatAm en paralelo, deduplicamos y verificamos cada vacante. Gratis para vacantes con más de 48h publicadas."
@@ -48,7 +70,10 @@
     <meta property="og:image:alt" content="BuscoTrabajo — vacantes de empleo en un solo lugar" />
 
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="BuscoTrabajo — Vacantes de Empleo en Colombia, Todas en un Solo Lugar" />
+    <meta
+      name="twitter:title"
+      content="BuscoTrabajo — Vacantes de Empleo en Colombia, Todas en un Solo Lugar"
+    />
     <meta
       name="twitter:description"
       content="Escaneamos varios portales de empleo en Colombia y LatAm en paralelo, deduplicamos y verificamos cada vacante."

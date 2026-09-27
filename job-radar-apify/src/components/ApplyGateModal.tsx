@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Mail, Check, X, ArrowUpRight } from "lucide-react";
 import { Job } from "../sources/types.js";
@@ -6,6 +6,7 @@ import { useAuth } from "../auth/auth-provider.js";
 import { translateAuthError } from "../lib/auth-error-messages.js";
 import { Button } from "./ui/button.js";
 import { GoogleIcon } from "./ui/google-icon.js";
+import { jobAnalyticsParams, trackEvent } from "../lib/analytics.js";
 
 export interface ApplyGateModalProps {
   job: Job;
@@ -17,10 +18,11 @@ export interface ApplyGateModalProps {
 // real intent, same pattern JobLeads uses. Dismissible (X, backdrop, Esc)
 // unlike RoleOnboardingModal: this interrupts one action, not the whole app.
 export function ApplyGateModal({ job, onClose }: ApplyGateModalProps) {
-  const { loginWithGoogle, signUpWithEmail } = useAuth();
+  const { loginWithGoogle } = useAuth();
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const openTracked = useRef(false);
 
   // Internal route, never the external job.url — loginWithGoogle round-trips
   // this through Supabase's OAuth redirect, and an attacker-supplied
@@ -46,12 +48,19 @@ export function ApplyGateModal({ job, onClose }: ApplyGateModalProps) {
   };
 
   useEffect(() => {
+    if (!openTracked.current) {
+      openTracked.current = true;
+      const surface = window.location.pathname.includes("/empleos/")
+        ? "job_page"
+        : "dashboard_detail";
+      trackEvent("apply_gate_open", jobAnalyticsParams(job, surface));
+    }
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [onClose]);
+  }, [job, onClose]);
 
   return (
     <div
@@ -71,15 +80,13 @@ export function ApplyGateModal({ job, onClose }: ApplyGateModalProps) {
           <X className="h-5 w-5" />
         </button>
 
-        <p className="text-xs font-mono text-ink-faint mb-1 pr-8">
-          Para aplicar a
-        </p>
+        <p className="text-xs font-mono text-ink-faint mb-1 pr-8">Para aplicar a</p>
         <h2 className="font-heading font-semibold text-xl text-foreground mb-1 leading-snug pr-8">
           {job.title}
         </h2>
         <p className="text-sm text-muted-foreground mb-6">
-          {job.company || "Confidencial"} · Crea tu cuenta gratis, sin tarjeta — o sigue directo a la
-          oferta original.
+          {job.company || "Confidencial"} · Crea tu cuenta gratis, sin tarjeta — o sigue directo a
+          la oferta original.
         </p>
 
         {/* Job SEO V2: lead capture is OPTIONAL. Continuing to the original
@@ -88,17 +95,25 @@ export function ApplyGateModal({ job, onClose }: ApplyGateModalProps) {
             is submitted on the visitor's behalf. */}
         {job.url && (
           <Button asChild size="lg" className="w-full mb-3 font-mono">
-            <a href={job.url} target="_blank" rel="nofollow noopener noreferrer" onClick={onClose}>
+            <a
+              href={job.url}
+              target="_blank"
+              rel="nofollow noopener noreferrer"
+              onClick={() => {
+                trackEvent("outbound_apply", jobAnalyticsParams(job, "apply_gate"));
+                onClose();
+              }}
+            >
               Continuar a la oferta original en {job.source} <ArrowUpRight className="h-4 w-4" />
             </a>
           </Button>
         )}
 
-        <p className="text-xs text-ink-faint text-center mb-3">o crea tu cuenta para guardarla y recibir alertas</p>
+        <p className="text-xs text-ink-faint text-center mb-3">
+          o crea tu cuenta para guardarla y recibir alertas
+        </p>
 
-        {error && (
-          <p className="text-xs text-destructive font-mono mb-4">{error}</p>
-        )}
+        {error && <p className="text-xs text-destructive font-mono mb-4">{error}</p>}
 
         <Button
           type="button"

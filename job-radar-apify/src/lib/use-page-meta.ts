@@ -30,10 +30,13 @@ export interface PageMetaInput {
 
 // The app has no SSR, so plain DOM updates in an effect are enough — every
 // routed page calls this, so there's no stale state to restore on unmount.
-export function usePageMeta({ title, description }: PageMetaInput) {
+export function usePageMeta(input: PageMetaInput | null) {
   const { pathname } = useLocation();
+  const title = input?.title;
+  const description = input?.description;
 
   useEffect(() => {
+    if (!title || !description) return;
     document.title = title;
     upsertMeta("name", "description", description);
     upsertMeta("property", "og:title", title);

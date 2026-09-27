@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect } from "react";
+import { Suspense, lazy, useEffect, useRef } from "react";
 import { BrowserRouter, Routes, Route, useLocation, Navigate } from "react-router-dom";
 import Header from "./sections/Header.js";
 import HeroDemo from "./sections/HeroDemo.js";
@@ -20,6 +20,7 @@ import {
 import { AuthProvider } from "./auth/auth-provider.js";
 import RequireAuth from "./auth/require-auth.js";
 import { registerBuscoTrabajoWebMcp } from "./lib/webmcp.js";
+import { captureAcquisition, trackPageView } from "./lib/analytics.js";
 
 // Code-split everything past the landing page — visitors hitting "/" (the
 // most common entrypoint) don't pay for Dashboard/Login/Pricing/Legal JS.
@@ -78,6 +79,22 @@ function AppRoutes() {
   const path = location.pathname;
   const isVePath = isVePrefixed(path);
   const scoped = isCountryScopedUnprefixed(path);
+  const lastPageViewPath = useRef(path);
+
+  useEffect(() => {
+    captureAcquisition(location.search);
+  }, [location.search]);
+
+  useEffect(() => {
+    // The inline GA config in index.html owns the first pageview. Every
+    // later BrowserRouter path transition needs an explicit SPA pageview.
+    // Comparing the path also avoids React StrictMode's development-only
+    // effect replay from creating a duplicate initial view.
+    if (lastPageViewPath.current === path) return;
+    lastPageViewPath.current = path;
+    const timer = window.setTimeout(() => trackPageView(path), 0);
+    return () => window.clearTimeout(timer);
+  }, [path]);
 
   useEffect(() => {
     if (isVePath) setStoredCountry("VE");

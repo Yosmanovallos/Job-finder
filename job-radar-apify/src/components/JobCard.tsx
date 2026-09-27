@@ -7,6 +7,7 @@ import { getModalityLabel } from "../lib/job-filters.js";
 import { buildCompanyPath } from "../lib/job-seo.js";
 import { buildLocationLabel } from "../countries/index.js";
 import { useAuth } from "../auth/auth-provider.js";
+import { jobAnalyticsParams, trackEvent } from "../lib/analytics.js";
 import { Button } from "./ui/button.js";
 import { Badge } from "./ui/badge.js";
 import { cn } from "../lib/utils.js";
@@ -77,7 +78,9 @@ export const JobCard: React.FC<JobCardProps> = ({
     if (!isAuthenticated && onApplyClick) {
       e.preventDefault();
       onApplyClick(job);
+      return;
     }
+    trackEvent("outbound_apply", jobAnalyticsParams(job, "dashboard_card"));
   };
 
   const otherSources =

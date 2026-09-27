@@ -10,6 +10,7 @@ import { usePageMeta } from "../lib/use-page-meta.js";
 import { buildJobMeta } from "../lib/job-seo.js";
 import { Button } from "../components/ui/button.js";
 import { ArrowLeft } from "lucide-react";
+import { jobAnalyticsParams, trackEvent } from "../lib/analytics.js";
 
 type LoadState = "loading" | "found" | "not-found";
 
@@ -21,7 +22,7 @@ type LoadState = "loading" | "found" | "not-found";
 // sent, and Googlebot's rendering pass reads the DOM after JS runs.
 export default function JobLanding() {
   const { id } = useParams<{ id: string }>();
-  const { accessToken, isAuthenticated, resumeStudioActive } = useAuth();
+  const { accessToken, resumeStudioActive } = useAuth();
   const navigate = useNavigate();
 
   const [job, setJob] = useState<any | null>(null);
@@ -46,6 +47,10 @@ export default function JobLanding() {
         if (data?.job) {
           setJob(data.job);
           setState("found");
+          trackEvent("view_job", {
+            ...jobAnalyticsParams(data.job, "job_page"),
+            surface: "job_page"
+          });
         } else {
           setState("not-found");
         }
@@ -58,10 +63,14 @@ export default function JobLanding() {
   // its effect once `job` resolves and the real title/description replace
   // this placeholder — a brief placeholder write, not a wrong final one.
   const meta = job ? buildJobMeta(job) : null;
-  usePageMeta({
-    title: meta?.title ?? "Cargando vacante... | BuscoTrabajo",
-    description: meta?.description ?? "Cargando el detalle de esta vacante."
-  });
+  usePageMeta(
+    meta
+      ? {
+          title: meta.title,
+          description: meta.description
+        }
+      : null
+  );
 
   return (
     <section className="relative w-full min-h-screen" style={{ backgroundColor: "#fafafa" }}>

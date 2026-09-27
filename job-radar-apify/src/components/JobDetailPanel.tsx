@@ -8,6 +8,7 @@ import { extractTechnologies } from "../lib/extract-technologies.js";
 import { buildCompanyPath } from "../lib/job-seo.js";
 import { buildLocationLabel } from "../countries/index.js";
 import { useAuth } from "../auth/auth-provider.js";
+import { jobAnalyticsParams, trackEvent } from "../lib/analytics.js";
 import { Button } from "./ui/button.js";
 import { Badge } from "./ui/badge.js";
 import { ReputationBadges, ReputationEntryProps } from "./ReputationBadges.js";
@@ -113,7 +114,8 @@ export const JobDetailPanel: React.FC<JobDetailPanelProps> = ({
   const extractedTechnologies = extractTechnologies(
     [job.description, ...(job.requirements || [])].filter(Boolean).join("\n")
   );
-  const technologies = extractedTechnologies.length > 0 ? extractedTechnologies : job.technologies || [];
+  const technologies =
+    extractedTechnologies.length > 0 ? extractedTechnologies : job.technologies || [];
 
   // Reused as-is in both layouts below: standalone near the bottom of the
   // panel when there's no description (today's default for every real
@@ -150,7 +152,10 @@ export const JobDetailPanel: React.FC<JobDetailPanelProps> = ({
     if (!isAuthenticated && onApplyClick) {
       e.preventDefault();
       onApplyClick(job);
+      return;
     }
+    const surface = headingLevel === "h1" ? "job_page" : "dashboard_detail";
+    trackEvent("outbound_apply", jobAnalyticsParams(job, surface));
   };
 
   return (
@@ -234,8 +239,8 @@ export const JobDetailPanel: React.FC<JobDetailPanelProps> = ({
         <div className="rounded-lg border border-border bg-muted/30 p-4 mb-3 flex flex-col sm:flex-row sm:items-center gap-4">
           <div className="flex-1 min-w-0">
             <p className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
-              <Sparkles className="h-4 w-4 text-muted-foreground shrink-0" /> Genera un CV para
-              esta vacante
+              <Sparkles className="h-4 w-4 text-muted-foreground shrink-0" /> Genera un CV para esta
+              vacante
             </p>
             <p className="text-xs text-muted-foreground mt-1">
               Adaptamos tu CV a esta posición con IA: reordenamos tu experiencia real, alineamos
