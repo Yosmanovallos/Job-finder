@@ -40,11 +40,11 @@ export function getHomeContent(country: "CO" | "VE"): PublicContent {
     : "LinkedIn, Computrabajo, Elempleo, Magneto, Torre y otros portales con cobertura real en Colombia";
   return {
     pathname: country === "VE" ? "/ve" : "/",
-    title: `BuscoTrabajo — Vacantes de Empleo en ${countryName}, Todas en un Solo Lugar`,
-    description: `Encuentra vacantes de empleo en ${countryName}, deduplicadas, verificadas y enlazadas a su fuente original.`,
-    heading: `Encuentra todas las vacantes de ${countryName} en un solo lugar`,
+    title: `Busco trabajo en ${countryName} | Vacantes de empleo | BuscoTrabajo`,
+    description: `Busca trabajo en ${countryName} entre vacantes de empleo públicas, deduplicadas y verificadas. Filtra oportunidades y aplica en el portal original.`,
+    heading: `Busco trabajo en ${countryName}: vacantes de empleo en un solo lugar`,
     introduction: [
-      `BuscoTrabajo es un agregador de vacantes que reúne resultados de ${sources}. Presenta información pública de ofertas laborales en un solo dashboard para reducir pestañas repetidas, duplicados y enlaces vencidos.`,
+      `Si buscas trabajo en ${countryName}, BuscoTrabajo reúne resultados de ${sources}. Presenta información pública de ofertas laborales en un solo dashboard para reducir pestañas repetidas, duplicados y enlaces vencidos.`,
       "El servicio ayuda a descubrir y comparar oportunidades; la postulación siempre se realiza manualmente en el portal que publicó la vacante."
     ],
     sections: sharedHomeSections

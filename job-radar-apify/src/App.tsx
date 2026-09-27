@@ -9,7 +9,7 @@ import Faq from "./sections/Faq.js";
 import Footer from "./sections/Footer.js";
 import ScrollToTop from "./components/ScrollToTop.js";
 import { usePageMeta, PageMeta } from "./lib/use-page-meta.js";
-import { getCountryConfig } from "./countries/index.js";
+import { getHomeContent } from "./lib/agent-readiness.js";
 import {
   getEffectiveCountry,
   getStoredCountry,
@@ -49,11 +49,11 @@ function Landing() {
   // prefix check here is safe.
   const location = useLocation();
   const country = getEffectiveCountry(location.pathname);
-  const countryName = getCountryConfig(country).name;
+  const homeContent = getHomeContent(country === "VE" ? "VE" : "CO");
 
   usePageMeta({
-    title: `BuscoTrabajo — Vacantes de Empleo en ${countryName}, Todas en un Solo Lugar`,
-    description: `Encuentra vacantes de empleo en ${countryName} de LinkedIn, Computrabajo${country === "CO" ? ", Elempleo, Magneto" : ""}, Torre y otros portales, deduplicadas y verificadas en un solo dashboard. Gratis para vacantes con más de 48h publicadas.`
+    title: homeContent.title,
+    description: homeContent.description
   });
 
   return (

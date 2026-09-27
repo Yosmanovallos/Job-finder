@@ -584,10 +584,13 @@ async function runHttpTests() {
       );
     }
     check(
-      veHtml.includes("Vacantes de Empleo en Venezuela") &&
-        !veHtml.includes("<title>BuscoTrabajo — Vacantes de Empleo en Colombia"),
-      "/ve tiene su propio <title> (Venezuela), no el de Colombia sin JS.",
-      "/ve todavía sirve el <title> de Colombia en el HTML crudo — lo que ve un crawler antes de ejecutar JS."
+      homeHtml.includes("<title>Busco trabajo en Colombia | Vacantes de empleo | BuscoTrabajo</title>") &&
+        homeHtml.includes("<h1>Busco trabajo en Colombia: vacantes de empleo en un solo lugar</h1>") &&
+        veHtml.includes("<title>Busco trabajo en Venezuela | Vacantes de empleo | BuscoTrabajo</title>") &&
+        veHtml.includes("<h1>Busco trabajo en Venezuela: vacantes de empleo en un solo lugar</h1>") &&
+        veHtml.includes('"alternateName": ["Busco Trabajo", "BuscoTrabajo.co"]'),
+      "/ y /ve orientan title/H1 a la intención exacta 'busco trabajo', conservan el país correcto y declaran el nombre alternativo de marca.",
+      "La portada de Colombia o Venezuela no sirve el nuevo title/H1 de intención, o falta alternateName en el HTML crudo."
     );
 
     // /dashboard must ship real vacancy links in its raw HTML, not rely on

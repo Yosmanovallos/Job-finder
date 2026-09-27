@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getCountryConfig } from "../countries/index.js";
+import { getHomeContent } from "../lib/agent-readiness.js";
 
 export interface HeroDemoProps {
   // Defaults to "CO" so /como-funciona and /fuentes (which render this
@@ -12,6 +13,8 @@ export default function HeroDemo({ country = "CO" }: HeroDemoProps) {
   const navigate = useNavigate();
   const [heroSearch, setHeroSearch] = useState("");
   const countryConfig = getCountryConfig(country);
+  const homeContent = getHomeContent(country === "VE" ? "VE" : "CO");
+  const [headingLead, headingTail] = homeContent.heading.split(": ");
   const dashboardPath = country === "VE" ? "/ve/dashboard" : "/dashboard";
   // First city in the country's own list (Bogotá for CO, Caracas for VE) —
   // same list the dashboard's own city filter uses (getCityOptionsForCountry).
@@ -54,12 +57,11 @@ export default function HeroDemo({ country = "CO" }: HeroDemoProps) {
             className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-foreground mb-4"
             style={{ fontFamily: "'Space Grotesk', sans-serif" }}
           >
-            Encuentra todas las vacantes de {countryConfig.name}{" "}
-            <span style={{ color: "#0f6b4c" }}>en un solo lugar</span>
+            {headingLead}: <span style={{ color: "#0f6b4c" }}>{headingTail}</span>
           </h1>
 
           <p className="text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto mb-8">
-            Sin duplicados, sin pestañas de más. Un solo buscador para todas las vacantes de {countryConfig.name}.
+            Busca y compara ofertas públicas de {countryConfig.name}, sin duplicados ni pestañas de más. La postulación se realiza en la fuente original.
           </p>
 
           <form

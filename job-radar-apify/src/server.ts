@@ -2866,27 +2866,13 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       // find-and-replace of the Colombia copy. Without this, Googlebot's
       // first (non-JS) look at "/ve" saw a title/description that literally
       // said "Colombia" — a content-parity problem, not just a linking one.
-      const veTitle = "BuscoTrabajo — Vacantes de Empleo en Venezuela, Todas en un Solo Lugar";
-      const veDescription =
-        "Encuentra vacantes de empleo en Venezuela de LinkedIn, Computrabajo, Torre, GetOnBoard y otros portales, deduplicadas y verificadas en un solo dashboard. Gratis para vacantes con más de 48h publicadas.";
-      indexHtml = indexHtml
-        .replace(/<title>[\s\S]*?<\/title>/, `<title>${escapeHtml(veTitle)}</title>`)
-        .replace(
-          /<meta\s+name=["']description["'][^>]*\/>/,
-          `<meta name="description" content="${escapeHtml(veDescription)}" />`
-        )
-        .replace(
-          /<meta property="og:locale" content="[^"]*" \/>/,
-          `<meta property="og:locale" content="es_VE" />`
-        )
-        .replace(
-          /<meta property="og:title" content="[^"]*" \/>/,
-          `<meta property="og:title" content="${escapeHtml(veTitle)}" />`
-        )
-        .replace(
-          /<meta\s+property=["']og:description["'][^>]*\/>/,
-          `<meta property="og:description" content="${escapeHtml(veDescription)}" />`
-        );
+      // injectPublicContent() already applied Venezuela's shared canonical
+      // title and description. Only the Open Graph locale differs here —
+      // keeping one content model prevents SSR and React from drifting.
+      indexHtml = indexHtml.replace(
+        /<meta property="og:locale" content="[^"]*" \/>/,
+        `<meta property="og:locale" content="es_VE" />`
+      );
     }
 
     await sendBody(
