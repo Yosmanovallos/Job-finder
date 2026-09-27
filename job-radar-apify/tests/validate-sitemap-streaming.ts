@@ -75,6 +75,19 @@ const server = startServer();
 try {
   await waitForServer(server);
 
+  // Before this process has produced any complete sitemap there is nothing
+  // to fall back to: a PostgreSQL failure must be a clean 503 no-store.
+  await pool.query("ALTER TABLE jobs RENAME TO jobs_p1_unavailable");
+  try {
+    const unavailable = await fetch(`${baseUrl}/sitemap-jobs.xml`);
+    assert.equal(unavailable.status, 503);
+    assert.equal(unavailable.headers.get("cache-control"), "no-store");
+    assert.match(await unavailable.text(), /temporalmente no disponible/i);
+  } finally {
+    await pool.query("ALTER TABLE jobs_p1_unavailable RENAME TO jobs");
+  }
+  console.log("✅ Sin sitemap previo, un fallo de PostgreSQL devuelve 503 no-store.");
+
   // Job SEO V2: the stream lists ONLY canonical rows that pass the shared
   // Google gate (stored verdict), with <lastmod> = real content-change time.
   // Promote a third of the synthetic fixture; the rest must never appear.
@@ -152,10 +165,18 @@ try {
       `heap +${(peakHeapGrowth / 1024 / 1024).toFixed(1)} MB y RSS ${(peakRss / 1024 / 1024).toFixed(1)} MB.`
   );
 
+  // From here on the process holds a complete sitemap (hotXml): every path
+  // that can't produce a fresh one must serve it, briefly cached, never a
+  // 503 or a truncated body.
+  const assertLastGood = async (response: Response) => {
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("cache-control"), "public, max-age=60, s-maxage=60");
+    assert.equal(await response.text(), hotXml);
+  };
+
   const paused = await openPausedSitemap();
   const concurrent = await fetch(`${baseUrl}/sitemap-jobs.xml`);
-  assert.equal(concurrent.status, 503);
-  assert.equal(concurrent.headers.get("retry-after"), "30");
+  await assertLastGood(concurrent);
   const navigation = await fetch(`${baseUrl}/dashboard`);
   assert.equal(navigation.status, 200);
   paused.response.destroy();
@@ -165,14 +186,11 @@ try {
 
   await pool.query("ALTER TABLE jobs RENAME TO jobs_p1_unavailable");
   try {
-    const unavailable = await fetch(`${baseUrl}/sitemap-jobs.xml`);
-    assert.equal(unavailable.status, 503);
-    assert.equal(unavailable.headers.get("cache-control"), "no-store");
-    assert.match(await unavailable.text(), /temporalmente no disponible/i);
+    await assertLastGood(await fetch(`${baseUrl}/sitemap-jobs.xml`));
   } finally {
     await pool.query("ALTER TABLE jobs_p1_unavailable RENAME TO jobs");
   }
-  console.log("✅ Un fallo de PostgreSQL devuelve una respuesta segura y reintentable.");
+  console.log("✅ Un fallo de PostgreSQL sirve el último sitemap completo, con caché corta.");
 
   // Regression (2026-09-26/27): a statement_timeout on the FIRST fetch — the
   // one that runs the whole DISTINCT ON + sort — used to arrive after the
@@ -183,10 +201,7 @@ try {
   await pool.query("ALTER TABLE jobs RENAME TO jobs_p1_slow");
   await pool.query("CREATE VIEW jobs AS SELECT * FROM jobs_p1_slow WHERE (SELECT true FROM pg_sleep(11))");
   try {
-    const slow = await fetch(`${baseUrl}/sitemap-jobs.xml`);
-    assert.equal(slow.status, 503);
-    assert.equal(slow.headers.get("cache-control"), "no-store");
-    assert.doesNotMatch(await slow.text(), /<urlset/);
+    await assertLastGood(await fetch(`${baseUrl}/sitemap-jobs.xml`));
   } finally {
     await pool.query("DROP VIEW jobs");
     await pool.query("ALTER TABLE jobs_p1_slow RENAME TO jobs");

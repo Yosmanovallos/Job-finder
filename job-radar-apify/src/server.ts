@@ -162,6 +162,14 @@ const PORT = process.env.PORT || 3000;
 const MAX_CONCURRENT_SITEMAP_STREAMS = 1;
 const SITEMAP_MAX_DURATION_MS = 30_000;
 let activeSitemapStreams = 0;
+// Last COMPLETE sitemap-jobs.xml body this process produced. When a fresh
+// read can't be served (DB statement_timeout under load, or a concurrent
+// stream), crawlers get this instead of a 503 — Search Console treats a
+// failed fetch as "couldn't read", and before this existed the timeout path
+// even leaked a truncated 200 that Cloudflare cached (parse error, 0 URLs).
+// ~200 B per URL, so ≤ ~10 MB at the 50k cap.
+let lastGoodJobsSitemap: string | null = null;
+const STALE_SITEMAP_CACHE_CONTROL = "public, max-age=60, s-maxage=60";
 const SPA_ROUTES = new Set([
   "/login",
   "/reset-password",
@@ -2808,7 +2816,23 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     // crawler — a sitemap has no session to resolve a real tier from
     // anyway, and it must never list a page (see isPubliclyDescribable
     // inside buildJobsSitemapXml) it wouldn't also show that visitor.
+    const sendLastGoodSitemap = async (): Promise<boolean> => {
+      if (lastGoodJobsSitemap === null) return false;
+      await sendBody(
+        req,
+        res,
+        200,
+        {
+          "Content-Type": "application/xml; charset=utf-8",
+          "Cache-Control": STALE_SITEMAP_CACHE_CONTROL
+        },
+        lastGoodJobsSitemap
+      );
+      return true;
+    };
+
     if (activeSitemapStreams >= MAX_CONCURRENT_SITEMAP_STREAMS) {
+      if (await sendLastGoodSitemap()) return;
       res.writeHead(503, {
         "Content-Type": "text/plain; charset=utf-8",
         "Retry-After": "30",
@@ -2825,6 +2849,11 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     const timeout = setTimeout(abort, SITEMAP_MAX_DURATION_MS);
     req.once("aborted", abort);
     res.once("close", abort);
+    const body: string[] = [];
+    const write = async (chunk: string) => {
+      body.push(chunk);
+      await writeWithBackpressure(res, chunk, controller.signal);
+    };
     try {
       let wroteEntry = false;
       await streamCanonicalSitemapJobs({
@@ -2837,7 +2866,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
             "Content-Type": "application/xml; charset=utf-8"
           });
           headersStarted = true;
-          await writeWithBackpressure(res, JOBS_SITEMAP_HEADER, controller.signal);
+          await write(JOBS_SITEMAP_HEADER);
         },
         onJob: async (job) => {
           const [visibleJob] = maskLockedFields([job], "free");
@@ -2846,17 +2875,19 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
             contentUpdatedAt: job.contentUpdatedAt
           });
           if (!entry) return;
-          await writeWithBackpressure(res, `${wroteEntry ? "\n" : ""}${entry}`, controller.signal);
+          await write(`${wroteEntry ? "\n" : ""}${entry}`);
           wroteEntry = true;
         }
       });
-      await writeWithBackpressure(res, JOBS_SITEMAP_FOOTER, controller.signal);
+      await write(JOBS_SITEMAP_FOOTER);
       res.end();
+      lastGoodJobsSitemap = body.join("");
     } catch (error) {
       if (error instanceof SitemapStreamAbortedError || controller.signal.aborted) {
         if (!res.writableEnded) res.destroy();
       } else if (!headersStarted) {
         console.error("[sitemap-jobs] No se pudo iniciar el stream:", error);
+        if (await sendLastGoodSitemap()) return;
         res.writeHead(503, {
           "Content-Type": "text/plain; charset=utf-8",
           "Retry-After": "60",
