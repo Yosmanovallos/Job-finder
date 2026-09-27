@@ -20,6 +20,8 @@ import {
   resolveCategorySlug,
   RETIRED_ROLE_SLUGS,
   buildCategoryMeta,
+  buildCategoryInsights,
+  buildCategoryInternalLinks,
   buildCategoryPath,
   buildCategoriesSitemapXml,
   buildJobUrlPrefix,
@@ -133,7 +135,13 @@ function runPureFunctionTests() {
     "buildJobPosting() devolvió null para una vacante apta para Google."
   );
   if (posting) {
-    const requiredKeys = ["title", "description", "datePosted", "hiringOrganization", "jobLocation"];
+    const requiredKeys = [
+      "title",
+      "description",
+      "datePosted",
+      "hiringOrganization",
+      "jobLocation"
+    ];
     const missing = requiredKeys.filter((k) => !(k in posting));
     check(
       missing.length === 0,
@@ -154,13 +162,22 @@ function runPureFunctionTests() {
       `La descripción del JobPosting no es la de la fuente: "${posting.description}"`
     );
     check(
-      posting.employmentType === "FULL_TIME" && !("skills" in posting) && !("qualifications" in posting) && !("baseSalary" in posting),
+      posting.employmentType === "FULL_TIME" &&
+        !("skills" in posting) &&
+        !("qualifications" in posting) &&
+        !("baseSalary" in posting),
       "employmentType usa el token schema.org; no se emiten skills/qualifications derivados ni baseSalary.",
       `JobPosting con campos inesperados: ${JSON.stringify(posting)}`
     );
   }
 
-  const thinJob: SeoJob = { ...openJob, jobId: "test-thin-1", description: undefined, requirements: [], seoReady: false };
+  const thinJob: SeoJob = {
+    ...openJob,
+    jobId: "test-thin-1",
+    description: undefined,
+    requirements: [],
+    seoReady: false
+  };
   check(
     buildJobPosting(thinJob) === null && isPubliclyDescribable(thinJob),
     "Una vacante visible pero no apta para Google (sin descripción) conserva su página pero no emite JobPosting.",
@@ -196,7 +213,13 @@ function runPureFunctionTests() {
     "location='Remoto' sin evidencia de la fuente no emite JobPosting (ni TELECOMMUTE con un país supuesto).",
     "Una vacante 'Remoto' sin evidencia emitió JobPosting."
   );
-  const statedRemoteJob: SeoJob = { ...openJob, location: "Remoto", country: null, remoteType: "fully_remote", applicantCountries: ["VE"] };
+  const statedRemoteJob: SeoJob = {
+    ...openJob,
+    location: "Remoto",
+    country: null,
+    remoteType: "fully_remote",
+    applicantCountries: ["VE"]
+  };
   const statedRemotePosting = buildJobPosting(statedRemoteJob) as any;
   check(
     statedRemotePosting?.jobLocationType === "TELECOMMUTE" &&
@@ -247,7 +270,9 @@ function runPureFunctionTests() {
   // --- Sitemap (Fase 2) ---
   const sitemapXml = buildJobsSitemapXml([openJob, lockedJob, thinJob]);
   check(
-    sitemapXml.includes(openJob.jobId) && !sitemapXml.includes(lockedJob.jobId) && !sitemapXml.includes(thinJob.jobId),
+    sitemapXml.includes(openJob.jobId) &&
+      !sitemapXml.includes(lockedJob.jobId) &&
+      !sitemapXml.includes(thinJob.jobId),
     "buildJobsSitemapXml() incluye solo vacantes aptas para Google (excluye bloqueadas y no aptas).",
     "buildJobsSitemapXml() listó una vacante bloqueada o no apta, o no listó la apta."
   );
@@ -270,7 +295,9 @@ function runPureFunctionTests() {
 
   // --- Category pages (Fase 4) ---
   check(
-    isUuid("e582c93b-bb2f-4dba-b983-647aedda5510") && !isUuid("bogota") && !isUuid("analista-de-datos"),
+    isUuid("e582c93b-bb2f-4dba-b983-647aedda5510") &&
+      !isUuid("bogota") &&
+      !isUuid("analista-de-datos"),
     "isUuid() distingue un jobId real de un slug de categoría.",
     "isUuid() no distinguió correctamente un UUID real de un slug de categoría."
   );
@@ -288,7 +315,9 @@ function runPureFunctionTests() {
   const veCitySlug = slugify(realVeCity);
   const veCityMatch = resolveCategorySlug(veCitySlug);
   check(
-    veCityMatch?.kind === "ciudad" && veCityMatch.label === realVeCity && veCityMatch.country === "VE",
+    veCityMatch?.kind === "ciudad" &&
+      veCityMatch.label === realVeCity &&
+      veCityMatch.country === "VE",
     `resolveCategorySlug("${veCitySlug}") resuelve a la ciudad venezolana real "${realVeCity}" con country="VE", sin necesidad de prefijo.`,
     `resolveCategorySlug("${veCitySlug}") no resolvió a la ciudad venezolana esperada: ${JSON.stringify(veCityMatch)}`
   );
@@ -316,13 +345,15 @@ function runPureFunctionTests() {
   );
 
   check(
-    buildCategoryPath(cityMatch!) === `/empleos/${citySlug}` && buildCategoryPath(veCityMatch!) === `/empleos/${veCitySlug}`,
+    buildCategoryPath(cityMatch!) === `/empleos/${citySlug}` &&
+      buildCategoryPath(veCityMatch!) === `/empleos/${veCitySlug}`,
     "buildCategoryPath() genera la ruta plana /empleos/<slug> para CUALQUIER ciudad (CO o VE), sin prefijo — el nombre de la ciudad ya es inequívoco.",
     `buildCategoryPath() produjo rutas inesperadas: CO=${buildCategoryPath(cityMatch!)}, VE=${buildCategoryPath(veCityMatch!)}`
   );
 
   check(
-    buildCategoryPath(roleMatchCO!) === `/empleos/${roleSlug}` && buildCategoryPath(roleMatchVE!) === `/ve/empleos/${roleSlug}`,
+    buildCategoryPath(roleMatchCO!) === `/empleos/${roleSlug}` &&
+      buildCategoryPath(roleMatchVE!) === `/ve/empleos/${roleSlug}`,
     "buildCategoryPath() SÍ prefija con /ve las páginas de ROL para Venezuela (mismo slug, país distinto → URLs distintas, para no mezclar bajo una sola).",
     `buildCategoryPath() no distinguió las rutas de rol por país: CO=${buildCategoryPath(roleMatchCO!)}, VE=${buildCategoryPath(roleMatchVE!)}`
   );
@@ -330,9 +361,11 @@ function runPureFunctionTests() {
   const cityMeta = buildCategoryMeta(cityMatch!, 42);
   check(
     cityMeta.title.includes(realCity) &&
-      cityMeta.title.includes("42") &&
+      cityMeta.title.includes("Trabajo en") &&
+      cityMeta.title.includes("vacantes de empleo") &&
+      cityMeta.description.includes("42 vacantes") &&
       cityMeta.canonicalUrl.endsWith(buildCategoryPath(cityMatch!)),
-    "buildCategoryMeta() para una ciudad incluye el nombre real, el conteo real y un canonical consistente.",
+    "buildCategoryMeta() orienta el título de ciudad a 'trabajo en' + 'vacantes de empleo', conserva el conteo real en la descripción y usa un canonical consistente.",
     `buildCategoryMeta(cityMatch, 42) produjo metadata inconsistente: ${JSON.stringify(cityMeta)}`
   );
 
@@ -352,9 +385,62 @@ function runPureFunctionTests() {
     `buildCategoryMeta(roleMatchVE, 3) produjo metadata incorrecta para Venezuela: ${JSON.stringify(veRoleMeta)}`
   );
 
+  const insightJobs: SeoJob[] = [
+    {
+      ...openJob,
+      company: "Empresa Real",
+      location: realCity,
+      source: "LinkedIn",
+      sources: ["LinkedIn", "Indeed"],
+      remoteType: "onsite",
+      publishedAt: "2026-09-25T12:00:00.000Z"
+    },
+    {
+      ...openJob,
+      jobId: crypto.randomUUID(),
+      title: "Analista remoto",
+      company: "Empresa Real",
+      location: "Remoto",
+      source: "Computrabajo",
+      sources: ["Computrabajo"],
+      remoteType: "fully_remote",
+      publishedAt: "2026-09-10T12:00:00.000Z"
+    }
+  ];
+  const insights = buildCategoryInsights(
+    cityMatch!,
+    42,
+    insightJobs,
+    new Date("2026-09-26T12:00:00.000Z")
+  );
+  check(
+    insights.visibleCount === 2 &&
+      insights.companyCount === 1 &&
+      insights.sources.length === 3 &&
+      insights.freshLast7Days === 1 &&
+      insights.modalities.some((item) => item.label === "Presencial" && item.count === 1) &&
+      insights.modalities.some((item) => item.label === "Remoto" && item.count === 1) &&
+      insights.intro.includes("42 vacantes activas") &&
+      insights.intro.includes("las 2 ofertas más recientes"),
+    "buildCategoryInsights() deriva empresas, fuentes, modalidades y frescura únicamente de la muestra real, sin extrapolar sus 2 filas al total de 42.",
+    `buildCategoryInsights() produjo cifras inesperadas: ${JSON.stringify(insights)}`
+  );
+
+  const categoryLinks = buildCategoryInternalLinks(cityMatch!);
+  check(
+    categoryLinks.some((link) => link.href === "/dashboard") &&
+      categoryLinks.some((link) => link.href === "/empresas") &&
+      categoryLinks.every(
+        (link) => link.label.includes("Colombia") || link.label.includes("BuscoTrabajo")
+      ),
+    "buildCategoryInternalLinks() enlaza desde una ciudad de Colombia a los hubs reales de vacantes, empresas e inicio.",
+    `buildCategoryInternalLinks() produjo enlaces inesperados: ${JSON.stringify(categoryLinks)}`
+  );
+
   const categoriesSitemapXml = buildCategoriesSitemapXml();
   const categoryLocs = [...categoriesSitemapXml.matchAll(/<loc>(.*?)<\/loc>/g)];
-  const expectedCount = CITY_OPTIONS.length + COUNTRIES.VE.cities.length + DEFAULT_ROLES_200.length * 2;
+  const expectedCount =
+    CITY_OPTIONS.length + COUNTRIES.VE.cities.length + DEFAULT_ROLES_200.length * 2;
   check(
     categoryLocs.length === expectedCount &&
       categoriesSitemapXml.includes(buildCategoryPath(cityMatch!)) &&
@@ -375,7 +461,8 @@ function runPureFunctionTests() {
 // isn't slower to RUN, just slower to transpile cold.
 async function waitForServer(server: ChildProcess, maxAttempts = 80, delayMs = 250): Promise<void> {
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    if (server.exitCode !== null) throw new Error(`El servidor de prueba terminó con código ${server.exitCode}.`);
+    if (server.exitCode !== null)
+      throw new Error(`El servidor de prueba terminó con código ${server.exitCode}.`);
     try {
       const res = await fetch(`${BASE_URL}/api/health`);
       if (res.ok) return;
@@ -409,7 +496,9 @@ function killServerTree(server: ChildProcess): void {
 }
 
 async function runHttpTests() {
-  console.log(`\n--- Parte 2: HTTP real contra el servidor (base desechable del runner aislado) ---\n`);
+  console.log(
+    `\n--- Parte 2: HTTP real contra el servidor (base desechable del runner aislado) ---\n`
+  );
 
   // Job SEO V2: the synthetic fixture jobs carry a one-line description, so
   // they are user-visible but NOT Google-ready. One of them is promoted
@@ -428,7 +517,11 @@ async function runHttpTests() {
       [
         readyId,
         "Buscamos analista de datos para el equipo de riesgo.\nConstruirás tableros de seguimiento de cartera y reportes mensuales para el comité.",
-        JSON.stringify(["Profesional en estadística o afines.", "Dos años de experiencia con SQL.", "Power BI."])
+        JSON.stringify([
+          "Profesional en estadística o afines.",
+          "Dos años de experiencia con SQL.",
+          "Power BI."
+        ])
       ]
     );
     await refreshGoogleReadiness(readyId, { contentObtained: true });
@@ -437,7 +530,9 @@ async function runHttpTests() {
 
   const rawJobs = await getJobs(200);
   const visibleJobs = maskLockedFields(rawJobs, "free");
-  const realJob = visibleJobs.find((j) => j.jobId === readyId && isPubliclyDescribable(j as SeoJob));
+  const realJob = visibleJobs.find(
+    (j) => j.jobId === readyId && isPubliclyDescribable(j as SeoJob)
+  );
   const thinJob = visibleJobs.find((j) => j.jobId === thinId);
 
   if (!realJob) {
@@ -489,7 +584,8 @@ async function runHttpTests() {
       );
     }
     check(
-      veHtml.includes("Vacantes de Empleo en Venezuela") && !veHtml.includes("<title>BuscoTrabajo — Vacantes de Empleo en Colombia"),
+      veHtml.includes("Vacantes de Empleo en Venezuela") &&
+        !veHtml.includes("<title>BuscoTrabajo — Vacantes de Empleo en Colombia"),
       "/ve tiene su propio <title> (Venezuela), no el de Colombia sin JS.",
       "/ve todavía sirve el <title> de Colombia en el HTML crudo — lo que ve un crawler antes de ejecutar JS."
     );
@@ -793,6 +889,21 @@ async function runHttpTests() {
       `La página de categoría ${cityPath} incluye al menos un link real a una página de vacante individual en el HTML crudo.`,
       `La página de categoría ${cityPath} no tiene ningún link /empleos/<uuid>/... en el HTML crudo.`
     );
+    check(
+      cityHtml.includes("data-category-overview") &&
+        cityHtml.includes("Empresas en la muestra") &&
+        cityHtml.includes("Fuentes verificables") &&
+        cityHtml.includes("Publicadas en 7 días") &&
+        cityHtml.includes('href="/dashboard"') &&
+        cityHtml.includes('href="/empresas"'),
+      `La página de categoría ${cityPath} incluye en SSR una introducción útil, estadísticas verificables y enlaces internos a los hubs reales.`,
+      `La página de categoría ${cityPath} no incluyó el resumen SEO enriquecido completo en el HTML crudo.`
+    );
+    check(
+      cityHtml.includes("Trabajo en") && cityHtml.includes("vacantes de empleo"),
+      `El título/H1 de ${cityPath} responde a la intención 'trabajo en <ciudad>' y 'vacantes de empleo'.`,
+      `La página ${cityPath} no contiene la orientación de búsqueda local esperada.`
+    );
 
     // Category pages (Fase 6) — BreadcrumbList + ItemList JSON-LD.
     const cityLdJsonBlocks = [
@@ -857,7 +968,9 @@ async function runHttpTests() {
     const roleResVE = await fetch(`${BASE_URL}${rolePathVE}`);
     const roleHtmlVE = await roleResVE.text();
     check(
-      roleResVE.status === 200 && rolePathVE === `/ve${rolePathCO}` && roleHtmlVE.includes("Venezuela"),
+      roleResVE.status === 200 &&
+        rolePathVE === `/ve${rolePathCO}` &&
+        roleHtmlVE.includes("Venezuela"),
       `GET ${rolePathVE} (mismo rol, Venezuela) responde 200 en una URL DISTINTA a la de Colombia, y el heading dice Venezuela.`,
       `GET ${rolePathVE} respondió ${roleResVE.status}, o la ruta/heading no distinguió el país correctamente.`
     );
@@ -892,7 +1005,8 @@ async function runHttpTests() {
       `Un slug de rol retirado (/empleos/${retiredSlug}) respondió ${retiredCategoryRes.status} en vez de 410.`
     );
     check(
-      retiredCategoryHtml.includes('noindex') && !retiredCategoryHtml.includes("application/ld+json"),
+      retiredCategoryHtml.includes("noindex") &&
+        !retiredCategoryHtml.includes("application/ld+json"),
       `La página 410 de /empleos/${retiredSlug} trae noindex y ningún JSON-LD.`,
       `La página 410 de /empleos/${retiredSlug} no trae noindex o incluye JSON-LD que Google no debería seguir.`
     );
@@ -946,7 +1060,11 @@ async function runHttpTests() {
           const parsed = JSON.parse(block[1]);
           if (parsed["@type"] === "Organization") organizationSchema = parsed;
         } catch {
-          check(false, "", `Un bloque JSON-LD en /empresas/${companySlug} no es JSON válido: ${block[1].slice(0, 200)}`);
+          check(
+            false,
+            "",
+            `Un bloque JSON-LD en /empresas/${companySlug} no es JSON válido: ${block[1].slice(0, 200)}`
+          );
         }
       }
       check(
@@ -990,14 +1108,17 @@ async function runHttpTests() {
       })
       .find((parsed) => parsed?.["@type"] === "ItemList");
     check(
-      empresasItemList !== undefined && Array.isArray(empresasItemList.itemListElement) && empresasItemList.itemListElement.length > 0,
+      empresasItemList !== undefined &&
+        Array.isArray(empresasItemList.itemListElement) &&
+        empresasItemList.itemListElement.length > 0,
       "/empresas incluye un ItemList JSON-LD válido con empresas reales.",
       "No se encontró un ItemList JSON-LD válido (o sin items) en /empresas."
     );
 
     // sitemap-categories.xml + índice actualizado — ahora incluye ambos
     // países (CO+VE ciudades, y roles duplicados por país).
-    const expectedCategoryCount = CITY_OPTIONS.length + COUNTRIES.VE.cities.length + DEFAULT_ROLES_200.length * 2;
+    const expectedCategoryCount =
+      CITY_OPTIONS.length + COUNTRIES.VE.cities.length + DEFAULT_ROLES_200.length * 2;
     const categoriesSitemapRes = await fetch(`${BASE_URL}/sitemap-categories.xml`);
     const categoriesSitemapXml = await categoriesSitemapRes.text();
     const categoryLocsHttp = [...categoriesSitemapXml.matchAll(/<loc>(.*?)<\/loc>/g)];

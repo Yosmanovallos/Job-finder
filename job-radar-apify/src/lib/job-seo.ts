@@ -180,7 +180,12 @@ function formatPublishedDate(value: string | Date | undefined): string | null {
   if (!value) return null;
   const date = new Date(value);
   if (!Number.isFinite(date.getTime())) return null;
-  return date.toLocaleDateString("es-CO", { day: "numeric", month: "long", year: "numeric", timeZone: "America/Bogota" });
+  return date.toLocaleDateString("es-CO", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "America/Bogota"
+  });
 }
 
 function remoteLabel(job: SeoJob): string | null {
@@ -205,7 +210,8 @@ export function buildJobPageBody(job: SeoJob): string {
   const eligible = (job.remoteType === "fully_remote" ? job.applicantCountries || [] : [])
     .map((code) => countryNameFor(code) || code)
     .filter(Boolean);
-  if (eligible.length > 0) facts.push(`<li>Candidatos desde: ${escapeHtml(eligible.join(", "))}</li>`);
+  if (eligible.length > 0)
+    facts.push(`<li>Candidatos desde: ${escapeHtml(eligible.join(", "))}</li>`);
   const published = formatPublishedDate(job.publishedAt);
   if (published) facts.push(`<li>Publicada: ${escapeHtml(published)}</li>`);
   if (job.employmentType) facts.push(`<li>Tipo de empleo: ${escapeHtml(job.employmentType)}</li>`);
@@ -285,7 +291,9 @@ export function buildJobPosting(job: SeoJob): Record<string, unknown> | null {
     }
   };
 
-  const employmentTypeToken = job.employmentType ? EMPLOYMENT_TYPE_LABEL_TO_SCHEMA[job.employmentType] : undefined;
+  const employmentTypeToken = job.employmentType
+    ? EMPLOYMENT_TYPE_LABEL_TO_SCHEMA[job.employmentType]
+    : undefined;
   if (employmentTypeToken) posting.employmentType = employmentTypeToken;
 
   if (job.validThrough) posting.validThrough = new Date(job.validThrough).toISOString();
@@ -382,12 +390,20 @@ export function resolveCategorySlug(
 // role pages do, since two countries' role pages would otherwise be
 // indistinguishable URLs serving different (and previously silently mixed)
 // data.
-export function buildCategoryPath(category: { kind: CategoryKind; label: string; country: string }): string {
+export function buildCategoryPath(category: {
+  kind: CategoryKind;
+  label: string;
+  country: string;
+}): string {
   const prefix = category.kind === "rol" && category.country === "VE" ? "/ve" : "";
   return `${prefix}/empleos/${slugify(category.label)}`;
 }
 
-export function buildCategoryUrl(category: { kind: CategoryKind; label: string; country: string }): string {
+export function buildCategoryUrl(category: {
+  kind: CategoryKind;
+  label: string;
+  country: string;
+}): string {
   return `${SITE_URL}${buildCategoryPath(category)}`;
 }
 
@@ -523,6 +539,24 @@ export interface CategoryMeta {
   canonicalUrl: string;
 }
 
+export interface CategoryInsights {
+  /** Number of real jobs included in the rendered sample (currently capped at 60). */
+  visibleCount: number;
+  /** Counts below always describe the rendered sample, never the uncapped total. */
+  companyCount: number;
+  topCompanies: string[];
+  sources: string[];
+  modalities: Array<{ label: string; count: number }>;
+  freshLast7Days: number;
+  latestPublishedLabel: string | null;
+  intro: string;
+}
+
+export interface CategoryInternalLink {
+  href: string;
+  label: string;
+}
+
 // totalCount is always the real match count for that city/role — never
 // capped to however many rows actually get embedded/rendered on the page
 // (see server.ts's 60-item cap), so the description never claims fewer or
@@ -539,19 +573,138 @@ export function buildCategoryMeta(category: ResolvedCategory, totalCount: number
   // Venezuela jobs, a real mismatch that existed before this country field.
   const countryName = getCountryConfig(country).name;
   const heading =
-    kind === "ciudad" ? `Vacantes de empleo en ${label}` : `Vacantes de ${label} en ${countryName}`;
-  // Elempleo/Magneto/Workana have no Venezuela adapter yet (see
-  // SourcesAndProblem.tsx's SOURCES_BY_COUNTRY) — naming them here for a
-  // Venezuela role page would overclaim sources that never actually
-  // contributed to it.
-  const sourcesPhrase =
-    country === "VE" ? "LinkedIn, Computrabajo y otros portales" : "LinkedIn, Computrabajo, Elempleo y otros portales";
+    kind === "ciudad"
+      ? `Trabajo en ${label}: vacantes de empleo`
+      : `Trabajo de ${label} en ${countryName}`;
+  const target = kind === "ciudad" ? `trabajo en ${label}` : `${label} en ${countryName}`;
   return {
-    title: `${heading} — ${countLabel} | BuscoTrabajo`,
+    // Keep the query wording stable even when the live count changes. The
+    // exact count remains in the description and visible body, where it is
+    // useful without forcing Google to relearn a new title every scrape.
+    title: `${heading} | BuscoTrabajo`,
     heading,
-    description: `${countLabel} ${kind === "ciudad" ? `en ${label}` : `de ${label} en ${countryName}`} agregadas de ${sourcesPhrase} — actualizadas en BuscoTrabajo.`,
+    description: `Encuentra ${countLabel} de ${target}. Compara ofertas de empleo actuales y visita la fuente original para aplicar.`,
     canonicalUrl: buildCategoryUrl(category)
   };
+}
+
+function incrementCount(
+  map: Map<string, { label: string; count: number }>,
+  rawLabel: string
+): void {
+  const label = rawLabel.trim();
+  if (!label) return;
+  const key = label.toLocaleLowerCase("es");
+  const current = map.get(key);
+  if (current) current.count += 1;
+  else map.set(key, { label, count: 1 });
+}
+
+function rankedLabels(map: Map<string, { label: string; count: number }>, limit: number): string[] {
+  return [...map.values()]
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, "es"))
+    .slice(0, limit)
+    .map((entry) => entry.label);
+}
+
+/**
+ * Builds useful category-page facts exclusively from the jobs actually
+ * rendered on that page. This intentionally does not extrapolate the 60-row
+ * sample to the uncapped total: labels in the UI say "muestra visible" so a
+ * visitor and crawler can tell exactly what each number represents.
+ */
+export function buildCategoryInsights(
+  category: ResolvedCategory,
+  totalCount: number,
+  jobs: SeoJob[],
+  asOf: Date = new Date()
+): CategoryInsights {
+  const companies = new Map<string, { label: string; count: number }>();
+  const sources = new Map<string, { label: string; count: number }>();
+  const modalityCounts = new Map<string, number>();
+  const asOfMs = Number.isFinite(asOf.getTime()) ? asOf.getTime() : Date.now();
+  const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+  let freshLast7Days = 0;
+  let latestPublishedMs: number | null = null;
+
+  for (const job of jobs) {
+    if (job.company) incrementCount(companies, job.company);
+    const jobSources =
+      Array.isArray(job.sources) && job.sources.length > 0 ? job.sources : [job.source];
+    for (const source of jobSources) if (source) incrementCount(sources, source);
+
+    const modality =
+      job.remoteType === "fully_remote"
+        ? "Remoto"
+        : job.remoteType === "hybrid"
+          ? "Híbrido"
+          : job.remoteType === "onsite"
+            ? "Presencial"
+            : getModalityLabel(job.location) || "Sin especificar";
+    modalityCounts.set(modality, (modalityCounts.get(modality) || 0) + 1);
+
+    if (job.publishedAt) {
+      const publishedMs = new Date(job.publishedAt).getTime();
+      if (Number.isFinite(publishedMs) && publishedMs <= asOfMs) {
+        if (asOfMs - publishedMs <= sevenDaysMs) freshLast7Days += 1;
+        latestPublishedMs =
+          latestPublishedMs === null ? publishedMs : Math.max(latestPublishedMs, publishedMs);
+      }
+    }
+  }
+
+  const visibleCount = jobs.length;
+  const countLabel = totalCount === 1 ? "1 vacante activa" : `${totalCount} vacantes activas`;
+  const target =
+    category.kind === "ciudad"
+      ? `trabajo en ${category.label}`
+      : `${category.label} en ${getCountryConfig(category.country).name}`;
+  const sampleLabel =
+    visibleCount < totalCount
+      ? `las ${visibleCount} ofertas más recientes que aparecen en esta página`
+      : visibleCount === 1
+        ? "la oferta visible en esta página"
+        : `las ${visibleCount} ofertas visibles en esta página`;
+  const intro =
+    visibleCount > 0
+      ? `Encuentra ${countLabel} de ${target}. Compara ${sampleLabel}; las cifras de empresas, fuentes, modalidades y frescura se calculan únicamente con esas ofertas.`
+      : `Todavía no hay vacantes activas de ${target}. Vuelve pronto o explora todas las ofertas disponibles.`;
+
+  const modalityOrder = ["Remoto", "Híbrido", "Presencial", "Sin especificar"];
+  const modalities = [...modalityCounts.entries()]
+    .map(([label, count]) => ({ label, count }))
+    .sort((a, b) => modalityOrder.indexOf(a.label) - modalityOrder.indexOf(b.label));
+  const latestPublishedLabel =
+    latestPublishedMs === null
+      ? null
+      : new Date(latestPublishedMs).toLocaleDateString("es-CO", {
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+          timeZone: "America/Bogota"
+        });
+
+  return {
+    visibleCount,
+    companyCount: companies.size,
+    topCompanies: rankedLabels(companies, 5),
+    sources: rankedLabels(sources, 8),
+    modalities,
+    freshLast7Days,
+    latestPublishedLabel,
+    intro
+  };
+}
+
+/** Stable, crawlable links shared by SSR and the hydrated category page. */
+export function buildCategoryInternalLinks(category: ResolvedCategory): CategoryInternalLink[] {
+  const prefix = category.country === "VE" ? "/ve" : "";
+  const countryName = getCountryConfig(category.country).name;
+  return [
+    { href: `${prefix}/dashboard`, label: `Todas las vacantes en ${countryName}` },
+    { href: `${prefix}/empresas`, label: `Empresas con vacantes en ${countryName}` },
+    { href: prefix || "/", label: `Inicio de BuscoTrabajo ${countryName}` }
+  ];
 }
 
 // BreadcrumbList for a category page (SEO Fase 6 — seo-technical/§1.7 flagged
@@ -637,9 +790,14 @@ export const JOBS_SITEMAP_FOOTER = "\n</urlset>\n";
  * OMITTED when unknown (legacy rows) — never the regeneration time, never a
  * stand-in like published_at.
  */
-export function buildJobSitemapEntry(job: SitemapJobInput & { contentUpdatedAt?: string | Date | null }): string | null {
+export function buildJobSitemapEntry(
+  job: SitemapJobInput & { contentUpdatedAt?: string | Date | null }
+): string | null {
   if (!isPubliclyDescribable(job)) return null;
-  return xmlUrlEntry(buildJobUrl(job), job.contentUpdatedAt ? new Date(job.contentUpdatedAt).toISOString() : undefined);
+  return xmlUrlEntry(
+    buildJobUrl(job),
+    job.contentUpdatedAt ? new Date(job.contentUpdatedAt).toISOString() : undefined
+  );
 }
 
 // Callers must pass jobs already sourced from the same deduped view

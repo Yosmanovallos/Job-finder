@@ -44,6 +44,8 @@ import {
   resolveCategorySlug,
   RETIRED_ROLE_SLUGS,
   buildCategoryMeta,
+  buildCategoryInsights,
+  buildCategoryInternalLinks,
   buildCategoryPath,
   buildCategoryBreadcrumbList,
   buildCategoryItemList,
@@ -105,7 +107,10 @@ import { collectFactIds } from "./cv/factuality.js";
 import { CV_TEMPLATES, DEFAULT_TEMPLATE_ID, getTemplate } from "./cv/templates/registry.js";
 import { handleResumeStudioRoute } from "./server/routes/resume-studio.js";
 import { handleRunsRoute, isRunsRoute } from "./server/routes/runs.js";
-import { handleAgentReadinessRoute, sendStructuredApiError } from "./server/routes/agent-readiness.js";
+import {
+  handleAgentReadinessRoute,
+  sendStructuredApiError
+} from "./server/routes/agent-readiness.js";
 import {
   DISCOVERY_LINKS,
   NOT_FOUND_HTML,
@@ -277,14 +282,13 @@ function writeWithBackpressure(
 async function attachReputation<T extends { company: string | null }>(
   jobs: T[]
 ): Promise<(T & { reputation: ReputationEntry[] })[]> {
-  const companies = jobs.flatMap((job) => job.company ? [job.company] : []);
+  const companies = jobs.flatMap((job) => (job.company ? [job.company] : []));
   const reputationMap = await getReputationForCompanies(companies);
   return jobs.map((job) => ({
     ...job,
     reputation: job.company ? reputationMap.get(job.company) || [] : []
   }));
 }
-
 
 // Mirrors ReputationBadges.tsx's SOURCE_LABELS exactly (that file's own
 // comment: "Text attribution only, never a source's logo" — none of these
@@ -514,10 +518,7 @@ const server = http.createServer((req, res) => {
   });
 });
 
-async function handleRequest(
-  req: http.IncomingMessage,
-  res: http.ServerResponse
-): Promise<void> {
+async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
   const parsedUrl = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
   const pathname = parsedUrl.pathname;
   const method = req.method || "GET";
@@ -538,10 +539,7 @@ async function handleRequest(
         "public, max-age=300, s-maxage=900, stale-while-revalidate=900"
       );
     } else {
-      res.setHeader(
-        "Cache-Control",
-        "public, max-age=0, s-maxage=300, stale-while-revalidate=600"
-      );
+      res.setHeader("Cache-Control", "public, max-age=0, s-maxage=300, stale-while-revalidate=600");
     }
   }
 
@@ -635,7 +633,8 @@ async function handleRequest(
       method,
       parsedUrl,
       clientIp,
-      loadIndexHtml: async () => (await readStaticFile(path.join(PUBLIC_DIR, "index.html"))).toString("utf8"),
+      loadIndexHtml: async () =>
+        (await readStaticFile(path.join(PUBLIC_DIR, "index.html"))).toString("utf8"),
       sendBody
     })
   ) {
@@ -816,7 +815,10 @@ async function handleRequest(
     // instead of resolving into a company page with zero jobs to show.
     const companyName =
       (await resolveCompanyBySlug(slug)) ||
-      resolveCompanyNameFromJobs(slug, companyNames.map((company) => ({ company })));
+      resolveCompanyNameFromJobs(
+        slug,
+        companyNames.map((company) => ({ company }))
+      );
     if (!companyName) {
       res.writeHead(404, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: "Empresa no encontrada" }));
@@ -1989,6 +1991,8 @@ async function handleRequest(
       }
 
       const meta = buildCategoryMeta(category, total);
+      const insights = buildCategoryInsights(category, total, page);
+      const internalLinks = buildCategoryInternalLinks(category);
 
       // Same "real links in the raw HTML" pattern /dashboard already uses
       // (see 7c below) — this page's whole SEO value is being a crawlable
@@ -2007,7 +2011,20 @@ async function handleRequest(
         })
         .join("\n");
       const emptyNotice = total === 0 ? "<p>No hay vacantes en esta categoría por ahora.</p>" : "";
-      const ssrSnippet = `<h1>${escapeHtml(meta.heading)}</h1>\n${emptyNotice}<nav aria-label="Vacantes"><ul>\n${items}\n</ul></nav>`;
+      const overviewHtml = `<section data-category-overview aria-label="Resumen de las vacantes">
+  <p>${escapeHtml(insights.intro)}</p>
+  <dl>
+    <div><dt>Empresas en la muestra</dt><dd>${insights.companyCount}</dd></div>
+    <div><dt>Fuentes verificables</dt><dd>${insights.sources.length}</dd></div>
+    <div><dt>Publicadas en 7 días</dt><dd>${insights.freshLast7Days}</dd></div>
+  </dl>
+  ${insights.topCompanies.length > 0 ? `<p><strong>Empresas visibles:</strong> ${escapeHtml(insights.topCompanies.join(", "))}.</p>` : ""}
+  ${insights.sources.length > 0 ? `<p><strong>Fuentes:</strong> ${escapeHtml(insights.sources.join(", "))}.</p>` : ""}
+  ${insights.modalities.length > 0 ? `<p><strong>Modalidades:</strong> ${escapeHtml(insights.modalities.map((item) => `${item.label} (${item.count})`).join(", "))}.</p>` : ""}
+  ${insights.latestPublishedLabel ? `<p><strong>Última publicación visible:</strong> ${escapeHtml(insights.latestPublishedLabel)}.</p>` : ""}
+  <nav aria-label="Explorar más empleos">${internalLinks.map((link) => `<a href="${escapeHtml(link.href)}">${escapeHtml(link.label)}</a>`).join(" · ")}</nav>
+</section>`;
+      const ssrSnippet = `<h1>${escapeHtml(meta.heading)}</h1>\n${emptyNotice}${overviewHtml}<nav aria-label="Vacantes"><ul>\n${items}\n</ul></nav>`;
       indexHtml = indexHtml.replace('<div id="app"></div>', `<div id="app">${ssrSnippet}</div>`);
 
       // Same fix /dashboard already had (Fase 1, §5.4) applied here too —
@@ -2028,7 +2045,8 @@ async function handleRequest(
         slug: id,
         country: category.country,
         jobs: page,
-        total
+        total,
+        insights
       });
       indexHtml = indexHtml.replace(
         "</head>",
@@ -2184,10 +2202,16 @@ async function handleRequest(
     // API read, so the four consumers can never disagree.
     const googleReady = isGoogleEligiblePage(visible);
     const jobPosting = googleReady ? buildJobPosting(visible) : null;
-    indexHtml = indexHtml.replace('<div id="app"></div>', `<div id="app">${buildJobPageBody(visible)}</div>`);
+    indexHtml = indexHtml.replace(
+      '<div id="app"></div>',
+      `<div id="app">${buildJobPageBody(visible)}</div>`
+    );
     indexHtml = indexHtml.replace(/<meta[^>]*name=["']robots["'][^>]*>/i, "");
     if (!googleReady || !jobPosting) {
-      indexHtml = indexHtml.replace("</head>", `  <meta name="robots" content="noindex,follow">\n</head>`);
+      indexHtml = indexHtml.replace(
+        "</head>",
+        `  <meta name="robots" content="noindex,follow">\n</head>`
+      );
     }
 
     indexHtml = indexHtml
@@ -2218,7 +2242,9 @@ async function handleRequest(
       )
       .replace(
         "</head>",
-        jobPosting ? `  <script type="application/ld+json">${escapeJsonForScriptTag(jobPosting)}</script>\n</head>` : "</head>"
+        jobPosting
+          ? `  <script type="application/ld+json">${escapeJsonForScriptTag(jobPosting)}</script>\n</head>`
+          : "</head>"
       );
 
     await sendBody(req, res, 200, { "Content-Type": "text/html; charset=utf-8" }, indexHtml);
@@ -2357,7 +2383,10 @@ async function handleRequest(
     const companyNames = await getActiveCompanyNames(requestCountry);
     const companyName =
       (await resolveCompanyBySlug(slug)) ||
-      resolveCompanyNameFromJobs(slug, companyNames.map((company) => ({ company })));
+      resolveCompanyNameFromJobs(
+        slug,
+        companyNames.map((company) => ({ company }))
+      );
     if (!companyName) {
       res.writeHead(404, { "Content-Type": "text/html; charset=utf-8" });
       res.end(
@@ -2722,13 +2751,12 @@ async function handleRequest(
         },
         onJob: async (job) => {
           const [visibleJob] = maskLockedFields([job], "free");
-          const entry = buildJobSitemapEntry({ ...visibleJob, contentUpdatedAt: job.contentUpdatedAt });
+          const entry = buildJobSitemapEntry({
+            ...visibleJob,
+            contentUpdatedAt: job.contentUpdatedAt
+          });
           if (!entry) return;
-          await writeWithBackpressure(
-            res,
-            `${wroteEntry ? "\n" : ""}${entry}`,
-            controller.signal
-          );
+          await writeWithBackpressure(res, `${wroteEntry ? "\n" : ""}${entry}`, controller.signal);
           wroteEntry = true;
         }
       });
