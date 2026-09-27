@@ -121,6 +121,17 @@ import {
   wantsMarkdown
 } from "./lib/agent-readiness.js";
 import { RESUME_STUDIO_ENABLED } from "./config.js";
+import {
+  SOURCE_DIRECTORY_SLUGS,
+  SOURCES_PAGE_DESCRIPTION,
+  SOURCES_PAGE_DISCLOSURES,
+  SOURCES_PAGE_HEADING,
+  SOURCES_PAGE_INTRO,
+  SOURCES_PAGE_LINKS,
+  SOURCES_PAGE_PATH,
+  SOURCES_PAGE_TITLE,
+  getSourcesPageSources
+} from "./lib/sources-page.js";
 import { getProviderRegistry } from "./ai-gateway/registry-instance.js";
 import { getCredentialResolver } from "./ai-gateway/credential-resolver-instance.js";
 import type { RunContext } from "./cv/model-gateway.js";
@@ -2251,7 +2262,76 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     return;
   }
 
-  // 7b-bis. GET /empresas, /ve/empresas (directory) and
+  // 7b-bis. GET /fuentes — a crawlable, self-canonical source-transparency
+  // page. This route used to fall through to the generic SPA shell, so its
+  // raw HTML inherited the homepage title/canonical and contained no H1 or
+  // meaningful copy. Keep this content aligned with SourcesAndProblem.tsx
+  // through the shared constants in sources-page.ts.
+  if (pathname === SOURCES_PAGE_PATH && (method === "GET" || method === "HEAD")) {
+    let indexHtml: string;
+    try {
+      indexHtml = fs.readFileSync(path.join(PUBLIC_DIR, "index.html"), "utf-8");
+    } catch {
+      res.writeHead(500, { "Content-Type": "text/plain" });
+      res.end("Server Error: build not found");
+      return;
+    }
+
+    const sources = getSourcesPageSources("CO");
+    const sourcesList = sources.map((source) => `<li>${escapeHtml(source)}</li>`).join("\n");
+    const disclosures = SOURCES_PAGE_DISCLOSURES.map(
+      (disclosure) => `<li>${escapeHtml(disclosure)}</li>`
+    ).join("\n");
+    const links = SOURCES_PAGE_LINKS.map(
+      (link) => `<li><a href="${link.href}">${escapeHtml(link.label)}</a></li>`
+    ).join("\n");
+    const ssrSnippet =
+      `<article data-sources-page>` +
+      `<h1>${escapeHtml(SOURCES_PAGE_HEADING)}</h1>` +
+      `<p>${escapeHtml(SOURCES_PAGE_INTRO)}</p>` +
+      `<section><h2>Fuentes disponibles en Colombia</h2><ul>${sourcesList}</ul></section>` +
+      `<section><h2>Qué significa que rastreamos una fuente</h2><ul>${disclosures}</ul></section>` +
+      `<nav aria-label="Explorar BuscoTrabajo"><ul>${links}</ul></nav>` +
+      `</article>`;
+    indexHtml = indexHtml.replace('<div id="app"></div>', `<div id="app">${ssrSnippet}</div>`);
+
+    const canonicalUrl = `${SITE_URL}${SOURCES_PAGE_PATH}`;
+    indexHtml = indexHtml
+      .replace(/<title>[\s\S]*?<\/title>/, `<title>${escapeHtml(SOURCES_PAGE_TITLE)}</title>`)
+      .replace(
+        /<meta[^>]*name=["']description["'][^>]*>/,
+        `<meta name="description" content="${escapeHtml(SOURCES_PAGE_DESCRIPTION)}" />`
+      )
+      .replace(
+        /<link[^>]*rel=["']canonical["'][^>]*>/,
+        `<link rel="canonical" href="${escapeHtml(canonicalUrl)}" />`
+      )
+      .replace(
+        /<meta[^>]*property=["']og:title["'][^>]*>/,
+        `<meta property="og:title" content="${escapeHtml(SOURCES_PAGE_TITLE)}" />`
+      )
+      .replace(
+        /<meta[^>]*property=["']og:description["'][^>]*>/,
+        `<meta property="og:description" content="${escapeHtml(SOURCES_PAGE_DESCRIPTION)}" />`
+      )
+      .replace(
+        /<meta[^>]*name=["']twitter:title["'][^>]*>/,
+        `<meta name="twitter:title" content="${escapeHtml(SOURCES_PAGE_TITLE)}" />`
+      )
+      .replace(
+        /<meta[^>]*name=["']twitter:description["'][^>]*>/,
+        `<meta name="twitter:description" content="${escapeHtml(SOURCES_PAGE_DESCRIPTION)}" />`
+      )
+      .replace(
+        "</head>",
+        `  <meta property="og:url" content="${escapeHtml(canonicalUrl)}" />\n</head>`
+      );
+
+    await sendBody(req, res, 200, { "Content-Type": "text/html; charset=utf-8" }, indexHtml);
+    return;
+  }
+
+  // 7b-ter. GET /empresas, /ve/empresas (directory) and
   // /empresas/:slug, /ve/empresas/:slug (individual company) — same SSR
   // principle as /empleos/:id/:slug and the category branch above, applied
   // to a page type that was deliberately left CSR-only when it first
@@ -2270,6 +2350,16 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       basePath === "/empresas" ? null : basePath.slice("/empresas/".length).split("/")[0] || null;
     const requestCountry = isVeEmpresas ? "VE" : "CO";
     const countryConfig = getCountryConfig(requestCountry);
+
+    // Search Console still sees historical source names under the employer
+    // directory (notably /empresas/elempleo). A source is not an employer
+    // profile, so consolidate these stable aliases into the transparent
+    // /fuentes page instead of returning a thin 404 or fabricating a page.
+    if (!isVeEmpresas && slug && SOURCE_DIRECTORY_SLUGS.has(slug)) {
+      res.writeHead(301, { Location: SOURCES_PAGE_PATH });
+      res.end();
+      return;
+    }
 
     let indexHtml: string;
     try {

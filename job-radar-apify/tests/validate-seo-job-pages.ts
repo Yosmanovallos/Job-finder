@@ -593,6 +593,48 @@ async function runHttpTests() {
       "La portada de Colombia o Venezuela no sirve el nuevo title/H1 de intención, o falta alternateName en el HTML crudo."
     );
 
+    // /fuentes used to be only a client-side shell: raw HTML inherited the
+    // homepage canonical/title, had no H1 and exposed almost no text. It is
+    // now the stable consolidation target for historical source-as-company
+    // URLs such as /empresas/elempleo.
+    const sourcesRes = await fetch(`${BASE_URL}/fuentes`);
+    const sourcesHtml = await sourcesRes.text();
+    check(
+      sourcesRes.status === 200,
+      "/fuentes responde 200.",
+      `/fuentes respondió ${sourcesRes.status}.`
+    );
+    check(
+      sourcesHtml.includes("<title>Fuentes de vacantes: Elempleo y más | BuscoTrabajo</title>") &&
+        sourcesHtml.includes(`<link rel="canonical" href="${SITE_URL}/fuentes" />`) &&
+        (sourcesHtml.match(/<h1\b/g) || []).length === 1,
+      "/fuentes tiene title específico, canonical propio y un solo H1 en HTML crudo.",
+      "/fuentes todavía hereda metadatos de la portada o no tiene exactamente un H1."
+    );
+    check(
+      sourcesHtml.includes("Fuentes de vacantes de empleo que rastrea BuscoTrabajo") &&
+        sourcesHtml.includes("Elempleo") &&
+        sourcesHtml.includes("no implica afiliación, alianza, patrocinio ni respaldo comercial") &&
+        sourcesHtml.includes('href="/dashboard"') &&
+        sourcesHtml.includes('href="/como-funciona"') &&
+        sourcesHtml.includes('href="/empresas"'),
+      "/fuentes entrega contenido sustancial, atribución clara y enlaces internos sin depender de JavaScript.",
+      "/fuentes no expone en HTML crudo las fuentes, el descargo o los enlaces internos requeridos."
+    );
+    check(
+      sourcesHtml.includes(`<meta property="og:url" content="${SITE_URL}/fuentes" />`) &&
+        sourcesHtml.includes('name="twitter:title" content="Fuentes de vacantes: Elempleo y más | BuscoTrabajo"'),
+      "/fuentes publica Open Graph y Twitter metadata específicos.",
+      "/fuentes conserva metadata social genérica de la portada."
+    );
+
+    const elempleoRes = await fetch(`${BASE_URL}/empresas/elempleo`, { redirect: "manual" });
+    check(
+      elempleoRes.status === 301 && elempleoRes.headers.get("location") === "/fuentes",
+      "/empresas/elempleo consolida permanentemente hacia /fuentes.",
+      `/empresas/elempleo no redirigió 301 a /fuentes (status=${elempleoRes.status}, location=${elempleoRes.headers.get("location")}).`
+    );
+
     // /dashboard must ship real vacancy links in its raw HTML, not rely on
     // the browser's fetch() to /api/jobs. Confirmed via Search Console
     // (2026-07-29) that Google's own rendered snapshot showed "0 de 0

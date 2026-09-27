@@ -59,6 +59,26 @@ async function main(): Promise<void> {
     assert.match(veHomeHtml, /<h1>Busco trabajo en Venezuela: vacantes de empleo en un solo lugar<\/h1>/);
     assert.match(veHomeHtml, /<meta property="og:locale" content="es_VE" \/>/);
 
+    const sourcesPage = await fetch(`${base}/fuentes`, { headers: { Accept: "text/html" } });
+    const sourcesHtml = await sourcesPage.text();
+    assert.equal(sourcesPage.status, 200);
+    assert.equal((sourcesHtml.match(/<h1\b/g) || []).length, 1);
+    assert.match(sourcesHtml, /<title>Fuentes de vacantes: Elempleo y más \| BuscoTrabajo<\/title>/);
+    assert.match(sourcesHtml, /<link rel="canonical" href="https:\/\/buscotrabajo\.co\/fuentes" \/>/);
+    assert.match(sourcesHtml, /<h1>Fuentes de vacantes de empleo que rastrea BuscoTrabajo<\/h1>/);
+    for (const source of ["LinkedIn Jobs", "Computrabajo", "Elempleo", "Magneto", "Workana"]) {
+      assert.ok(sourcesHtml.includes(`<li>${source}</li>`), source);
+    }
+    assert.match(sourcesHtml, /no implica afiliación, alianza, patrocinio ni respaldo comercial/);
+    for (const href of ["/dashboard", "/como-funciona", "/empresas"]) {
+      assert.ok(sourcesHtml.includes(`href="${href}"`), href);
+    }
+    assert.match(sourcesHtml, /<meta property="og:url" content="https:\/\/buscotrabajo\.co\/fuentes" \/>/);
+
+    const elempleoRedirect = await fetch(`${base}/empresas/elempleo`, { redirect: "manual" });
+    assert.equal(elempleoRedirect.status, 301);
+    assert.equal(elempleoRedirect.headers.get("location"), "/fuentes");
+
     const markdown = await fetch(`${base}/`, { headers: { Accept: "text/markdown", "Accept-Encoding": "gzip" } });
     assert.equal(markdown.status, 200);
     assert.match(markdown.headers.get("content-type") || "", /^text\/markdown; charset=utf-8/);

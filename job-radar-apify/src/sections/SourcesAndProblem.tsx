@@ -1,18 +1,24 @@
 import { Browsers, Copy, LinkBreak } from "@phosphor-icons/react";
 import { SOURCES_BY_COUNTRY } from "../countries/index.js";
+import {
+  SOURCES_PAGE_DISCLOSURES,
+  SOURCES_PAGE_HEADING,
+  SOURCES_PAGE_INTRO,
+  SOURCES_PAGE_LINKS
+} from "../lib/sources-page.js";
 
 const problems = [
   {
     icon: Browsers,
     title: "Diez pestañas abiertas",
     description:
-      "Cada portal tiene su propio buscador, sus propios filtros y su propia forma de mentir sobre la fecha de publicación."
+      "Cada portal tiene su propio buscador, sus propios filtros y una forma distinta de mostrar la fecha de publicación."
   },
   {
     icon: Copy,
     title: "La misma vacante cuatro veces",
     description:
-      "Los portales se copian entre sí. Aplicas dos veces al mismo puesto sin saberlo, perdiendo tiempo y credibilidad."
+      "Una misma oportunidad puede aparecer en varias fuentes. Sin una vista unificada, es fácil revisarla o postularse más de una vez."
   },
   {
     icon: LinkBreak,
@@ -26,9 +32,13 @@ export interface SourcesAndProblemProps {
   // Defaults to "CO" so /fuentes (rendered outside the country-aware
   // Landing route) keeps today's exact source list.
   country?: string;
+  standalone?: boolean;
 }
 
-export default function SourcesAndProblem({ country = "CO" }: SourcesAndProblemProps) {
+export default function SourcesAndProblem({
+  country = "CO",
+  standalone = false
+}: SourcesAndProblemProps) {
   const sources = SOURCES_BY_COUNTRY[country] || SOURCES_BY_COUNTRY.CO;
   return (
     <section
@@ -39,8 +49,101 @@ export default function SourcesAndProblem({ country = "CO" }: SourcesAndProblemP
         borderBottom: "1px solid #e6e8e4"
       }}
     >
+      {standalone && (
+        <div className="bg-white" style={{ borderBottom: "1px solid #e6e8e4" }}>
+          <article
+            className="mx-auto px-4 md:px-8 lg:px-16 py-14 md:py-20"
+            style={{ maxWidth: "1200px" }}
+            data-sources-page
+          >
+            <p
+              className="mb-4 text-xs uppercase tracking-widest"
+              style={{
+                fontFamily: "ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace",
+                color: "#0f6b4c",
+                letterSpacing: "0.12em"
+              }}
+            >
+              Transparencia de fuentes
+            </p>
+            <h1
+              className="font-heading font-semibold leading-tight"
+              style={{
+                fontSize: "clamp(2rem, 5vw, 3.75rem)",
+                letterSpacing: "-0.035em",
+                color: "#0e0f10",
+                maxWidth: "900px"
+              }}
+            >
+              {SOURCES_PAGE_HEADING}
+            </h1>
+            <p
+              className="mt-6 leading-relaxed"
+              style={{ color: "#5b5f5c", fontSize: "1.0625rem", maxWidth: "780px" }}
+            >
+              {SOURCES_PAGE_INTRO}
+            </p>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-10">
+              <section
+                className="p-6 md:p-8"
+                style={{ border: "1px solid #e6e8e4", borderRadius: "12px" }}
+              >
+                <h2 className="font-heading font-semibold text-xl" style={{ color: "#0e0f10" }}>
+                  Fuentes disponibles en Colombia
+                </h2>
+                <ul className="grid grid-cols-2 gap-x-5 gap-y-3 mt-5">
+                  {sources.map((source) => (
+                    <li key={source} className="flex items-center gap-2" style={{ color: "#343735" }}>
+                      <span aria-hidden="true" style={{ color: "#0f6b4c" }}>•</span>
+                      {source}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+
+              <section
+                className="p-6 md:p-8"
+                style={{ border: "1px solid #e6e8e4", borderRadius: "12px" }}
+              >
+                <h2 className="font-heading font-semibold text-xl" style={{ color: "#0e0f10" }}>
+                  Qué significa que rastreamos una fuente
+                </h2>
+                <ul className="flex flex-col gap-4 mt-5">
+                  {SOURCES_PAGE_DISCLOSURES.map((disclosure) => (
+                    <li key={disclosure} className="flex gap-3 leading-relaxed" style={{ color: "#5b5f5c" }}>
+                      <span aria-hidden="true" style={{ color: "#0f6b4c" }}>✓</span>
+                      <span>{disclosure}</span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            </div>
+
+            <nav aria-label="Explorar BuscoTrabajo" className="flex flex-wrap gap-3 mt-8">
+              {SOURCES_PAGE_LINKS.map((link) => (
+                <a
+                  key={link.href}
+                  href={link.href}
+                  className="inline-flex items-center px-4 py-2 text-sm font-medium transition-colors"
+                  style={{
+                    color: "#0f6b4c",
+                    border: "1px solid rgba(15,107,76,0.28)",
+                    borderRadius: "999px",
+                    background: "rgba(15,107,76,0.05)"
+                  }}
+                >
+                  {link.label}
+                </a>
+              ))}
+            </nav>
+          </article>
+        </div>
+      )}
+
       {/* Sources Strip */}
-      <div
+      {!standalone && (
+        <div
         style={{
           borderBottom: "1px solid #e6e8e4",
           background: "#ffffff"
@@ -108,7 +211,8 @@ export default function SourcesAndProblem({ country = "CO" }: SourcesAndProblemP
             </div>
           </div>
         </div>
-      </div>
+        </div>
+      )}
 
       {/* Problem Section */}
       <div className="mx-auto px-4 md:px-8 lg:px-16 py-16 md:py-20" style={{ maxWidth: "1200px" }}>

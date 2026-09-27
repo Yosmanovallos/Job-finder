@@ -21,6 +21,7 @@ import { AuthProvider } from "./auth/auth-provider.js";
 import RequireAuth from "./auth/require-auth.js";
 import { registerBuscoTrabajoWebMcp } from "./lib/webmcp.js";
 import { captureAcquisition, trackPageView } from "./lib/analytics.js";
+import { SOURCES_PAGE_DESCRIPTION, SOURCES_PAGE_TITLE } from "./lib/sources-page.js";
 
 // Code-split everything past the landing page — visitors hitting "/" (the
 // most common entrypoint) don't pay for Dashboard/Login/Pricing/Legal JS.
@@ -180,11 +181,8 @@ function AppRoutes() {
         path="/fuentes"
         element={
           <>
-            <PageMeta
-              title="Fuentes de empleo que rastreamos — BuscoTrabajo"
-              description="Vacantes agregadas de LinkedIn, Computrabajo, Elempleo, Magneto, Torre y otros portales de empleo en Colombia y LatAm, en un solo lugar."
-            />
-            <SourcesAndProblem />
+            <PageMeta title={SOURCES_PAGE_TITLE} description={SOURCES_PAGE_DESCRIPTION} />
+            <SourcesAndProblem standalone />
           </>
         }
       />
