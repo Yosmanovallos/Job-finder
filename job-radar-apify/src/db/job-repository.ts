@@ -466,13 +466,21 @@ export async function streamCanonicalSitemapJobs(options: SitemapStreamOptions):
        ORDER BY published_at DESC, id DESC
        LIMIT ${limit}`
     );
+    const fetchBatch = async () =>
+      (await client.query(`FETCH FORWARD ${batchSize} FROM sitemap_jobs_cursor`)).rows as SitemapJobRow[];
+
+    // The outer ORDER BY makes the FIRST fetch run the whole DISTINCT ON +
+    // sort; later fetches only read the materialized result. Fetch it BEFORE
+    // onReady so a statement_timeout here still becomes a clean 503 no-store.
+    // Sending 200 + the XML header first turned such failures into a
+    // truncated 200 that Cloudflare cached and served to Google as an empty
+    // sitemap (observed 2026-09-26/27: Search Console read 0 job URLs).
+    let rows = await fetchBatch();
     await options.onReady?.();
 
     let count = 0;
     while (count < limit) {
       if (options.signal?.aborted) throw new SitemapStreamAbortedError();
-      const result = await client.query(`FETCH FORWARD ${batchSize} FROM sitemap_jobs_cursor`);
-      const rows = result.rows as SitemapJobRow[];
       for (const row of rows) {
         if (options.signal?.aborted) throw new SitemapStreamAbortedError();
         await options.onJob({
@@ -487,7 +495,8 @@ export async function streamCanonicalSitemapJobs(options: SitemapStreamOptions):
         });
         count += 1;
       }
-      if (rows.length < batchSize) break;
+      if (rows.length < batchSize || count >= limit) break;
+      rows = await fetchBatch();
     }
 
     await client.query("CLOSE sitemap_jobs_cursor");

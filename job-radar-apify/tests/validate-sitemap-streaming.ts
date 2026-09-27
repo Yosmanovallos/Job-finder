@@ -173,6 +173,25 @@ try {
     await pool.query("ALTER TABLE jobs_p1_unavailable RENAME TO jobs");
   }
   console.log("✅ Un fallo de PostgreSQL devuelve una respuesta segura y reintentable.");
+
+  // Regression (2026-09-26/27): a statement_timeout on the FIRST fetch — the
+  // one that runs the whole DISTINCT ON + sort — used to arrive after the
+  // 200 + XML header were already sent, leaving a truncated 200 that
+  // Cloudflare cached and served to Google as an empty sitemap. The view's
+  // InitPlan sleeps only at execution time (not while planning DECLARE),
+  // past the 10 s statement timeout.
+  await pool.query("ALTER TABLE jobs RENAME TO jobs_p1_slow");
+  await pool.query("CREATE VIEW jobs AS SELECT * FROM jobs_p1_slow WHERE (SELECT true FROM pg_sleep(11))");
+  try {
+    const slow = await fetch(`${baseUrl}/sitemap-jobs.xml`);
+    assert.equal(slow.status, 503);
+    assert.equal(slow.headers.get("cache-control"), "no-store");
+    assert.doesNotMatch(await slow.text(), /<urlset/);
+  } finally {
+    await pool.query("DROP VIEW jobs");
+    await pool.query("ALTER TABLE jobs_p1_slow RENAME TO jobs");
+  }
+  console.log("✅ Un timeout en la consulta del sitemap nunca produce un 200 truncado.");
 } finally {
   server.kill("SIGTERM");
   // Leave the disposable DB as found for the suites that run after this one
