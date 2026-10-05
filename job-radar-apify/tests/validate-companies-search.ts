@@ -41,6 +41,7 @@ const MERGE_CAPS = "ZZMERGE HOLDINGS SAS";
 const MERGE_COUNTRY = "ZzMerge Holdings Colombia";
 const DUP_COMPANY_A = "ZzDup Corp";
 const DUP_COMPANY_B = "ZzDup Corp S.A.S.";
+const COUNTRY_COMPANY = "ZzCountry Corp";
 const PLACEHOLDER_VARIANTS = ["Empresa Confidencial", "CONFIDENCIAL", "-Confidencial-", "Confidencial USQ"];
 
 async function cleanupTestJobs(): Promise<void> {
@@ -134,7 +135,14 @@ async function runCompaniesSearchValidation() {
       title: "Analista ZzDup",
       location: "Medellin, Antioquia, Colombia"
     }),
-    makeJob("csearch_dup_other_city", DUP_COMPANY_A, { title: "Analista ZzDup", location: "Cali, Valle del Cauca" })
+    makeJob("csearch_dup_other_city", DUP_COMPANY_A, { title: "Analista ZzDup", location: "Cali, Valle del Cauca" }),
+    // Country-only duplicate: one source dropped the city. Dropped only when
+    // the same title exists in a real city; a lone country-only posting and
+    // a remote one stay.
+    makeJob("csearch_country_only_dup", COUNTRY_COMPANY, { title: "Analista ZzCountry", location: "Colombia" }),
+    makeJob("csearch_country_city", COUNTRY_COMPANY, { title: "Analista ZzCountry", location: "Bogotá, D.C." }),
+    makeJob("csearch_country_remote", COUNTRY_COMPANY, { title: "Analista ZzCountry", location: "Remoto" }),
+    makeJob("csearch_country_alone", COUNTRY_COMPANY, { title: "Gerente ZzCountry", location: "Colombia" })
   ];
   await saveJobs(jobs, "Test Companies Search");
 
@@ -308,6 +316,20 @@ async function runCompaniesSearchValidation() {
       throw new Error(`[Test 10] El filtro de empresa debía devolver 2 vacantes, llegó ${JSON.stringify(body10b)}.`);
     }
     console.log(`✅ [PASSED] Duplicado entre fuentes colapsado; ciudades distintas se conservan.`);
+
+    // Test 11: "Colombia" + "Bogotá" for the same title = one vacancy; the
+    // remote one and a lone "Colombia" posting are kept.
+    console.log(`\n🔍 [Test 11] Duplicado solo-país se descarta si existe la misma vacante en una ciudad...`);
+    const res11 = await fetch(`${BASE_URL}/api/jobs?company=${encodeURIComponent(COUNTRY_COMPANY)}&country=CO&limit=50`);
+    const body11 = (await res11.json()) as { jobs: Array<{ jobId: string }>; total: number };
+    const res11b = await fetch(`${BASE_URL}/api/companies/search?q=zzcountry`);
+    const body11b = companySearchResponseSchema.parse(await res11b.json());
+    if (body11.total !== 3 || body11b.companies[0]?.count !== 3) {
+      throw new Error(
+        `[Test 11] Esperaba 3 vacantes (Bogotá, Remoto, Gerente@Colombia). jobs total=${body11.total}, directorio=${JSON.stringify(body11b)}.`
+      );
+    }
+    console.log(`✅ [PASSED] Solo-país duplicado descartado; remoto y solo-país único conservados.`);
 
     console.log(`\n==================================================`);
     console.log(`🎉 [TEST SUITE PASSED] GET /api/companies/search (Fase E4) verificado contra el servidor HTTP real.`);

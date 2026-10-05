@@ -120,6 +120,35 @@ export function vacancyIdentityColumnsSql(): string {
   );
 }
 
+// Location keys that name only the country, not a city. Remote is not here:
+// "Remoto" is its own vacancy, never folded into a city one.
+const COUNTRY_ONLY_LOCATION_KEYS = "('colombia', 'venezuela')";
+
+/**
+ * FROM-source for the canonical vacancy queries: `jobs` rows matching
+ * `where`, with the three identity keys, minus country-only duplicates.
+ * Use as `SELECT DISTINCT ON (VACANCY_IDENTITY_KEYS) ... FROM <this> ORDER BY
+ * VACANCY_IDENTITY_KEYS, published_at DESC, id DESC`.
+ *
+ * Country-only duplicates (measured on prod 2026-10-05): one source drops the
+ * city — Accenture "Order to Cash" @ "Colombia" (Glassdoor) and @ "Medellin,
+ * Antioquia, Colombia" (LinkedIn). A country-only row is dropped when the
+ * same employer posts the same title in a real city of the same country;
+ * a country-only posting with no city sibling stays. Confidential employers
+ * are excluded (two anonymous employers are not the same employer).
+ * Partitioning by the DISTINCT ON prefix lets Postgres reuse one sort.
+ */
+export function vacancyIdentitySourceSql(where: string): string {
+  return `(SELECT * FROM (
+         SELECT keyed.*,
+                bool_or(identity_location NOT IN ${COUNTRY_ONLY_LOCATION_KEYS} AND identity_location NOT IN ('remoto', 'remote'))
+                  OVER (PARTITION BY identity_title, identity_company, country) AS has_city_sibling
+         FROM (SELECT jobs.*, ${vacancyIdentityColumnsSql()} FROM jobs WHERE ${where}) keyed
+       ) sibling_checked
+       WHERE NOT (identity_location IN ${COUNTRY_ONLY_LOCATION_KEYS} AND has_city_sibling
+                  AND lower(COALESCE(company, '')) NOT LIKE '%confidencial%'))`;
+}
+
 /** JS twin of the search folding (accents + case) for user-typed queries. */
 export function foldSearchText(text: string): string {
   return text.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();

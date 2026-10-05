@@ -22,7 +22,7 @@ import {
   foldSearchText,
   foldedCompanySql,
   isPlaceholderCompanyKeySql,
-  vacancyIdentityColumnsSql
+  vacancyIdentitySourceSql
 } from "../lib/company-identity.js";
 
 dotenv.config();
@@ -298,8 +298,7 @@ export async function getJobs(
               id, url_hash, title, company, location, url, source, sources, date_text, published_at, role_origin, country,
               description, requirements, technologies, employment_type, salary_min, salary_max, salary_currency, salary_raw, applicant_count,
               (published_at > NOW() - INTERVAL '48 hours') AS is_locked
-       FROM (SELECT jobs.*, ${vacancyIdentityColumnsSql()}
-             FROM jobs WHERE is_active = TRUE AND ${liveJobSql()}) jobs
+       FROM ${vacancyIdentitySourceSql(`is_active = TRUE AND ${liveJobSql()}`)} jobs
        ORDER BY ${VACANCY_IDENTITY_KEYS}, published_at DESC, id DESC
      ) deduped
      ORDER BY published_at DESC, id DESC
@@ -356,8 +355,7 @@ export async function getJobsLight(
               id, url_hash, title, company, location, url, source, sources, date_text, published_at, role_origin, country,
               employment_type, salary_min, salary_max, salary_currency, salary_raw, applicant_count,
               (published_at > NOW() - INTERVAL '48 hours') AS is_locked
-       FROM (SELECT jobs.*, ${vacancyIdentityColumnsSql()}
-             FROM jobs WHERE is_active = TRUE AND ${liveJobSql()}) jobs
+       FROM ${vacancyIdentitySourceSql(`is_active = TRUE AND ${liveJobSql()}`)} jobs
        ORDER BY ${VACANCY_IDENTITY_KEYS}, published_at DESC, id DESC
      ) deduped
      ORDER BY published_at DESC, id DESC
@@ -778,8 +776,7 @@ async function queryJobsPage(options: JobsPageOptions): Promise<JobsPage> {
               role_origin, country, employment_type, salary_min, salary_max,
               salary_currency, salary_raw, applicant_count,
               (published_at > NOW() - INTERVAL '48 hours') AS is_locked
-       FROM (SELECT jobs.*, ${vacancyIdentityColumnsSql()}
-             FROM jobs WHERE is_active = TRUE AND ${liveJobSql()}) jobs
+       FROM ${vacancyIdentitySourceSql(`is_active = TRUE AND ${liveJobSql()}`)} jobs
        ORDER BY ${VACANCY_IDENTITY_KEYS}, published_at DESC, id DESC
      ), filtered AS (
        SELECT canonical.*,
@@ -887,8 +884,7 @@ function companyVariantsCte(rowWhere: string[], prioritizedParam: string, prefil
   return `canonical AS MATERIALIZED (
        SELECT DISTINCT ON (${VACANCY_IDENTITY_KEYS})
               id, company, company_key, country, published_at
-       FROM (SELECT jobs.*, ${vacancyIdentityColumnsSql()}
-             FROM jobs WHERE is_active = TRUE AND ${liveJobSql()} AND ${prefilter}) jobs
+       FROM ${vacancyIdentitySourceSql(`is_active = TRUE AND ${liveJobSql()} AND ${prefilter}`)} jobs
        ORDER BY ${VACANCY_IDENTITY_KEYS}, published_at DESC, id DESC
      ), variants AS (
        SELECT ${storedCompanyKeySql()} AS company_key, company, COUNT(*) AS count,
@@ -1003,8 +999,7 @@ export async function countCanonicalJobsByCompany(company: string): Promise<numb
   const result = await pool.query(
     `SELECT COUNT(*) AS count FROM (
        SELECT DISTINCT ON (${VACANCY_IDENTITY_KEYS}) id
-       FROM (SELECT jobs.*, ${vacancyIdentityColumnsSql()}
-             FROM jobs WHERE is_active = TRUE AND ${liveJobSql()} AND ${companyMatchSql("$1")}) jobs
+       FROM ${vacancyIdentitySourceSql(`is_active = TRUE AND ${liveJobSql()} AND ${companyMatchSql("$1")}`)} jobs
        ORDER BY ${VACANCY_IDENTITY_KEYS}, published_at DESC, id DESC
      ) canonical`,
     [company]

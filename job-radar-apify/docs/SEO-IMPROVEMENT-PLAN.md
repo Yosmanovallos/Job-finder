@@ -1285,8 +1285,28 @@ ubicación); nunca fusionan palabras distintas ni la misma vacante en ciudades d
 Efecto SEO: `/empresas/:slug` de cualquier variante (`/empresas/accenture` y
 `/empresas/accenture-colombia`) muestra el mismo contenido y su `canonical`/H1/JSON-LD apuntan
 al nombre que muestra el directorio. Sitemap, `content_fingerprint`, `canonicalSql` y
-`/empleos/:id` no cambian. Pendiente tras desplegar: `/seo drift compare` sobre las URLs de
-baseline + una página de empresa con variantes.
+`/empleos/:id` no cambian.
+
+**Desplegado 2026-10-05** (`977d459`, migración aplicada antes: 43.349 filas, 61 s). Verificado
+en prod: grupos de empresas casi-duplicadas en las primeras 1.440 del directorio 75 → 3
+(Falabella/Grupo Falabella, Staffing de Colombia/Staffing, Coomeva/Grupo Coomeva, separados a
+propósito); Accenture 4 entradas → 1 (80 vacantes, reputación Merco+GPTW conservada); 0 empresas
+"confidencial". Directorio 0,22-0,34 s (antes 0,55-0,70 s).
+
+**Drift post-deploy**: el runtime de `claude-seo` no instala en esta máquina (Smart App Control
+de Windows bloquea la DLL de `charset_normalizer`) y los baselines 1-6 no existen aquí, así que
+la comparación se hizo a mano sobre `/`, `/dashboard`, `/empleos/bogota`, `/ve`,
+`/ve/empleos/project-manager`, una vacante del sitemap, `/empresas`, `/ve/empresas` y
+`/empresas/{accenture,accenture-colombia,accenture-ltda,bancolombia}`: todas 200, un solo
+`<title>`, canonical propio, hreflang recíproco intacto, JSON-LD válido (JobPosting en la vacante
+del sitemap, ItemList en directorios). Único cambio: las variantes de Accenture ahora tienen
+canonical `/empresas/accenture` (intencional). Sitemap de vacantes: 8.517 URLs. Instantánea
+guardada como nuevo baseline manual.
+
+**Seguimiento (rama `fix/country-only-dupes`)**: una vacante con ubicación solo-país
+("Colombia") se descarta del listado cuando el mismo empleador publica el mismo título en una
+ciudad del mismo país (Accenture "Order to Cash" @ Colombia en Glassdoor vs @ Medellín en
+LinkedIn). Una solo-país sin ciudad hermana y las remotas se conservan. No toca el sitemap.
 
 ## 2. Primer paso al reiniciar sesión: baseline de `seo-drift`
 
