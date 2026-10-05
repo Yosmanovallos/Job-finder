@@ -26,7 +26,8 @@ const suites: Record<string, string[]> = {
     "validate-source-contract.test.ts",
     "validate-agent-readiness.test.ts",
     "validate-source-closure.test.ts",
-    "validate-job-freshness.test.ts"
+    "validate-job-freshness.test.ts",
+    "validate-company-identity.test.ts"
   ],
   integration: [
     "validate-isolated-database.ts",
@@ -48,7 +49,7 @@ const suites: Record<string, string[]> = {
   observability: ["validate-run-observability.ts"],
   pagination: ["validate-job-pagination.ts"],
   seo: ["validate-seo-job-pages.ts"],
-  companies: ["validate-companies-search.ts"],
+  companies: ["validate-company-identity.test.ts", "validate-companies-search.ts"],
   baseline: ["validate-public-baseline.ts"],
   "agent-readiness": ["validate-agent-readiness.test.ts", "validate-agent-readiness.ts"],
   "job-seo": [
@@ -288,6 +289,11 @@ async function main(): Promise<void> {
       const seoBlock = /-- BEGIN job-seo-v2\r?\n([\s\S]*?)-- END job-seo-v2/.exec(schema)?.[1];
       if (!seoBlock) throw new Error("[P0] schema.sql no contiene el bloque job-seo-v2.");
       await pool.query(seoBlock);
+      // Company identity keys: same rule — production gets this block (via
+      // scripts/migrate-company-identity.ts) before the code reading it ships.
+      const identityBlock = /-- BEGIN company-identity\r?\n([\s\S]*?)-- END company-identity/.exec(schema)?.[1];
+      if (!identityBlock) throw new Error("[P0] schema.sql no contiene el bloque company-identity.");
+      await pool.query(identityBlock);
       await pool.query("INSERT INTO test_sandbox (run_id) VALUES ($1)", [runId]);
       await pool.end();
       pool = undefined;

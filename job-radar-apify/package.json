@@ -63,6 +63,7 @@
     "indexing:migrate": "tsx scripts/migrate-indexing-queue.ts",
     "db:migrate-last-seen-at": "tsx scripts/migrate-last-seen-at.ts",
     "db:migrate-job-details": "tsx scripts/migrate-job-details.ts",
+    "db:migrate-company-identity": "tsx scripts/migrate-company-identity.ts",
     "indexing:backfill": "tsx scripts/backfill-indexing-queue.ts",
     "indexing:tick": "tsx scripts/run-indexing-tick.ts",
     "seo:check-search-console": "tsx scripts/check-search-console.ts",

@@ -15,6 +15,15 @@ import { seoReadySql } from "../lib/google-job-readiness.js";
 import { liveJobSql } from "../lib/job-freshness.js";
 import { findExpiredUrlHashes } from "./expired-job-repository.js";
 import { StaleWhileRevalidateCache } from "../lib/stale-while-revalidate-cache.js";
+import {
+  VACANCY_IDENTITY_KEYS,
+  companyKeySql,
+  storedCompanyKeySql,
+  foldSearchText,
+  foldedCompanySql,
+  isPlaceholderCompanyKeySql,
+  vacancyIdentityColumnsSql
+} from "../lib/company-identity.js";
 
 dotenv.config();
 
@@ -285,13 +294,13 @@ export async function getJobs(
   // chronologically so the dashboard's default order is preserved.
   const result = await pool.query(
     `SELECT * FROM (
-       SELECT DISTINCT ON (lower(trim(title)), lower(trim(COALESCE(company, 'confidencial'))), lower(trim(COALESCE(location, CASE country WHEN 'VE' THEN 'venezuela' ELSE 'colombia' END))))
+       SELECT DISTINCT ON (${VACANCY_IDENTITY_KEYS})
               id, url_hash, title, company, location, url, source, sources, date_text, published_at, role_origin, country,
               description, requirements, technologies, employment_type, salary_min, salary_max, salary_currency, salary_raw, applicant_count,
               (published_at > NOW() - INTERVAL '48 hours') AS is_locked
-       FROM jobs
-       WHERE is_active = TRUE AND ${liveJobSql()}
-       ORDER BY lower(trim(title)), lower(trim(COALESCE(company, 'confidencial'))), lower(trim(COALESCE(location, CASE country WHEN 'VE' THEN 'venezuela' ELSE 'colombia' END))), published_at DESC, id DESC
+       FROM (SELECT jobs.*, ${vacancyIdentityColumnsSql()}
+             FROM jobs WHERE is_active = TRUE AND ${liveJobSql()}) jobs
+       ORDER BY ${VACANCY_IDENTITY_KEYS}, published_at DESC, id DESC
      ) deduped
      ORDER BY published_at DESC, id DESC
      LIMIT $1 OFFSET $2`,
@@ -343,13 +352,13 @@ export async function getJobsLight(
 ): Promise<any[]> {
   const result = await pool.query(
     `SELECT * FROM (
-       SELECT DISTINCT ON (lower(trim(title)), lower(trim(COALESCE(company, 'confidencial'))), lower(trim(COALESCE(location, CASE country WHEN 'VE' THEN 'venezuela' ELSE 'colombia' END))))
+       SELECT DISTINCT ON (${VACANCY_IDENTITY_KEYS})
               id, url_hash, title, company, location, url, source, sources, date_text, published_at, role_origin, country,
               employment_type, salary_min, salary_max, salary_currency, salary_raw, applicant_count,
               (published_at > NOW() - INTERVAL '48 hours') AS is_locked
-       FROM jobs
-       WHERE is_active = TRUE AND ${liveJobSql()}
-       ORDER BY lower(trim(title)), lower(trim(COALESCE(company, 'confidencial'))), lower(trim(COALESCE(location, CASE country WHEN 'VE' THEN 'venezuela' ELSE 'colombia' END))), published_at DESC, id DESC
+       FROM (SELECT jobs.*, ${vacancyIdentityColumnsSql()}
+             FROM jobs WHERE is_active = TRUE AND ${liveJobSql()}) jobs
+       ORDER BY ${VACANCY_IDENTITY_KEYS}, published_at DESC, id DESC
      ) deduped
      ORDER BY published_at DESC, id DESC
      LIMIT $1 OFFSET $2`,
@@ -649,6 +658,18 @@ function rolePredicate(sql: SqlParts, role: string, column = "title"): string {
   return `(${match.words.map((word) => titleWordPredicate(sql, word, column)).join(joiner)})`;
 }
 
+// A company filter/page matches every spelling of the same employer
+// ("Accenture", "Accenture Colombia", "ACCENTURE LTDA" — company-identity.ts),
+// except placeholder employers ("Empresa Confidencial"), which only ever
+// match their exact spelling so unrelated anonymous employers never merge.
+function companyMatchSql(nameParam: string): string {
+  const targetKey = companyKeySql(`${nameParam}::text`);
+  return (
+    `(company = ${nameParam} OR (NOT ${isPlaceholderCompanyKeySql(targetKey)} AND ` +
+    `${storedCompanyKeySql()} = ${targetKey}))`
+  );
+}
+
 function buildJobWhere(filters: JobFilterParams, sql: SqlParts): string[] {
   const where: string[] = [];
   const rawSearch = filters.search?.trim();
@@ -718,7 +739,7 @@ function buildJobWhere(filters: JobFilterParams, sql: SqlParts): string[] {
     where.push(`(${filters.roles.map((role) => rolePredicate(sql, role)).join(" OR ")})`);
   }
 
-  if (filters.company) where.push(`company = ${sql.param(filters.company)}`);
+  if (filters.company) where.push(companyMatchSql(sql.param(filters.company)));
   if (filters.country) {
     where.push(`(country IS NULL OR country = ${sql.param(filters.country.toUpperCase())})`);
   }
@@ -752,14 +773,14 @@ async function queryJobsPage(options: JobsPageOptions): Promise<JobsPage> {
 
   const result = await pool.query(
     `WITH canonical AS MATERIALIZED (
-       SELECT DISTINCT ON (lower(trim(title)), lower(trim(COALESCE(company, 'confidencial'))), lower(trim(COALESCE(location, CASE country WHEN 'VE' THEN 'venezuela' ELSE 'colombia' END))))
-              id, title, company, location, url, source, sources, date_text, published_at,
+       SELECT DISTINCT ON (${VACANCY_IDENTITY_KEYS})
+              id, title, company, company_key, location, url, source, sources, date_text, published_at,
               role_origin, country, employment_type, salary_min, salary_max,
               salary_currency, salary_raw, applicant_count,
               (published_at > NOW() - INTERVAL '48 hours') AS is_locked
-       FROM jobs
-       WHERE is_active = TRUE AND ${liveJobSql()}
-       ORDER BY lower(trim(title)), lower(trim(COALESCE(company, 'confidencial'))), lower(trim(COALESCE(location, CASE country WHEN 'VE' THEN 'venezuela' ELSE 'colombia' END))), published_at DESC, id DESC
+       FROM (SELECT jobs.*, ${vacancyIdentityColumnsSql()}
+             FROM jobs WHERE is_active = TRUE AND ${liveJobSql()}) jobs
+       ORDER BY ${VACANCY_IDENTITY_KEYS}, published_at DESC, id DESC
      ), filtered AS (
        SELECT canonical.*,
               CASE WHEN ${preferencePredicate} THEN 0 ELSE 1 END AS preference_rank,
@@ -816,6 +837,14 @@ export interface CompanyPage {
   total: number;
 }
 
+// One directory entry per employer, not per spelling: rows are grouped by
+// the employer key (company-identity.ts) and shown under one display name — a name with a known
+// logo first (prioritizedCompanies), then the spelling most of its
+// vacancies use. Placeholder employers ("Empresa Confidencial",
+// "-Confidencial-", ...) are never listed as a company. The search term is
+// matched against ANY spelling of the group (HAVING, not a row WHERE), so
+// typing "colombia" still shows Accenture's full count, not only its
+// "Accenture Colombia" rows.
 export async function searchActiveCompanies(
   query: string,
   country: string | undefined,
@@ -823,43 +852,136 @@ export async function searchActiveCompanies(
   offset: number,
   prioritizedCompanies: string[] = []
 ): Promise<CompanyPage> {
+  const cacheKey = JSON.stringify({
+    query: foldSearchText(query),
+    country: country?.toUpperCase() || null,
+    limit,
+    offset,
+    prioritizedCompanies
+  });
+  return companySearchCache.get(cacheKey, () =>
+    querySearchActiveCompanies(query, country, limit, offset, prioritizedCompanies)
+  );
+}
+
+function cloneCompanyPage(page: CompanyPage): CompanyPage {
+  return { total: page.total, companies: page.companies.map((item) => ({ ...item })) };
+}
+
+// Same stale-while-revalidate policy as getJobsPage(): the grouping runs the
+// identity expressions over every live row, and /empresas SSR, its infinite
+// scroll and the dashboard autocomplete all call this.
+const companySearchCache = new StaleWhileRevalidateCache<string, CompanyPage>({
+  freshForMs: JOBS_PAGE_CACHE_FRESH_MS,
+  staleForMs: JOBS_PAGE_CACHE_STALE_MS,
+  maxEntries: JOBS_PAGE_CACHE_MAX_ENTRIES,
+  clone: cloneCompanyPage,
+  onBackgroundRefreshError: () => {
+    // Same reasoning as jobsPageCache: the key can hold user-typed text.
+    console.warn("[company-search-cache] Background refresh failed; serving the last valid page.");
+  }
+});
+
+// Canonical vacancies (same dedupe as the dashboard) -> one row per
+// (employer key, spelling) with its vacancy count.
+function companyVariantsCte(rowWhere: string[], prioritizedParam: string, prefilter = "TRUE"): string {
+  return `canonical AS MATERIALIZED (
+       SELECT DISTINCT ON (${VACANCY_IDENTITY_KEYS})
+              id, company, company_key, country, published_at
+       FROM (SELECT jobs.*, ${vacancyIdentityColumnsSql()}
+             FROM jobs WHERE is_active = TRUE AND ${liveJobSql()} AND ${prefilter}) jobs
+       ORDER BY ${VACANCY_IDENTITY_KEYS}, published_at DESC, id DESC
+     ), variants AS (
+       SELECT ${storedCompanyKeySql()} AS company_key, company, COUNT(*) AS count,
+              bool_or(company = ANY(${prioritizedParam}::text[])) AS prioritized
+       FROM canonical
+       WHERE ${rowWhere.join(" AND ")}
+       GROUP BY 1, company
+     )`;
+}
+
+// Display-name preference inside one employer group: known logo, then most
+// vacancies; on a tie, a trimmed and mixed-case spelling over "TERPEL ".
+const DISPLAY_NAME_ORDER =
+  "prioritized DESC, count DESC, (company = trim(company)) DESC, (company = upper(company)) ASC, LOWER(company), company";
+
+async function querySearchActiveCompanies(
+  query: string,
+  country: string | undefined,
+  limit: number,
+  offset: number,
+  prioritizedCompanies: string[]
+): Promise<CompanyPage> {
   const sql = createSqlParts();
-  const where = ["company IS NOT NULL", "company NOT IN ('Confidencial', 'Empresa confidencial')"];
-  const trimmed = query.trim().toLowerCase();
-  if (trimmed.length >= 2) where.push(`LOWER(company) LIKE ${sql.param(`%${trimmed}%`)}`);
-  if (country) where.push(`(country IS NULL OR country = ${sql.param(country.toUpperCase())})`);
+  const rowWhere = ["company IS NOT NULL", "trim(company) <> ''"];
+  if (country) rowWhere.push(`(country IS NULL OR country = ${sql.param(country.toUpperCase())})`);
   const prioritizedParam = sql.param(prioritizedCompanies);
+  const having = [`NOT ${isPlaceholderCompanyKeySql("company_key")}`];
+  const folded = foldSearchText(query);
+  if (folded.length >= 2) having.push(`bool_or(${foldedCompanySql()} LIKE ${sql.param(`%${folded}%`)})`);
   const limitParam = sql.param(Math.min(Math.max(limit, 1), 100));
   const offsetParam = sql.param(Math.max(offset, 0));
   const result = await pool.query(
-    `WITH canonical AS MATERIALIZED (
-       SELECT DISTINCT ON (lower(trim(title)), lower(trim(COALESCE(company, 'confidencial'))), lower(trim(COALESCE(location, CASE country WHEN 'VE' THEN 'venezuela' ELSE 'colombia' END))))
-              id, company, country, published_at
-       FROM jobs
-       WHERE is_active = TRUE AND ${liveJobSql()}
-       ORDER BY lower(trim(title)), lower(trim(COALESCE(company, 'confidencial'))), lower(trim(COALESCE(location, CASE country WHEN 'VE' THEN 'venezuela' ELSE 'colombia' END))), published_at DESC, id DESC
-     ), grouped AS (
-       SELECT company, COUNT(*) AS count
-       FROM canonical
-       WHERE ${where.join(" AND ")}
-       GROUP BY company
+    `WITH ${companyVariantsCte(rowWhere, prioritizedParam)}, grouped AS (
+       SELECT (array_agg(company ORDER BY ${DISPLAY_NAME_ORDER}))[1] AS company,
+              SUM(count) AS count,
+              bool_or(prioritized) AS prioritized
+       FROM variants
+       GROUP BY company_key
+       HAVING ${having.join(" AND ")}
      )
      SELECT company, count, COUNT(*) OVER() AS total_count
      FROM grouped
-     ORDER BY CASE WHEN company = ANY(${prioritizedParam}::text[]) THEN 0 ELSE 1 END,
+     ORDER BY CASE WHEN prioritized THEN 0 ELSE 1 END,
               count DESC, LOWER(company), company
      LIMIT ${limitParam} OFFSET ${offsetParam}`,
     sql.values
   );
   const rows = result.rows as Array<{ company: string; count: string | number; total_count: string | number }>;
   if (rows.length === 0 && offset > 0) {
-    const first = await searchActiveCompanies(query, country, 1, 0, prioritizedCompanies);
+    const first = await querySearchActiveCompanies(query, country, 1, 0, prioritizedCompanies);
     return { companies: [], total: first.total };
   }
   return {
     companies: rows.map((row) => ({ company: row.company, count: Number(row.count) })),
     total: Number(rows[0]?.total_count || 0)
   };
+}
+
+export interface CompanyGroup {
+  /** Name the directory card shows for this employer (h1, canonical URL, logo). */
+  displayName: string;
+  /** Every live spelling of the employer, display name first. */
+  variants: string[];
+}
+
+/**
+ * Resolves a raw company name (e.g. from a slug) to its employer group in
+ * this country's live corpus — same grouping and display-name rule as
+ * searchActiveCompanies(), so a company page and its directory card agree
+ * on name and count. Placeholder employers resolve only to themselves.
+ * Null when the employer has no live vacancy in this scope.
+ */
+export async function getCompanyGroup(
+  companyName: string,
+  country: string | undefined,
+  prioritizedCompanies: string[] = []
+): Promise<CompanyGroup | null> {
+  const sql = createSqlParts();
+  // The employer key is part of the vacancy identity, so narrowing to this
+  // employer before DISTINCT ON keeps the same canonical rows for it.
+  const match = companyMatchSql(sql.param(companyName));
+  const rowWhere = ["company IS NOT NULL"];
+  if (country) rowWhere.push(`(country IS NULL OR country = ${sql.param(country.toUpperCase())})`);
+  const prioritizedParam = sql.param(prioritizedCompanies);
+  const result = await pool.query(
+    `WITH ${companyVariantsCte(rowWhere, prioritizedParam, match)}
+     SELECT company FROM variants ORDER BY ${DISPLAY_NAME_ORDER}`,
+    sql.values
+  );
+  const variants = (result.rows as Array<{ company: string }>).map((row) => row.company);
+  if (variants.length === 0) return null;
+  return { displayName: variants[0], variants };
 }
 
 export async function getActiveCompanyNames(country?: string): Promise<string[]> {
@@ -878,10 +1000,10 @@ export async function getActiveCompanyNames(country?: string): Promise<string[]>
 export async function countCanonicalJobsByCompany(company: string): Promise<number> {
   const result = await pool.query(
     `SELECT COUNT(*) AS count FROM (
-       SELECT DISTINCT ON (lower(trim(title)), lower(trim(COALESCE(company, 'confidencial'))), lower(trim(COALESCE(location, CASE country WHEN 'VE' THEN 'venezuela' ELSE 'colombia' END)))) id
-       FROM jobs
-       WHERE is_active = TRUE AND ${liveJobSql()} AND company = $1
-       ORDER BY lower(trim(title)), lower(trim(COALESCE(company, 'confidencial'))), lower(trim(COALESCE(location, CASE country WHEN 'VE' THEN 'venezuela' ELSE 'colombia' END))), published_at DESC, id DESC
+       SELECT DISTINCT ON (${VACANCY_IDENTITY_KEYS}) id
+       FROM (SELECT jobs.*, ${vacancyIdentityColumnsSql()}
+             FROM jobs WHERE is_active = TRUE AND ${liveJobSql()} AND ${companyMatchSql("$1")}) jobs
+       ORDER BY ${VACANCY_IDENTITY_KEYS}, published_at DESC, id DESC
      ) canonical`,
     [company]
   );

@@ -36,6 +36,12 @@ const COMPANY_TIE_A = "ZzTest Corp Tie A";
 const COMPANY_TIE_B = "ZzTest Corp Tie B";
 const COMPANY_TIE_C = "ZzTest Corp Tie C";
 const TEST_URL_PREFIX = "https://www.example.com/job/companies-search-";
+const MERGE_DISPLAY = "ZzMerge Holdings S.A.S";
+const MERGE_CAPS = "ZZMERGE HOLDINGS SAS";
+const MERGE_COUNTRY = "ZzMerge Holdings Colombia";
+const DUP_COMPANY_A = "ZzDup Corp";
+const DUP_COMPANY_B = "ZzDup Corp S.A.S.";
+const PLACEHOLDER_VARIANTS = ["Empresa Confidencial", "CONFIDENCIAL", "-Confidencial-", "Confidencial USQ"];
 
 async function cleanupTestJobs(): Promise<void> {
   await pool.query(`DELETE FROM jobs WHERE url LIKE $1`, [`${TEST_URL_PREFIX}%`]);
@@ -78,12 +84,16 @@ function killServerTree(server: ChildProcess): void {
   }
 }
 
-function makeJob(id: string, company: string): Job {
+function makeJob(
+  id: string,
+  company: string,
+  overrides: { title?: string; location?: string } = {}
+): Job {
   return {
     jobId: id,
-    title: `Vacante de prueba ${id}`,
+    title: overrides.title ?? `Vacante de prueba ${id}`,
     company,
-    location: "Bogotá, Colombia",
+    location: overrides.location ?? "Bogotá, Colombia",
     url: `${TEST_URL_PREFIX}${id}`,
     dateText: "Hace 1 día",
     source: "LinkedIn",
@@ -108,7 +118,23 @@ async function runCompaniesSearchValidation() {
     makeJob("csearch_tie_b_0", COMPANY_TIE_B),
     makeJob("csearch_tie_c_0", COMPANY_TIE_C),
     makeJob("csearch_confidencial_0", "Confidencial"),
-    makeJob("csearch_empresa_confidencial_0", "Empresa confidencial")
+    makeJob("csearch_empresa_confidencial_0", "Empresa confidencial"),
+    // Prod spellings of undisclosed employers (2026-10-05: "Empresa
+    // Confidencial" alone was listed as a 247-vacancy company).
+    ...PLACEHOLDER_VARIANTS.map((name, i) => makeJob(`csearch_placeholder_${i}`, name)),
+    // One employer, three source spellings -> one directory entry (count 6).
+    ...Array.from({ length: 3 }, (_, i) => makeJob(`csearch_merge_sas_${i}`, MERGE_DISPLAY)),
+    ...Array.from({ length: 2 }, (_, i) => makeJob(`csearch_merge_caps_${i}`, MERGE_CAPS)),
+    makeJob("csearch_merge_country_0", MERGE_COUNTRY),
+    // The same vacancy from two sources (different employer spelling AND
+    // location format) is one vacancy; the same title in another city is
+    // a different vacancy.
+    makeJob("csearch_dup_glassdoor", DUP_COMPANY_A, { title: "Analista ZzDup", location: "Medellín" }),
+    makeJob("csearch_dup_linkedin", DUP_COMPANY_B, {
+      title: "Analista ZzDup",
+      location: "Medellin, Antioquia, Colombia"
+    }),
+    makeJob("csearch_dup_other_city", DUP_COMPANY_A, { title: "Analista ZzDup", location: "Cali, Valle del Cauca" })
   ];
   await saveJobs(jobs, "Test Companies Search");
 
@@ -133,20 +159,16 @@ async function runCompaniesSearchValidation() {
     }
     console.log(`✅ [PASSED] Substring case-insensitive funciona.`);
 
-    // Test 2: excludes the two exact placeholder strings — exact-match
-    // only, by design (regla 5 de AGENTS.md: no fusión difusa de nombres
-    // casi-duplicados). Real data has other casing variants ("Empresa
-    // Confidencial" con C mayúscula, "CONFIDENCIAL", etc.) that are
-    // legitimately different strings and are NOT expected to be excluded —
-    // this only asserts the two literal placeholders never appear.
-    console.log(`\n🔍 [Test 2] Los dos placeholders exactos nunca aparecen (variantes de casing sí)...`);
+    // Test 2: no spelling of an undisclosed employer is ever listed as a
+    // company. The old exact, case-sensitive exclusion let "Empresa
+    // Confidencial" (capital C) through as prod's 247-vacancy "company".
+    console.log(`\n🔍 [Test 2] Ninguna variante de "confidencial" aparece como empresa...`);
     const res2 = await fetch(`${BASE_URL}/api/companies/search?q=confidencial&limit=50`);
     const body2 = companySearchResponseSchema.parse(await res2.json());
-    const names2 = body2.companies.map((c) => c.company);
-    if (names2.includes("Confidencial") || names2.includes("Empresa confidencial")) {
-      throw new Error(`[Test 2] Los placeholders exactos no deben aparecer nunca. Body: ${JSON.stringify(body2)}`);
+    if (body2.companies.length !== 0) {
+      throw new Error(`[Test 2] Los placeholders no deben aparecer nunca. Body: ${JSON.stringify(body2)}`);
     }
-    console.log(`✅ [PASSED] Los dos placeholders exactos están excluidos (case-sensitive, sin fuzzy-merge).`);
+    console.log(`✅ [PASSED] Todas las variantes de placeholder están excluidas.`);
 
     // Test 3: ordered by count descending
     console.log(`\n🔍 [Test 3] Orden por conteo de vacantes descendente...`);
@@ -234,6 +256,58 @@ async function runCompaniesSearchValidation() {
       );
     }
     console.log(`✅ [PASSED] Tiebreak alfabético estable y paginación sin duplicados ni huecos.`);
+
+    // Test 7: spellings of one employer are one directory entry.
+    console.log(`\n🔍 [Test 7] Variantes de nombre (S.A.S, MAYÚSCULAS, "Colombia") = una sola empresa...`);
+    const res7 = await fetch(`${BASE_URL}/api/companies/search?q=zzmerge`);
+    const body7 = companySearchResponseSchema.parse(await res7.json());
+    if (body7.companies.length !== 1 || body7.companies[0].company !== MERGE_DISPLAY || body7.companies[0].count !== 6) {
+      throw new Error(
+        `[Test 7] Esperaba una sola entrada "${MERGE_DISPLAY}" con count=6. Body: ${JSON.stringify(body7)}`
+      );
+    }
+    console.log(`✅ [PASSED] Una entrada, nombre más frecuente, conteo sumado (6).`);
+
+    // Test 8: a query matching only one spelling still returns the whole
+    // group's count, not just that spelling's rows.
+    console.log(`\n🔍 [Test 8] Buscar por una sola variante devuelve el conteo completo del grupo...`);
+    const res8 = await fetch(`${BASE_URL}/api/companies/search?q=holdings%20colombia`);
+    const body8 = companySearchResponseSchema.parse(await res8.json());
+    const merged8 = body8.companies.find((c) => c.company === MERGE_DISPLAY);
+    if (!merged8 || merged8.count !== 6) {
+      throw new Error(`[Test 8] Esperaba ${MERGE_DISPLAY} con count=6. Body: ${JSON.stringify(body8)}`);
+    }
+    console.log(`✅ [PASSED] La búsqueda no recorta el conteo del grupo.`);
+
+    // Test 9: the company page agrees with its directory card from any
+    // variant slug — same name, same total.
+    console.log(`\n🔍 [Test 9] /api/companies/:slug desde cualquier variante = mismo nombre y total que el directorio...`);
+    for (const slug of ["zzmerge-holdings-colombia", "zzmerge-holdings-sas", "zzmerge-holdings-s-a-s"]) {
+      const res9 = await fetch(`${BASE_URL}/api/companies/${slug}?country=CO`);
+      if (res9.status !== 200) throw new Error(`[Test 9] ${slug} respondió ${res9.status}.`);
+      const body9 = (await res9.json()) as { companyName: string; total: number; jobs: unknown[] };
+      if (body9.companyName !== MERGE_DISPLAY || body9.total !== 6 || body9.jobs.length !== 6) {
+        throw new Error(
+          `[Test 9] ${slug}: esperaba ${MERGE_DISPLAY} con total=6, llegó ${body9.companyName} total=${body9.total} jobs=${body9.jobs.length}.`
+        );
+      }
+    }
+    console.log(`✅ [PASSED] Página de empresa y directorio coinciden desde cualquier variante.`);
+
+    // Test 10: same vacancy from two sources (employer spelling + location
+    // format differ) is listed once; same title in another city stays.
+    console.log(`\n🔍 [Test 10] La misma vacante de dos fuentes cuenta una vez; otra ciudad cuenta aparte...`);
+    const res10 = await fetch(`${BASE_URL}/api/companies/search?q=zzdup`);
+    const body10 = companySearchResponseSchema.parse(await res10.json());
+    if (body10.companies.length !== 1 || body10.companies[0].count !== 2) {
+      throw new Error(`[Test 10] Esperaba una empresa ZzDup con count=2 (Medellín + Cali). Body: ${JSON.stringify(body10)}`);
+    }
+    const res10b = await fetch(`${BASE_URL}/api/jobs?company=${encodeURIComponent(DUP_COMPANY_B)}&country=CO&limit=50`);
+    const body10b = (await res10b.json()) as { jobs: Array<{ title: string; location: string }>; total: number };
+    if (body10b.total !== 2 || body10b.jobs.length !== 2) {
+      throw new Error(`[Test 10] El filtro de empresa debía devolver 2 vacantes, llegó ${JSON.stringify(body10b)}.`);
+    }
+    console.log(`✅ [PASSED] Duplicado entre fuentes colapsado; ciudades distintas se conservan.`);
 
     console.log(`\n==================================================`);
     console.log(`🎉 [TEST SUITE PASSED] GET /api/companies/search (Fase E4) verificado contra el servidor HTTP real.`);

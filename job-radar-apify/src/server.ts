@@ -10,6 +10,7 @@ import {
   getJobById,
   isJobExpiredInPlace,
   getActiveCompanyNames,
+  getCompanyGroup,
   searchActiveCompanies,
   maskLockedFields,
   updateUserName,
@@ -308,6 +309,35 @@ async function attachReputation<T extends { company: string | null }>(
     ...job,
     reputation: job.company ? reputationMap.get(job.company) || [] : []
   }));
+}
+
+interface CompanyView {
+  displayName: string;
+  logoUrl: string | null;
+  reputation: ReputationEntry[];
+}
+
+// Company page (API + SSR): one employer, whatever spelling the slug came
+// from. The curated reputation alias table is keyed by exact raw names, so
+// reputation is looked up for every live spelling (plus the resolved name)
+// and kept once per source — the badge must not vanish just because the
+// display name is "Accenture Colombia" while the alias row says "Accenture".
+async function resolveCompanyView(resolvedName: string, country: string | undefined): Promise<CompanyView> {
+  const group = await getCompanyGroup(resolvedName, country, Object.keys(COMPANY_LOGO_DOMAINS));
+  const displayName = group?.displayName ?? resolvedName;
+  const names = [...new Set([displayName, ...(group?.variants ?? []), resolvedName])];
+  const reputationMap = await getReputationForCompanies(names);
+  const seenSources = new Set<string>();
+  const reputation: ReputationEntry[] = [];
+  for (const name of names) {
+    for (const entry of reputationMap.get(name) || []) {
+      if (seenSources.has(entry.source)) continue;
+      seenSources.add(entry.source);
+      reputation.push(entry);
+    }
+  }
+  const logoUrl = names.map((name) => getCompanyLogoUrl(name)).find(Boolean) ?? null;
+  return { displayName, logoUrl, reputation };
 }
 
 // Mirrors ReputationBadges.tsx's SOURCE_LABELS exactly (that file's own
@@ -833,17 +863,20 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     // against this country-scoped view, so a slug that only resolves via a
     // job from the other country correctly falls through to the 404 below
     // instead of resolving into a company page with zero jobs to show.
-    const companyName =
+    const resolvedName =
       (await resolveCompanyBySlug(slug)) ||
       resolveCompanyNameFromJobs(
         slug,
         companyNames.map((company) => ({ company }))
       );
-    if (!companyName) {
+    if (!resolvedName) {
       res.writeHead(404, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: "Empresa no encontrada" }));
       return;
     }
+    // Same employer grouping as the /empresas directory (see the SSR branch).
+    const companyView = await resolveCompanyView(resolvedName, country);
+    const companyName = companyView.displayName;
 
     const matched = await getJobsPage({
       filters: { company: companyName, country },
@@ -863,14 +896,13 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       return;
     }
     const page = maskLockedFields(matched.jobs, tier);
-    const reputationMap = await getReputationForCompanies([companyName]);
 
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(
       JSON.stringify({
         companyName,
-        logoUrl: getCompanyLogoUrl(companyName),
-        reputation: reputationMap.get(companyName) || [],
+        logoUrl: companyView.logoUrl,
+        reputation: companyView.reputation,
         jobs: page,
         total: matched.total
       })
@@ -2482,19 +2514,24 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     // API handler below), so SSR never disagrees with what the client
     // fetch would have shown.
     const companyNames = await getActiveCompanyNames(requestCountry);
-    const companyName =
+    const resolvedName =
       (await resolveCompanyBySlug(slug)) ||
       resolveCompanyNameFromJobs(
         slug,
         companyNames.map((company) => ({ company }))
       );
-    if (!companyName) {
+    if (!resolvedName) {
       res.writeHead(404, { "Content-Type": "text/html; charset=utf-8" });
       res.end(
         '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Empresa no encontrada | BuscoTrabajo</title><meta name="robots" content="noindex"></head><body><h1>Empresa no encontrada</h1><p><a href="/dashboard">Ver todas las vacantes</a></p></body></html>'
       );
       return;
     }
+    // Every spelling of the employer ("accenture" and "accenture-colombia")
+    // renders the same page under the directory's display name, and its
+    // canonical URL points at that one slug.
+    const companyView = await resolveCompanyView(resolvedName, requestCountry);
+    const companyName = companyView.displayName;
 
     const matched = await getJobsPage({
       filters: { company: companyName, country: requestCountry },
@@ -2518,8 +2555,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     // branches already apply.
     const page = maskLockedFields(matched.jobs, "free").filter(isPubliclyDescribable);
 
-    const reputationMap = await getReputationForCompanies([companyName]);
-    const reputation = reputationMap.get(companyName) || [];
+    const reputation = companyView.reputation;
     const meta = buildCompanyMeta(companyName, matched.total, requestCountry);
 
     const reputationItems = reputation
@@ -2550,7 +2586,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       slug,
       country: requestCountry,
       companyName,
-      logoUrl: getCompanyLogoUrl(companyName),
+      logoUrl: companyView.logoUrl,
       reputation,
       jobs: page,
       total: matched.total

@@ -1265,6 +1265,29 @@ publicación: una vacante visible ya no es automáticamente candidata para Googl
 declararlo listo en producción: migración autorizada, clasificación, despliegue, limpieza de la cola,
 `/seo drift compare` y Rich Results Test (§8 de la arquitectura).
 
+### 1.24 Empresas y vacantes repetidas por variantes de nombre (2026-10-05, rama `fix/companies-dedupe`, sin desplegar)
+
+Bug reportado por el usuario y medido en producción: el directorio agrupaba por
+`company` literal, así que cada forma de escribir el mismo empleador era otra empresa
+(`Accenture Colombia` 64 / `Accenture` 14 / `Accenture Ltda`; `ACTIVOS S.A.S` 100 /
+`ACTIVOS S A S` 74; 75 grupos así en las primeras 1.440 empresas), y la deduplicación de
+vacantes (`title`+`company`+`location` con `lower(trim())`) dejaba la misma oferta dos veces
+cuando las fuentes escribían distinto la empresa o la ciudad (`Medellín` vs `Medellin,
+Antioquia, Colombia`). Además, `Empresa Confidencial` (247) y otras 15 variantes de
+"confidencial" salían como empresa porque la exclusión era exacta y sensible a mayúsculas.
+
+Fix: claves de identidad guardadas (`jobs.title_key/company_key/location_key`, trigger +
+`scripts/migrate-company-identity.ts`, ver `src/lib/company-identity.ts`), usadas por el
+directorio, `/empresas/:slug`, el filtro por empresa y el dashboard. Solo pliegan formato
+(mayúsculas, tildes, puntuación, sufijo societario, país final, cola región/país de la
+ubicación); nunca fusionan palabras distintas ni la misma vacante en ciudades distintas.
+
+Efecto SEO: `/empresas/:slug` de cualquier variante (`/empresas/accenture` y
+`/empresas/accenture-colombia`) muestra el mismo contenido y su `canonical`/H1/JSON-LD apuntan
+al nombre que muestra el directorio. Sitemap, `content_fingerprint`, `canonicalSql` y
+`/empleos/:id` no cambian. Pendiente tras desplegar: `/seo drift compare` sobre las URLs de
+baseline + una página de empresa con variantes.
+
 ## 2. Primer paso al reiniciar sesión: baseline de `seo-drift`
 
 Antes de cualquier fase nueva de la tabla de abajo, capturar un baseline

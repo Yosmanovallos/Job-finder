@@ -46,6 +46,13 @@ export default function CompaniesDirectory() {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   const requestIdRef = useRef(0);
+  // Next page offset, tracked apart from companies.length because appended
+  // pages are de-duplicated (a company can shift across a page boundary when
+  // counts change between requests), and a synchronous in-flight flag: the
+  // isLoadingMore state only updates after a render, so two observer
+  // callbacks in a row used to fetch — and append — the same page twice.
+  const nextOffsetRef = useRef(0);
+  const loadingMoreRef = useRef(false);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -79,7 +86,9 @@ export default function CompaniesDirectory() {
     const ssrCompanies = (window as any).__SSR_COMPANIES__;
     delete (window as any).__SSR_COMPANIES__;
     if (ssrCompanies && ssrCompanies.country === country && debouncedSearch.trim() === "") {
-      setCompanies(Array.isArray(ssrCompanies.companies) ? ssrCompanies.companies : []);
+      const ssrList = Array.isArray(ssrCompanies.companies) ? ssrCompanies.companies : [];
+      nextOffsetRef.current = ssrList.length;
+      setCompanies(ssrList);
       setTotal(ssrCompanies.total || 0);
       setHasMore(!!ssrCompanies.hasMore);
       setIsLoading(false);
@@ -88,12 +97,15 @@ export default function CompaniesDirectory() {
 
     setIsLoading(true);
     setCompanies([]);
+    nextOffsetRef.current = 0;
 
     fetch(`/api/companies/search?${buildQuery(0)}`)
       .then((res) => (res.ok ? res.json() : { companies: [], total: 0, hasMore: false }))
       .then((data) => {
         if (myRequestId !== requestIdRef.current) return;
-        setCompanies(Array.isArray(data.companies) ? data.companies : []);
+        const firstPage = Array.isArray(data.companies) ? data.companies : [];
+        nextOffsetRef.current = firstPage.length;
+        setCompanies(firstPage);
         setTotal(data.total || 0);
         setHasMore(!!data.hasMore);
       })
@@ -109,20 +121,30 @@ export default function CompaniesDirectory() {
   }, [buildQuery]);
 
   const loadMore = useCallback(() => {
-    if (isLoadingMore || !hasMore) return;
+    if (loadingMoreRef.current || !hasMore) return;
     const myRequestId = requestIdRef.current;
+    const offset = nextOffsetRef.current;
+    loadingMoreRef.current = true;
     setIsLoadingMore(true);
 
-    fetch(`/api/companies/search?${buildQuery(companies.length)}`)
+    fetch(`/api/companies/search?${buildQuery(offset)}`)
       .then((res) => (res.ok ? res.json() : { companies: [], hasMore: false }))
       .then((data) => {
         if (myRequestId !== requestIdRef.current) return;
-        setCompanies((prev) => [...prev, ...(Array.isArray(data.companies) ? data.companies : [])]);
-        setHasMore(!!data.hasMore);
+        const pageItems: CompanyResult[] = Array.isArray(data.companies) ? data.companies : [];
+        nextOffsetRef.current = offset + pageItems.length;
+        setCompanies((prev) => {
+          const seen = new Set(prev.map((c) => c.company));
+          return [...prev, ...pageItems.filter((c) => !seen.has(c.company))];
+        });
+        setHasMore(!!data.hasMore && pageItems.length > 0);
       })
       .catch(() => {})
-      .finally(() => setIsLoadingMore(false));
-  }, [buildQuery, companies.length, hasMore, isLoadingMore]);
+      .finally(() => {
+        loadingMoreRef.current = false;
+        setIsLoadingMore(false);
+      });
+  }, [buildQuery, hasMore]);
 
   // Same stale-observer guard as Dashboard.tsx's infinite scroll: loadMore's
   // identity changes every time companies.length/hasMore update, so the

@@ -646,6 +646,29 @@ CREATE INDEX IF NOT EXISTS idx_expired_job_urls_expired_at ON expired_job_urls (
 ALTER TABLE expired_job_urls ENABLE ROW LEVEL SECURITY;
 -- END job-freshness
 
+-- BEGIN company-identity
+-- Claves de identidad de empresa/vacante (src/lib/company-identity.ts,
+-- 2026-10-05). Aditivo e idempotente; lo aplica
+-- scripts/migrate-company-identity.ts (que además rellena las filas viejas).
+-- GENERADO desde companyIdentitySchemaSql(): no editar a mano —
+-- tests/validate-company-identity.test.ts exige que coincidan byte a byte.
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS title_key TEXT;
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS company_key TEXT;
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS location_key TEXT;
+CREATE OR REPLACE FUNCTION jobs_set_identity_keys() RETURNS trigger LANGUAGE plpgsql AS $fn$
+BEGIN
+  NEW.title_key := regexp_replace(translate(lower(COALESCE(NEW.title, '')), 'áàäâãåāéèëêēíìïîīóòöôõōúùüûūñç', 'aaaaaaaeeeeeiiiiioooooouuuuunc'), '[^a-z0-9]+', '', 'g');
+  NEW.company_key := replace(regexp_replace(regexp_replace(regexp_replace(trim(regexp_replace(translate(lower(COALESCE(NEW.company, 'confidencial')), 'áàäâãåāéèëêēíìïîīóòöôõōúùüûūñç', 'aaaaaaaeeeeeiiiiioooooouuuuunc'), '[^a-z0-9]+', ' ', 'g')), '( (s a s|sas|s a|sa|ltda|limitada|e s p|esp|bic|inc|llc|ltd|corp|s de r l|srl|ca|c a))+$', ''), '(?<! de| del) (colombia|venezuela)$', ''), '( (s a s|sas|s a|sa|ltda|limitada|e s p|esp|bic|inc|llc|ltd|corp|s de r l|srl|ca|c a))+$', ''), ' ', '');
+  NEW.location_key := replace(regexp_replace(trim(regexp_replace(split_part(translate(lower(COALESCE(NULLIF(trim(NEW.location), ''), CASE NEW.country WHEN 'VE' THEN 'venezuela' ELSE 'colombia' END)), 'áàäâãåāéèëêēíìïîīóòöôõōúùüûūñç', 'aaaaaaaeeeeeiiiiioooooouuuuunc'), ',', 1), '[^a-z0-9]+', ' ', 'g')), '^(greater |area metropolitana (de |del )?)| (metropolitan area|area metropolitana|d c)$', '', 'g'), ' ', '');
+  RETURN NEW;
+END
+$fn$;
+DROP TRIGGER IF EXISTS trg_jobs_identity_keys ON jobs;
+CREATE TRIGGER trg_jobs_identity_keys
+  BEFORE INSERT OR UPDATE OF title, company, location, country ON jobs
+  FOR EACH ROW EXECUTE FUNCTION jobs_set_identity_keys();
+-- END company-identity
+
 -- =============================================================================
 -- ROW LEVEL SECURITY: every read/write from this app goes through the `pool`
 -- (direct `pg` connection as the `postgres` role, which has BYPASSRLS — see
