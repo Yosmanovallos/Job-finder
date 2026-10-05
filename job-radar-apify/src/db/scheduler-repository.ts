@@ -140,15 +140,38 @@ export async function markGlobalSourceRun(sourceName: string): Promise<void> {
 // the only point that can ever notify Google those pages are now dead (SEO
 // Fase 3 — see indexing-repository.ts). `is_active` is NOT part of this: it
 // is only ever set by the one-off scripts/migrate-dedupe.ts cleanup, never
-// flipped as part of normal ingestion — a hard DELETE here is the real (and
-// only) expiration signal in this codebase.
+// flipped as part of normal ingestion — a hard DELETE is the expiration
+// signal in this codebase. Since 2026-10-04 there are two: this age purge
+// and deleteClosedJobs() below (the source itself says the posting closed).
 export async function purgeOldJobs(): Promise<number> {
   const result = await pool.query(
     `DELETE FROM jobs WHERE last_seen_at < NOW() - INTERVAL '30 days'
      RETURNING id, title, company, location, url, source, published_at`
   );
+  await recordRemovedJobs(result.rows, "purgeOldJobs");
+  return result.rowCount ?? 0;
+}
 
-  const deleted = result.rows
+/**
+ * Hard-deletes jobs the SOURCE confirmed closed (see src/queue/source-closure.ts),
+ * through exactly the same tombstone/URL_DELETED path as the age purge, so a
+ * closed posting's page answers 410 and leaves the sitemap the same way an
+ * expired one does. `is_active = TRUE` in the WHERE keeps a concurrent dedupe
+ * cleanup from being double-processed.
+ */
+export async function deleteClosedJobs(jobIds: string[]): Promise<number> {
+  if (jobIds.length === 0) return 0;
+  const result = await pool.query(
+    `DELETE FROM jobs WHERE id = ANY($1::uuid[]) AND is_active = TRUE
+     RETURNING id, title, company, location, url, source, published_at`,
+    [jobIds]
+  );
+  await recordRemovedJobs(result.rows, "deleteClosedJobs");
+  return result.rowCount ?? 0;
+}
+
+async function recordRemovedJobs(rows: any[], caller: string): Promise<void> {
+  const deleted = rows
     .map((row) => ({
       jobId: row.id,
       title: row.title,
@@ -198,9 +221,7 @@ export async function purgeOldJobs(): Promise<number> {
         [urls]
       );
     } catch (err) {
-      console.warn(`⚠️ [purgeOldJobs] Failed to enqueue URL_DELETED notifications:`, err);
+      console.warn(`⚠️ [${caller}] Failed to enqueue URL_DELETED notifications:`, err);
     }
   }
-
-  return result.rowCount ?? 0;
 }

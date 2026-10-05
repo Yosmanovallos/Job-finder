@@ -73,13 +73,23 @@ export const SOURCE_CADENCE_MS: Record<string, number> = {
 // identical requests for zero differentiation. Now fetched once per
 // window like RemoteOK/GetOnBoard. 4h — no official rate limit published,
 // matches WeRemoto's conservative default for a source with no clear SLA.
+//
+// Jooble unscheduled (2026-10-04), CO and VE: with the current key the API
+// only covers the US. Verified with the real key: `location: "co"` returns
+// Colorado, USA (75329 results, every sampled `location` = "Colorado");
+// "Colombia" and "Bogotá, Colombia" return totalCount 0; co.jooble.org's API
+// answers 403/400. Every Jooble job was being rejected by KNOWN_SOURCES anyway
+// — which is the only thing that kept Colorado jobs off a Colombian board —
+// while each call spent the key's fixed ~500-request budget. Re-add only with
+// a key that verifiably returns Colombian locations, AND add 'Jooble' to
+// KNOWN_SOURCES in src/db/job-validator.ts in the same change.
 export const GLOBAL_SOURCE_CADENCE_MS: Record<string, number> = {
   RemoteOK: 1 * HOUR_MS,
   GetOnBoard: 1 * HOUR_MS,
-  Jooble: 6 * HOUR_MS,
   WeRemoto: 4 * HOUR_MS,
   Remotive: 4 * HOUR_MS,
-  WorkanaV2: 3 * HOUR_MS
+  WorkanaV2: 3 * HOUR_MS,
+  Jooble: 6 * HOUR_MS
 };
 
 // --- Venezuela (backlog/venezuela-expansion.md, Día 1) ----------------------
@@ -104,7 +114,8 @@ export const SOURCE_CADENCE_MS_VE: Record<string, number> = {
 // VE's tick fetch the identical catalog again would double the request
 // volume for zero new coverage. Jooble is different: its API takes a
 // location filter, so Jooble-VE's response is genuinely distinct content
-// from CO's Jooble fetch, not a re-fetch of the same catalog.
-export const GLOBAL_SOURCE_CADENCE_MS_VE: Record<string, number> = {
-  "Jooble-VE": 6 * HOUR_MS
-};
+// from CO's Jooble fetch, not a re-fetch of the same catalog. Jooble-VE is
+// unscheduled for the same reason as Jooble above (US-only key; "Venezuela"
+// has always returned 0), which leaves this map empty — getDueGlobalSources
+// returns [] for it without querying.
+export const GLOBAL_SOURCE_CADENCE_MS_VE: Record<string, number> = {};

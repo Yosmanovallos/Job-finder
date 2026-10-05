@@ -107,7 +107,7 @@ function parseJobviews(html: string, now: number, fallbackLocationName: string):
     const chunk = chunks[i];
     const ageInDays = numField(chunk, "ageInDays");
     const title = field(chunk, "jobTitleText");
-    if (ageInDays === null || ageInDays > 1 || !title) continue;
+    if (ageInDays === null || ageInDays > 2 || !title) continue;
 
     const company = field(chunk, "employerNameFromSearch") || "Confidencial";
     const location = field(chunk, "locationName") || fallbackLocationName;
@@ -155,7 +155,7 @@ export async function scrapeGlassdoorBrowser(country: Country = "CO"): Promise<G
   }
 
   for (const { slug, locationId } of config.cities) {
-    await sleep(1500);
+    await sleep(2500 + Math.floor(Math.random() * 1500));
     const url = `https://www.glassdoor.com/Job/${slug}-jobs-SRCH_IL.0,${slug.length}_IC${locationId}.htm?fromAge=1`;
     try {
       const html = await browserFetch(url);

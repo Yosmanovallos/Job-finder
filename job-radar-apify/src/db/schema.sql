@@ -616,6 +616,17 @@ BEGIN
 END $$;
 -- END job-seo-v2
 
+-- BEGIN source-closure
+-- Cierre confirmado por la fuente (src/queue/source-closure.ts, 2026-10-04).
+-- Aditivo e idempotente; lo aplica scripts/migrate-source-closure.ts.
+-- source_checked_at = última vez que se le preguntó a la FUENTE si la vacante
+-- sigue abierta. NULL = nunca. Es solo el cursor de rotación del chequeo: no
+-- cambia visibilidad, SEO ni orden del dashboard.
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS source_checked_at TIMESTAMPTZ;
+CREATE INDEX IF NOT EXISTS idx_jobs_source_closure
+  ON jobs (source, source_checked_at NULLS FIRST, published_at) WHERE is_active = TRUE;
+-- END source-closure
+
 -- =============================================================================
 -- ROW LEVEL SECURITY: every read/write from this app goes through the `pool`
 -- (direct `pg` connection as the `postgres` role, which has BYPASSRLS — see

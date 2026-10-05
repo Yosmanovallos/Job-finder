@@ -126,7 +126,7 @@ async function getBrowser(browserSource: string = DEFAULT_BROWSER_SOURCE): Promi
   sharedBrowser = await chromium.launch({
     headless: true,
     executablePath: chromium.executablePath(),
-    args: ["--no-sandbox"],
+    args: ["--no-sandbox", "--disable-blink-features=AutomationControlled"],
     env: { ...process.env, LD_LIBRARY_PATH: `${libDir}:${process.env.LD_LIBRARY_PATH || ""}` },
     proxy: parseProxyUrl(proxyUrl),
   });
@@ -148,7 +148,7 @@ export async function closeBrowser(): Promise<void> {
  * which is what the browser's first response carries, same as a plain HTTP
  * fetch would (just able to actually get a 200 instead of a block).
  *
- * Retries once on failure (403/timeout/connection error). This is safe to
+ * Retries on failure (403/timeout/connection error) with backoff. This is safe to
  * do more freely than the fast tick's retry policy (gsFetch/executeWithResilience
  * fail fast on 401/403, deliberately not retrying a "no") because a
  * Rotating Residential proxy hands out a fresh exit IP per new browser
@@ -163,8 +163,9 @@ async function browserFetchOnce(url: string, timeoutMs: number): Promise<string>
   const browser = await getBrowser();
   const context = await browser.newContext({
     userAgent:
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
     locale: "es-CO",
+    timezoneId: "America/Bogota",
   });
   try {
     const page = await context.newPage();
@@ -183,12 +184,21 @@ async function browserFetchOnce(url: string, timeoutMs: number): Promise<string>
   }
 }
 
-export async function browserFetch(url: string, timeoutMs = 30_000): Promise<string> {
-  try {
-    return await browserFetchOnce(url, timeoutMs);
-  } catch (firstError: any) {
-    console.warn(`[browser-fetch] First attempt failed for ${url}: ${firstError.message} — retrying once (fresh proxy IP)...`);
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    return await browserFetchOnce(url, timeoutMs);
+export async function browserFetch(url: string, timeoutMs = 30_000, maxRetries = 2): Promise<string> {
+  let lastError: any;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await browserFetchOnce(url, timeoutMs);
+    } catch (err: any) {
+      lastError = err;
+      if (attempt < maxRetries) {
+        const backoffMs = (attempt + 1) * 2000;
+        console.warn(
+          `[browser-fetch] Attempt ${attempt + 1} failed for ${url}: ${err.message} — retrying in ${backoffMs}ms (fresh proxy IP)...`
+        );
+        await new Promise((resolve) => setTimeout(resolve, backoffMs));
+      }
+    }
   }
+  throw lastError;
 }

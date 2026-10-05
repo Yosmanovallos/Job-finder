@@ -24,7 +24,8 @@ const suites: Record<string, string[]> = {
     "validate-run-telemetry.test.ts",
     "validate-fetch-context.test.ts",
     "validate-source-contract.test.ts",
-    "validate-agent-readiness.test.ts"
+    "validate-agent-readiness.test.ts",
+    "validate-source-closure.test.ts"
   ],
   integration: [
     "validate-isolated-database.ts",
@@ -36,8 +37,10 @@ const suites: Record<string, string[]> = {
     "validate-execution-deadlines.ts",
     "validate-source-contract.ts",
     "validate-agent-readiness.ts",
-    "validate-job-seo-v2.ts"
+    "validate-job-seo-v2.ts",
+    "validate-source-closure.ts"
   ],
+  "source-closure": ["validate-source-closure.test.ts", "validate-source-closure.ts"],
   sitemap: ["validate-sitemap-streaming.ts"],
   observability: ["validate-run-observability.ts"],
   pagination: ["validate-job-pagination.ts"],
@@ -54,7 +57,7 @@ const suites: Record<string, string[]> = {
 const selection = process.argv[2] || "unit";
 if (!Object.hasOwn(suites, selection) || process.argv.slice(3).some((arg) => arg !== "--dry-run")) {
   throw new Error(
-    "[P0] Suite inválida. Usa unit, integration, sitemap, observability, pagination, seo, companies, baseline, agent-readiness o job-seo; --dry-run es opcional."
+    "[P0] Suite inválida. Usa unit, integration, sitemap, observability, pagination, seo, companies, baseline, agent-readiness, job-seo o source-closure; --dry-run es opcional."
   );
 }
 

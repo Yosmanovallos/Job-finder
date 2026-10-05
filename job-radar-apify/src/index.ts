@@ -593,87 +593,126 @@ const TORRE_COMMITMENT_LABELS: Record<string, string> = {
 
 export async function scrapeTorre(keyword: string): Promise<Job[]> {
   console.log(`[Torre] Searching for keyword "${keyword}"...`);
-  const url = "https://search.torre.co/opportunities/_search?offset=0&size=20";
-  const body = {
-    "skill/role": { text: keyword, experience: "1-plus-year" }
-  };
+  // Torre migrated /opportunities/_search to torre.ai behind X-Torre-Gateway: paladin
+  // with personalized AI matching (bestfor query). Verified 2026-10-04: unauthenticated
+  // requests work with public Torre personas ("emma", "torreBotCrawler") or custom TORRE_USERNAME.
+  const url =
+    "https://torre.ai/api/search/opportunities/_search?currency=USD&periodicity=hourly&lang=en&size=20&aggregate=false&contextFeature=generative_job_search";
 
-  try {
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "User-Agent": pickUserAgent()
-      },
-      body: JSON.stringify(body)
-    });
+  const usernames = Array.from(
+    new Set(
+      [process.env.TORRE_USERNAME?.trim(), "emma", "torreBotCrawler"].filter(
+        (u): u is string => typeof u === "string" && u.length > 0
+      )
+    )
+  );
 
-    if (!response.ok) {
-      console.warn(`[Torre] Failed: ${response.status} ${response.statusText}`);
-      return [];
-    }
-
-    const data: any = await response.json();
-    const jobs: Job[] = [];
-    const now = new Date();
-
-    if (data.results && Array.isArray(data.results)) {
-      for (const item of data.results) {
-        let createdDate = now;
-        if (item.created) {
-          createdDate = new Date(item.created);
-          const ageInMs = now.getTime() - createdDate.getTime();
-          const ageInDays = ageInMs / (1000 * 60 * 60 * 24);
-          if (ageInDays > 14) continue; // max 14 days old
-        }
-
-        const locations = item.locations || [];
-        const isColombia = locations.some((loc: string) => loc.toLowerCase().includes("colombia"));
-        const isRemote = item.remote === true || locations.length === 0;
-
-        if (isColombia || isRemote) {
-          const skills: string[] = Array.isArray(item.skills)
-            ? item.skills.map((s: any) => s?.name).filter((n: unknown): n is string => typeof n === "string")
-            : [];
-
-          jobs.push({
-            jobId: item.id,
-            title: htmlEntities(item.objective || "Oportunidad Torre"),
-            company: htmlEntities(item.organizations?.[0]?.name || "Confidencial"),
-            location: isRemote ? "Remoto" : locations.join(", "),
-            url: `https://torre.ai/jobs/${item.id}`,
-            dateText: "Reciente",
-            source: "Torre",
-            // Full timestamp, not just the calendar date — Torre's API gives
-            // real hour/minute precision via `item.created`; truncating it
-            // discards exactly what the 24h/48h dashboard filter needs.
-            publishedAt: createdDate.toISOString(),
-            // `tagline` is Torre's own short plain-text summary — not HTML,
-            // so no extractStructuredFromHtml needed here.
-            description: item.tagline ? htmlEntities(item.tagline).trim() : undefined,
-            // A one-sentence tagline is a teaser, not the posting (Job SEO V2,
-            // docs/JOB-DETAIL-ENRICHMENT.md): stated here so the Google gate
-            // never mistakes it for a complete description.
-            descriptionKind: "snippet",
-            // Only Torre's own flag counts as "fully remote". An empty
-            // `locations` array still shows as "Remoto" in the UI (unchanged
-            // behavior), but it is not source evidence of remote work.
-            remoteType: item.remote === true ? "fully_remote" : undefined,
-            technologies: skills.length > 0 ? skills : undefined,
-            employmentType: TORRE_COMMITMENT_LABELS[item.commitment as string]
-            // item.compensation.data comes back null/hidden on every live
-            // result seen so far (2026-08-11) — no confirmed field shape to
-            // map salaryMin/salaryMax from, so left out rather than guessed.
-          });
+  for (const username of usernames) {
+    const andFilters: any[] = [
+      {
+        bestfor: {
+          username,
+          context: { contextFeature: "generative_job_search" }
         }
       }
+    ];
+
+    if (keyword && keyword.trim()) {
+      andFilters.push({
+        "skill/role": {
+          text: keyword.trim(),
+          experience: "potential-to-develop"
+        }
+      });
     }
-    console.log(`[Torre] Found ${jobs.length} jobs.`);
-    return jobs;
-  } catch (error) {
-    console.error("[Torre] Fetch error:", error);
-    return [];
+
+    andFilters.push({
+      status: { code: "open" }
+    });
+
+    const body = { and: andFilters };
+
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          "X-Torre-Gateway": "paladin",
+          "User-Agent": pickUserAgent()
+        },
+        body: JSON.stringify(body)
+      });
+
+      if (!response.ok) {
+        console.warn(`[Torre] (${username}) Failed: ${response.status} ${response.statusText}`);
+        continue;
+      }
+
+      const data: any = await response.json();
+      const jobs: Job[] = [];
+      const now = new Date();
+
+      if (data.results && Array.isArray(data.results)) {
+        for (const item of data.results) {
+          let createdDate = now;
+          if (item.created) {
+            createdDate = new Date(item.created);
+            const ageInMs = now.getTime() - createdDate.getTime();
+            const ageInDays = ageInMs / (1000 * 60 * 60 * 24);
+            if (ageInDays > 14) continue; // max 14 days old
+          }
+
+          const locations = item.locations || [];
+          const isColombia = locations.some((loc: string) => loc.toLowerCase().includes("colombia"));
+          const isRemote = item.remote === true || locations.length === 0;
+
+          if (isColombia || isRemote) {
+            const skills: string[] = Array.isArray(item.skills)
+              ? item.skills.map((s: any) => s?.name).filter((n: unknown): n is string => typeof n === "string")
+              : [];
+
+            jobs.push({
+              jobId: item.id,
+              title: htmlEntities(item.objective || "Oportunidad Torre"),
+              company: htmlEntities(item.organizations?.[0]?.name || "Confidencial"),
+              location: isRemote ? "Remoto" : locations.join(", "),
+              url: `https://torre.ai/jobs/${item.id}`,
+              dateText: "Reciente",
+              source: "Torre",
+              // Full timestamp, not just the calendar date — Torre's API gives
+              // real hour/minute precision via `item.created`; truncating it
+              // discards exactly what the 24h/48h dashboard filter needs.
+              publishedAt: createdDate.toISOString(),
+              // `tagline` is Torre's own short plain-text summary — not HTML,
+              // so no extractStructuredFromHtml needed here.
+              description: item.tagline ? htmlEntities(item.tagline).trim() : undefined,
+              // A one-sentence tagline is a teaser, not the posting (Job SEO V2,
+              // docs/JOB-DETAIL-ENRICHMENT.md): stated here so the Google gate
+              // never mistakes it for a complete description.
+              descriptionKind: "snippet",
+              // Only Torre's own flag counts as "fully remote". An empty
+              // `locations` array still shows as "Remoto" in the UI (unchanged
+              // behavior), but it is not source evidence of remote work.
+              remoteType: item.remote === true ? "fully_remote" : undefined,
+              technologies: skills.length > 0 ? skills : undefined,
+              employmentType: TORRE_COMMITMENT_LABELS[item.commitment as string]
+              // item.compensation.data comes back null/hidden on every live
+              // result seen so far (2026-08-11) — no confirmed field shape to
+              // map salaryMin/salaryMax from, so left out rather than guessed.
+            });
+          }
+        }
+      }
+      console.log(`[Torre] Found ${jobs.length} jobs.`);
+      return jobs;
+    } catch (error) {
+      console.error(`[Torre] (${username}) Fetch error:`, error);
+      continue;
+    }
   }
+
+  return [];
 }
 
 // Scrape Workana Colombia/Remote directly from HTML options payload.
@@ -1278,6 +1317,13 @@ export async function scrapeRemotive(): Promise<Job[]> {
 // WeRemoto pattern of one full-catalog fetch per window (see
 // GLOBAL_SOURCE_CADENCE_MS). That was never the bug.
 //
+// ⚠️ CORRECTED 2026-10-04: the conclusion below is wrong. "co" is parsed as
+// the US state of Colorado, not Colombia — every sampled result's `location`
+// was "Colorado" (QMAP, RN, Sandwich Artist...), and co.jooble.org's API
+// answers 403/400 with this key. This key has no Colombian inventory at all,
+// which is why Jooble/Jooble-VE are no longer scheduled (see
+// GLOBAL_SOURCE_CADENCE_MS in src/queue/source-cadence.ts). Original note:
+//
 // The actual root cause of "always 0 jobs" (also confirmed live, same
 // session): `location` needs an ISO country code ("co"), NOT the full
 // country name. `location: "Colombia"` returns `totalCount: 0` every
@@ -1299,8 +1345,8 @@ export async function scrapeRemotive(): Promise<Job[]> {
 // passing "Venezuela" — changing the string doesn't fix a coverage gap,
 // and future evidence otherwise is easy to test against the live API
 // again if Jooble ever adds Venezuela.
-export async function scrapeJooble(locationQuery: string = "co"): Promise<Job[]> {
-  const apiKey = process.env.JOOBLE_API_KEY;
+export async function scrapeJooble(locationQuery: string = "Colombia"): Promise<Job[]> {
+  const apiKey = process.env.JOOBLE_API_KEY_CO || process.env.JOOBLE_API_KEY;
   if (!apiKey) {
     console.warn("[Jooble] JOOBLE_API_KEY no configurada — omitiendo (fuente opcional).");
     // P2: tells the run telemetry this `[]` is a configuration gap, not an empty feed.
@@ -1308,65 +1354,98 @@ export async function scrapeJooble(locationQuery: string = "co"): Promise<Job[]>
     return [];
   }
 
-  console.log(`[Jooble] Fetching postings for "${locationQuery}"...`);
+  // Jooble uses per-country regional subdomains (e.g. co.jooble.org, ve.jooble.org, jooble.org).
+  // A key registered on jooble.org only covers the US; co.jooble.org requires a regional key.
+  const isVE = locationQuery.toLowerCase().includes("venezuela") || locationQuery.toLowerCase() === "ve";
+  const defaultHost = isVE ? "ve.jooble.org" : "co.jooble.org";
+  const primaryHost = process.env.JOOBLE_HOST || defaultHost;
+  const targetLocation = locationQuery === "co" ? "Colombia" : locationQuery;
+
+  console.log(`[Jooble] Fetching postings for "${targetLocation}" via ${primaryHost}...`);
   const jobs: Job[] = [];
   const now = Date.now();
 
-  try {
-    const response = await fetch(`https://jooble.org/api/${apiKey}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ keywords: "", location: locationQuery })
-    });
+  const hostsToTry = Array.from(new Set([primaryHost, "jooble.org"]));
 
-    if (!response.ok) {
-      console.warn(`[Jooble] Failed: ${response.status} ${response.statusText}`);
-      reportSourceSignal("swallowed_error");
-      return [];
-    }
-
-    const data = await response.json();
-    if (!Array.isArray(data.jobs)) {
-      console.warn(
-        `[Jooble] Response OK but "jobs" is not an array (totalCount=${data.totalCount}). Raw keys: ${Object.keys(data).join(", ")}`
-      );
-      reportSourceSignal("swallowed_error");
-      return [];
-    }
-    console.log(`[Jooble] "${locationQuery}": totalCount=${data.totalCount}, page batch=${data.jobs.length}`);
-
-    for (const item of data.jobs) {
-      if (!item.id || !item.title || !item.updated) continue;
-
-      const publishedDate = new Date(item.updated);
-      if (isNaN(publishedDate.getTime())) continue;
-      const ageInDays = (now - publishedDate.getTime()) / (1000 * 60 * 60 * 24);
-      if (ageInDays > 2) continue;
-
-      jobs.push({
-        jobId: String(item.id),
-        title: htmlEntities(item.title),
-        company: htmlEntities(item.company || "Confidencial"),
-        location: htmlEntities(item.location || locationQuery),
-        url: item.link,
-        dateText: "Reciente",
-        source: "Jooble",
-        publishedAt: publishedDate.toISOString(),
-        // Confirmed live (2026-08-11): `snippet` is plain text (Jooble
-        // truncates it with "..." itself, not HTML), `salary` is free text
-        // (e.g. "$25 - $40 per hour"), `type` is often empty for a given
-        // listing — used only when present, never guessed.
-        description: item.snippet ? htmlEntities(item.snippet).trim() : undefined,
-        // Jooble's `snippet` is a search-result excerpt, never the full posting.
-        descriptionKind: "snippet",
-        salaryRaw: typeof item.salary === "string" && item.salary.trim() ? item.salary.trim() : undefined,
-        employmentType: item.type ? htmlEntities(item.type).trim() || undefined : undefined
+  for (const host of hostsToTry) {
+    try {
+      const response = await fetch(`https://${host}/api/${apiKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "User-Agent": pickUserAgent() },
+        body: JSON.stringify({ keywords: "", location: targetLocation })
       });
+
+      if (!response.ok) {
+        if (response.status === 403 && host.startsWith("co.")) {
+          console.warn(`[Jooble] ${host} retornó 403 (clave no registrada para Colombia en co.jooble.org/api/about). Probando fallback...`);
+          continue;
+        }
+        console.warn(`[Jooble] (${host}) Failed: ${response.status} ${response.statusText}`);
+        continue;
+      }
+
+      const text = await response.text();
+      let data: any;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        console.warn(`[Jooble] (${host}) Respuesta no es JSON válido`);
+        continue;
+      }
+
+      if (!Array.isArray(data.jobs)) {
+        console.warn(
+          `[Jooble] Response OK but "jobs" is not an array (totalCount=${data.totalCount}). Raw keys: ${Object.keys(data).join(", ")}`
+        );
+        continue;
+      }
+      console.log(`[Jooble] (${host}) "${targetLocation}": totalCount=${data.totalCount}, page batch=${data.jobs.length}`);
+
+      for (const item of data.jobs) {
+        if (!item.id || !item.title || !item.updated) continue;
+
+        // Discard US / Colorado results when querying Colombia through global endpoint
+        const locLower = (item.location || "").toLowerCase();
+        if (
+          !isVE &&
+          (locLower.includes("colorado") || locLower.includes(", co") || locLower.endsWith(" co"))
+        ) {
+          continue;
+        }
+
+        const publishedDate = new Date(item.updated);
+        if (isNaN(publishedDate.getTime())) continue;
+        const ageInDays = (now - publishedDate.getTime()) / (1000 * 60 * 60 * 24);
+        if (ageInDays > 2) continue;
+
+        jobs.push({
+          jobId: String(item.id),
+          title: htmlEntities(item.title),
+          company: htmlEntities(item.company || "Confidencial"),
+          location: htmlEntities(item.location || targetLocation),
+          url: item.link,
+          dateText: "Reciente",
+          source: "Jooble",
+          publishedAt: publishedDate.toISOString(),
+          // Confirmed live (2026-08-11): `snippet` is plain text (Jooble
+          // truncates it with "..." itself, not HTML), `salary` is free text
+          // (e.g. "$25 - $40 per hour"), `type` is often empty for a given
+          // listing — used only when present, never guessed.
+          description: item.snippet ? htmlEntities(item.snippet).trim() : undefined,
+          // Jooble's `snippet` is a search-result excerpt, never the full posting.
+          descriptionKind: "snippet",
+          salaryRaw: typeof item.salary === "string" && item.salary.trim() ? item.salary.trim() : undefined,
+          employmentType: item.type ? htmlEntities(item.type).trim() || undefined : undefined
+        });
+      }
+
+      break;
+    } catch (error) {
+      console.error(`[Jooble] (${host}) Fetch error:`, error);
+      reportSourceSignal("swallowed_error");
     }
-  } catch (error) {
-    console.error("[Jooble] Fetch error:", error);
-    reportSourceSignal("swallowed_error");
   }
+
   console.log(`[Jooble] Found ${jobs.length} jobs (filtered by date).`);
   return jobs;
 }
@@ -1388,10 +1467,12 @@ export async function scrapeJooble(locationQuery: string = "co"): Promise<Job[]>
 // (confirmed root cause of Indeed getting hammered on every keyword even
 // after it started blocking every request — see docs/source-catalog/indeed.md).
 async function gsFetch(url: string, label: string, attempts = 3): Promise<string> {
+  const proxyUrl = process.env.WEBSHARE_PROXY_URL;
   for (let attempt = 1; attempt <= attempts; attempt++) {
     try {
       const response = await gotScraping({
         url,
+        proxyUrl: proxyUrl || undefined,
         timeout: { request: 30000 },
         retry: { limit: 0 },
         headerGeneratorOptions: {

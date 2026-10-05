@@ -25,6 +25,13 @@ import { BUDGET_ESTIMATES, createFetchContext, hasBudget, isCancelled, whenAbort
 import { drainDetailQueue } from "../src/queue/detail-enrichment.js";
 import { planTickBudget, type TickBudgetPlan } from "../src/queue/tick-budget.js";
 import { claimLease, refreshLeases, releaseLease, releaseRunLeases } from "../src/db/scrape-leases.js";
+import { formatClosureReport, verifyTorreClosures } from "../src/queue/source-closure.js";
+
+// Closure pass: the 2026-10-04 audit answered 3703 status requests in ~4.5 min
+// at concurrency 4 (~0.29s each), so 400 at concurrency 3 ≈ 40s.
+// Capped at 60s; not started at all with under 15s left.
+const CLOSURE_BUDGET_MS = 60 * 1000;
+const CLOSURE_MIN_BUDGET_MS = 15 * 1000;
 
 dotenv.config();
 
@@ -533,6 +540,20 @@ async function main() {
       }
     } catch (error) {
       console.warn("⚠️ [Tick] Drenaje de detalle omitido:", (error as Error)?.name);
+    }
+  }
+
+  // Source-confirmed closures (2026-10-04 bug: 92% of visible Torre rows were
+  // already closed on Torre). Torre is a CO-tick adapter, so only the CO tick
+  // asks; its own child budget keeps it from eating the purge/teardown time.
+  if (TICK_COUNTRY === "CO" && !isCancelled(rootCtx) && hasBudget(rootCtx, CLOSURE_MIN_BUDGET_MS)) {
+    const closureCtx = rootCtx.child(CLOSURE_BUDGET_MS);
+    try {
+      console.log(formatClosureReport(await verifyTorreClosures(closureCtx)));
+    } catch (error) {
+      console.warn("⚠️ [Tick] Chequeo de cierre en la fuente omitido:", (error as Error)?.message || error);
+    } finally {
+      closureCtx.dispose();
     }
   }
 

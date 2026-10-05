@@ -2,7 +2,7 @@ import { Job } from '../sources/types.js';
 
 const KNOWN_SOURCES = new Set([
   'LinkedIn', 'Computrabajo', 'Elempleo', 'Torre', 'Magneto', 'Workana',
-  'WeRemoto', 'GetOnBoard', 'RemoteOK', 'Remotive', 'Indeed', 'Glassdoor'
+  'WeRemoto', 'GetOnBoard', 'RemoteOK', 'Remotive', 'Indeed', 'Glassdoor', 'Jooble'
 ]);
 
 export interface ValidationResult {
