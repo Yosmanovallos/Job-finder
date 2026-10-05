@@ -15,6 +15,7 @@
 import { assessDescription, type DescriptionReason, type DescriptionSignals } from "./job-description-quality.js";
 import { toCountryCode, toCountryCodes } from "./country-codes.js";
 import { getGoogleJobSourcePolicy } from "./google-job-source-policy.js";
+import { jobStaleReason, liveJobSql } from "./job-freshness.js";
 
 export type ReadinessReason =
   | DescriptionReason
@@ -167,17 +168,21 @@ export interface StoredReadiness {
   seoReady?: boolean | null;
   isActive?: boolean | null;
   validThrough?: string | Date | null;
+  publishedAt?: string | Date | null;
 }
 
+// Since 2026-10-04 the time-dependent part is the shared freshness rule
+// (src/lib/job-freshness.ts): past validThrough OR published more than a
+// month ago. A posting that is no longer shown is never "ready" for Google
+// either, so nothing re-queues or sends a URL_UPDATED for it.
 export function isGoogleReadyNow(row: StoredReadiness, now: Date = new Date()): boolean {
   if (row.seoReady !== true || row.isActive === false) return false;
-  const validThrough = parseDate(row.validThrough);
-  return !validThrough || validThrough.getTime() > now.getTime();
+  return jobStaleReason(row.publishedAt, row.validThrough, now) === null;
 }
 
 /** SQL twin of isGoogleReadyNow(). `alias` is the jobs table alias in the calling query. */
 export function seoReadySql(alias = "jobs"): string {
-  return `(${alias}.seo_ready = TRUE AND ${alias}.is_active = TRUE AND (${alias}.valid_through IS NULL OR ${alias}.valid_through > NOW()))`;
+  return `(${alias}.seo_ready = TRUE AND ${alias}.is_active = TRUE AND ${liveJobSql(alias)})`;
 }
 
 /**
@@ -190,7 +195,7 @@ export function canonicalSql(alias = "jobs"): string {
   return `(${alias}.content_fingerprint IS NULL OR NOT EXISTS (
     SELECT 1 FROM jobs newer
     WHERE newer.content_fingerprint = ${alias}.content_fingerprint
-      AND newer.is_active = TRUE AND newer.id <> ${alias}.id
+      AND newer.is_active = TRUE AND ${liveJobSql("newer")} AND newer.id <> ${alias}.id
       AND (newer.published_at, newer.id) > (${alias}.published_at, ${alias}.id)
   ))`;
 }

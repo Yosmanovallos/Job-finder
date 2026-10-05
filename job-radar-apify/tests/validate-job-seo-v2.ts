@@ -29,6 +29,7 @@ import {
 } from "../src/db/job-readiness-repository.js";
 import { checkIndexingTarget, enqueueIndexingNotifications, getPendingIndexingBatch, wasJobPurged } from "../src/db/indexing-repository.js";
 import { purgeOldJobs } from "../src/db/scheduler-repository.js";
+import { jobStaleReason } from "../src/lib/job-freshness.js";
 import { buildJobPath, buildJobUrl, escapeHtml } from "../src/lib/job-seo.js";
 import type { Job } from "../src/sources/types.js";
 import { DETAIL_ADAPTER_NAMES, sourceSupportsDetail } from "../src/sources/detail-capability.js";
@@ -469,10 +470,13 @@ try {
   await pool.query(`UPDATE jobs SET valid_through = NOW() - INTERVAL '1 minute' WHERE id = $1`, [expiringId]);
   const expired = await page(expiringId);
   assert.equal(expired.jobPosting, null);
-  assert.ok(expired.noindexFollow);
+  // Since 2026-10-04 (src/lib/job-freshness.ts) an expired posting is not
+  // shown at all — previously it stayed visible as noindex,follow. It answers
+  // 410 straight away, before the next purge deletes the row.
+  assert.equal(expired.status, 410, "an expired posting is gone, not merely noindexed");
   assert.ok(!(await sitemapLocs()).some((loc) => loc.includes(expiringId)));
   assert.deepEqual(await checkIndexingTarget({ url: buildJobUrl({ jobId: expiringId, title: "Ingeniero Civil", location: "Bogotá, Colombia" }), notification_type: "URL_UPDATED", job_id: expiringId }), { send: false, reason: "target_not_seo_ready" });
-  console.log("✅ [expiry] a passed source validThrough turns every consumer off on read.");
+  console.log("✅ [expiry] a passed source validThrough removes the posting from every consumer on read (410).");
 
   // --- 16. Send order and pre-send check -----------------------------------------
   const batch = await getPendingIndexingBatch(100);
@@ -552,16 +556,23 @@ try {
   assert.equal(reconcileAgain.code, 0, reconcileAgain.output);
   assert.deepEqual(await queueState(), afterFirstReconcile, "hourly reconcile is idempotent");
   console.log("✅ [reconcile] the hourly reconcile never queues a non-ready job and is idempotent.");
-  // The expired job had a URL_UPDATED queued while it was ready. Until the
-  // hourly reconcile, that row is pending but can never be sent (pre-send
-  // check); after it, the four consumers agree at rest too.
-  await assertConsumersAgree(expiringId, false, "expired job (after the hourly reconcile)");
+  // The expired job had a URL_UPDATED queued while it was ready. Since
+  // 2026-10-04 (src/lib/job-freshness.ts) the purge in section 17 already
+  // deleted it — a passed validThrough is an expiry, not a noindex — so every
+  // consumer agrees it is gone: no row, 410, out of the sitemap, nothing queued.
+  assert.equal(await row(expiringId), undefined, "a passed validThrough is purged");
+  assert.ok(await wasJobPurged(expiringId), "the expired job left its 410 tombstone");
+  assert.equal((await updatedRows(expiringId)).filter((r) => r.status === "pending" || r.status === "sent").length, 0);
+  assert.ok(!(await sitemapLocs()).some((loc) => loc.includes(expiringId)));
 
   // --- 19. Legacy classification: dry-run writes nothing, apply is exact and idempotent
+  // "Legacy Rico" is 20 days old, not 40: since 2026-10-04 anything older than
+  // a month is expired (src/lib/job-freshness.ts) and could never be the
+  // Google-ready legacy row this section classifies.
   const legacy = await pool.query<{ id: string; kind: string }>(
     `INSERT INTO jobs (url_hash, content_fingerprint, title, company, location, country, url, source, sources, published_at, description, requirements)
      VALUES
-       (md5('legacy-rich'), md5('fp-legacy-rich'), 'Legacy Rico', 'Legado SA', 'Bogotá, Colombia', 'CO', 'https://example.com/l1', 'LinkedIn', '["LinkedIn"]', NOW() - INTERVAL '40 days', $1, $2::jsonb),
+       (md5('legacy-rich'), md5('fp-legacy-rich'), 'Legacy Rico', 'Legado SA', 'Bogotá, Colombia', 'CO', 'https://example.com/l1', 'LinkedIn', '["LinkedIn"]', NOW() - INTERVAL '20 days', $1, $2::jsonb),
        (md5('legacy-none'), md5('fp-legacy-none'), 'Legacy Vacio', 'Legado SA', 'Bogotá, Colombia', 'CO', 'https://example.com/l2', 'LinkedIn', '["LinkedIn"]', NOW() - INTERVAL '3 days', NULL, '[]'),
        (md5('legacy-torre'), md5('fp-legacy-torre'), 'Legacy Torre', 'Legado SA', 'Remoto', NULL, 'https://example.com/l3', 'Torre', '["Torre"]', NOW() - INTERVAL '3 days', 'Short tagline for a remote role.', '[]'),
        (md5('legacy-glass'), md5('fp-legacy-glass'), 'Legacy Glass', 'Legado SA', 'Caracas', 'VE', 'https://example.com/l4', 'Glassdoor', '["Glassdoor"]', NOW() - INTERVAL '3 days', NULL, '[]')
@@ -687,11 +698,13 @@ try {
   console.log("✅ [cleanup] dry-run read-only; apply supersedes (never deletes, never converts to DELETE) and re-prioritizes.");
 
   // --- 21. Final sweep: every job in the table obeys the invariant ----------------
-  const all = await pool.query(`SELECT id, seo_ready, valid_through FROM jobs WHERE is_active`);
+  const all = await pool.query(`SELECT id, seo_ready, valid_through, published_at FROM jobs WHERE is_active`);
   const locs = new Set(await sitemapLocs());
   const sitemapIds = new Set([...locs].map((loc) => /\/empleos\/([0-9a-f-]{36})\//.exec(loc)?.[1]));
   for (const current of all.rows) {
-    const readyNow = current.seo_ready && (!current.valid_through || new Date(current.valid_through) > new Date());
+    // Ready for Google AND live (src/lib/job-freshness.ts: an expired or
+    // month-old posting is not shown anywhere, sitemap included).
+    const readyNow = current.seo_ready && jobStaleReason(current.published_at, current.valid_through) === null;
     assert.equal(sitemapIds.has(current.id), readyNow, `sitemap/readiness mismatch for ${current.id}`);
     if (!readyNow) {
       const queued = await pool.query(

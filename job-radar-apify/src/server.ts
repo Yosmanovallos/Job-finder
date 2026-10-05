@@ -8,6 +8,7 @@ import dotenv from "dotenv";
 import {
   getJobsPage,
   getJobById,
+  isJobExpiredInPlace,
   getActiveCompanyNames,
   searchActiveCompanies,
   maskLockedFields,
@@ -2170,11 +2171,13 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       // drop, not keep re-checking) from "this id never existed" (plain
       // 404). `id` is always a real UUID here — the category branch above
       // already intercepted any non-UUID segment — so this only ever
-      // queries wasJobPurged() with a well-formed jobId.
-      if (id && (await wasJobPurged(id))) {
+      // queries wasJobPurged() with a well-formed jobId. A row that already
+      // expired (src/lib/job-freshness.ts) but awaits the next purge is the
+      // same permanent removal, so it answers 410 too.
+      if (id && ((await wasJobPurged(id)) || (await isJobExpiredInPlace(id)))) {
         res.writeHead(410, { "Content-Type": "text/html; charset=utf-8" });
         res.end(
-          '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Vacante ya no disponible | BuscoTrabajo</title><meta name="robots" content="noindex"></head><body><h1>Esta vacante ya no está disponible</h1><p>Fue retirada porque venció (más de 30 días publicada).</p><p><a href="/dashboard">Ver vacantes activas</a></p></body></html>'
+          '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Vacante ya no disponible | BuscoTrabajo</title><meta name="robots" content="noindex"></head><body><h1>Esta vacante ya no está disponible</h1><p>Fue retirada porque venció: lleva más de 30 días publicada, pasó su fecha límite o la fuente la cerró.</p><p><a href="/dashboard">Ver vacantes activas</a></p></body></html>'
         );
         return;
       }

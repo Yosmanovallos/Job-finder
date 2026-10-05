@@ -1,6 +1,8 @@
 import { pool } from "./client.js";
 import { buildJobUrl, isPubliclyDescribable } from "../lib/job-seo.js";
 import { apiNotifiedUrls, DELETE_NOT_API_NOTIFIED, enqueueIndexingNotifications, INDEXING_PRIORITY } from "./indexing-repository.js";
+import { pruneExpiredUrlHashes, recordExpiredUrlHashes } from "./expired-job-repository.js";
+import { liveJobSql, MAX_JOB_AGE_DAYS } from "../lib/job-freshness.js";
 
 /**
  * Idempotent upsert of the known role list into `search_roles` — safe to
@@ -143,13 +145,49 @@ export async function markGlobalSourceRun(sourceName: string): Promise<void> {
 // flipped as part of normal ingestion — a hard DELETE is the expiration
 // signal in this codebase. Since 2026-10-04 there are two: this age purge
 // and deleteClosedJobs() below (the source itself says the posting closed).
-export async function purgeOldJobs(): Promise<number> {
+//
+// Also since 2026-10-04 (bug: postings older than a month were still live):
+// "not re-seen for 30 days" alone let a posting the source keeps listing live
+// forever, because re-seeing it bumps last_seen_at. This now also deletes
+// every row that fails liveJobSql() — published more than MAX_JOB_AGE_DAYS
+// ago, or past the source's own validThrough — the same rule every public
+// read already filters on. Each deleted URL goes to expired_job_urls so
+// saveJobs() does not bring it back as "new" on the next tick.
+//
+// Bounded per call (AGENTS.md #12): the first run after this rule shipped
+// faces every posting that was kept alive only by being re-seen. Those rows
+// are already hidden from every read by liveJobSql(), so deleting them over a
+// few ticks costs users nothing, while one unbounded DELETE + tombstones +
+// enqueues could eat the tick's deadline. Oldest first.
+export const PURGE_BATCH_LIMIT = 2_000;
+
+export async function purgeOldJobs(limit: number = PURGE_BATCH_LIMIT): Promise<number> {
   const result = await pool.query(
-    `DELETE FROM jobs WHERE last_seen_at < NOW() - INTERVAL '30 days'
-     RETURNING id, title, company, location, url, source, published_at`
+    `DELETE FROM jobs
+     WHERE id IN (
+       SELECT id FROM jobs
+       WHERE last_seen_at < NOW() - INTERVAL '${MAX_JOB_AGE_DAYS} days' OR NOT ${liveJobSql()}
+       ORDER BY published_at ASC, id ASC
+       LIMIT $1
+     )
+     RETURNING id, url_hash, title, company, location, url, source, published_at`,
+    [Math.max(1, Math.min(limit, 20_000))]
   );
   await recordRemovedJobs(result.rows, "purgeOldJobs");
+  await rememberExpired(result.rows, "expired", "purgeOldJobs");
+  await pruneExpiredUrlHashes().catch((err) => console.warn("⚠️ [purgeOldJobs] Poda de expired_job_urls omitida:", err?.message || err));
   return result.rowCount ?? 0;
+}
+
+// After the tombstones, never before: the DELETE is already committed, so a
+// failure here must not cost the 410 path. Worst case the URL can come back
+// once and is purged again on the following tick.
+async function rememberExpired(rows: { url_hash: string }[], reason: string, caller: string): Promise<void> {
+  try {
+    await recordExpiredUrlHashes(rows.map((row) => row.url_hash), reason);
+  } catch (err) {
+    console.warn(`⚠️ [${caller}] No se pudo registrar en expired_job_urls:`, (err as Error)?.message || err);
+  }
 }
 
 /**
@@ -163,10 +201,11 @@ export async function deleteClosedJobs(jobIds: string[]): Promise<number> {
   if (jobIds.length === 0) return 0;
   const result = await pool.query(
     `DELETE FROM jobs WHERE id = ANY($1::uuid[]) AND is_active = TRUE
-     RETURNING id, title, company, location, url, source, published_at`,
+     RETURNING id, url_hash, title, company, location, url, source, published_at`,
     [jobIds]
   );
   await recordRemovedJobs(result.rows, "deleteClosedJobs");
+  await rememberExpired(result.rows, "source_closed", "deleteClosedJobs");
   return result.rowCount ?? 0;
 }
 

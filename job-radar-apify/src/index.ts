@@ -696,6 +696,13 @@ export async function scrapeTorre(keyword: string): Promise<Job[]> {
               // behavior), but it is not source evidence of remote work.
               remoteType: item.remote === true ? "fully_remote" : undefined,
               technologies: skills.length > 0 ? skills : undefined,
+              // Torre's own application deadline (bug 2026-10-04: expired
+              // postings stayed live). Only a parseable source value counts;
+              // a missing deadline is left unset, never guessed.
+              validThrough:
+                typeof item.deadline === "string" && Number.isFinite(new Date(item.deadline).getTime())
+                  ? new Date(item.deadline).toISOString()
+                  : undefined,
               employmentType: TORRE_COMMITMENT_LABELS[item.commitment as string]
               // item.compensation.data comes back null/hidden on every live
               // result seen so far (2026-08-11) — no confirmed field shape to

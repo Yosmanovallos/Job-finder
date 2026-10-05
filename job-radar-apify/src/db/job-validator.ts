@@ -1,4 +1,5 @@
 import { Job } from '../sources/types.js';
+import { jobStaleReason } from '../lib/job-freshness.js';
 
 const KNOWN_SOURCES = new Set([
   'LinkedIn', 'Computrabajo', 'Elempleo', 'Torre', 'Magneto', 'Workana',
@@ -34,6 +35,13 @@ export function validateJobs(jobs: Job[]): ValidationResult {
     }
     if (job.publishedAt && isNaN(new Date(job.publishedAt).getTime())) {
       discarded.push({ job, reason: 'publishedAt no parseable' });
+      continue;
+    }
+    // Same rule every public read filters on (src/lib/job-freshness.ts):
+    // an expired posting is never stored, so it can never be shown.
+    const staleReason = jobStaleReason(job.publishedAt, job.validThrough);
+    if (staleReason) {
+      discarded.push({ job, reason: staleReason });
       continue;
     }
 

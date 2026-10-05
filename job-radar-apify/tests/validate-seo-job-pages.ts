@@ -113,7 +113,10 @@ function runPureFunctionTests() {
     url: "https://example.com/job/1",
     dateText: "Hoy",
     source: "LinkedIn",
-    publishedAt: new Date("2026-01-01T00:00:00Z").toISOString(),
+    // Relative, not a fixed date: since 2026-10-04 a posting older than a
+    // month is never Google-ready (src/lib/job-freshness.ts), so a fixed
+    // date would silently turn this "apta" fixture stale as time passes.
+    publishedAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
     description:
       "Buscamos un/a Analista de Datos para el equipo de BI de la compañía.\nSerás responsable de los tableros comerciales y del modelo de datos de ventas.",
     requirements: ["Manejo de SQL avanzado", "Experiencia con Power BI", "Inglés intermedio"],

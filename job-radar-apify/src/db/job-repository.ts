@@ -12,6 +12,8 @@ import type { JobFilterParams } from "../lib/job-filters.js";
 import { initialDetailStatus, refreshGoogleReadinessInTransaction } from "./job-readiness-repository.js";
 import { sourceSupportsDetail } from "../sources/detail-capability.js";
 import { seoReadySql } from "../lib/google-job-readiness.js";
+import { liveJobSql } from "../lib/job-freshness.js";
+import { findExpiredUrlHashes } from "./expired-job-repository.js";
 import { StaleWhileRevalidateCache } from "../lib/stale-while-revalidate-cache.js";
 
 dotenv.config();
@@ -85,8 +87,17 @@ export async function saveJobs(
     }
   }
 
+  // A URL purged as expired never comes back as "new" (src/lib/job-freshness.ts):
+  // a source that keeps listing an old posting without its own date would
+  // otherwise re-insert it with published_at = now on the very next tick.
+  const expiredHashes = await findExpiredUrlHashes(valid.map((job) => computeUrlHash(job.url)));
+  if (expiredHashes.size > 0) {
+    console.warn(`🧹 [Reviewer] ${expiredHashes.size} URL(s) ya vencida(s) omitida(s) — no se reinsertan.`);
+  }
+
   for (const job of valid) {
     const hash = computeUrlHash(job.url);
+    if (expiredHashes.has(hash)) continue;
     const fingerprint = computeContentFingerprint(job);
     const publishedAt =
       job.publishedAt && !isNaN(new Date(job.publishedAt).getTime())
@@ -279,7 +290,7 @@ export async function getJobs(
               description, requirements, technologies, employment_type, salary_min, salary_max, salary_currency, salary_raw, applicant_count,
               (published_at > NOW() - INTERVAL '48 hours') AS is_locked
        FROM jobs
-       WHERE is_active = TRUE
+       WHERE is_active = TRUE AND ${liveJobSql()}
        ORDER BY lower(trim(title)), lower(trim(COALESCE(company, 'confidencial'))), lower(trim(COALESCE(location, CASE country WHEN 'VE' THEN 'venezuela' ELSE 'colombia' END))), published_at DESC, id DESC
      ) deduped
      ORDER BY published_at DESC, id DESC
@@ -337,7 +348,7 @@ export async function getJobsLight(
               employment_type, salary_min, salary_max, salary_currency, salary_raw, applicant_count,
               (published_at > NOW() - INTERVAL '48 hours') AS is_locked
        FROM jobs
-       WHERE is_active = TRUE
+       WHERE is_active = TRUE AND ${liveJobSql()}
        ORDER BY lower(trim(title)), lower(trim(COALESCE(company, 'confidencial'))), lower(trim(COALESCE(location, CASE country WHEN 'VE' THEN 'venezuela' ELSE 'colombia' END))), published_at DESC, id DESC
      ) deduped
      ORDER BY published_at DESC, id DESC
@@ -457,7 +468,7 @@ export async function streamCanonicalSitemapJobs(options: SitemapStreamOptions):
                 id, title, company, location, url, published_at, content_updated_at,
                 seo_ready, is_active, valid_through
          FROM jobs
-         WHERE is_active = TRUE
+         WHERE is_active = TRUE AND ${liveJobSql()}
          ORDER BY lower(trim(title)), lower(trim(COALESCE(company, 'confidencial'))), lower(trim(COALESCE(location, CASE country WHEN 'VE' THEN 'venezuela' ELSE 'colombia' END))), published_at DESC, id DESC
        ) canonical
        -- Job SEO V2: canonical first, THEN the shared Google gate — a ready
@@ -747,7 +758,7 @@ async function queryJobsPage(options: JobsPageOptions): Promise<JobsPage> {
               salary_currency, salary_raw, applicant_count,
               (published_at > NOW() - INTERVAL '48 hours') AS is_locked
        FROM jobs
-       WHERE is_active = TRUE
+       WHERE is_active = TRUE AND ${liveJobSql()}
        ORDER BY lower(trim(title)), lower(trim(COALESCE(company, 'confidencial'))), lower(trim(COALESCE(location, CASE country WHEN 'VE' THEN 'venezuela' ELSE 'colombia' END))), published_at DESC, id DESC
      ), filtered AS (
        SELECT canonical.*,
@@ -825,7 +836,7 @@ export async function searchActiveCompanies(
        SELECT DISTINCT ON (lower(trim(title)), lower(trim(COALESCE(company, 'confidencial'))), lower(trim(COALESCE(location, CASE country WHEN 'VE' THEN 'venezuela' ELSE 'colombia' END))))
               id, company, country, published_at
        FROM jobs
-       WHERE is_active = TRUE
+       WHERE is_active = TRUE AND ${liveJobSql()}
        ORDER BY lower(trim(title)), lower(trim(COALESCE(company, 'confidencial'))), lower(trim(COALESCE(location, CASE country WHEN 'VE' THEN 'venezuela' ELSE 'colombia' END))), published_at DESC, id DESC
      ), grouped AS (
        SELECT company, COUNT(*) AS count
@@ -858,7 +869,7 @@ export async function getActiveCompanyNames(country?: string): Promise<string[]>
   const result = await pool.query(
     `SELECT DISTINCT company
      FROM jobs
-     WHERE is_active = TRUE AND company IS NOT NULL ${countryWhere}`,
+     WHERE is_active = TRUE AND ${liveJobSql()} AND company IS NOT NULL ${countryWhere}`,
     values
   );
   return (result.rows as Array<{ company: string }>).map((row) => row.company);
@@ -869,12 +880,23 @@ export async function countCanonicalJobsByCompany(company: string): Promise<numb
     `SELECT COUNT(*) AS count FROM (
        SELECT DISTINCT ON (lower(trim(title)), lower(trim(COALESCE(company, 'confidencial'))), lower(trim(COALESCE(location, CASE country WHEN 'VE' THEN 'venezuela' ELSE 'colombia' END)))) id
        FROM jobs
-       WHERE is_active = TRUE AND company = $1
+       WHERE is_active = TRUE AND ${liveJobSql()} AND company = $1
        ORDER BY lower(trim(title)), lower(trim(COALESCE(company, 'confidencial'))), lower(trim(COALESCE(location, CASE country WHEN 'VE' THEN 'venezuela' ELSE 'colombia' END))), published_at DESC, id DESC
      ) canonical`,
     [company]
   );
   return Number(result.rows[0]?.count || 0);
+}
+
+/**
+ * True when the row still exists but already fails liveJobSql() (older than
+ * MAX_JOB_AGE_DAYS or past validThrough) and the next purge has not deleted
+ * it yet. The detail route answers it 410, same as a purged id, instead of a
+ * 404 that would tell Google "never existed" for up to one tick.
+ */
+export async function isJobExpiredInPlace(id: string): Promise<boolean> {
+  const result = await pool.query(`SELECT 1 FROM jobs WHERE id = $1 AND NOT ${liveJobSql()} LIMIT 1`, [id]);
+  return (result.rowCount ?? 0) > 0;
 }
 
 /**
@@ -900,11 +922,11 @@ export async function getJobById(id: string): Promise<any | null> {
             candidate.content_updated_at,
             (candidate.published_at > NOW() - INTERVAL '48 hours') AS is_locked
      FROM jobs candidate
-     WHERE candidate.id = $1 AND candidate.is_active = TRUE
+     WHERE candidate.id = $1 AND candidate.is_active = TRUE AND ${liveJobSql("candidate")}
        AND NOT EXISTS (
          SELECT 1
          FROM jobs newer
-         WHERE newer.is_active = TRUE
+         WHERE newer.is_active = TRUE AND ${liveJobSql("newer")}
            AND lower(trim(newer.title)) = lower(trim(candidate.title))
            AND lower(trim(COALESCE(newer.company, 'confidencial'))) = lower(trim(COALESCE(candidate.company, 'confidencial')))
            AND lower(trim(COALESCE(newer.location, CASE newer.country WHEN 'VE' THEN 'venezuela' ELSE 'colombia' END))) =

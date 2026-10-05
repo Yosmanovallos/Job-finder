@@ -627,6 +627,25 @@ CREATE INDEX IF NOT EXISTS idx_jobs_source_closure
   ON jobs (source, source_checked_at NULLS FIRST, published_at) WHERE is_active = TRUE;
 -- END source-closure
 
+-- BEGIN job-freshness
+-- Vacantes vencidas no vuelven (src/lib/job-freshness.ts, 2026-10-04).
+-- Aditivo e idempotente; lo aplica scripts/migrate-job-freshness.ts.
+-- Una fila por URL (url_hash, mismo hash que jobs.url_hash) que se borró por
+-- vencida: más de 30 días publicada, validThrough pasado o cerrada en la
+-- fuente. saveJobs() no reinserta esas URLs: sin esto, una fuente que sigue
+-- listando una oferta vieja sin fecha propia (Magneto, textos de fecha no
+-- reconocidos → "ahora") la haría volver como nueva al tick siguiente.
+-- purgeOldJobs() poda las filas de más de 180 días. RLS sin políticas, igual
+-- que el resto (ver el bloque ROW LEVEL SECURITY y su REVOKE al final).
+CREATE TABLE IF NOT EXISTS expired_job_urls (
+    url_hash    TEXT PRIMARY KEY,
+    expired_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    reason      TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_expired_job_urls_expired_at ON expired_job_urls (expired_at);
+ALTER TABLE expired_job_urls ENABLE ROW LEVEL SECURITY;
+-- END job-freshness
+
 -- =============================================================================
 -- ROW LEVEL SECURITY: every read/write from this app goes through the `pool`
 -- (direct `pg` connection as the `postgres` role, which has BYPASSRLS — see
@@ -674,5 +693,5 @@ REVOKE ALL ON jobs, search_roles, users, social_posts, transactions,
   role_source_runs, source_circuit_state, indexing_queue, company_reputation,
   company_reputation_alias, cv_profiles, cv_generations, llm_response_cache,
   llm_usage_ledger, user_ai_credentials, scrape_runs, source_attempts,
-  scrape_leases
+  scrape_leases, expired_job_urls
   FROM anon, authenticated;
