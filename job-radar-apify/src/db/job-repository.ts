@@ -838,9 +838,8 @@ export interface CompanyPage {
 }
 
 // One directory entry per employer, not per spelling: rows are grouped by
-// the employer key (company-identity.ts) and shown under one display name — a name with a known
-// logo first (prioritizedCompanies), then the spelling most of its
-// vacancies use. Placeholder employers ("Empresa Confidencial",
+// the employer key (company-identity.ts) and shown under one display name
+// (DISPLAY_NAME_ORDER below). Placeholder employers ("Empresa Confidencial",
 // "-Confidencial-", ...) are never listed as a company. The search term is
 // matched against ANY spelling of the group (HAVING, not a row WHERE), so
 // typing "colombia" still shows Accenture's full count, not only its
@@ -900,10 +899,13 @@ function companyVariantsCte(rowWhere: string[], prioritizedParam: string, prefil
      )`;
 }
 
-// Display-name preference inside one employer group: known logo, then most
-// vacancies; on a tie, a trimmed and mixed-case spelling over "TERPEL ".
+// Display-name preference inside one employer group. It names the company
+// page's canonical URL, so it deliberately ignores vacancy counts (two
+// spellings' counts crossing would flip the canonical back and forth): a
+// name with a known logo, then a trimmed, mixed-case spelling ("Terpel" over
+// "TERPEL "), then the shortest ("Accenture" over "Accenture Colombia").
 const DISPLAY_NAME_ORDER =
-  "prioritized DESC, count DESC, (company = trim(company)) DESC, (company = upper(company)) ASC, LOWER(company), company";
+  "prioritized DESC, (company = trim(company)) DESC, (company = upper(company)) ASC, length(company), company";
 
 async function querySearchActiveCompanies(
   query: string,

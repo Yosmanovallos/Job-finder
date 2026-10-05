@@ -35,6 +35,30 @@ function schemaBlock(schema: string, name: string): string {
   return block;
 }
 
+// ADD COLUMN / CREATE TRIGGER need a brief exclusive lock on `jobs`. A long
+// read (the sitemap stream holds a cursor while a slow crawler downloads)
+// would make the ALTER wait — and every read queued behind it would block.
+// So give up after 5s and retry instead of stalling the live site.
+async function applyBlockWithLockTimeout(block: string): Promise<void> {
+  for (let attempt = 1; attempt <= 6; attempt++) {
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query("SET LOCAL lock_timeout = '5s'");
+      await client.query(block);
+      await client.query("COMMIT");
+      return;
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      if ((error as { code?: string })?.code !== "55P03" || attempt === 6) throw error;
+      console.warn(`   lock de jobs ocupado (intento ${attempt}/6); reintento en 10s...`);
+      await new Promise((resolve) => setTimeout(resolve, 10_000));
+    } finally {
+      client.release();
+    }
+  }
+}
+
 async function pendingRows(): Promise<number> {
   const hasColumns = await pool.query(
     `SELECT COUNT(*)::int AS n FROM information_schema.columns
@@ -64,7 +88,7 @@ async function main() {
   }
 
   const schema = await readFile(new URL("../src/db/schema.sql", import.meta.url), "utf8");
-  await pool.query(schemaBlock(schema, "company-identity"));
+  await applyBlockWithLockTimeout(schemaBlock(schema, "company-identity"));
   console.log("[migrate-company-identity] Columnas y trigger listos.");
 
   const started = Date.now();

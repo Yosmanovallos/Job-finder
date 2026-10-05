@@ -266,7 +266,7 @@ async function runCompaniesSearchValidation() {
         `[Test 7] Esperaba una sola entrada "${MERGE_DISPLAY}" con count=6. Body: ${JSON.stringify(body7)}`
       );
     }
-    console.log(`✅ [PASSED] Una entrada, nombre más frecuente, conteo sumado (6).`);
+    console.log(`✅ [PASSED] Una entrada, nombre estable (mixto, más corto), conteo sumado (6).`);
 
     // Test 8: a query matching only one spelling still returns the whole
     // group's count, not just that spelling's rows.
