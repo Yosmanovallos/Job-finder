@@ -2,12 +2,8 @@ import type http from "node:http";
 import { checkRateLimit, recordSuspiciousEvent } from "../lib/security-monitor.js";
 
 /**
- * Fase 5 de docs/RESUME-STUDIO-PLAN.md — extraído de `server.ts` (donde
- * vivían como funciones locales desde Fase 7 de CV-GENERATION-PLAN.md)
- * para que `server/routes/resume-studio.ts` los pueda reusar sin crear un
- * import circular (`server.ts` monta ese módulo de rutas, así que ese
- * módulo no puede a su vez importar de `server.ts`). Comportamiento
- * idéntico al de siempre — esto es mover código, no cambiarlo.
+ * Helpers HTTP compartidos, extraídos de `server.ts` para que los módulos
+ * de `server/routes/` los puedan reusar sin crear un import circular.
  */
 
 export function respondToUnexpectedError(
@@ -27,7 +23,7 @@ export function respondToUnexpectedError(
 }
 
 // For endpoints that write data or cost real money/quota to call (checkout,
-// triggering a scrape, connecting a BYOK credential) — a much lower bar
+// triggering a scrape) — a much lower bar
 // than the general read cap.
 export const SENSITIVE_RATE_LIMIT = 10;
 export const SENSITIVE_RATE_WINDOW_MS = 60 * 1000;
@@ -44,9 +40,8 @@ export function checkSensitiveRateLimit(
   return false;
 }
 
-// Fase 7 (docs/CV-GENERATION-PLAN.md §9.5): reads a JSON body with a hard
-// byte cap, WITHOUT `req.destroy()` mid-stream — that was tried for the
-// upload endpoint (parse-upload.ts) and reset the raw socket before a
+// Reads a JSON body with a hard byte cap, WITHOUT `req.destroy()`
+// mid-stream — that was tried for an upload endpoint and reset the raw socket before a
 // clean 4xx could flush, so a client saw a connection reset instead of a
 // real error. Same fix here: once over cap, stop appending but let the
 // stream drain naturally, then respond normally.

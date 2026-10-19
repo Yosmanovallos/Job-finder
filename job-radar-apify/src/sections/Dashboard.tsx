@@ -4,8 +4,6 @@ import { PRO_MONTHLY_PRICE_COP, formatCOP, PAYWALL_ENABLED } from "../config.js"
 import { JobCard } from "../components/JobCard.js";
 import { PaywallCard } from "../components/PaywallCard.js";
 import { ApplyGateModal } from "../components/ApplyGateModal.js";
-import { CvAdjustOverlay } from "../components/CvAdjustOverlay.js";
-import { ResumeStudio } from "../components/ResumeStudio/ResumeStudio.js";
 import { JobListItem } from "../components/JobListItem.js";
 import { JobDetailPanel } from "../components/JobDetailPanel.js";
 import { FilterBar, FilterState, EMPTY_FILTERS } from "../components/FilterBar.js";
@@ -44,7 +42,7 @@ export default function Dashboard() {
     description: `Explora vacantes actualizadas de LinkedIn, Computrabajo${country === "CO" ? ", Elempleo" : ""} y más en ${countryConfig.name}, filtradas y sin duplicados. Gratis para vacantes con más de 48h publicadas.`
   });
 
-  const { tier, isAuthenticated, accessToken, user, refreshTier, resumeStudioActive } = useAuth();
+  const { tier, isAuthenticated, accessToken, user, refreshTier } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -76,9 +74,6 @@ export default function Dashboard() {
   // between the mobile JobCard list and the desktop detail panel so both
   // trigger the exact same modal instead of each owning a copy.
   const [applyGateJob, setApplyGateJob] = useState<any | null>(null);
-  // Job the CV-adjust overlay is currently open for (Fase 6, §9.2) — same
-  // shape as applyGateJob, only reachable from the desktop JobDetailPanel.
-  const [cvAdjustJob, setCvAdjustJob] = useState<any | null>(null);
   // Set once the apply_job=<id> effect (below) resolves — renders a banner
   // with a real, user-clicked link to the job the visitor registered to
   // apply for, since auto-opening it isn't reliable (see that effect).
@@ -803,7 +798,6 @@ export default function Dashboard() {
                         onSaveToggle={handleSaveToggle}
                         onAppliedToggle={handleAppliedToggle}
                         onApplyClick={setApplyGateJob}
-                        onCvAdjustClick={setCvAdjustJob}
                         country={country}
                       />
                     )}
@@ -867,12 +861,6 @@ export default function Dashboard() {
       </div>
 
       {applyGateJob && <ApplyGateModal job={applyGateJob} onClose={() => setApplyGateJob(null)} />}
-      {cvAdjustJob &&
-        (resumeStudioActive ? (
-          <ResumeStudio job={cvAdjustJob} onClose={() => setCvAdjustJob(null)} />
-        ) : (
-          <CvAdjustOverlay job={cvAdjustJob} onClose={() => setCvAdjustJob(null)} />
-        ))}
     </section>
   );
 }

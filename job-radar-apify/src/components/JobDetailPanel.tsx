@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { Star, Check, ArrowUpRight, Search, Sparkles } from "lucide-react";
+import { Star, Check, ArrowUpRight, Search } from "lucide-react";
 import { Job } from "../sources/types.js";
 import { getSourceColor } from "../lib/source-colors.js";
 import { getModalityLabel } from "../lib/job-filters.js";
@@ -36,10 +36,6 @@ export interface JobDetailPanelProps {
   onSaveToggle?: (jobId: string) => void;
   onAppliedToggle?: (jobId: string) => void;
   onApplyClick?: (job: any) => void;
-  // Fase 6 (docs/CV-GENERATION-PLAN.md §9.1/§9.2) — opens CvAdjustOverlay.
-  // Only wired from Dashboard.tsx's desktop panel (confirmed scope,
-  // 2026-08-07): JobCard/mobile doesn't get this entry point in this phase.
-  onCvAdjustClick?: (job: any) => void;
   // Dashboard context ("CO"/"VE") — see JobCard.tsx's identical prop for why
   // this, not job.country, decides the company link's prefix.
   country?: string;
@@ -75,7 +71,6 @@ export const JobDetailPanel: React.FC<JobDetailPanelProps> = ({
   onSaveToggle,
   onAppliedToggle,
   onApplyClick,
-  onCvAdjustClick,
   country,
   headingLevel = "h2"
 }) => {
@@ -228,28 +223,6 @@ export const JobDetailPanel: React.FC<JobDetailPanelProps> = ({
             {job.source}
           </Badge>
           {job.dateText && <Badge variant="outline">{job.dateText}</Badge>}
-        </div>
-
-        {/* Fase 6 (docs/CV-GENERATION-PLAN.md §9.1) puesta en pausa
-            (2026-08-12): la generación de CV todavía no está lista para
-            usuarios reales, así que el CTA queda deshabilitado como teaser
-            ("Muy pronto") en vez de un botón funcional — no hay
-            onClick/navegación, nadie puede activarlo por accidente
-            mientras el pipeline no esté verificado de punta a punta. */}
-        <div className="rounded-lg border border-border bg-muted/30 p-4 mb-3 flex flex-col sm:flex-row sm:items-center gap-4">
-          <div className="flex-1 min-w-0">
-            <p className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
-              <Sparkles className="h-4 w-4 text-muted-foreground shrink-0" /> Genera un CV para esta
-              vacante
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Adaptamos tu CV a esta posición con IA: reordenamos tu experiencia real, alineamos
-              palabras clave y revisamos compatibilidad ATS. Nunca inventamos información.
-            </p>
-          </div>
-          <Button type="button" variant="outline" size="lg" className="font-mono shrink-0" disabled>
-            Muy pronto
-          </Button>
         </div>
 
         <Button asChild size="lg" className="w-full mb-5 font-mono">

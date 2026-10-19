@@ -24,11 +24,6 @@ export interface AuthContextType {
   // True once /api/me has resolved at least once for the current session —
   // distinguishes "not onboarded" from "haven't checked yet".
   profileLoaded: boolean;
-  // Combinado servidor-side (RESUME_STUDIO_ENABLED && resume_studio_beta),
-  // ver el comentario en server.ts's GET /api/me — Fase 7 de
-  // docs/RESUME-STUDIO-PLAN.md. Decide qué overlay monta Dashboard.tsx/
-  // JobLanding.tsx al hacer click en "Ajustar CV".
-  resumeStudioActive: boolean;
   loginWithGoogle: (returnTo?: string) => Promise<void>;
   loginWithEmail: (email: string, password: string) => Promise<{ error?: string }>;
   signUpWithEmail: (
@@ -61,7 +56,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [subscriptionEnd, setSubscriptionEnd] = useState<string | undefined>(undefined);
   const [dbName, setDbName] = useState<string | undefined>(undefined);
   const [preferredRoles, setPreferredRoles] = useState<string[] | null>(null);
-  const [resumeStudioActive, setResumeStudioActive] = useState(false);
   // Distinct from `loading` (session resolution): tracks whether the /api/me
   // round trip has settled at least once for the current session, so callers
   // can tell "not onboarded yet" (preferredRoles === null, profileLoaded)
@@ -82,7 +76,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSubscriptionEnd(data.subscriptionEnd);
       setDbName(data.name || undefined);
       setPreferredRoles(Array.isArray(data.preferredRoles) ? data.preferredRoles : null);
-      setResumeStudioActive(!!data.resumeStudioActive);
     } catch (e) {
       console.warn("[Auth] No se pudo verificar el tier con el servidor:", e);
     } finally {
@@ -130,7 +123,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setSubscriptionEnd(undefined);
         setDbName(undefined);
         setPreferredRoles(null);
-        setResumeStudioActive(false);
         setProfileLoaded(false);
       }
     });
@@ -310,7 +302,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         accessToken: session?.access_token || null,
         preferredRoles,
         profileLoaded,
-        resumeStudioActive,
         loginWithGoogle,
         loginWithEmail,
         signUpWithEmail,

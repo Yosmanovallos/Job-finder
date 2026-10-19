@@ -1,12 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../auth/auth-provider.js";
-import {
-  PRO_MONTHLY_PRICE_COP,
-  formatCOP,
-  PAYWALL_ENABLED,
-  RESUME_STUDIO_ENABLED
-} from "../config.js";
+import { PRO_MONTHLY_PRICE_COP, formatCOP, PAYWALL_ENABLED } from "../config.js";
 
 interface TransactionRecord {
   id: string;
@@ -96,30 +91,12 @@ export default function Account() {
           Mi cuenta
         </h1>
 
-        {/* Shell de navegación de Settings (Fase 6 de
-            docs/RESUME-STUDIO-PLAN.md, §6 fila 6) — Cuenta/IA/Currículum/
-            Facturación/Seguridad. Solo "IA" está conectada a una página
-            real hoy, y solo cuando RESUME_STUDIO_ENABLED (mismo patrón
-            hardcoded-boolean que PAYWALL_ENABLED, config.ts) está en
-            true — el resto queda preparado para fases futuras sin que
-            cada una tenga que rediseñar esta barra. */}
+        {/* Shell de navegación de Settings — Cuenta/Facturación/Seguridad.
+            El resto queda preparado para fases futuras sin que cada una
+            tenga que rediseñar esta barra. */}
         <nav className="flex items-center gap-1 mb-8 border-b border-[#e6e8e4]">
           <span className="px-3 py-2 text-xs font-mono font-semibold text-foreground border-b-2 border-primary -mb-px">
             Cuenta
-          </span>
-          {RESUME_STUDIO_ENABLED && (
-            <Link
-              to="/cuenta/ai/providers"
-              className="px-3 py-2 text-xs font-mono font-semibold text-muted-foreground hover:text-foreground transition-colors"
-            >
-              IA
-            </Link>
-          )}
-          <span
-            className="px-3 py-2 text-xs font-mono font-semibold text-ink-faint/50 cursor-not-allowed"
-            title="Próximamente"
-          >
-            Currículum
           </span>
           <span
             className="px-3 py-2 text-xs font-mono font-semibold text-ink-faint/50 cursor-not-allowed"

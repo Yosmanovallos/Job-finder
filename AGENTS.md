@@ -104,8 +104,9 @@ pnpm apply:prepare --job <uuid> && pnpm apply:approve --application <uuid>
 - Roadmap maestro: `job-radar-apify/docs/PROD-IMPROVEMENTS-PLAN.md`
   (estado por fase, gates, rollback). Artefactos spec-driven por cambio:
   `job-radar-apify/openspec/` — un cambio por fase, archivar al completar.
-- Work in the isolated `codex/prod-improvements-seo-ux-security` worktree;
-  do not inspect, merge or modify the frozen CV Generator work.
+- Work in an isolated `codex/` worktree started from `origin/main`. The CV
+  Generator / Resume Studio / BYOK was removed from production on 2026-10-18;
+  do not reintroduce it.
 - In `job-radar-apify`, `npm run test:unit` runs offline safety, dashboard
   filter and role-matching checks with sanitized environment and blocked TCP.
 - `npm run test:integration` provisions its own disposable PostgreSQL 16
@@ -143,9 +144,8 @@ pnpm apply:prepare --job <uuid> && pnpm apply:approve --application <uuid>
   `buscotrabajo-social-automation` on Free. Total intended Render spend stays
   below USD 10/month; do not upgrade, duplicate or add paid services without
   explicit user approval.
-- Never mix dashboard/performance work with CV Generator work. Start from the
-  current production `origin/main` in an isolated `codex/` worktree and verify
-  the diff contains no CV Generator files before deployment.
+- Start dashboard/performance work from the current production `origin/main`
+  in an isolated `codex/` worktree.
 
 ## Agent readiness — protected public contract
 

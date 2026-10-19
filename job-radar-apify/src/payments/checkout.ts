@@ -13,8 +13,7 @@ export type CheckoutPlan = "pro" | "pro_max";
 export interface StartCheckoutInput {
   userId: string;
   userEmail: string;
-  /** Fase 10 (docs/CV-GENERATION-PLAN.md §10) — default 'pro' preserves
-   * every caller from before this existed. */
+  /** Default 'pro' preserves every caller from before this existed. */
   plan?: CheckoutPlan;
 }
 

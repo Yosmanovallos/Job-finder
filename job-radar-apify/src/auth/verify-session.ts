@@ -23,8 +23,6 @@ export interface VerifiedSession {
   tier: "free" | "pro" | "pro_max";
   subscriptionEnd: string | null;
   preferredRoles: string[] | null;
-  /** Fase 1 de docs/RESUME-STUDIO-PLAN.md — ver AppUser.resumeStudioBeta. */
-  resumeStudioBeta: boolean;
 }
 
 function extractBearerToken(req: IncomingMessage): string | null {
@@ -57,7 +55,6 @@ export async function verifySession(req: IncomingMessage): Promise<VerifiedSessi
     name: appUser.name,
     tier: appUser.subscriptionTier,
     subscriptionEnd: appUser.subscriptionEnd,
-    preferredRoles: appUser.preferredRoles,
-    resumeStudioBeta: appUser.resumeStudioBeta
+    preferredRoles: appUser.preferredRoles
   };
 }

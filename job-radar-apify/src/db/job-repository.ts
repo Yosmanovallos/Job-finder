@@ -1191,10 +1191,6 @@ export interface AppUser {
   subscriptionTier: SubscriptionTier;
   subscriptionEnd: string | null;
   preferredRoles: string[] | null;
-  /** Fase 1 de docs/RESUME-STUDIO-PLAN.md — flag por-usuario del beta,
-   * DEFAULT false en el schema. No confundir con RESUME_STUDIO_ENABLED (env,
-   * kill-switch de despliegue) — este campo solo importa si ese env es true. */
-  resumeStudioBeta: boolean;
 }
 
 function effectiveTier(row: {
@@ -1225,7 +1221,7 @@ export async function getOrCreateUser(
     `INSERT INTO users (id, email, name)
      VALUES ($1, $2, $3)
      ON CONFLICT (id) DO UPDATE SET email = EXCLUDED.email
-     RETURNING id, email, name, subscription_tier, subscription_end, preferred_roles, resume_studio_beta`,
+     RETURNING id, email, name, subscription_tier, subscription_end, preferred_roles`,
     [authUid, email, name ?? null]
   );
   const row = result.rows[0];
@@ -1235,8 +1231,7 @@ export async function getOrCreateUser(
     name: row.name,
     subscriptionTier: effectiveTier(row),
     subscriptionEnd: row.subscription_end,
-    preferredRoles: row.preferred_roles,
-    resumeStudioBeta: row.resume_studio_beta
+    preferredRoles: row.preferred_roles
   };
 }
 
@@ -1248,7 +1243,7 @@ export async function getOrCreateUser(
 export async function updateUserName(authUid: string, name: string): Promise<AppUser> {
   const result = await pool.query(
     `UPDATE users SET name = $2 WHERE id = $1
-     RETURNING id, email, name, subscription_tier, subscription_end, preferred_roles, resume_studio_beta`,
+     RETURNING id, email, name, subscription_tier, subscription_end, preferred_roles`,
     [authUid, name]
   );
   const row = result.rows[0];
@@ -1258,8 +1253,7 @@ export async function updateUserName(authUid: string, name: string): Promise<App
     name: row.name,
     subscriptionTier: effectiveTier(row),
     subscriptionEnd: row.subscription_end,
-    preferredRoles: row.preferred_roles,
-    resumeStudioBeta: row.resume_studio_beta
+    preferredRoles: row.preferred_roles
   };
 }
 
@@ -1272,7 +1266,7 @@ export async function updateUserName(authUid: string, name: string): Promise<App
 export async function updateUserPreferredRoles(authUid: string, roles: string[]): Promise<AppUser> {
   const result = await pool.query(
     `UPDATE users SET preferred_roles = $2::jsonb WHERE id = $1
-     RETURNING id, email, name, subscription_tier, subscription_end, preferred_roles, resume_studio_beta`,
+     RETURNING id, email, name, subscription_tier, subscription_end, preferred_roles`,
     [authUid, JSON.stringify(roles)]
   );
   const row = result.rows[0];
@@ -1282,8 +1276,7 @@ export async function updateUserPreferredRoles(authUid: string, roles: string[])
     name: row.name,
     subscriptionTier: effectiveTier(row),
     subscriptionEnd: row.subscription_end,
-    preferredRoles: row.preferred_roles,
-    resumeStudioBeta: row.resume_studio_beta
+    preferredRoles: row.preferred_roles
   };
 }
 
