@@ -107,7 +107,7 @@ nulo o futuro.
 |---|---|
 | D1 ✅ | Esquema, Greenhouse, Lever, Ashby (APIs públicas documentadas) y SmartRecruiters; tick con `--dry-run`; BD local; pruebas |
 | D2 ✅ (desplegada 2026-10-20) | Workflow `direct-employers-tick.yml` (tick cada 6 h; migración y seed solo por `workflow_dispatch`) + migración en producción. SmartRecruiters **habilitado por opt-in explícito del dueño el 2026-10-19** (ADR-0002 §2) |
-| D3 | Descubrimiento de empresas (§7). Meta del dueño (2026-10-20): cubrir el 100 % de las empresas de Colombia que publiquen vacantes en un portal propio |
+| D3 | Descubrimiento de empresas (§7, decisión en §7.1). Meta del dueño (2026-10-20): cubrir el 100 % de las empresas de Colombia que publiquen vacantes en un portal propio — medido por vía y con denominador explícito, nunca afirmado sin evidencia |
 | D4 | **Prioridad oficial sobre bolsas sin duplicados** (§8) y luego visibilidad en dashboard y `/empresas/:slug`. Hasta D4 nada de esto se muestra en el sitio |
 | D5 | Conectores por cobertura medida (§7): Workday CXS, SuccessFactors (sitemap + microdatos `datePosted`), Phenom, Gupy, Eightfold, Teamtailor — cada uno tras revisión `source-researcher` de robots/términos |
 
@@ -131,6 +131,63 @@ nombre Colombia **y** nombre de empresa coincidente donde el ATS lo da) →
 `employer_sources` habilitado. Corre por lotes acotados en GitHub Actions. El
 volumen grande llega con D5 (Workday/SuccessFactors/Phenom), no con más
 slugs de Greenhouse.
+
+### 7.1 Decisión D3 (2026-10-20, tras revisión `architect` + `data-quality-reviewer` + `source-researcher`)
+
+Medido al diseñar: el directorio de producción **no tiene dominio** para casi
+ninguna empresa. El `logoUrl` sale de `COMPANY_LOGO_DOMAINS`
+(`src/data/company-logo-domains.ts`), un mapa curado a mano de ~80 nombres;
+`jobs` no guarda el sitio de la empresa. Las cifras del top 100 de arriba son
+de esa parte curada y no se extrapolan. Por eso la huella del sitio **no**
+puede ser la vía principal.
+
+- **Candidatos**: empresas del directorio de Colombia (`jobs` vigentes,
+  `country = 'CO'` o remotas), en orden descendente de vacantes, sin nombres
+  de relleno (`isPlaceholderCompanyKeySql`). datos.gov.co queda como
+  **denominador** externo (pendiente), no como fuente de dominios. Common
+  Crawl se pospone (Greenhouse/Ashby ~0 en CDX).
+- **Vía 1 — nombre en el ATS** (escala sin dominio). Slugs deterministas
+  derivados del nombre. Habilita sola **solo** en Greenhouse
+  (`/v1/boards/{token}` declara `name`) y SmartRecruiters
+  (`company.name`), y solo si: nombre declarado con el mismo `company_key`
+  que el candidato, clave de ≥ 4 caracteres y no genérica, candidato que no
+  es agencia (lista curada `data/direct-discovery-agencies.json`), listado
+  completo y ≥ 1 vacante vigente en Colombia (la "señal Colombia"). Un
+  acierto en Lever o Ashby (no declaran nombre) va a `needs_review`.
+- **Vía 2 — sitio propio**, solo con dominio respaldado por evidencia (hoy
+  el mapa curado). Reglas en `docs/source-catalog/site-probe-ats-links.md`:
+  robots.txt (RFC 9309), nunca evadir bloqueos, no seguir dominios ajenos,
+  redirects revisados salto a salto, cuerpo ≤ 2 MB, solo hrefs como
+  evidencia. Un link desde el sitio a Greenhouse/Lever/Ashby/SmartRecruiters
+  con ≥ 1 vacante vigente en Colombia verifica; a un ATS sin conector
+  (Workday, SuccessFactors, Buk, Gupy…) queda solo como evidencia para D5;
+  a Magneto, en su propio estado (pregunta abierta).
+- **Dominios**: se miden antes de adivinarlos — modo de solo lectura
+  `domain-census` del workflow (hosts de ATS, sitios y dominios de correo
+  mencionados en las vacantes por empresa). Un dominio adivinado
+  (`{clave}.com.co`) nunca habilita nada.
+- **Nunca sobrescribe**: el descubrimiento solo inserta
+  (`ON CONFLICT DO NOTHING`). Un tablero que ya tiene dueño no se reasigna,
+  un slug existente con otra `company_key` no se renombra, un alias de otra
+  empresa no se toma: todo eso va a `needs_review`. `employers` /
+  `employer_sources` solo reciben candidatos `verified`; lo no verificado y
+  los ATS sin conector viven solo en `employer_discovery`.
+- **Reversión blanda**: `rejected` (decisión humana) es pegajoso — re-correr
+  el descubrimiento no lo reabre. Revertir = `enabled = false` + retirar el
+  alias, con constancia en `employer_discovery`. Nunca `DELETE employers`
+  (cascada + purga de cerradas a 1 día).
+- **Cobertura por vía**, nunca un solo porcentaje: cada candidato guarda
+  `name_probe_status` y `site_probe_status` por separado. "No encontrado por
+  nombre" no es "sin portal"; `no_portal` solo existe tras leer un sitio con
+  dominio con evidencia. El reporte muestra la fracción sondeada y el grupo
+  `no_domain` a propósito, por empresas y ponderado por vacantes.
+- **Capacidad del tick**: con N tableros habilitados cada uno se lee cada
+  ⌈N / 50⌉ × 6 h. El descubrimiento tiene tope de habilitaciones por
+  corrida y el reporte muestra el `last_ok_at` más viejo; subir el tope del
+  tick es una decisión aparte.
+- **Aislamiento**: una prueba recorre el grafo de imports desde
+  `src/server.ts` y falla si llega a `src/direct/**` o a
+  `src/db/direct-*` (§9).
 
 ### 8. Prioridad: la vacante oficial gana y no se repite (requisito del dueño)
 

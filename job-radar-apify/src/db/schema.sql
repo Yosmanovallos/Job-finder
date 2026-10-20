@@ -812,3 +812,49 @@ BEGIN
 END
 $revoke$;
 -- END direct-employers
+
+-- BEGIN direct-discovery
+-- Descubrimiento de empresas con portal propio (docs/adr/0006-direct-employers.md
+-- §7.1, fase D3). Aditivo e idempotente; lo aplica
+-- scripts/migrate-direct-employers.ts junto al bloque direct-employers. Una
+-- fila por candidato del directorio (company_key de jobs). Lo no verificado y
+-- los ATS sin conector viven solo aquí: employers / employer_sources reciben
+-- únicamente candidatos verified. Estados validados en la app
+-- (src/direct/discovery/probe.ts); la BD solo exige formato.
+CREATE TABLE IF NOT EXISTS employer_discovery (
+    id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    company_key        TEXT UNIQUE NOT NULL,
+    company_name       VARCHAR(255) NOT NULL,
+    directory_count    INTEGER NOT NULL DEFAULT 0,
+    website_domain     VARCHAR(255),
+    -- De dónde salió el dominio; solo un origen con evidencia lo pone aquí.
+    domain_origin      VARCHAR(30) CHECK (domain_origin ~ '^[a-z0-9_]{2,30}$'),
+    name_probe_status  VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (name_probe_status ~ '^[a-z_]{2,20}$'),
+    site_probe_status  VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (site_probe_status ~ '^[a-z_]{2,20}$'),
+    decision           VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (decision ~ '^[a-z_]{2,20}$'),
+    decision_reason    VARCHAR(300),
+    decided_by         VARCHAR(10) CHECK (decided_by IN ('auto', 'human')),
+    decided_at         TIMESTAMPTZ,
+    rule_version       VARCHAR(20),
+    employer_id        UUID REFERENCES employers(id) ON DELETE SET NULL,
+    -- Última evidencia: {boards, site} — sin HTML, solo pares ATS, URLs y conteos.
+    evidence           JSONB NOT NULL DEFAULT '{}'::jsonb,
+    -- Bitácora de decisiones (append-only): nunca se reescribe una entrada.
+    history            JSONB NOT NULL DEFAULT '[]'::jsonb,
+    attempts           INTEGER NOT NULL DEFAULT 0,
+    last_probed_at     TIMESTAMPTZ,
+    next_probe_at      TIMESTAMPTZ,
+    created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_employer_discovery_due ON employer_discovery (decision, next_probe_at, directory_count DESC);
+ALTER TABLE employer_discovery ENABLE ROW LEVEL SECURITY;
+DO $revoke$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon')
+     AND EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+    REVOKE ALL ON employer_discovery FROM anon, authenticated;
+  END IF;
+END
+$revoke$;
+-- END direct-discovery

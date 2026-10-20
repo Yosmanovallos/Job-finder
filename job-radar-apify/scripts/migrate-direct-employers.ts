@@ -1,7 +1,8 @@
 /**
  * Migration for official employer vacancies (docs/adr/0006-direct-employers.md).
- * Applies schema.sql's additive `direct-employers` block: four NEW tables with
- * RLS + REVOKE. Touches no existing table, so it takes no lock on `jobs`.
+ * Applies schema.sql's additive `direct-employers` block (four NEW tables) and
+ * `direct-discovery` block (employer_discovery, phase D3), all with RLS +
+ * REVOKE. Touches no existing table, so it takes no lock on `jobs`.
  *
  * Run once, explicitly:
  *   npx tsx scripts/migrate-direct-employers.ts --dry-run
@@ -16,7 +17,8 @@ import { assertDirectDatabaseAllowed } from "../src/direct/db-guard.js";
 
 dotenv.config();
 
-const TABLES = ["employers", "employer_aliases", "employer_sources", "direct_jobs"];
+const TABLES = ["employers", "employer_aliases", "employer_sources", "direct_jobs", "employer_discovery"];
+const BLOCKS = ["direct-employers", "direct-discovery"];
 
 async function main() {
   assertDirectDatabaseAllowed(process.env.DATABASE_URL, process.argv);
@@ -35,9 +37,11 @@ async function main() {
       return;
     }
     const schema = await readFile(new URL("../src/db/schema.sql", import.meta.url), "utf8");
-    const block = /-- BEGIN direct-employers\r?\n([\s\S]*?)-- END direct-employers/.exec(schema)?.[1];
-    if (!block) throw new Error("schema.sql no contiene el bloque direct-employers.");
-    await pool.query(block);
+    for (const name of BLOCKS) {
+      const block = new RegExp(`-- BEGIN ${name}\\r?\\n([\\s\\S]*?)-- END ${name}`).exec(schema)?.[1];
+      if (!block) throw new Error(`schema.sql no contiene el bloque ${name}.`);
+      await pool.query(block);
+    }
     const after = await pool.query<{ n: number }>(
       `SELECT COUNT(*)::int AS n FROM information_schema.tables WHERE table_schema = 'public' AND table_name = ANY($1)`,
       [TABLES]

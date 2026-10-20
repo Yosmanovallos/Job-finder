@@ -8,6 +8,9 @@
  *   npm run direct:local -- run      up + migrate + seed + tick + report
  *   npm run direct:local -- tick     tick again (all boards, ignoring the interval)
  *   npm run direct:local -- report   official vs job-board counts per employer
+ *   npm run direct:local -- discover [args]  discovery (D3) against the local DB
+ *   npm run direct:local -- coverage discovery coverage funnel
+ *   npm run direct:local -- review [args]    list / approve / reject candidates
  *   npm run direct:local -- down     stop the container (data kept)
  *   npm run direct:local -- reset    delete the container AND its data
  */
@@ -106,6 +109,13 @@ async function main() {
       return runScript("run-direct-tick.ts", ["--force", ...process.argv.slice(3)]);
     case "report":
       return runScript("direct-report.ts");
+    case "discover":
+      runScript("migrate-direct-employers.ts");
+      return runScript("discover-direct-employers.ts", process.argv.slice(3));
+    case "coverage":
+      return runScript("direct-coverage.ts");
+    case "review":
+      return runScript("direct-discovery-review.ts", process.argv.slice(3));
     case "down":
       docker(["stop", CONTAINER], true);
       return console.log("[direct-local] Contenedor detenido (datos conservados).");
@@ -114,7 +124,7 @@ async function main() {
       docker(["volume", "rm", VOLUME], true);
       return console.log("[direct-local] Contenedor y datos locales eliminados.");
     default:
-      throw new Error("Uso: npm run direct:local -- up|run|tick|report|down|reset");
+      throw new Error("Uso: npm run direct:local -- up|run|tick|report|discover|coverage|review|down|reset");
   }
 }
 

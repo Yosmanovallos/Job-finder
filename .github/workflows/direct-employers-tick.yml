@@ -13,7 +13,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "tick | dry-run | migrate-dry-run | migrate | seed-dry-run | seed"
+        description: "tick | dry-run | migrate-dry-run | migrate | seed-dry-run | seed | domain-census | discover-dry-run | discover | coverage"
         required: true
         default: "dry-run"
         type: choice
@@ -24,6 +24,12 @@ on:
           - migrate
           - seed-dry-run
           - seed
+          # Phase D3 (ADR 0006 §7.1). domain-census, discover-dry-run and
+          # coverage only READ the database; discover writes (insert-only).
+          - domain-census
+          - discover-dry-run
+          - discover
+          - coverage
 
 concurrency:
   group: direct-employers-tick
@@ -47,8 +53,8 @@ jobs:
           cd job-radar-apify
           npm ci || npm install
 
-      # Migration and seed run only when dispatched by hand, never on the
-      # schedule (schema changes are explicit — job-radar-apify/CLAUDE.md).
+      # Migration, seed and discovery run only when dispatched by hand, never
+      # on the schedule (schema changes are explicit — job-radar-apify/CLAUDE.md).
       - name: Run
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
@@ -63,6 +69,10 @@ jobs:
             migrate)         cmd="npx tsx scripts/migrate-direct-employers.ts --allow-remote-db" ;;
             seed-dry-run)    cmd="npx tsx scripts/seed-direct-employers.ts --dry-run" ;;
             seed)            cmd="npx tsx scripts/seed-direct-employers.ts --allow-remote-db" ;;
+            domain-census)   cmd="npx tsx scripts/direct-domain-census.ts --allow-remote-db" ;;
+            discover-dry-run) cmd="npx tsx scripts/discover-direct-employers.ts --dry-run --allow-remote-db --limit 100" ;;
+            discover)        cmd="npx tsx scripts/discover-direct-employers.ts --allow-remote-db --limit 300 --max-enables 20 --deadline-min 14" ;;
+            coverage)        cmd="npx tsx scripts/direct-coverage.ts --allow-remote-db" ;;
             *) echo "modo desconocido: $MODE"; exit 1 ;;
           esac
           echo "## Direct employers — $MODE" >> "$GITHUB_STEP_SUMMARY"
