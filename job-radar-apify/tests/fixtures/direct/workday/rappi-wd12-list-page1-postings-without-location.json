@@ -1,0 +1,135 @@
+{
+  "total": 24,
+  "jobPostings": [
+    {
+      "title": "NOC",
+      "externalPath": "/job/DBA-DevOps_JR108149",
+      "timeType": "Full time",
+      "postedOn": "Posted 30+ Days Ago",
+      "bulletFields": [
+        "JR108149"
+      ]
+    },
+    {
+      "title": "Auxiliar de Operações RappiTurbo - Volante",
+      "externalPath": "/job/BRA-So-Paulo/Auxiliar-de-Operaes--RappiTurbo_JR106306",
+      "timeType": "Full time",
+      "locationsText": "BRA-São Paulo",
+      "postedOn": "Posted 30+ Days Ago",
+      "bulletFields": [
+        "JR106306"
+      ]
+    },
+    {
+      "title": "iOs Developer",
+      "externalPath": "/job/iOs-Developer_JR106313",
+      "timeType": "Full time",
+      "postedOn": "Posted 30+ Days Ago",
+      "bulletFields": [
+        "JR106313"
+      ]
+    },
+    {
+      "title": "Auxiliar de Operações - Picker",
+      "externalPath": "/job/BRA-So-Paulo/Auxiliar-de-Operaes---Picker_JR103878",
+      "timeType": "Full time",
+      "locationsText": "36 Locations",
+      "postedOn": "Posted 30+ Days Ago",
+      "bulletFields": [
+        "JR103878"
+      ]
+    }
+  ],
+  "facets": [
+    {
+      "facetParameter": "jobFamilyGroup",
+      "descriptor": "Job Category",
+      "values": [
+        {
+          "descriptor": "Business Group",
+          "id": "13c153b615df100963a4fe89d4db0000",
+          "count": 20
+        },
+        {
+          "descriptor": "JFG: Business",
+          "id": "9f5804a6e51310020cd0ccf1c09e0000",
+          "count": 1
+        },
+        {
+          "descriptor": "JFG: Operations",
+          "id": "35c273db87bf1000339e1a800a810000",
+          "count": 1
+        },
+        {
+          "descriptor": "JFG: Technology",
+          "id": "35c273db87bf1000339e18141a4d0000",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "facetParameter": "workerSubType",
+      "descriptor": "Job Type",
+      "values": [
+        {
+          "descriptor": "Fixed Term (Fixed Term)",
+          "id": "35c273db87bf100032876d4e48340000",
+          "count": 19
+        },
+        {
+          "descriptor": "Intern (Fixed Term) (Trainee)",
+          "id": "35c273db87bf100032876c0999990000",
+          "count": 1
+        },
+        {
+          "descriptor": "Regular",
+          "id": "35c273db87bf100032876a3632470001",
+          "count": 4
+        }
+      ]
+    },
+    {
+      "facetParameter": "timeType",
+      "descriptor": "Full/Part-time",
+      "values": [
+        {
+          "descriptor": "Full time",
+          "id": "7d29b7bf8b481010fb265cf9c9d90003",
+          "count": 24
+        }
+      ]
+    },
+    {
+      "facetParameter": "locationMainGroup",
+      "values": [
+        {
+          "facetParameter": "locations",
+          "descriptor": "Locations",
+          "values": [
+            {
+              "descriptor": "BRA - BEL_Região Centro",
+              "id": "277fb8846e31100129e012383a970000",
+              "count": 1
+            },
+            {
+              "descriptor": "BRA - BEL_Região Leste",
+              "id": "808f10a2c51a100129f64571df3d0000",
+              "count": 1
+            },
+            {
+              "descriptor": "BRA - BEL_Região Norte",
+              "id": "808f10a2c51a100129b60601f8e50000",
+              "count": 1
+            },
+            {
+              "descriptor": "BRA - BEL_Região Oeste",
+              "id": "808f10a2c51a10012a0fba36588d0000",
+              "count": 1
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "userAuthenticated": false
+}

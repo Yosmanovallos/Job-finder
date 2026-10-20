@@ -1,0 +1,20 @@
+{
+  "http429": {
+    "errorCode": "HTTP_429",
+    "httpStatus": 429,
+    "message": ""
+  },
+  "http422_unknown_tenant_or_pod": {
+    "errorCode": "HTTP_422",
+    "httpStatus": 422
+  },
+  "http400_limit_over_20_or_unknown_facet_key": {
+    "errorCode": "HTTP_400",
+    "httpStatus": 400
+  },
+  "http404_unknown_site": {
+    "errorCode": "S21",
+    "httpStatus": 404,
+    "message": "not found: Job_Posting_Site_ID=..."
+  }
+}

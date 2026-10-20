@@ -1,0 +1,169 @@
+{
+  "total": 341,
+  "jobPostings": [
+    {
+      "title": "Drawing Specialist, Facilities",
+      "externalPath": "/job/Uppsala/Drawing-specialist_JR020745-2",
+      "locationsText": "Uppsala",
+      "postedOn": "Posted 29 Days Ago",
+      "bulletFields": [
+        "JR020745"
+      ]
+    },
+    {
+      "title": "Manager, U.S. Benefits",
+      "externalPath": "/job/Boston/Manager--US-Benefits_JR021226-1",
+      "locationsText": "Boston",
+      "postedOn": "Posted Today",
+      "bulletFields": [
+        "JR021226"
+      ]
+    },
+    {
+      "title": "Senior Employee Relations Partner",
+      "externalPath": "/job/Remote-US/Senior-Employee-Relations-Partner_JR021262-1",
+      "locationsText": "Remote-US",
+      "postedOn": "Posted Today",
+      "bulletFields": [
+        "JR021262"
+      ]
+    },
+    {
+      "title": "Account Manager, Immunology - Asheville, NC",
+      "externalPath": "/job/Asheville-NC/Account-Manager--Immunology---Asheville--NC_JR021224",
+      "locationsText": "Asheville, NC",
+      "postedOn": "Posted Today",
+      "bulletFields": [
+        "JR021224"
+      ]
+    },
+    {
+      "title": "Invoicing & Receivables Coord",
+      "externalPath": "/job/Mexico-City/Invoicing---Receivables-Coord_JR021152",
+      "locationsText": "Mexico City",
+      "postedOn": "Posted Today",
+      "bulletFields": [
+        "JR021152"
+      ]
+    }
+  ],
+  "facets": [
+    {
+      "facetParameter": "alocationCountry",
+      "descriptor": "Country",
+      "values": [
+        {
+          "descriptor": "United States of America",
+          "id": "bc33aa3152ec42d4995f4791a106ed09",
+          "count": 66
+        },
+        {
+          "descriptor": "China",
+          "id": "6cb77610a8a543aea2d6bc10457e35d4",
+          "count": 64
+        },
+        {
+          "descriptor": "Canada",
+          "id": "a30a87ed25634629aa6c3958aa2b91ea",
+          "count": 58
+        },
+        {
+          "descriptor": "India",
+          "id": "c4f78be1a8f14da0ab49ce1162348a5e",
+          "count": 25
+        },
+        {
+          "descriptor": "Colombia",
+          "id": "e8106cd6a3534f2dba6fdee2d41db89d",
+          "count": 7
+        }
+      ]
+    },
+    {
+      "facetParameter": "blocations",
+      "descriptor": "Locations",
+      "values": [
+        {
+          "descriptor": "Baie-D'Urfé",
+          "id": "bd2de1bd985801172f39dc48d50055df",
+          "count": 51
+        },
+        {
+          "descriptor": "Mumbai",
+          "id": "bd2de1bd985801f8fc38e948d5009fdf",
+          "count": 23
+        },
+        {
+          "descriptor": "Shanghai",
+          "id": "bd2de1bd985801fa6c96b748d500f6de",
+          "count": 22
+        },
+        {
+          "descriptor": "Barcelona",
+          "id": "81f95ee679ce1000f5b58c64ed410000",
+          "count": 18
+        }
+      ]
+    },
+    {
+      "facetParameter": "cjobFamilyGroup",
+      "descriptor": "Job Category",
+      "values": [
+        {
+          "descriptor": "Commercial",
+          "id": "bd2de1bd985801eebb88c99ad3009e89",
+          "count": 134
+        },
+        {
+          "descriptor": "Research and Development",
+          "id": "bd2de1bd9858013f6c05c99ad3009c89",
+          "count": 32
+        },
+        {
+          "descriptor": "Marketing",
+          "id": "1c033b194a7d1001e35683b5e4670000",
+          "count": 29
+        },
+        {
+          "descriptor": "Supply Chain",
+          "id": "bd2de1bd9858010b4822ca9ad300a089",
+          "count": 26
+        }
+      ]
+    },
+    {
+      "facetParameter": "dworkerSubType",
+      "descriptor": "Job Type",
+      "values": [
+        {
+          "descriptor": "Regular",
+          "id": "bd2de1bd9858010d60ca1ec8d400918f",
+          "count": 272
+        },
+        {
+          "descriptor": "Fixed Term (Fixed Term)",
+          "id": "bd2de1bd9858016ef63d1fc8d400938f",
+          "count": 68
+        },
+        {
+          "descriptor": "Intern (Fixed Term)",
+          "id": "bd2de1bd985801854a0d1fc8d400928f",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "facetParameter": "etimeType",
+      "descriptor": "Full/Part-time",
+      "values": [
+        {
+          "descriptor": "Full time",
+          "id": "e49cdb8e6b5d01d8d8751f425d086300",
+          "count": 288
+        }
+      ]
+    }
+  ],
+  "userAuthenticated": false,
+  "_note": "jobPostings recortado a 5, facets recortadas (se conserva Colombia). total real=341"
+}

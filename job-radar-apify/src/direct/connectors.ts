@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { listSuccessFactors } from "./ats/successfactors.js";
 import { listTeamtailor } from "./ats/teamtailor.js";
+import { listWorkday, WORKDAY_REF } from "./ats/workday.js";
 import { SITE_REF } from "./ats/site.js";
 import { htmlToText, isoDate, safeJson, text } from "./text.js";
 import type { BoardListing, DirectAtsType, EmployerSourceRef, HttpGet, ListOptions, RawAtsPosting, Workplace } from "./types.js";
@@ -325,6 +326,17 @@ const CONNECTORS: Record<DirectAtsType, Connector> = {
     refPattern: /^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?(?:\.[a-z]{2})?$/,
     portalUrl: (ref) => `https://${ref}.teamtailor.com/jobs`,
     list: listTeamtailor
+  },
+  // Undocumented JSON endpoint of the public career site
+  // (docs/source-catalog/workday.md). A nonexistent id answers 404, but no
+  // real closed posting was checked: listings only.
+  workday: {
+    refPattern: WORKDAY_REF,
+    portalUrl: (ref) => {
+      const [, tenant, pod, site] = WORKDAY_REF.exec(ref)!;
+      return `https://${tenant}.${pod}.myworkdayjobs.com/${site}`;
+    },
+    list: listWorkday
   }
 };
 

@@ -1,0 +1,8 @@
+{
+  "errorCode": "S21",
+  "errorCaseId": "(redacted)",
+  "httpStatus": 404,
+  "message": "not found: Job_Posting_Anchor_ID=Nope_JR999999",
+  "messageParams": {},
+  "_note": "HTTP 404 observado en GET detalle de id inexistente"
+}

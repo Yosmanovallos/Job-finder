@@ -1,0 +1,35 @@
+{
+  "jobPostingInfo": {
+    "title": "JUNIOR DATA SCIENTIST",
+    "jobDescription": "<p><b>Dreaming big is in our DNA. It’s who we are as a company. It’s our culture. It’s our heritage. And more than ever, it’s our future. A future where we’re always looking forward. Always serving up new ways to meet life’s moments. A future where we keep dreaming bigger. We look for people with pa...[recortado]",
+    "location": "COL - Office - Edificio Calle 127",
+    "postedOn": "Posted 30+ Days Ago",
+    "startDate": "2023-09-26",
+    "timeType": "Full time",
+    "jobReqId": "30050717",
+    "jobPostingId": "JUNIOR-DATA-SCIENTIST_30050717",
+    "jobPostingSiteId": "COL",
+    "country": {
+      "descriptor": "Colombia",
+      "id": "e8106cd6a3534f2dba6fdee2d41db89d"
+    },
+    "canApply": true,
+    "posted": true,
+    "includeResumeParsing": true,
+    "jobRequisitionLocation": {
+      "descriptor": "COL - Office - Edificio Calle 127",
+      "country": {
+        "descriptor": "Colombia",
+        "id": "e8106cd6a3534f2dba6fdee2d41db89d",
+        "alpha2Code": "CO"
+      }
+    },
+    "externalUrl": "https://wd1.myworkdaysite.com/recruiting/abinbev/COL/job/COL---Office---Edificio-Calle-127/JUNIOR-DATA-SCIENTIST_30050717"
+  },
+  "hiringOrganization": {
+    "name": "CO19 BAVARIA & CIA S.C.A",
+    "url": ""
+  },
+  "similarJobs": [],
+  "userAuthenticated": false
+}
