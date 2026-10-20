@@ -3,7 +3,7 @@ import { listBoard } from "../connectors.js";
 import { selectColombianPostings } from "../ingest.js";
 import { safeJson } from "../text.js";
 import { DIRECT_ATS_TYPES, type DirectAtsType, type HttpGet } from "../types.js";
-import { companyKey, companyWords, isWeakKey } from "./company-key.js";
+import { companyKey, companyWords, foldName, isWeakKey } from "./company-key.js";
 import type { DetectableAtsType } from "./ats-links.js";
 import type { SiteProbeResult } from "./site-probe.js";
 
@@ -236,7 +236,22 @@ export async function probeCandidate(candidate: DiscoveryCandidate, deps: ProbeD
       notes = { pagesRead: [], offsiteCareersHosts: [], detail: site.detail };
     }
   }
+  // The curated agency list only covers the directory's top; past it, a name
+  // that declares itself an agency never auto-verifies (BPOs are employers
+  // and stay out of this pattern).
+  if (looksLikeAgency(candidate.companyName)) {
+    for (const entry of evidence) {
+      if (entry.outcome === "verified") Object.assign(entry, { outcome: "needs_review", reason: "el nombre parece de agencia de empleo: revisión humana" });
+    }
+  }
   return { nameProbe, siteProbe, evidence, site: notes, ...decide(nameProbe, siteProbe, evidence) };
+}
+
+const AGENCY_WORDS = /\b(temporal(es)?|empleos?|staffing|recruit(ing|ment|ers?)?|reclutamiento|headhunt(ers?|ing)?|seleccion de personal|bolsa de trabajo)\b/;
+
+/** Name declares an employment agency ("Servicios Temporales", "XYZ Staffing"). */
+export function looksLikeAgency(name: string): boolean {
+  return AGENCY_WORDS.test(foldName(name));
 }
 
 function decide(nameProbe: NameProbeStatus, siteProbe: SiteProbeStatus, evidence: BoardEvidence[]): { decision: Decision; reason: string } {

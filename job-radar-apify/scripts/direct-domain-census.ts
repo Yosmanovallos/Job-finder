@@ -28,7 +28,7 @@ const ATS_HOST = String.raw`(?:[a-z0-9-]+\.)*(?:greenhouse\.io|lever\.co|ashbyhq
 async function main() {
   assertDirectDatabaseAllowed(process.env.DATABASE_URL, process.argv);
   const { pool } = await import("../src/db/client.js");
-  const { isPlaceholderCompanyKeySql } = await import("../src/lib/company-identity.js");
+  const { isPlaceholderCompanyKeySql, storedCompanyKeySql } = await import("../src/lib/company-identity.js");
   const { liveJobSql } = await import("../src/lib/job-freshness.js");
   const client = await pool.connect();
   try {
@@ -36,11 +36,12 @@ async function main() {
     await client.query("BEGIN READ ONLY");
     await client.query("SET LOCAL statement_timeout = '180s'");
     const result = await client.query<{ company_key: string; kind: string; domain: string; n: number }>(
-      `WITH live AS (
-         SELECT company_key, url, COALESCE(left(description, 20000), '') AS description
+      `WITH keyed AS (
+         SELECT ${storedCompanyKeySql()} AS company_key, url, COALESCE(left(description, 20000), '') AS description
          FROM jobs
          WHERE is_active = TRUE AND ${liveJobSql()} AND (country = 'CO' OR country IS NULL)
-           AND company_key IS NOT NULL AND NOT ${isPlaceholderCompanyKeySql("company_key")}
+       ), live AS (
+         SELECT * FROM keyed WHERE company_key <> '' AND NOT ${isPlaceholderCompanyKeySql("company_key")}
        ), found AS (
          SELECT company_key, 'ats' AS kind, lower(m[1]) AS domain
          FROM live, regexp_matches(url || ' ' || description, '(${ATS_HOST})', 'gi') AS m
@@ -55,13 +56,18 @@ async function main() {
        FROM found GROUP BY 1, 2, 3`
     );
     const total = await client.query<{ n: number }>(
-      `SELECT COUNT(DISTINCT company_key)::int AS n FROM jobs
-       WHERE is_active = TRUE AND ${liveJobSql()} AND (country = 'CO' OR country IS NULL)
-         AND company_key IS NOT NULL AND NOT ${isPlaceholderCompanyKeySql("company_key")}`
+      `SELECT COUNT(DISTINCT company_key)::int AS n FROM (
+         SELECT ${storedCompanyKeySql()} AS company_key FROM jobs
+         WHERE is_active = TRUE AND ${liveJobSql()} AND (country = 'CO' OR country IS NULL)
+       ) keyed
+       WHERE company_key <> '' AND NOT ${isPlaceholderCompanyKeySql("company_key")}`
     );
     await client.query("COMMIT");
 
-    const isEmployerDomain = (domain: string) => !NOT_EMPLOYER.some((blocked) => domain === blocked || domain.endsWith(`.${blocked}`));
+    const atsHost = new RegExp(`^${ATS_HOST}$`, "i");
+    // An ATS host is counted as ATS, never as the employer's own site.
+    const isEmployerDomain = (domain: string) =>
+      !atsHost.test(domain) && !NOT_EMPLOYER.some((blocked) => domain === blocked || domain.endsWith(`.${blocked}`));
     const byKind = { ats: new Map<string, Set<string>>(), web: new Map<string, Set<string>>(), email: new Map<string, Set<string>>() };
     // A domain named by many companies is a job board / provider, not one employer's site.
     const companiesPerDomain = new Map<string, Set<string>>();

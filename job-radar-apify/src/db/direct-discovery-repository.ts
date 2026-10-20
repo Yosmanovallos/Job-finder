@@ -1,5 +1,5 @@
 import { pool } from "./client.js";
-import { companyKeySql, isPlaceholderCompanyKeySql } from "../lib/company-identity.js";
+import { companyKeySql, isPlaceholderCompanyKeySql, storedCompanyKeySql } from "../lib/company-identity.js";
 import { liveJobSql } from "../lib/job-freshness.js";
 import { portalUrl } from "../direct/connectors.js";
 import { companyWords } from "../direct/discovery/company-key.js";
@@ -28,13 +28,16 @@ export interface DirectoryCandidateRow {
  */
 export async function loadDirectoryCandidates(limit: number): Promise<DirectoryCandidateRow[]> {
   const result = await pool.query<{ company_key: string; company: string; n: number }>(
-    `WITH spellings AS (
-       SELECT company_key, company, COUNT(*)::int AS n
+    // Stored key, or the expression for a row the backfill hasn't reached
+    // (same fallback as every listing read).
+    `WITH keyed AS (
+       SELECT ${storedCompanyKeySql()} AS company_key, company
        FROM jobs
-       WHERE is_active = TRUE AND ${liveJobSql()}
-         AND (country = 'CO' OR country IS NULL)
-         AND company_key IS NOT NULL
-         AND NOT ${isPlaceholderCompanyKeySql("company_key")}
+       WHERE is_active = TRUE AND ${liveJobSql()} AND (country = 'CO' OR country IS NULL)
+     ), spellings AS (
+       SELECT company_key, company, COUNT(*)::int AS n
+       FROM keyed
+       WHERE company_key <> '' AND NOT ${isPlaceholderCompanyKeySql("company_key")}
        GROUP BY company_key, company
      )
      SELECT company_key, (array_agg(company ORDER BY n DESC, length(company), company))[1] AS company, SUM(n)::int AS n
@@ -234,6 +237,18 @@ export async function promoteCandidate(
 
     const promoted: string[] = [];
     for (const board of boards) {
+      // The ATS APIs match identifiers case-insensitively ("sgs" = "SGS")
+      // but UNIQUE (ats_type, ats_ref) doesn't: look the owner up folded.
+      const owned = await client.query<{ employer_id: string }>(
+        `SELECT employer_id FROM employer_sources WHERE ats_type = $1 AND lower(ats_ref) = lower($2)`,
+        [board.atsType, board.atsRef]
+      );
+      if (owned.rowCount) {
+        if (owned.rows.some((row) => row.employer_id !== employerId)) {
+          return await conflict(`el tablero ${board.atsType}:${board.atsRef} ya pertenece a otra empresa`);
+        }
+        continue;
+      }
       const inserted = await client.query(
         `INSERT INTO employer_sources (employer_id, ats_type, ats_ref, portal_url, enabled)
          VALUES ($1, $2, $3, $4, TRUE)

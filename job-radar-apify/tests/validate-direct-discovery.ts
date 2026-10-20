@@ -121,6 +121,17 @@ async function run(): Promise<void> {
     `Conflicto de tablero: ${JSON.stringify({ boardConflict, owner: owner.rows[0], noEmployer: noEmployer.rows[0].n })}`
   );
 
+  // …including the same board spelled in another case (the APIs ignore case).
+  await upsertEmployer({ slug: "case-owner", displayName: "Case Owner", websiteDomain: null, origin: "seed", aliases: [], sources: [{ atsType: "smartrecruiters", atsRef: "CaseCo", portalUrl: "https://jobs.smartrecruiters.com/CaseCo", enabled: true }] });
+  await syncCandidates([candidate("Case Thief", 2)]);
+  const caseConflict = await promoteCandidate(candidate("Case Thief"), [{ atsType: "smartrecruiters", atsRef: "caseco", method: "name" }], "auto", null);
+  const caseRows = await pool.query(`SELECT COUNT(*)::int AS n FROM employer_sources WHERE lower(ats_ref) = 'caseco'`);
+  check(
+    caseConflict.kind === "conflict" && caseRows.rows[0].n === 1,
+    "El mismo tablero con otras mayúsculas (SGS / sgs) cuenta como ajeno: no se duplica.",
+    `Mayúsculas: ${JSON.stringify({ caseConflict, rows: caseRows.rows[0].n })}`
+  );
+
   // Sticky decisions: an automatic probe never reopens verified.
   const overwritten = await recordProbe(candidate("Disco Test"), outcome("not_found"), 0);
   check(!overwritten && (await getCandidate("discotest"))?.decision === "verified", "Un sondeo automático no reabre un 'verified'.", "Se sobrescribió un 'verified'.");
@@ -145,7 +156,7 @@ async function run(): Promise<void> {
   check((await jobsFingerprint()) === jobsBefore, "La tabla jobs quedó intacta.", "Se modificó la tabla jobs.");
 
   await pool.query(`DELETE FROM employer_discovery`);
-  await pool.query(`DELETE FROM employers WHERE slug IN ('disco-test', 'slug-thief', 'seeded-co')`);
+  await pool.query(`DELETE FROM employers WHERE slug IN ('disco-test', 'slug-thief', 'seeded-co', 'case-owner')`);
   await pool.query(`DELETE FROM jobs WHERE company IN ('Disco Test', 'DISCO TEST S.A.S.', 'Otra Prueba', 'Confidencial')`);
 }
 

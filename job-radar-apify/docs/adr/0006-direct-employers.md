@@ -3,7 +3,7 @@
 **Fecha:** 2026-10-19
 **Estado:** aceptado · D1 y D2 **desplegadas en producción** (2026-10-20:
 migración, seed de 18 empresas y primer tick con 185 vacantes de Colombia);
-**nada visible en el sitio** hasta D4
+D3 **en código, no desplegada** (2026-10-20, §7.1); **nada visible en el sitio** hasta D4
 **Contexto:** pedido del dueño (2026-10-19): poblar BuscoTrabajo con las
 vacantes que publican las empresas de Colombia en su propio portal, sin
 mezclarlas con las que traen los scrapers de bolsas, con las empresas bien
@@ -207,6 +207,10 @@ oficiales aparte duplicaría. Diseño para D4 (requisito previo a mostrar nada):
   detalle (y qué pasa con la URL ya indexada de la copia, respetando el
   flujo de tombstones 410 / Indexing API) lo decide D4.
 - El enlace de postulación es siempre el del portal de la empresa.
+- Toda lectura pública exige además `employer_sources.enabled`: un tablero
+  apagado (p. ej. por un rechazo de D3, §7.1) deja de leerse en el tick, así
+  que sus vacantes abiertas nunca se cerrarían y seguirían "vigentes" hasta
+  30 días. Cerrarlas al rechazar no sirve (la purga las borraría al día).
 - Se mide el dashboard en frío contra `DASHBOARD-PERFORMANCE-RUNBOOK.md`
   antes de desplegar (invariante protegido).
 

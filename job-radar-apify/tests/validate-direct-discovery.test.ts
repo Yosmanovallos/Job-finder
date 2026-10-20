@@ -8,7 +8,7 @@ import { curatedDomains, parseAgencyKeys, toCandidates } from "../src/direct/dis
 import { companyKey, isWeakKey } from "../src/direct/discovery/company-key.js";
 import { summarizeCoverage } from "../src/direct/discovery/coverage.js";
 import { isPrivateAddress } from "../src/direct/discovery/html-http.js";
-import { probeCandidate, slugVariants, verifiedBoards, type DiscoveryCandidate } from "../src/direct/discovery/probe.js";
+import { looksLikeAgency, probeCandidate, slugVariants, verifiedBoards, type DiscoveryCandidate } from "../src/direct/discovery/probe.js";
 import { isAllowed, parseRobots } from "../src/direct/discovery/robots.js";
 import { isSameSite, probeSite, registrableDomain } from "../src/direct/discovery/site-probe.js";
 import type { SiteGet } from "../src/direct/discovery/html-http.js";
@@ -280,6 +280,15 @@ test("site evidence: a site link to a supported board verifies; to Workday it wa
   assert.equal(outcome.decision, "verified", "Lever verified by the employer's own link");
   assert.deepEqual(verifiedBoards(outcome.evidence), [{ atsType: "lever", atsRef: "fcorp", method: "site" }], "Workday is never promoted");
   assert.ok(outcome.evidence.some((entry) => entry.atsType === "workday" && entry.outcome === "unsupported"));
+});
+
+test("past the curated list, a name that declares an agency never auto-verifies", async () => {
+  const http = ats({ [gh("temporalesandinos")]: { name: "Temporales Andinos" }, [ghJobs("temporalesandinos")]: { jobs: [ghJob(1, "Cali, Colombia")] } });
+  const outcome = await probeCandidate(candidate("Temporales Andinos"), { http, probeSite: noSite }, NOW);
+  assert.equal(outcome.decision, "needs_review");
+  assert.deepEqual(verifiedBoards(outcome.evidence), []);
+  assert.equal(looksLikeAgency("Concentrix"), false, "a BPO is an employer");
+  assert.equal(looksLikeAgency("Sagan Recruitment"), true);
 });
 
 test("transient errors are retried, never recorded as 'nothing there'", async () => {

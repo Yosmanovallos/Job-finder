@@ -39,7 +39,8 @@ export function summarizeCoverage(rows: CoverageBucketRow[]): CoverageSummary {
     return { label: "", companies: selected.reduce((n, row) => n + row.companies, 0), rows: selected.reduce((n, row) => n + row.rows, 0) };
   };
   const total = sum(() => true);
-  const probed = sum((row) => row.decision !== "pending" || row.nameProbe !== "pending");
+  // A transient error is not "looked at": pending rows never count as reviewed.
+  const probed = sum((row) => row.decision !== "pending");
   const lines: FunnelLine[] = Object.entries(DECISION_LABELS).map(([decision, label]) => ({ ...sum((row) => row.decision === decision), label }));
   // not_found split by what could be looked at: the honest "unknown" part.
   lines.push({ ...sum((row) => row.decision === "not_found" && row.siteProbe === "no_domain"), label: "no encontrado por nombre; sin dominio para leer su sitio" });
