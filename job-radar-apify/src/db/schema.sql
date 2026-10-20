@@ -858,3 +858,17 @@ BEGIN
 END
 $revoke$;
 -- END direct-discovery
+
+-- BEGIN direct-projection
+-- Proyección de vacantes oficiales en `jobs` (docs/adr/0006-direct-employers.md
+-- §10, fase D4). Aditivo: dos columnas nullable (ADD COLUMN nullable es solo
+-- metadatos en PostgreSQL) e índices parciales que hoy no indexan ninguna
+-- fila. direct_job_id marca la fila que escribe el tick oficial (= su id);
+-- superseded_by marca una copia de bolsa reemplazada por esa fila (sin FK: la
+-- proyección se borra y la reversión es explícita, nunca en cascada).
+-- Lo aplica scripts/migrate-direct-employers.ts.
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS direct_job_id UUID;
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS superseded_by UUID;
+CREATE INDEX IF NOT EXISTS idx_jobs_direct_job_id ON jobs (direct_job_id) WHERE direct_job_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_jobs_superseded_by ON jobs (superseded_by) WHERE superseded_by IS NOT NULL;
+-- END direct-projection

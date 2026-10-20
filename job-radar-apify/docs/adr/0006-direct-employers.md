@@ -226,6 +226,87 @@ oficiales aparte duplicaría. Diseño para D4 (requisito previo a mostrar nada):
   request, tope de páginas por tablero, cuerpo máximo 15 MB.
 - Ninguna URL oficial entra al presupuesto de la Indexing API hasta decidirlo.
 
+### 10. Enmienda D4 (2026-10-20): proyección materializada en `jobs`
+
+**Enmienda a §1** ("nunca `jobs`"). Requisito del dueño: las oficiales se ven
+con *exactamente* los mismos componentes, filtros, sitemap y JSON-LD que las
+de bolsas, sin regresión de performance en frío. Unirlas en cada lectura
+(`jobs UNION direct_jobs` + anti-join de copias) tocaría todas las consultas
+calientes. En su lugar el tick **materializa** una proyección: `direct_jobs`
+sigue siendo la fuente de verdad y `jobs` recibe una copia de lectura que el
+tick escribe y borra. Las consultas públicas no cambian (ya filtran por
+`is_active = TRUE AND liveJobSql()`). Revisado por `data-quality-reviewer`
+(2026-10-20: aprobado con cambios, todos incorporados abajo).
+
+1. **Identidad estable.** `jobs.id = jobs.direct_job_id = direct_jobs.id`;
+   `url_hash = content_fingerprint = sha256("direct:" + id)`. **Nunca** el hash
+   de la URL de postulación (una bolsa puede llevar esa URL y algunas cambian
+   con el título) ni el fingerprint real (el índice único parcial de
+   fingerprints haría que `saveJobs()` fundiera la bolsa en la oficial o que el
+   INSERT chocara con una copia activa). Upsert por `id`.
+2. **Campos.** Solo lo que el ATS declara: `url` = URL oficial (el botón
+   "Aplicar" lleva al portal de la empresa), `source = sources = "Portal
+   oficial"`, `country = 'CO'`, `location` = ciudad + ", Colombia" o solo
+   "Colombia" (sin ciudad inventada: esa fila se ve pero no es apta para
+   Google), `remote_type`/`applicant_countries = ['CO']` solo si el ATS dijo
+   remoto, `detail_status` = `complete` o `unsupported`. `company =
+   display_name` del empleador, **fijo al insertar** (su `company_key` ya es
+   alias): un ranking de grafías cambiaría entre ticks.
+3. **Fechas.** `published_at = COALESCE(direct.published_at,
+   direct.first_seen_at)` al insertar; después solo puede moverse hacia atrás
+   (`LEAST`), nunca a NOW() (§9.2 de SEO-PLAN). `last_seen_at = NOW()` en cada
+   tick para toda proyección viva (si no, `purgeOldJobs` la borraría viva).
+4. **Qué se proyecta.** `liveDirectJobSql()` con `employer_sources.enabled`.
+   No se consulta `expired_job_urls`: la vigencia la decide `direct_jobs`, y
+   una vacante reabierta (falso cierre, tablero re-encendido) debe volver con
+   el **mismo id**. Por eso las oficiales cerradas se conservan 30 días en
+   `direct_jobs` (antes 1): reaparecer reabre la misma fila, con su
+   `first_seen_at` original. Venezuela no se toca.
+5. **Salida.** Proyección cuya oficial ya no está vigente o cuyo tablero se
+   apagó → `deleteClosedJobs()` (lápida 410; `URL_DELETED` solo si Google la
+   recibió por la API, que no ocurre). La edad la cubre también
+   `purgeOldJobs()`.
+6. **Copias (§8).** Fila activa de bolsa, no proyección, `country = 'CO'` **o
+   NULL** (remotas: si no, la copia más nueva taparía a la oficial en el
+   DISTINCT ON), con `company_key` en `employer_aliases` del empleador y el
+   mismo `title_key` (la clave del trigger, igual a la de dedupe; nada fuzzy).
+   La ciudad (`location_key`) desempata solo si la empresa tiene ese título en
+   varias ciudades; una copia ambigua (país o remoto) se deja. Se oculta con
+   `is_active = FALSE` + `superseded_by` en el **mismo** UPDATE
+   (`mutateReadinessRelevantJobs`, que ahora admite ambas columnas). No se
+   borra; `saveJobs()` no toca `is_active` y ahora funde un re-scrape con URL
+   nueva en la copia oculta en lugar de insertar otra activa. El scrape tick
+   corre el mismo paso al terminar (la copia nueva no espera una hora).
+   **Regla única de reversión**, barrido idempotente en cada tick, sin importar
+   quién borró la proyección: una copia cuya proyección ya no existe vuelve
+   (`is_active = TRUE`, `superseded_by = NULL`, `source_checked_at = NULL` para
+   que el cierre en la fuente la re-verifique) solo si su bolsa la vio en las
+   últimas 48 h y no hay otra fila activa con su fingerprint; una por
+   transacción (un choque de unicidad la pospone, no revierte el lote). Una
+   copia más vieja queda oculta: su URL responde 410. `migrate-dedupe.ts`
+   excluye proyecciones y copias.
+7. **SEO.** `/empleos/:idCopia` responde **301** a su proyección viva (se
+   revisa antes de 404/410), **410** si la oficial cerró; nunca 404.
+   `/api/jobs/:idCopia` devuelve la oficial. La proyección pasa el gate de
+   Google (`seo_ready`: sitemap y JSON-LD `JobPosting`) con `notify: false`:
+   **no** encola `URL_UPDATED`, y el reconcile horario de la cola excluye
+   `direct_job_id IS NOT NULL` (§9). Efecto: `seo_ready_at` queda fijado sin
+   notificar; si el dueño habilita la Indexing API para oficiales, hará falta
+   un backfill explícito.
+8. **Aislamiento.** Código en `src/db/direct-projection-repository.ts`, llamado
+   solo por `scripts/run-direct-tick.ts` y `scripts/run-scrape-tick.ts`; el
+   servidor no lo importa (la prueba del grafo cubre `src/db/direct-*`). El
+   servidor solo gana la lectura de `superseded_by` (`getSupersedingTarget`).
+9. **Esquema.** Bloque aditivo `direct-projection`: `jobs.direct_job_id UUID
+   NULL`, `jobs.superseded_by UUID NULL` (sin FK: la proyección se borra y la
+   reversión es explícita) e índices parciales `WHERE … IS NOT NULL`. `ADD
+   COLUMN` nullable es solo metadatos en PostgreSQL 16. Lo aplica
+   `migrate-direct-employers.ts` (con `--dry-run`).
+10. **Pruebas.** `tests/validate-direct-projection.ts` (Postgres desechable):
+    proyección, copias ocultas y restauradas, 301/410, re-scrape sin copia
+    activa nueva, reapertura con el mismo id, cero `URL_UPDATED` oficiales,
+    Venezuela intacta, idempotencia.
+
 ## Consecuencias
 
 - Volumen honesto de arranque (medido 2026-10-19): 185 vacantes oficiales

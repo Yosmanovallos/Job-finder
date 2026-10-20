@@ -40,6 +40,8 @@ interface CompanySearchResult {
 const COMPANY_SEARCH_DEBOUNCE_MS = 300;
 
 export const SOURCE_OPTIONS = [
+  // Vacancies read straight from the company's own careers portal (ADR 0006 §10).
+  "Portal oficial",
   "LinkedIn",
   "Computrabajo",
   "Elempleo",

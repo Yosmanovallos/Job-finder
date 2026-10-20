@@ -17,7 +17,10 @@ export const SOURCE_COLORS: Record<string, { bg: string; text: string }> = {
   WeRemoto: { bg: "rgba(124,58,237,0.10)", text: "#7C3AED" },
   RemoteOK: { bg: "rgba(180,140,0,0.12)", text: "#B48C00" },
   Remotive: { bg: "rgba(79,70,229,0.10)", text: "#4F46E5" },
-  Jooble: { bg: "rgba(29,78,216,0.10)", text: "#1D4ED8" }
+  Jooble: { bg: "rgba(29,78,216,0.10)", text: "#1D4ED8" },
+  // The company's own careers portal (docs/adr/0006-direct-employers.md §10):
+  // same badge component, its own accent.
+  "Portal oficial": { bg: "rgba(4,120,87,0.10)", text: "#047857" }
 };
 
 export const DEFAULT_SOURCE_COLOR = { bg: "#f1f2f0", text: "#5b5f5c" };

@@ -243,7 +243,12 @@ export function buildJobMeta(job: SeoJob): JobMeta {
   const company = job.company || "una empresa confidencial";
   return {
     title: `${job.title} — ${company} (${location}) | BuscoTrabajo`,
-    description: `${job.title} en ${company}, ${location}. Vacante agregada de ${job.source} en BuscoTrabajo — vacantes de empleo en ${countryName}.`,
+    // An official vacancy comes from the company's own careers portal (ADR
+    // 0006 §10), not from a job board: said as such, never as "agregada de".
+    description:
+      job.source === "Portal oficial"
+        ? `${job.title} en ${company}, ${location}. Vacante del portal oficial de empleo de ${company}, en BuscoTrabajo — vacantes de empleo en ${countryName}.`
+        : `${job.title} en ${company}, ${location}. Vacante agregada de ${job.source} en BuscoTrabajo — vacantes de empleo en ${countryName}.`,
     canonicalUrl: buildJobUrl(job)
   };
 }

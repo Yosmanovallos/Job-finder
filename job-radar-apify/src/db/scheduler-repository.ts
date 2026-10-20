@@ -141,9 +141,10 @@ export async function markGlobalSourceRun(sourceName: string): Promise<void> {
 // can never be recomputed for the URL these jobs' pages lived at, so this is
 // the only point that can ever notify Google those pages are now dead (SEO
 // Fase 3 — see indexing-repository.ts). `is_active` is NOT part of this: it
-// is only ever set by the one-off scripts/migrate-dedupe.ts cleanup, never
-// flipped as part of normal ingestion — a hard DELETE is the expiration
-// signal in this codebase. Since 2026-10-04 there are two: this age purge
+// is set by the one-off scripts/migrate-dedupe.ts cleanup and by the official
+// vacancy tick, which hides a job-board copy while its official version is
+// live (ADR 0006 §10.6, `superseded_by`) — never as an expiration signal: a
+// hard DELETE is the expiration signal in this codebase. Since 2026-10-04 there are two: this age purge
 // and deleteClosedJobs() below (the source itself says the posting closed).
 //
 // Also since 2026-10-04 (bug: postings older than a month were still live):

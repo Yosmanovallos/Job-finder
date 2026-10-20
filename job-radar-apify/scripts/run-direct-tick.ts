@@ -137,6 +137,26 @@ async function main() {
     }
     const purged = await repository.purgeClosedDirectJobs();
     printReports(reports, purged);
+    // Phase D4 (ADR 0006 §10): project the live official vacancies into
+    // `jobs` and hide their job-board copies — only once the additive
+    // migration added the projection columns; before that, a clean no-op.
+    const columns = await pool.query(
+      `SELECT COUNT(*)::int AS n FROM information_schema.columns
+       WHERE table_schema = 'public' AND table_name = 'jobs' AND column_name IN ('direct_job_id', 'superseded_by')`
+    );
+    if (columns.rows[0].n !== 2) {
+      console.log("[direct-tick] Sin columnas de proyección en jobs (falta la migración D4): no se proyecta nada.");
+    } else if (process.argv.includes("--no-projection")) {
+      console.log("[direct-tick] --no-projection: no se tocó jobs.");
+    } else {
+      const { syncProjections } = await import("../src/db/direct-projection-repository.js");
+      const projection = await syncProjections();
+      console.log(
+        `[direct-tick] Proyección en jobs: +${projection.inserted} nuevas · ${projection.updated} actualizadas · ` +
+          `${projection.removed} retiradas · ${projection.superseded} copias de bolsas ocultadas · ` +
+          `${projection.reverted} copias restauradas${projection.revertSkipped ? ` (${projection.revertSkipped} pospuestas)` : ""}.`
+      );
+    }
   } finally {
     await pool.end();
   }

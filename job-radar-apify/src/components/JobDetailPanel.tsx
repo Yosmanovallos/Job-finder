@@ -285,8 +285,8 @@ export const JobDetailPanel: React.FC<JobDetailPanelProps> = ({
 
         <p className="text-xs text-muted-foreground mt-5">
           {job.description
-            ? `La postulación se hace en ${job.source} — el botón de arriba te lleva directo a la oferta original.`
-            : `La fuente no publicó una descripción que podamos mostrar; el detalle completo y la postulación están en ${job.source}.`}
+            ? `La postulación se hace en ${job.source === "Portal oficial" ? `el portal oficial de ${job.company || "la empresa"}` : job.source} — el botón de arriba te lleva directo a la oferta original.`
+            : `La fuente no publicó una descripción que podamos mostrar; el detalle completo y la postulación están en ${job.source === "Portal oficial" ? `el portal oficial de ${job.company || "la empresa"}` : job.source}.`}
         </p>
       </div>
     </div>

@@ -242,12 +242,12 @@ async function run(): Promise<void> {
     `Ventana incorrecta: ${live.rows.map((row) => row.external_id).join(",")}`
   );
 
-  // 6) Purge: only rows closed more than a day ago; listed rows stay even when out of the window.
-  await pool.query(`UPDATE direct_jobs SET closed_at = NOW() - INTERVAL '2 days' WHERE external_id = 'a'`);
+  // 6) Purge: only rows closed more than 30 days ago; listed rows stay even when out of the window.
+  await pool.query(`UPDATE direct_jobs SET closed_at = NOW() - INTERVAL '31 days' WHERE external_id = 'a'`);
   const purged = await purgeClosedDirectJobs();
   const remaining = await pool.query(`SELECT external_id FROM direct_jobs WHERE employer_id = $1 ORDER BY external_id`, [first.employerId]);
   check(
-    // "e" closed minutes ago: kept a day for audit, then purged.
+    // "e" closed minutes ago: kept 30 days so a reappearance reopens the same row.
     purged === 1 && remaining.rows.map((row) => row.external_id).join(",") === "b,c,e",
     "La purga borra solo cerradas; una vacante aún listada no se borra (no resucita con fecha nueva).",
     `Purga inesperada: ${purged} · quedan ${remaining.rows.map((row) => row.external_id).join(",")}`

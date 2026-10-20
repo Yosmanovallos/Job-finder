@@ -53,6 +53,20 @@ export function computeUrlHash(url: string): string {
 // getCountryConfig('CO').name.toLowerCase() === "colombia", the exact
 // literal this replaces. See scripts/verify-fingerprint-compat.ts, which
 // confirms that empirically against the real corpus before this ships.
+/**
+ * Runs `sql`; if the official-vacancy projection columns are not migrated yet
+ * (ADR 0006 §10, error 42703), runs it again without the copy clause, so a
+ * deploy that lands before the migration never breaks scraping.
+ */
+async function queryWithProjectionFallback(sql: string, params: unknown[]) {
+  try {
+    return await pool.query(sql, params);
+  } catch (error) {
+    if ((error as { code?: string })?.code !== "42703") throw error;
+    return pool.query(sql.replace("(is_active = TRUE OR superseded_by IS NOT NULL)", "is_active = TRUE").replace("ORDER BY is_active DESC", ""), params);
+  }
+}
+
 export function computeContentFingerprint(job: Job): string {
   const normalized = [
     job.title.toLowerCase().trim(),
@@ -116,9 +130,13 @@ export async function saveJobs(
     // Check content fingerprint FIRST — if a job with the same
     // title+company+location already exists (regardless of URL), just
     // merge the source and skip insertion entirely.
-    const existingByFingerprint = await pool.query(
+    const existingByFingerprint = await queryWithProjectionFallback(
+      // A copy superseded by an official vacancy (ADR 0006 §10.6) still
+      // absorbs its re-scrapes: otherwise a new URL for the same posting
+      // would insert a second, ACTIVE copy next to the official one.
       `SELECT id, url_hash, sources, source FROM jobs
-       WHERE content_fingerprint = $1 AND url_hash != $2 AND is_active = TRUE
+       WHERE content_fingerprint = $1 AND url_hash != $2 AND (is_active = TRUE OR superseded_by IS NOT NULL)
+       ORDER BY is_active DESC
        LIMIT 1`,
       [fingerprint, hash]
     );
@@ -1013,6 +1031,34 @@ export async function countCanonicalJobsByCompany(company: string): Promise<numb
  * it yet. The detail route answers it 410, same as a purged id, instead of a
  * 404 that would tell Google "never existed" for up to one tick.
  */
+/**
+ * A job-board copy hidden because the company's official vacancy replaces it
+ * (docs/adr/0006-direct-employers.md §10.6-10.7). `target` is the official
+ * row when it is still live — the copy's URL then answers 301 there, so no
+ * indexed URL breaks; null when the official version closed — 410.
+ * Undefined when `id` is not such a copy.
+ */
+export async function getSupersedingTarget(
+  id: string
+): Promise<{ target: { jobId: string; title: string; location: string | null } | null } | undefined> {
+  const result = await pool.query(
+    `SELECT target.id, target.title, target.location
+     FROM jobs copy
+     LEFT JOIN jobs target ON target.id = copy.superseded_by AND target.is_active = TRUE AND ${liveJobSql("target")}
+     WHERE copy.id = $1 AND copy.superseded_by IS NOT NULL AND copy.is_active = FALSE
+     LIMIT 1`,
+    [id]
+  
+  ).catch((error: { code?: string }) => {
+    // Before the additive migration (column missing): no copy exists yet.
+    if (error?.code === "42703") return { rows: [] as any[] };
+    throw error;
+  });
+  if (result.rows.length === 0) return undefined;
+  const row = result.rows[0];
+  return { target: row.id ? { jobId: row.id, title: row.title, location: row.location } : null };
+}
+
 export async function isJobExpiredInPlace(id: string): Promise<boolean> {
   const result = await pool.query(`SELECT 1 FROM jobs WHERE id = $1 AND NOT ${liveJobSql()} LIMIT 1`, [id]);
   return (result.rowCount ?? 0) > 0;

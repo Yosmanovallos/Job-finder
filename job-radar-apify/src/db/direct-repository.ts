@@ -1,6 +1,6 @@
 import { pool } from "./client.js";
 import { companyKeySql, storedCompanyKeySql } from "../lib/company-identity.js";
-import { liveJobSql } from "../lib/job-freshness.js";
+import { liveJobSql, MAX_JOB_AGE_DAYS } from "../lib/job-freshness.js";
 import { liveDirectJobSql, MISSING_LISTINGS_TO_CLOSE } from "../direct/ingest.js";
 import { DIRECT_ATS_TYPES, type DirectAtsType, type DirectPosting } from "../direct/types.js";
 
@@ -308,11 +308,17 @@ export async function recordSourceOutcome(sourceId: string, outcome: SourceOutco
   );
 }
 
-/** Deletes postings closed more than a day ago, bounded per tick. */
+/**
+ * Deletes postings closed more than 30 days ago, bounded per tick. Kept that
+ * long on purpose (ADR 0006 §10, review I5): a posting that reappears on its
+ * board within the window reopens the SAME row — same id, so the same public
+ * URL, and its original first_seen_at, so an undated posting can't come back
+ * looking new.
+ */
 export async function purgeClosedDirectJobs(limit = 5_000): Promise<number> {
   const result = await pool.query(
     `DELETE FROM direct_jobs WHERE id IN (
-       SELECT id FROM direct_jobs WHERE closed_at < NOW() - INTERVAL '1 day' ORDER BY closed_at LIMIT $1)`,
+       SELECT id FROM direct_jobs WHERE closed_at < NOW() - INTERVAL '${MAX_JOB_AGE_DAYS} days' ORDER BY closed_at LIMIT $1)`,
     [limit]
   );
   return result.rowCount ?? 0;

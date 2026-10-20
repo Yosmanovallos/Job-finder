@@ -7,6 +7,7 @@ import dotenv from "dotenv";
 import {
   getJobsPage,
   getJobById,
+  getSupersedingTarget,
   isJobExpiredInPlace,
   getActiveCompanyNames,
   getCompanyGroup,
@@ -525,7 +526,13 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     // published_at). Serving that id 200 would resurrect exactly the
     // soft-404/near-duplicate class §1.18 fixed, just for this API instead
     // of the SSR page.
-    const job = await getJobById(id);
+    let job = await getJobById(id);
+    if (!job) {
+      // A job-board copy replaced by the company's official vacancy (ADR 0006
+      // §10.7): the apply-gate re-fetch gets the official one instead.
+      const superseded = await getSupersedingTarget(id);
+      if (superseded?.target) job = await getJobById(superseded.target.jobId);
+    }
     if (!job) {
       res.writeHead(404, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: "Vacante no encontrada" }));
@@ -1166,7 +1173,16 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       // queries wasJobPurged() with a well-formed jobId. A row that already
       // expired (src/lib/job-freshness.ts) but awaits the next purge is the
       // same permanent removal, so it answers 410 too.
-      if (id && ((await wasJobPurged(id)) || (await isJobExpiredInPlace(id)))) {
+      // A job-board copy replaced by the company's official vacancy (ADR 0006
+      // §10.7): 301 to the official page while it is live, so no indexed URL
+      // breaks; 410 once the official version closed — never a 404.
+      const superseded = id ? await getSupersedingTarget(id) : undefined;
+      if (superseded?.target) {
+        res.writeHead(301, { Location: buildJobPath(superseded.target) });
+        res.end();
+        return;
+      }
+      if (id && (superseded || (await wasJobPurged(id)) || (await isJobExpiredInPlace(id)))) {
         res.writeHead(410, { "Content-Type": "text/html; charset=utf-8" });
         res.end(
           '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Vacante ya no disponible | BuscoTrabajo</title><meta name="robots" content="noindex"></head><body><h1>Esta vacante ya no está disponible</h1><p>Fue retirada porque venció: lleva más de 30 días publicada, pasó su fecha límite o la fuente la cerró.</p><p><a href="/dashboard">Ver vacantes activas</a></p></body></html>'

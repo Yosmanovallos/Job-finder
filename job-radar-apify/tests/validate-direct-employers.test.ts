@@ -371,8 +371,12 @@ test("the web server never imports the direct-employer module", () => {
         if (name !== "direct") walk(full);
       } else if (
         /\.(ts|tsx)$/.test(name) &&
-        // The two repositories of the module itself (scripts-only; tests/validate-direct-discovery.test.ts walks the server's import graph).
-        ![path.join(root, "db", "direct-repository.ts"), path.join(root, "db", "direct-discovery-repository.ts")].includes(full)
+        // The repositories of the module itself (scripts-only; tests/validate-direct-discovery.test.ts walks the server's import graph).
+        ![
+          path.join(root, "db", "direct-repository.ts"),
+          path.join(root, "db", "direct-discovery-repository.ts"),
+          path.join(root, "db", "direct-projection-repository.ts")
+        ].includes(full)
       ) {
         if (/from ["'][^"']*(\/direct\/|direct-repository)/.test(readFileSync(full, "utf8"))) offenders.push(path.relative(root, full));
       }
