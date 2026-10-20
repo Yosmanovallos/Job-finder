@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { listSuccessFactors } from "./ats/successfactors.js";
+import { SITE_REF } from "./ats/site.js";
 import { htmlToText, isoDate, safeJson, text } from "./text.js";
 import type { BoardListing, DirectAtsType, EmployerSourceRef, HttpGet, ListOptions, RawAtsPosting, Workplace } from "./types.js";
 
@@ -306,6 +308,13 @@ const CONNECTORS: Record<DirectAtsType, Connector> = {
     refPattern: TOKEN_REF,
     portalUrl: (ref) => `https://jobs.smartrecruiters.com/${ref}`,
     list: listSmartRecruiters
+  },
+  // Career site, not an API (docs/source-catalog/successfactors.md). An
+  // unknown id redirects to a robots-forbidden error page: listings only.
+  successfactors: {
+    refPattern: SITE_REF,
+    portalUrl: (ref) => `https://${ref}/`,
+    list: listSuccessFactors
   }
 };
 

@@ -4,7 +4,7 @@
  * here is ever written to that table.
  */
 
-export const DIRECT_ATS_TYPES = ["greenhouse", "lever", "ashby", "smartrecruiters"] as const;
+export const DIRECT_ATS_TYPES = ["greenhouse", "lever", "ashby", "smartrecruiters", "successfactors"] as const;
 export type DirectAtsType = (typeof DIRECT_ATS_TYPES)[number];
 
 export type Workplace = "onsite" | "hybrid" | "remote";

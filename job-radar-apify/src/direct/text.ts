@@ -21,7 +21,7 @@ export function decodeEntities(text: string): string {
 
 /** HTML (possibly entity-encoded, as Greenhouse sends it) to plain text. */
 export function htmlToText(html: string): string {
-  const decoded = /&lt;\w/.test(html) ? decodeEntities(html) : html;
+  const decoded = (/&lt;\w/.test(html) ? decodeEntities(html) : html).replace(/\r/g, "");
   return decodeEntities(
     decoded
       .replace(/<(script|style)[\s\S]*?<\/\1>/gi, " ")
