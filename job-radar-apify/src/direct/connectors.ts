@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { htmlToText, isoDate, safeJson, text } from "./text.js";
-import type { BoardListing, DirectAtsType, EmployerSourceRef, HttpGet, RawAtsPosting, Workplace } from "./types.js";
+import type { BoardListing, DirectAtsType, EmployerSourceRef, HttpGet, ListOptions, RawAtsPosting, Workplace } from "./types.js";
 
 /**
  * Public, documented job-board APIs (ADR 0006 §5, phase D1). Each connector
@@ -269,7 +269,7 @@ function smartRecruitersPosting(
 interface Connector {
   refPattern: RegExp;
   portalUrl(ref: string): string;
-  list(ref: string, http: HttpGet): Promise<BoardListing>;
+  list(ref: string, http: HttpGet, options: ListOptions): Promise<BoardListing>;
   postingUrl?(ref: string, id: string): string;
 }
 
@@ -342,12 +342,12 @@ function errorDetail(error: unknown): string {
 }
 
 /** Reads one employer board end to end. Never throws. */
-export async function listBoard(ref: EmployerSourceRef, http: HttpGet): Promise<BoardListing> {
+export async function listBoard(ref: EmployerSourceRef, http: HttpGet, options: ListOptions = {}): Promise<BoardListing> {
   const connector = CONNECTORS[ref.atsType];
   if (!connector) return { kind: "error", detail: `ATS sin conector: ${ref.atsType}` };
   if (!connector.refPattern.test(ref.atsRef)) return { kind: "error", detail: "ats_ref con formato inválido" };
   try {
-    return await connector.list(ref.atsRef, http);
+    return await connector.list(ref.atsRef, http, options);
   } catch (error) {
     return { kind: "error", detail: errorDetail(error) };
   }

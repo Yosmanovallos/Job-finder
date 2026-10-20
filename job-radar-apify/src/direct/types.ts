@@ -30,6 +30,12 @@ export interface RawAtsPosting {
   validThrough: string | null;
   /** Employer name as the ATS writes it, when it has one. */
   companyName: string | null;
+  /**
+   * True when the posting comes from a listing that lacks the detail fields
+   * (description, validThrough): storing it must keep what an earlier detail
+   * read saved instead of blanking it.
+   */
+  partial?: boolean;
 }
 
 /** A posting that passed the Colombia filter, ready to store. */
@@ -47,6 +53,8 @@ export interface DirectPosting {
   publishedAt: string | null;
   validThrough: string | null;
   contentHash: string;
+  /** See RawAtsPosting.partial. */
+  partial: boolean;
 }
 
 /**
@@ -54,9 +62,29 @@ export interface DirectPosting {
  * with the expected shape — closures are applied only to complete listings.
  */
 export type BoardListing =
-  | { kind: "complete"; boardTotal: number; postings: RawAtsPosting[] }
+  | {
+      kind: "complete";
+      boardTotal: number;
+      postings: RawAtsPosting[];
+      /**
+       * New postings left out of this read because the per-board detail
+       * budget ran out: they never were stored, so leaving them out closes
+       * nothing, and the next read fetches them.
+       */
+      deferred?: number;
+    }
   | { kind: "not_found"; detail: string }
   | { kind: "error"; detail: string };
+
+/**
+ * What a read already knows. Connectors whose listing lacks a date or a
+ * description fetch the posting's own page only for ids not stored yet,
+ * at most `detailBudget` per read.
+ */
+export interface ListOptions {
+  knownIds?: ReadonlySet<string>;
+  detailBudget?: number;
+}
 
 export interface EmployerSourceRef {
   atsType: DirectAtsType;
@@ -75,6 +103,7 @@ export interface HttpResponse {
  */
 export interface HttpRequestInit {
   json?: unknown;
+  /** Asks for HTML/XML. Such requests never follow redirects: a 3xx comes back as is. */
   accept?: string;
 }
 export type HttpGet = (url: string, init?: HttpRequestInit) => Promise<HttpResponse>;

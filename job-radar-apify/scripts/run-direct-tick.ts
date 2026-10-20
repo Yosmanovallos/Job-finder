@@ -116,7 +116,8 @@ async function main() {
         http: boundedGet,
         saveListing: repository.saveListing,
         recordOutcome: repository.recordSourceOutcome,
-        closeConfirmed: repository.closeConfirmedGone
+        closeConfirmed: repository.closeConfirmedGone,
+        knownIds: repository.knownExternalIds
       },
       new Date(),
       Date.now() + deadlineMin * 60_000

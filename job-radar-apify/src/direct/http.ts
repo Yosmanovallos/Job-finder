@@ -22,6 +22,9 @@ async function once(url: string, init: HttpRequestInit = {}): Promise<{ status: 
       ...(post ? { "Content-Type": "application/json" } : {})
     },
     body: post ? JSON.stringify(init.json) : undefined,
+    // A career site's redirect may land on a path its robots.txt forbids
+    // (SuccessFactors sends unknown ids to /errorpage): the caller sees the 3xx.
+    redirect: init.accept ? "manual" : "follow",
     signal: AbortSignal.timeout(TIMEOUT_MS)
   });
   const declared = Number(response.headers.get("content-length") || 0);
