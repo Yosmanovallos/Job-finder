@@ -253,3 +253,21 @@ y estado de usuario; sin correos ni teléfonos (verificado con regex).
 4. publishDate podría reiniciarse al republicar [NV]: validar antes de ordenar por fecha.
 5. Sura: robots.txt del sitio propio devolvió 403 (X-Malicious-User-Agent-Detected: true); queda blocked, solo evidencia; el enlace se vio en la home alcanzable por redirect.
 6. **Discovery actual no reconoce el href de Éxito**: src/direct/discovery/ats-links.ts solo acepta ^/co/empresas/{slug}; https://www.magneto365.com/grupo-exito da slug null y el href envuelto por Trend Micro está en otro host. Para contarlo como verificado hace falta ampliar la regex a /{slug} o resolver UN redirect del mismo host (301 a /co/empresas/grupo-exito), validando que el destino final sea /co/empresas/{slug}. /hn/ (Homecenter) ya queda rechazado por la regex actual: correcto.
+
+## Conector implementado y canario (2026-10-20)
+
+Decisión del dueño (2026-10-20): la página de empresa en Magneto a la que enlaza el
+sitio **propio** de la empresa es su portal oficial; el resto de Magneto sigue como
+bolsa. `src/direct/ats/magneto.ts` (`ats_type = magneto`, `ats_ref` = slug). Solo se
+habilita por el sondeo del sitio (método 2 de D3), nunca por nombre. Completo solo si
+filas == totalRows == totalHits == faceta `company_show_slug` == ItemList; si no,
+error "listado incompleto" (nada se guarda ni se cierra) y en el descubrimiento queda
+en el grupo `magneto` (re-chequeo a los 30 días). Descripción del JSON-LD del detalle
+para ids nuevos. Cierre solo por listados (Magneto responde 500, no 404).
+
+Canario en vivo (sin BD): `claro-colombia` completo, 9 (3 leídas con detalle, 6
+diferidas); `vanti` incompleto (filas 20, totalRows 21, totalHits 25).
+
+**Hallazgo fuera de alcance (pendiente de decisión del dueño):** el adaptador de bolsa
+`scrapeMagneto` (`src/index.ts:822`) pide `/co/empleos?q=…`, y el robots.txt de Magneto
+tiene `Disallow: /*?` para `*`.

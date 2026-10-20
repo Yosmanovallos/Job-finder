@@ -176,10 +176,6 @@ export async function boardsFromSite(candidate: DiscoveryCandidate, site: Extrac
   const evidence: BoardEvidence[] = [];
   for (const link of site.links) {
     const base = { method: "site" as const, atsType: link.atsType, atsRef: link.atsRef, pageUrl: link.pageUrl };
-    if (link.atsType === "magneto") {
-      evidence.push({ ...base, outcome: "magneto", reason: "página de Magneto (bolsa): pregunta abierta del dueño" });
-      continue;
-    }
     if (!isSupported(link.atsType)) {
       evidence.push({ ...base, outcome: "unsupported", reason: `${link.atsType} aún sin conector (D5)` });
       continue;
@@ -193,6 +189,14 @@ export async function boardsFromSite(candidate: DiscoveryCandidate, site: Extrac
       continue;
     }
     const check = await checkBoard(link.atsType, link.atsRef, http, now);
+    // Owner decision (2026-10-20): a company page on Magneto linked from the
+    // company's own site is its official portal. Magneto serves only 20 rows,
+    // so a bigger company can't be listed completely: its own bucket,
+    // re-checked every 30 days, never a transient error retried forever.
+    if (link.atsType === "magneto" && check.listing === "error" && (check.detail ?? "").startsWith("listado incompleto")) {
+      evidence.push({ ...base, outcome: "magneto", reason: `Magneto: ${check.detail}` });
+      continue;
+    }
     let declaredName = check.declaredName ?? null;
     if (link.atsType === "greenhouse" && check.listing === "complete") {
       const meta = await greenhouseBoardName(link.atsRef, http);
@@ -267,7 +271,7 @@ function decide(nameProbe: NameProbeStatus, siteProbe: SiteProbeStatus, evidence
   if (has("verified")) return { decision: "verified", reason: "tablero verificado" };
   if (has("needs_review")) return { decision: "needs_review", reason: evidence.find((entry) => entry.outcome === "needs_review")!.reason };
   if (has("unsupported")) return { decision: "unsupported_ats", reason: "el sitio enlaza a un ATS aún sin conector" };
-  if (has("magneto")) return { decision: "magneto", reason: "el sitio enlaza a Magneto" };
+  if (has("magneto")) return { decision: "magneto", reason: "el sitio enlaza a su página de Magneto, pero no se puede listar completa" };
   // A transient failure is retried later, never recorded as "nothing there".
   if (nameProbe === "error" || siteProbe === "unreachable") return { decision: "pending", reason: "error transitorio: se reintenta" };
   return { decision: "not_found", reason: siteProbe === "no_domain" ? "no encontrado por nombre (sin dominio para leer el sitio)" : "no encontrado por nombre ni en el sitio" };

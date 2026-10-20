@@ -1,0 +1,35 @@
+{
+ "@context": "https://schema.org",
+ "@type": "JobPosting",
+ "title": "Analista de Soporte Operación de Logística",
+ "datePosted": "2026-10-16",
+ "validThrough": "2026-11-16",
+ "description": "En nuestra compañía líder en Distribución y\nComercialización de Gas Natural y Soluciones energéticas nos encontramos en la\nbúsqueda de nuestro(a) próximo(a) Analista de Soporte Operativo quién será responsable\nde Apoyar la gestión administr...[TRUNCATED]",
+ "employmentType": "FIXED_TERM",
+ "hiringOrganization": {
+  "@type": "Organization",
+  "name": "Vanti",
+  "sameAs": "https://www.magneto365.com/co/empresas/vanti"
+ },
+ "jobLocation": {
+  "@type": "Place",
+  "address": {
+   "@type": "PostalAddress",
+   "addressLocality": [
+    "Bogotá, D.C."
+   ],
+   "addressRegion": [
+    "Bogotá D.C."
+   ],
+   "addressCountry": "CO"
+  }
+ },
+ "baseSalary": {
+  "@type": "MonetaryAmount",
+  "currency": "COP"
+ },
+ "skills": "",
+ "qualifications": "Tecnólogo",
+ "industry": "Transportador de Energía",
+ "occupationalCategory": "Inventarios,facturación,cuentas por cobrar"
+}

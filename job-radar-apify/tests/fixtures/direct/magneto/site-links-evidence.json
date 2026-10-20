@@ -1,0 +1,73 @@
+{
+ "captured": "2026-10-20",
+ "ua": "BuscoTrabajoBot/1.0 (+https://buscotrabajo.co)",
+ "links": [
+  {
+   "company": "Vanti",
+   "site_page": "https://www.grupovanti.com/",
+   "href": "https://www.magneto365.com/co/empresas/vanti",
+   "anchor": "Trabaja con Vanti",
+   "slug": "vanti",
+   "totalRows": 21,
+   "totalHits": 25,
+   "rows_page1": 20
+  },
+  {
+   "company": "Claro Colombia",
+   "site_page": "https://www.claro.com.co/institucional/empleos-claro/",
+   "href": "https://www.magneto365.com/co/empresas/claro-colombia",
+   "anchor": "Oportunidades laborales",
+   "slug": "claro-colombia",
+   "totalRows": 9,
+   "totalHits": 9,
+   "rows_page1": 9
+  },
+  {
+   "company": "Colombina",
+   "site_page": "https://colombina.com/co-es/contactanos/trabaja-con-nosotros",
+   "href": "https://www.magneto365.com/co/empresas/colombina",
+   "anchor": "CONOCE NUESTRAS VACANTES",
+   "slug": "colombina",
+   "totalRows": 39,
+   "totalHits": 292,
+   "rows_page1": 20
+  },
+  {
+   "company": "Grupo Exito",
+   "site_page": "https://www.grupoexito.com.co/es",
+   "href": "https://www.magneto365.com/grupo-exito (301 -> /co/empresas/grupo-exito); also a Trend Micro-wrapped href to /co/empresas/grupo-exito",
+   "anchor": "Oportunidades de empleo",
+   "slug": "grupo-exito",
+   "totalRows": 66,
+   "totalHits": 2904,
+   "rows_page1": 20
+  },
+  {
+   "company": "Alkosto-Ktronix",
+   "site_page": "https://www.alkosto.com/",
+   "href": "https://www.magneto365.com/co/empresas/alkosto-ktronix",
+   "anchor": "Trabaja con nosotros",
+   "slug": "alkosto-ktronix",
+   "totalRows": 90,
+   "totalHits": 345,
+   "rows_page1": 20
+  },
+  {
+   "company": "Sura Colombia",
+   "site_page": "https://www.sura.co/seguros (redirect from segurossura.com.co; sura.co robots.txt answered 403)",
+   "href": "https://www.magneto365.com/co/empresas/seguros-sura",
+   "anchor": "Trabaja con nosotros",
+   "slug": "seguros-sura",
+   "totalRows": 57,
+   "totalHits": 212,
+   "rows_page1": 20
+  },
+  {
+   "company": "Homecenter (Colombia domain)",
+   "site_page": "https://www.homecenter.com.co/homecenter-co/",
+   "href": "https://www.magneto365.com/hn/empresas/homecenter",
+   "anchor": "Trabaja con nosotros",
+   "note": "points to the HONDURAS (hn) Magneto site; not a CO vacancy board"
+  }
+ ]
+}

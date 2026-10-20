@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { EIGHTFOLD_REF, listEightfold } from "./ats/eightfold.js";
+import { listMagneto, MAGNETO_REF } from "./ats/magneto.js";
 import { listPhenom, PHENOM_REF } from "./ats/phenom.js";
 import { listSuccessFactors } from "./ats/successfactors.js";
 import { listTeamtailor } from "./ats/teamtailor.js";
@@ -354,6 +355,14 @@ const CONNECTORS: Record<DirectAtsType, Connector> = {
     refPattern: EIGHTFOLD_REF,
     portalUrl: (ref) => `https://${ref.split("@")[0]}/careers`,
     list: listEightfold
+  },
+  // A company's own Magneto page, only when its own site links to it (owner
+  // decision 2026-10-20; docs/source-catalog/magneto-official.md). A missing
+  // posting answers 500, not 404: listings only.
+  magneto: {
+    refPattern: MAGNETO_REF,
+    portalUrl: (ref) => `https://www.magneto365.com/co/empresas/${ref}/empleos`,
+    list: listMagneto
   }
 };
 

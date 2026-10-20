@@ -27,7 +27,7 @@ const DECISION_LABELS: Record<string, string> = {
   verified: "con tablero oficial (descubierto y verificado)",
   needs_review: "detectado, falta revisión humana",
   unsupported_ats: "portal en un ATS aún sin conector (D5)",
-  magneto: "portal en Magneto (pregunta abierta)",
+  magneto: "portal en Magneto sin listado completo (más de 20 vacantes)",
   excluded: "agencia de empleo (excluida)",
   rejected: "rechazado por revisión humana",
   pending: "sin revisar o con error transitorio"

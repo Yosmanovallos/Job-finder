@@ -1,0 +1,112 @@
+# =========================================================
+# Magneto Global - Robots.txt
+# =========================================================
+
+# LLM Guidance file (for AI assistants & agents)
+# https://www.magneto365.com/llms.txt
+
+
+User-agent: *
+Allow: /
+Allow: /*.css
+Allow: /*.js
+Allow: /*.jpg
+Allow: /*.svg
+Allow: /*.png
+Allow: /*.ttf
+Allow: /*.woff
+Allow: /*.jpeg
+Allow: /*.gif
+
+Disallow: /*?
+Allow: /*paginator[page]
+Disallow: /manager/*
+
+
+# ========================
+# AI / LLM BOTS — ALLOWED
+# ========================
+
+User-agent: CCBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: GPTBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: anthropic-ai
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Bytespider
+Allow: /
+
+
+# ========================
+# BOTS BLOQUEADOS
+# ========================
+
+User-agent: BeBeeBot
+Disallow: /
+
+User-agent: 008
+Disallow: /
+
+User-agent: JobdiggerSpider
+Disallow: /
+
+User-agent: Cliqzbot
+Disallow: /
+
+User-agent: ia_archiver
+Disallow: /
+
+User-Agent: OmniExplorer_Bot
+Disallow: /
+
+User-agent: buscaempleoefectivo
+Disallow: /
+
+User-agent: jobrapido
+Disallow: /
+
+User-agent: kitempleo
+Disallow: /
+
+User-agent: Baiduspider
+Disallow: /
+
+User-agent: Scrapy
+Disallow: /
+
+User-agent: MegaIndex.ru
+Disallow: /
+
+
+# ========================
+# SITEMAPS
+# ========================
+
+Sitemap: https://sitemaps.magneto365.com/by-occupation-with-location.xml
+Sitemap: https://www.magneto365.com/co/sitemap.xml
+Sitemap: https://sitemaps.magneto365.com/sitemap-jobs.xml
+Sitemap: https://sitemaps.magneto365.com/by-occupation.xml
+Sitemap: https://sitemaps.magneto365.com/search-hit.xml
+Sitemap: https://sitemaps.magneto365.com/by-location.xml
+Sitemap: https://sitemaps.magneto365.com/by-sector.xml
+Sitemap: https://empresas.magneto365.com/sitemap.xml
+Sitemap: https://sitemaps.magneto365.com/sitemap-jobsites.xml
+
