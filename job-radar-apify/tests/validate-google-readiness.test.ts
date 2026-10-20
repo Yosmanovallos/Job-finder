@@ -34,6 +34,15 @@ interface PostingShape {
 
 const NOW = new Date("2026-09-18T12:00:00Z");
 
+// The page consumers (isGoogleEligiblePage → isGoogleReadyNow) read the wall
+// clock; freeze it at NOW so the dated fixtures don't age out of the window.
+test.beforeEach(() => {
+  test.mock.timers.enable({ apis: ["Date"], now: NOW });
+});
+test.afterEach(() => {
+  test.mock.timers.reset();
+});
+
 const RICH_DESCRIPTION = [
   "Buscamos una persona analista de datos para el equipo de riesgo crediticio de la compañía.",
   "Serás responsable de construir tableros de seguimiento de cartera y automatizar reportes mensuales.",
