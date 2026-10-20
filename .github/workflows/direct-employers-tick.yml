@@ -6,8 +6,9 @@ name: Direct Employers Tick
 # until phase D4. The web server never imports this code.
 on:
   schedule:
-    # Each board is read at most every 6 h (MIN_INTERVAL_HOURS in
-    # run-direct-tick.ts); off the hour to avoid the other ticks.
+    # Every 6 h, off the hour to avoid the other ticks. A board is re-read
+    # once 5 h passed (MIN_INTERVAL_HOURS in src/direct/tick.ts — kept below
+    # this period on purpose so no tick is skipped).
     - cron: "17 */6 * * *"
   workflow_dispatch:
     inputs:

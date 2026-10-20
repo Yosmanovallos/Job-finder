@@ -145,7 +145,9 @@ oficiales aparte duplicaría. Diseño para D4 (requisito previo a mostrar nada):
 - La vacante oficial vigente **reemplaza** a sus copias de bolsas en toda
   lectura pública (dashboard, búsqueda, SSR, sitemap, `/empresas`): la fila de
   bolsa no se borra (evita churn al re-scrapear), queda marcada como
-  superada y no se lista; su URL de detalle redirige (301) a la oficial.
+  superada y deja de listarse. Cómo obtiene la oficial su propia página de
+  detalle (y qué pasa con la URL ya indexada de la copia, respetando el
+  flujo de tombstones 410 / Indexing API) lo decide D4.
 - El enlace de postulación es siempre el del portal de la empresa.
 - Se mide el dashboard en frío contra `DASHBOARD-PERFORMANCE-RUNBOOK.md`
   antes de desplegar (invariante protegido).

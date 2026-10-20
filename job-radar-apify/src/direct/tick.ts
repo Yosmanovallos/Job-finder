@@ -20,6 +20,14 @@ export interface TickDeps {
 // Per-posting checks per board and tick (one request each).
 const MAX_CLOSURE_CONFIRMATIONS = 25;
 
+/**
+ * Minimum hours between two reads of the same board. Deliberately BELOW the
+ * workflow's 6 h cron: last_run_at is stamped minutes after a tick starts,
+ * so an interval equal to the period would skip every other tick (12 h
+ * effective, worse with GitHub's schedule delays).
+ */
+export const MIN_INTERVAL_HOURS = 5;
+
 export interface SourceReport {
   employer: string;
   board: string;

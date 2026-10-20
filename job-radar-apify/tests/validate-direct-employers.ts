@@ -11,7 +11,7 @@ import {
   upsertEmployer
 } from "../src/db/direct-repository.js";
 import { liveDirectJobSql } from "../src/direct/ingest.js";
-import { runSource, type TickDeps } from "../src/direct/tick.js";
+import { MIN_INTERVAL_HOURS, runSource, type TickDeps } from "../src/direct/tick.js";
 import type { HttpGet } from "../src/direct/types.js";
 
 /**
@@ -117,6 +117,21 @@ async function run(): Promise<void> {
 
   const other = await upsertEmployer({ ...seed, slug: "acme-other", displayName: "Acme Other", aliases: ["Acme Test LA"], sources: [] });
   check(other.aliasConflicts.length === 1, "Un alias de otra empresa no se reasigna en silencio.", "Un alias cambió de empresa sin aviso.");
+
+  // 0) Cadence with real timestamps: a board read ~6 h ago by the previous
+  // cron tick (stamped minutes after it started) must be due again now.
+  const due = async (lastRun: string) => {
+    await pool.query(`UPDATE employer_sources SET last_run_at = NOW() - $1::interval WHERE ats_ref = 'acme-test'`, [lastRun]);
+    return (await pickDueSources({ limit: 10, minIntervalHours: MIN_INTERVAL_HOURS, employerSlug: "acme-test" })).length;
+  };
+  const dueAfterCron = await due("5 hours 50 minutes");
+  const dueTooSoon = await due("1 hour");
+  await pool.query(`UPDATE employer_sources SET last_run_at = NULL WHERE ats_ref = 'acme-test'`);
+  check(
+    dueAfterCron === 1 && dueTooSoon === 0,
+    "Cadencia: un tablero leído en el tick anterior (~6 h) vuelve a tocar; uno de hace 1 h no.",
+    `Cadencia incorrecta: tras ~6 h=${dueAfterCron}, tras 1 h=${dueTooSoon}`
+  );
 
   // 1) First complete listing: 3 Colombian postings (one undated), 1 abroad.
   board = {

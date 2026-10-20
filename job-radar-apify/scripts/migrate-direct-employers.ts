@@ -43,7 +43,23 @@ async function main() {
       [TABLES]
     );
     if (after.rows[0].n !== TABLES.length) throw new Error(`se esperaban ${TABLES.length} tablas, hay ${after.rows[0].n}`);
-    console.log(`[migrate-direct-employers] OK — ${TABLES.join(", ")} listas.`);
+    // Proof, not hope: on Supabase, RLS + REVOKE is the only barrier between
+    // these tables and the public anon key (security audit 2026-08-02).
+    const rls = await pool.query<{ relname: string }>(
+      `SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+       WHERE n.nspname = 'public' AND c.relname = ANY($1) AND NOT c.relrowsecurity`,
+      [TABLES]
+    );
+    if (rls.rowCount) throw new Error(`RLS desactivado en: ${rls.rows.map((row) => row.relname).join(", ")}`);
+    const grants = await pool.query<{ grantee: string; table_name: string; privilege_type: string }>(
+      `SELECT grantee, table_name, privilege_type FROM information_schema.role_table_grants
+       WHERE table_schema = 'public' AND table_name = ANY($1) AND grantee IN ('anon', 'authenticated')`,
+      [TABLES]
+    );
+    if (grants.rowCount) {
+      throw new Error(`permisos públicos sin revocar: ${grants.rows.map((row) => `${row.grantee}:${row.table_name}:${row.privilege_type}`).join(", ")}`);
+    }
+    console.log(`[migrate-direct-employers] OK — ${TABLES.join(", ")} listas; RLS activo y 0 permisos para anon/authenticated.`);
   } finally {
     await pool.end();
   }

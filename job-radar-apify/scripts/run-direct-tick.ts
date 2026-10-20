@@ -18,14 +18,13 @@ import { assertDirectDatabaseAllowed } from "../src/direct/db-guard.js";
 import { boundedGet } from "../src/direct/http.js";
 import { selectColombianPostings } from "../src/direct/ingest.js";
 import { parseEmployerSeed } from "../src/direct/seed.js";
-import type { SourceReport } from "../src/direct/tick.js";
+import { MIN_INTERVAL_HOURS, type SourceReport } from "../src/direct/tick.js";
 
 dotenv.config();
 
-// Boards per tick and minimum hours between two reads of the same board.
+// Boards per tick.
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 500;
-const MIN_INTERVAL_HOURS = 6;
 
 function argValue(name: string): string | undefined {
   const index = process.argv.indexOf(name);
