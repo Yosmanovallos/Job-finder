@@ -151,6 +151,16 @@ test("Workday: small board read whole; foreign ISO-3 prefixes need no detail; a 
   assert.deepEqual(short, { kind: "error", detail: "se leyeron 4 de 24 vacantes: listado incompleto" });
 });
 
+test("Workday: the country facet is found however the tenant spells it, never a look-alike", () => {
+  const facet = (facetParameter: string) => [{ facetParameter, values: [{ descriptor: "Colombia", id: "co-id", count: 3 }] }];
+  for (const name of ["locationCountry", "alocationCountry", "Location_Country", "Country", "country"]) {
+    assert.deepEqual(colombiaFacet(facet(name)), { name, colombiaId: "co-id", count: 3 }, name);
+  }
+  for (const name of ["locations", "Location_Country_Region", "jobFamilyGroup", "workerSubType"]) {
+    assert.equal(colombiaFacet(facet(name)), null, name);
+  }
+});
+
 test("Common Crawl refs: Workday site with or without locale, SmartRecruiters company id, nothing else", () => {
   assert.equal(workdayRefFromUrl("https://rappi.wd12.myworkdayjobs.com/es/Rappi_jobs/job/COL-Bogot/x_JR1"), "rappi/wd12/Rappi_jobs");
   assert.equal(workdayRefFromUrl("https://galderma.wd3.myworkdayjobs.com/External"), "galderma/wd3/External");

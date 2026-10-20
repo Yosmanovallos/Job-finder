@@ -1,5 +1,5 @@
 {
-  "$comment": "Empresas con tablero ATS público verificado en vivo el 2026-10-19 con al menos una vacante que nombra Colombia (docs/adr/0006-direct-employers.md). Solo referencias: ninguna vacante, fecha ni reputación escrita a mano. aliases = forma exacta en que las bolsas escriben a la empresa en producción (consultado en /api/companies/search). SmartRecruiters habilitado por opt-in explícito del dueño el 2026-10-19 (ADR-0002, ADR 0006 §5). 2026-10-20 (fase D5): 14 tableros de SuccessFactors, Teamtailor, Workday, Phenom, Eightfold y Magneto verificados con canario en vivo (docs/source-catalog/<ats>.md §canario); Magneto solo donde el sitio propio enlaza su página (decisión del dueño). Alias consultados en /api/companies/search; se omiten los ambiguos (avianca AR, RappiPay, Connect). Microsoft (Eightfold) queda enabled=false: respondió 429 en la investigación y en el dry-run del 2026-10-20; se habilita tras un canario completo.",
+  "$comment": "Empresas con tablero ATS público verificado en vivo el 2026-10-19 con al menos una vacante que nombra Colombia (docs/adr/0006-direct-employers.md). Solo referencias: ninguna vacante, fecha ni reputación escrita a mano. aliases = forma exacta en que las bolsas escriben a la empresa en producción (consultado en /api/companies/search). SmartRecruiters habilitado por opt-in explícito del dueño el 2026-10-19 (ADR-0002, ADR 0006 §5). 2026-10-20 (fase D5): 14 tableros de SuccessFactors, Teamtailor, Workday, Phenom, Eightfold y Magneto verificados con canario en vivo (docs/source-catalog/<ats>.md §canario); Magneto solo donde el sitio propio enlaza su página (decisión del dueño). Alias consultados en /api/companies/search; se omiten los ambiguos (avianca AR, RappiPay, Connect). Microsoft (Eightfold) queda enabled=false: respondió 429 en la investigación y en el dry-run del 2026-10-20; se habilita tras un canario completo. 2026-10-20 (internacionales que contratan en Colombia): 20 tableros verificados con canario por source-researcher (docs/source-catalog/international-employers.md) y re-verificados tras corregir la faceta de país de Workday (Location_Country/Country). Propiedad: enlace desde el sitio de carreras de la empresa o hiringOrganization de su filial colombiana. Turing queda fuera (propiedad media). Merck & Co. opera en Colombia como MSD (no confundir con Merck KGaA: 'Merck Group'/'Merck Healthcare' no son alias).",
   "employers": [
     {
       "slug": "sezzle",
@@ -453,6 +453,308 @@
         {
           "atsType": "magneto",
           "atsRef": "claro-colombia",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "slug": "scotiabank",
+      "displayName": "Scotiabank",
+      "websiteDomain": "scotiabank.com",
+      "aliases": [
+        "Scotiabank",
+        "ScotiaGBS Colombia del grupo Scotiabank"
+      ],
+      "sources": [
+        {
+          "atsType": "successfactors",
+          "atsRef": "jobs.scotiabank.com",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "slug": "mercado-libre",
+      "displayName": "Mercado Libre",
+      "websiteDomain": "mercadolibre.com",
+      "aliases": [
+        "Mercado Libre"
+      ],
+      "sources": [
+        {
+          "atsType": "eightfold",
+          "atsRef": "mercadolibre.eightfold.ai@mercadolibre.com",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "slug": "kyndryl",
+      "displayName": "Kyndryl",
+      "websiteDomain": "kyndryl.com",
+      "aliases": [
+        "Kyndryl"
+      ],
+      "sources": [
+        {
+          "atsType": "workday",
+          "atsRef": "kyndryl/wd5/KyndrylProfessionalCareers",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "slug": "bbva",
+      "displayName": "BBVA",
+      "websiteDomain": "bbva.com",
+      "aliases": [
+        "BBVA",
+        "BBVA en Colombia",
+        "Comercializadora de Servicios financieros - Grupo BBVA Colombia"
+      ],
+      "sources": [
+        {
+          "atsType": "workday",
+          "atsRef": "bbva/wd3/BBVA",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "slug": "visa",
+      "displayName": "Visa",
+      "websiteDomain": "visa.com",
+      "aliases": [
+        "Visa"
+      ],
+      "sources": [
+        {
+          "atsType": "workday",
+          "atsRef": "visa/wd5/Visa",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "slug": "concentrix",
+      "displayName": "Concentrix",
+      "websiteDomain": "concentrix.com",
+      "aliases": [
+        "Concentrix"
+      ],
+      "sources": [
+        {
+          "atsType": "workday",
+          "atsRef": "cnx/wd1/external_global",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "slug": "transunion",
+      "displayName": "TransUnion",
+      "websiteDomain": "transunion.com",
+      "aliases": [
+        "TransUnion"
+      ],
+      "sources": [
+        {
+          "atsType": "workday",
+          "atsRef": "transunion/wd5/TransUnion",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "slug": "experian",
+      "displayName": "Experian",
+      "websiteDomain": "experian.com",
+      "aliases": [
+        "Experian Spanish Latam"
+      ],
+      "sources": [
+        {
+          "atsType": "smartrecruiters",
+          "atsRef": "Experian",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "slug": "citi",
+      "displayName": "Citi",
+      "websiteDomain": "citi.com",
+      "aliases": [
+        "Citi"
+      ],
+      "sources": [
+        {
+          "atsType": "eightfold",
+          "atsRef": "citi.eightfold.ai@citi.com",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "slug": "foundever",
+      "displayName": "Foundever",
+      "websiteDomain": "foundever.com",
+      "aliases": [],
+      "sources": [
+        {
+          "atsType": "successfactors",
+          "atsRef": "jobs.foundever.com",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "slug": "taskus",
+      "displayName": "TaskUs",
+      "websiteDomain": "taskus.com",
+      "aliases": [
+        "TaskUs"
+      ],
+      "sources": [
+        {
+          "atsType": "workday",
+          "atsRef": "taskus/wd1/Careers",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "slug": "motorola-solutions",
+      "displayName": "Motorola Solutions",
+      "websiteDomain": "motorolasolutions.com",
+      "aliases": [
+        "Motorola Solutions"
+      ],
+      "sources": [
+        {
+          "atsType": "workday",
+          "atsRef": "motorolasolutions/wd5/Careers",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "slug": "roche",
+      "displayName": "Roche",
+      "websiteDomain": "roche.com",
+      "aliases": [
+        "Roche"
+      ],
+      "sources": [
+        {
+          "atsType": "phenom",
+          "atsRef": "careers.roche.com/global/en",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "slug": "cisco",
+      "displayName": "Cisco",
+      "websiteDomain": "cisco.com",
+      "aliases": [
+        "Cisco",
+        "Cisco Systems"
+      ],
+      "sources": [
+        {
+          "atsType": "phenom",
+          "atsRef": "careers.cisco.com/global/en",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "slug": "fiserv",
+      "displayName": "Fiserv",
+      "websiteDomain": "fiserv.com",
+      "aliases": [],
+      "sources": [
+        {
+          "atsType": "phenom",
+          "atsRef": "careers.fiserv.com/us/en",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "slug": "msd",
+      "displayName": "MSD",
+      "websiteDomain": "merck.com",
+      "aliases": [
+        "MSD LATAM"
+      ],
+      "sources": [
+        {
+          "atsType": "phenom",
+          "atsRef": "jobs.merck.com/us/en",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "slug": "ericsson",
+      "displayName": "Ericsson",
+      "websiteDomain": "ericsson.com",
+      "aliases": [
+        "Ericsson"
+      ],
+      "sources": [
+        {
+          "atsType": "eightfold",
+          "atsRef": "jobs.ericsson.com@ericsson.com",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "slug": "abbott",
+      "displayName": "Abbott",
+      "websiteDomain": "abbott.com",
+      "aliases": [
+        "Abbott",
+        "Abbott Laboratories"
+      ],
+      "sources": [
+        {
+          "atsType": "workday",
+          "atsRef": "abbott/wd5/abbottcareers",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "slug": "diageo",
+      "displayName": "Diageo",
+      "websiteDomain": "diageo.com",
+      "aliases": [
+        "Diageo"
+      ],
+      "sources": [
+        {
+          "atsType": "workday",
+          "atsRef": "diageo/wd3/Diageo_Careers",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "slug": "baxter",
+      "displayName": "Baxter",
+      "websiteDomain": "baxter.com",
+      "aliases": [
+        "Baxter",
+        "Baxter International Inc."
+      ],
+      "sources": [
+        {
+          "atsType": "workday",
+          "atsRef": "baxter/wd1/baxter",
           "enabled": true
         }
       ]

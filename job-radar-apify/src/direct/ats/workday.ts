@@ -93,7 +93,9 @@ export function colombiaFacet(
     const values = Array.isArray(facet.values) ? facet.values : [];
     if (
       typeof facet.facetParameter === "string" &&
-      /locationcountry$/i.test(facet.facetParameter)
+      // Spelled per tenant: locationCountry, alocationCountry (letter-prefixed),
+      // Location_Country, Country (2026-10-20, international-employers research).
+      /(location_?country|^[a-z]?country)$/i.test(facet.facetParameter)
     ) {
       const colombia = values
         .map((value) => FacetValue.safeParse(value))
