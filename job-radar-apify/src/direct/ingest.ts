@@ -13,6 +13,8 @@ export interface SelectionStats {
   notColombia: number;
   stale: number;
   testPostings: number;
+  /** Postings placed in Colombia, of any age — the subset the drop guard watches. */
+  colombia: number;
   kept: number;
 }
 
@@ -36,7 +38,7 @@ export function selectColombianPostings(
   postings: RawAtsPosting[],
   now: Date = new Date()
 ): { postings: DirectPosting[]; stats: SelectionStats } {
-  const stats: SelectionStats = { boardTotal: postings.length, notColombia: 0, stale: 0, testPostings: 0, kept: 0 };
+  const stats: SelectionStats = { boardTotal: postings.length, notColombia: 0, stale: 0, testPostings: 0, colombia: 0, kept: 0 };
   const kept = new Map<string, DirectPosting>();
   for (const raw of postings) {
     if (isTestPosting(raw.title)) {
@@ -48,6 +50,7 @@ export function selectColombianPostings(
       stats.notColombia++;
       continue;
     }
+    stats.colombia++;
     if (jobStaleReason(raw.publishedAt, raw.validThrough, now)) {
       stats.stale++;
       continue;
@@ -92,13 +95,22 @@ function contentHash(posting: Omit<DirectPosting, "contentHash">): string {
  * Mass-drop guard (ADR 0006 §3): a board that suddenly lists nothing, or a
  * fifth of what it listed before, most likely moved ATS or changed its API.
  * Closing every posting on that evidence would be wrong, so the tick marks
- * the board `suspect` and closes nothing.
+ * the board `suspect` and closes nothing. Applied to the whole board AND to
+ * its Colombian subset: a board that rewrites its location format ("Remote -
+ * Colombia" → "Remote, CO") keeps its total but loses every Colombian match.
  */
-export function isSuspectDrop(previousBoardTotal: number | null, boardTotal: number): boolean {
-  if (previousBoardTotal === null || previousBoardTotal === 0) return false;
-  if (boardTotal === 0) return true;
-  return previousBoardTotal >= 10 && boardTotal < previousBoardTotal * 0.2;
+export function isSuspectDrop(previousTotal: number | null, total: number): boolean {
+  if (previousTotal === null || previousTotal === 0) return false;
+  if (total === 0) return true;
+  return previousTotal >= 10 && total < previousTotal * 0.2;
 }
+
+/**
+ * Suspicious listings in a row after which the drop is accepted as real (the
+ * employer did close those postings): the guard delays closures, it must not
+ * freeze a board forever.
+ */
+export const SUSPECT_LISTINGS_BEFORE_ACCEPTING = 3;
 
 /** Consecutive complete listings a posting must be missing from to close. */
 export const MISSING_LISTINGS_TO_CLOSE = 2;

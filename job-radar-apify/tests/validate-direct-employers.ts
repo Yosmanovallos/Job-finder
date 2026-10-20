@@ -173,6 +173,30 @@ async function run(): Promise<void> {
     `La guardia de caída masiva falló: ${JSON.stringify({ report, rows, source: source.rows[0] })}`
   );
 
+  // 4b) The board keeps its size but its Colombian subset collapses (a
+  // location-format change): same guard on the subset.
+  await pool.query(
+    `UPDATE employer_sources SET last_board_total = NULL, last_colombia_total = 20, consecutive_suspect = 0 WHERE ats_ref = 'acme-test'`
+  );
+  const abroad = Array.from({ length: 19 }, (_, index) => leverPosting(`x${index}`, "Remote, CO", 2));
+  board = { status: 200, body: [leverPosting("c", "Cali", 10), ...abroad] };
+  report = await runSource(await sourceRow(), deps);
+  check(
+    report.status === "suspect" && /Colombia/.test(report.detail ?? "") && report.saved?.markedMissing === 0,
+    "Si solo cae el subconjunto de Colombia (cambio de formato), tampoco se cierra nada.",
+    `La guardia del subconjunto Colombia falló: ${JSON.stringify(report)}`
+  );
+
+  // 4c) The same drop three listings in a row is real: accepted, closures run.
+  await runSource(await sourceRow(), deps);
+  report = await runSource(await sourceRow(), deps);
+  const accepted = await pool.query(`SELECT status, last_colombia_total, consecutive_suspect FROM employer_sources WHERE ats_ref = 'acme-test'`);
+  check(
+    report.status === "ok" && report.saved?.markedMissing === 1 && accepted.rows[0].last_colombia_total === 1 && accepted.rows[0].consecutive_suspect === 0,
+    "Tras 3 listados sospechosos seguidos la caída se acepta como real (la guardia no congela el tablero).",
+    `La caída no se aceptó: ${JSON.stringify({ report, source: accepted.rows[0] })}`
+  );
+
   // 5) Read window: undated postings age by first sighting; closed ones never show.
   await pool.query(`UPDATE direct_jobs SET first_seen_at = NOW() - INTERVAL '40 days' WHERE external_id = 'b'`);
   const live = await pool.query(`SELECT external_id FROM direct_jobs WHERE ${liveDirectJobSql()} AND employer_id = $1 ORDER BY external_id`, [first.employerId]);

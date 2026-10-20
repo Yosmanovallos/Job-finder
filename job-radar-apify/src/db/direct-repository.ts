@@ -2,7 +2,7 @@ import { pool } from "./client.js";
 import { companyKeySql, storedCompanyKeySql } from "../lib/company-identity.js";
 import { liveJobSql } from "../lib/job-freshness.js";
 import { liveDirectJobSql, MISSING_LISTINGS_TO_CLOSE } from "../direct/ingest.js";
-import type { DirectAtsType, DirectPosting } from "../direct/types.js";
+import { DIRECT_ATS_TYPES, type DirectAtsType, type DirectPosting } from "../direct/types.js";
 
 /**
  * Persistence for employers and their official vacancies (ADR 0006).
@@ -16,6 +16,8 @@ export interface EmployerSourceRow {
   atsType: DirectAtsType;
   atsRef: string;
   lastBoardTotal: number | null;
+  lastColombiaTotal: number | null;
+  consecutiveSuspect: number;
 }
 
 // ---------- employers ----------
@@ -104,14 +106,17 @@ export async function pickDueSources(options: {
   employerSlug?: string;
 }): Promise<EmployerSourceRow[]> {
   const result = await pool.query(
-    `SELECT s.id, s.employer_id, e.slug, s.ats_type, s.ats_ref, s.last_board_total
+    `SELECT s.id, s.employer_id, e.slug, s.ats_type, s.ats_ref, s.last_board_total,
+            s.last_colombia_total, s.consecutive_suspect
      FROM employer_sources s JOIN employers e ON e.id = s.employer_id
      WHERE s.enabled
+       -- A board of an ATS this build has no connector for waits for it.
+       AND s.ats_type = ANY($4::text[])
        AND ($3::text IS NULL OR e.slug = $3)
        AND (s.last_run_at IS NULL OR s.last_run_at < NOW() - make_interval(hours => $2::int))
      ORDER BY s.last_run_at NULLS FIRST, s.id
      LIMIT $1`,
-    [options.limit, options.minIntervalHours, options.employerSlug ?? null]
+    [options.limit, options.minIntervalHours, options.employerSlug ?? null, [...DIRECT_ATS_TYPES]]
   );
   return result.rows.map((row) => ({
     id: row.id,
@@ -119,7 +124,9 @@ export async function pickDueSources(options: {
     employerSlug: row.slug,
     atsType: row.ats_type,
     atsRef: row.ats_ref,
-    lastBoardTotal: row.last_board_total
+    lastBoardTotal: row.last_board_total,
+    lastColombiaTotal: row.last_colombia_total,
+    consecutiveSuspect: row.consecutive_suspect
   }));
 }
 
@@ -220,9 +227,13 @@ export async function saveListing(
   }
 }
 
+/**
+ * `colombiaTotal` counts the board's Colombian postings of any age (the
+ * subset the drop guard compares), not only the live ones stored.
+ */
 export type SourceOutcome =
   | { status: "ok"; boardTotal: number; colombiaTotal: number }
-  | { status: "suspect"; boardTotal: number; colombiaTotal: number; detail: string }
+  | { status: "suspect"; detail: string }
   | { status: "not_found" | "error"; detail: string };
 
 /** Records the board's health after a run. Failures never touch postings. */
@@ -230,18 +241,20 @@ export async function recordSourceOutcome(sourceId: string, outcome: SourceOutco
   if (outcome.status === "ok") {
     await pool.query(
       `UPDATE employer_sources SET status = 'ok', last_run_at = NOW(), last_ok_at = NOW(),
-         last_board_total = $2, last_colombia_total = $3, consecutive_failures = 0, last_error = NULL
+         last_board_total = $2, last_colombia_total = $3, consecutive_failures = 0,
+         consecutive_suspect = 0, last_error = NULL
        WHERE id = $1`,
       [sourceId, outcome.boardTotal, outcome.colombiaTotal]
     );
     return;
   }
   if (outcome.status === "suspect") {
-    // last_board_total is kept: the guard compares the next run with the
-    // last trusted total, not with the suspicious one.
+    // The last totals are kept: the guard compares the next run with the
+    // last trusted listing, not with the suspicious one.
     await pool.query(
       `UPDATE employer_sources SET status = 'suspect', last_run_at = NOW(),
-         consecutive_failures = consecutive_failures + 1, last_error = $2
+         consecutive_failures = consecutive_failures + 1, consecutive_suspect = consecutive_suspect + 1,
+         last_error = $2
        WHERE id = $1`,
       [sourceId, outcome.detail.slice(0, 300)]
     );

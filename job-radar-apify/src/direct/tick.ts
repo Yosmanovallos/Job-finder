@@ -1,5 +1,5 @@
 import { listBoard } from "./connectors.js";
-import { isSuspectDrop, selectColombianPostings, type SelectionStats } from "./ingest.js";
+import { isSuspectDrop, selectColombianPostings, SUSPECT_LISTINGS_BEFORE_ACCEPTING, type SelectionStats } from "./ingest.js";
 import type { EmployerSourceRow, SaveListingResult, SourceOutcome } from "../db/direct-repository.js";
 import type { DirectPosting, HttpGet } from "./types.js";
 
@@ -37,18 +37,23 @@ export async function runSource(source: EmployerSourceRow, deps: TickDeps, now =
     return { employer: source.employerSlug, board, status: listing.kind, detail: listing.detail, stats: null, saved: null };
   }
   const { postings, stats } = selectColombianPostings(listing.postings, now);
-  const suspect = isSuspectDrop(source.lastBoardTotal, listing.boardTotal);
+  const drop = isSuspectDrop(source.lastBoardTotal, listing.boardTotal)
+    ? `el tablero pasó de ${source.lastBoardTotal} a ${listing.boardTotal} vacantes`
+    : isSuspectDrop(source.lastColombiaTotal, stats.colombia)
+      ? `las vacantes en Colombia pasaron de ${source.lastColombiaTotal} a ${stats.colombia}`
+      : null;
+  // The same drop seen SUSPECT_LISTINGS_BEFORE_ACCEPTING times in a row is
+  // real: accept it as the new baseline and let closures run.
+  const suspect = drop !== null && source.consecutiveSuspect + 1 < SUSPECT_LISTINGS_BEFORE_ACCEPTING;
   // A suspicious listing still refreshes what it does show; it just can't
   // prove anything is gone.
   const saved = await deps.saveListing(source, postings, !suspect);
-  const detail = suspect
-    ? `el tablero pasó de ${source.lastBoardTotal} a ${listing.boardTotal} vacantes: no se cerró nada`
-    : null;
+  const detail = suspect ? `${drop}: no se cerró nada` : drop ? `${drop}: aceptado tras ${SUSPECT_LISTINGS_BEFORE_ACCEPTING} listados` : null;
   await deps.recordOutcome(
     source.id,
     suspect
-      ? { status: "suspect", boardTotal: listing.boardTotal, colombiaTotal: postings.length, detail: detail! }
-      : { status: "ok", boardTotal: listing.boardTotal, colombiaTotal: postings.length }
+      ? { status: "suspect", detail: detail! }
+      : { status: "ok", boardTotal: listing.boardTotal, colombiaTotal: stats.colombia }
   );
   return { employer: source.employerSlug, board, status: suspect ? "suspect" : "ok", detail, stats, saved };
 }

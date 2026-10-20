@@ -71,9 +71,15 @@ nulo o futuro.
   `validate-source-closure`.
 - Un listado cuenta solo si fue completo: HTTP 200, forma válida y todas las
   páginas leídas. Error, timeout o página faltante = no se toca nada.
-- Si el total del tablero cae a 0 o a menos del 20 % del anterior (con ≥ 10
-  antes), el tablero queda `suspect` y no se cierra nada: probable cambio de
-  ATS o de API, no N cierres.
+- Si el total del tablero **o su subconjunto de Colombia** cae a 0 o a menos
+  del 20 % del anterior (con ≥ 10 antes), el tablero queda `suspect` y no se
+  cierra nada: probable cambio de ATS, de API o de formato de ubicación
+  ("Remote - Colombia" → "Remote, CO"), no N cierres.
+- La misma caída en 3 listados seguidos se acepta como real (la empresa sí
+  cerró esas vacantes): la guardia retrasa cierres, no congela un tablero.
+- `ats_type`, `status` y `discovery_origin` solo tienen CHECK de formato; sus
+  valores los valida la app. Así sumar Workday/SuccessFactors (D5) nunca
+  exige `DROP CONSTRAINT` sobre una tabla de producción.
 
 ### 4. Filtro Colombia: explícito o nada
 

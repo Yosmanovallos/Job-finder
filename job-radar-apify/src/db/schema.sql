@@ -724,6 +724,9 @@ REVOKE ALL ON jobs, search_roles, users, social_posts, transactions,
 -- (docs/adr/0006-direct-employers.md). Aditivo e idempotente; lo aplica
 -- scripts/migrate-direct-employers.ts. Corpus separado: sin FK ni trigger
 -- hacia jobs — las vacantes oficiales nunca se mezclan con las de bolsas.
+-- Los valores de ats_type / status / discovery_origin se validan en la app
+-- (src/direct/types.ts); la BD solo exige formato, para que sumar un ATS
+-- (Workday, SuccessFactors… fase D5) nunca requiera DROP CONSTRAINT.
 CREATE TABLE IF NOT EXISTS employers (
     id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     slug              VARCHAR(120) UNIQUE NOT NULL,
@@ -732,7 +735,7 @@ CREATE TABLE IF NOT EXISTS employers (
     website_domain    VARCHAR(255),
     nit               VARCHAR(20),
     discovery_origin  VARCHAR(30) NOT NULL DEFAULT 'manual'
-                      CHECK (discovery_origin IN ('manual', 'seed', 'datos_gov', 'commoncrawl')),
+                      CHECK (discovery_origin ~ '^[a-z0-9_]{2,30}$'),
     created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -749,17 +752,18 @@ CREATE TABLE IF NOT EXISTS employer_sources (
     id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     employer_id           UUID NOT NULL REFERENCES employers(id) ON DELETE CASCADE,
     ats_type              VARCHAR(30) NOT NULL
-                          CHECK (ats_type IN ('greenhouse', 'lever', 'ashby', 'smartrecruiters')),
+                          CHECK (ats_type ~ '^[a-z0-9_]{2,30}$'),
     ats_ref               VARCHAR(200) NOT NULL,
     portal_url            TEXT NOT NULL,
     enabled               BOOLEAN NOT NULL DEFAULT TRUE,
     status                VARCHAR(20) NOT NULL DEFAULT 'unverified'
-                          CHECK (status IN ('unverified', 'ok', 'not_found', 'error', 'suspect')),
+                          CHECK (status ~ '^[a-z_]{2,20}$'),
     last_run_at           TIMESTAMPTZ,
     last_ok_at            TIMESTAMPTZ,
     last_board_total      INTEGER,
     last_colombia_total   INTEGER,
     consecutive_failures  INTEGER NOT NULL DEFAULT 0,
+    consecutive_suspect   INTEGER NOT NULL DEFAULT 0,
     last_error            VARCHAR(300),
     created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (ats_type, ats_ref)
