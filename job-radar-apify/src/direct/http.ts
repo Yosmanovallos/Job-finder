@@ -1,7 +1,7 @@
 import type { HttpGet } from "./types.js";
 
 /**
- * Bounded GET for the public ATS APIs (ADR 0006 §6): identifiable
+ * Bounded GET for the public ATS APIs (ADR 0006 §9): identifiable
  * User-Agent, 15s timeout, 15 MB body cap, one retry on 429/5xx honoring a
  * short Retry-After. Never follows the request anywhere the caller didn't ask.
  */

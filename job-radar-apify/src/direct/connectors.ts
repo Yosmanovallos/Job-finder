@@ -277,6 +277,35 @@ const SINGLE_PAGE: Record<Exclude<EmployerSourceRef["atsType"], "smartrecruiters
   ashby: { url: (ref) => `https://api.ashbyhq.com/posting-api/job-board/${ref}`, parse: ashby }
 };
 
+// Per-posting endpoints that answer a clean 404 once the posting is gone
+// (measured 2026-10-19 with live and nonexistent ids). Ashby has none and its
+// public page is an SPA that answers 200 for any id; SmartRecruiters answers
+// 400 for an unknown id, which is not proof of closure — those two close on
+// missing listings only.
+const POSTING_URL: Partial<Record<EmployerSourceRef["atsType"], (ref: string, id: string) => string>> = {
+  greenhouse: (ref, id) => `https://boards-api.greenhouse.io/v1/boards/${ref}/jobs/${id}`,
+  lever: (ref, id) => `https://api.lever.co/v0/postings/${ref}/${id}`
+};
+
+export function canConfirmClosure(atsType: EmployerSourceRef["atsType"]): boolean {
+  return atsType in POSTING_URL;
+}
+
+/**
+ * True only when the ATS itself says the posting no longer exists (404/410).
+ * Errors, timeouts and anything else are "not proven" — never a closure.
+ */
+export async function confirmPostingGone(ref: EmployerSourceRef, externalId: string, http: HttpGet): Promise<boolean> {
+  const build = POSTING_URL[ref.atsType];
+  if (!build || !REF_PATTERN.test(ref.atsRef) || !/^[A-Za-z0-9-]{1,100}$/.test(externalId)) return false;
+  try {
+    const response = await http(build(ref.atsRef, externalId));
+    return response.status === 404 || response.status === 410;
+  } catch {
+    return false;
+  }
+}
+
 function errorDetail(error: unknown): string {
   return (error instanceof Error ? error.message : String(error)).slice(0, 200);
 }

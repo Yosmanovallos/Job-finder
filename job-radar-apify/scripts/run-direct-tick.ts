@@ -96,6 +96,12 @@ async function main() {
   const repository = await import("../src/db/direct-repository.js");
   const { runDirectTick } = await import("../src/direct/tick.js");
   try {
+    // A scheduled run that lands before the migration is a clean no-op.
+    const ready = await pool.query(`SELECT to_regclass('public.direct_jobs') IS NOT NULL AS present`);
+    if (!ready.rows[0].present) {
+      console.log("[direct-tick] Sin migración (falta direct_jobs): no se hace nada. Ver ADR 0006 fase D2.");
+      return;
+    }
     const sources = await repository.pickDueSources({
       limit,
       minIntervalHours: process.argv.includes("--force") ? 0 : MIN_INTERVAL_HOURS,
@@ -104,7 +110,8 @@ async function main() {
     const reports = await runDirectTick(sources, {
       http: boundedGet,
       saveListing: repository.saveListing,
-      recordOutcome: repository.recordSourceOutcome
+      recordOutcome: repository.recordSourceOutcome,
+      closeConfirmed: repository.closeConfirmedGone
     });
     const purged = await repository.purgeClosedDirectJobs();
     printReports(reports, purged);

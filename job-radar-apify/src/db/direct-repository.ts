@@ -135,6 +135,8 @@ export interface SaveListingResult {
   updated: number;
   closed: number;
   markedMissing: number;
+  /** External ids missing from this listing for the first time (still open). */
+  missingIds: string[];
 }
 
 /**
@@ -205,20 +207,22 @@ export async function saveListing(
 
     let closed = 0;
     let markedMissing = 0;
+    const missingIds: string[] = [];
     if (applyClosures) {
-      const missing = await client.query<{ closed: boolean }>(
+      const missing = await client.query<{ closed: boolean; external_id: string }>(
         `UPDATE direct_jobs SET
            missing_count = missing_count + 1,
            closed_at = CASE WHEN missing_count + 1 >= $3 THEN NOW() ELSE NULL END
          WHERE employer_source_id = $1 AND closed_at IS NULL AND NOT (external_id = ANY($2::text[]))
-         RETURNING closed_at IS NOT NULL AS closed`,
+         RETURNING closed_at IS NOT NULL AS closed, external_id`,
         [source.id, postings.map((posting) => posting.externalId), MISSING_LISTINGS_TO_CLOSE]
       );
       closed = missing.rows.filter((row) => row.closed).length;
       markedMissing = missing.rows.length - closed;
+      missingIds.push(...missing.rows.filter((row) => !row.closed).map((row) => row.external_id));
     }
     await client.query("COMMIT");
-    return { inserted, updated, closed, markedMissing };
+    return { inserted, updated, closed, markedMissing, missingIds };
   } catch (error) {
     await client.query("ROLLBACK").catch(() => undefined);
     throw error;
@@ -231,6 +235,20 @@ export async function saveListing(
  * `colombiaTotal` counts the board's Colombian postings of any age (the
  * subset the drop guard compares), not only the live ones stored.
  */
+/**
+ * Closes postings the ATS confirmed gone (per-posting 404/410) on their
+ * first miss, so a dead apply link never waits for a second listing.
+ */
+export async function closeConfirmedGone(sourceId: string, externalIds: string[]): Promise<number> {
+  if (externalIds.length === 0) return 0;
+  const result = await pool.query(
+    `UPDATE direct_jobs SET closed_at = NOW()
+     WHERE employer_source_id = $1 AND external_id = ANY($2::text[]) AND closed_at IS NULL`,
+    [sourceId, externalIds]
+  );
+  return result.rowCount ?? 0;
+}
+
 export type SourceOutcome =
   | { status: "ok"; boardTotal: number; colombiaTotal: number }
   | { status: "suspect"; detail: string }

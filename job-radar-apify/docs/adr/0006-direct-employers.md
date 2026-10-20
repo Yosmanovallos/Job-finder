@@ -1,8 +1,8 @@
 # ADR 0006 — Empresas y vacantes oficiales (directo del ATS de cada empresa)
 
 **Fecha:** 2026-10-19
-**Estado:** aceptado · Fase D1 implementada en `codex/direct-employers` · **no
-desplegado** (solo local hasta aprobación explícita)
+**Estado:** aceptado · D1 y D2 desplegadas el 2026-10-19 (recolección en
+producción; **nada visible en el sitio** hasta D4)
 **Contexto:** pedido del dueño (2026-10-19): poblar BuscoTrabajo con las
 vacantes que publican las empresas de Colombia en su propio portal, sin
 mezclarlas con las que traen los scrapers de bolsas, con las empresas bien
@@ -69,6 +69,13 @@ nulo o futuro.
 - Se cierra una vacante cuando falta en **2 listados completos seguidos**
   (`missing_count >= 2`), mismo criterio de dos señales que
   `validate-source-closure`.
+- **Link muerto = cierre inmediato** donde el ATS tiene endpoint por vacante
+  (Greenhouse, Lever): en la primera ausencia se consulta esa vacante y un
+  404/410 la cierra en ese tick (máx. 25 consultas por tablero). Medido
+  2026-10-19: los 185 links oficiales vigentes respondían 200; un id
+  inexistente da 404 en Greenhouse/Lever, 400 en SmartRecruiters (no es
+  prueba de cierre) y **200 en Ashby** (SPA): por eso Ashby y SmartRecruiters
+  solo cierran por listados.
 - Un listado cuenta solo si fue completo: HTTP 200, forma válida y todas las
   páginas leídas. Error, timeout o página faltante = no se toca nada.
 - Si el total del tablero **o su subconjunto de Colombia** cae a 0 o a menos
@@ -97,15 +104,53 @@ nulo o futuro.
 
 | Fase | Contenido |
 |---|---|
-| **D1 (esta)** | Esquema, Greenhouse, Lever, Ashby (APIs públicas documentadas) y SmartRecruiters (implementado, **`enabled = false`** por ADR-0002 hasta opt-in del dueño); tick con `--dry-run`; BD local; pruebas |
-| D2 | Workflow de GitHub Actions + migración en producción (requiere aprobación) |
-| D3 | Descubrimiento de empresas (datos.gov.co, Common Crawl CDX, huella de ATS) |
-| D4 | Sección "Vacantes en su portal oficial" en `/empresas/:slug` |
-| D5 | Workday CXS, SuccessFactors/sitemap + JSON-LD, Buk — cada uno tras revisión `source-researcher` de robots/términos |
+| D1 ✅ | Esquema, Greenhouse, Lever, Ashby (APIs públicas documentadas) y SmartRecruiters; tick con `--dry-run`; BD local; pruebas |
+| D2 ✅ | Workflow `direct-employers-tick.yml` (tick cada 6 h; migración y seed solo por `workflow_dispatch`) + migración en producción. SmartRecruiters **habilitado por opt-in explícito del dueño el 2026-10-19** (ADR-0002 §2) |
+| D3 | Descubrimiento de empresas (§7) |
+| D4 | **Prioridad oficial sobre bolsas sin duplicados** (§8) y luego visibilidad en dashboard y `/empresas/:slug`. Hasta D4 nada de esto se muestra en el sitio |
+| D5 | Conectores por cobertura medida (§7): Workday CXS, SuccessFactors (sitemap + microdatos `datePosted`), Phenom, Gupy, Eightfold, Teamtailor — cada uno tras revisión `source-researcher` de robots/términos |
 
-Magneto (incluidas sus páginas de empresa) sigue siendo una **bolsa**.
+Magneto (incluidas sus páginas de empresa) sigue siendo una **bolsa** — con
+una pregunta abierta: para Éxito, Claro, Colombina o Vanti la página de
+Magneto **es** el portal al que enlaza su propio sitio (§7).
 
-### 6. Seguridad operativa
+### 7. Descubrimiento a escala (medido 2026-10-19, evidencia para D3/D5)
+
+| Vía | Resultado medido |
+|---|---|
+| Nombres del directorio de producción (9.663 empresas) → slug en Greenhouse/Lever/Ashby/SmartRecruiters | Top 300 empresas: **10** con tablero público y vacantes en Colombia (~3 %). Útil pero no cubre a los grandes |
+| Huella del sitio de la empresa (dominio sale del `logoUrl` del directorio) | Top 100: Phenom 5, Workday 4, Magneto 4, SuccessFactors 3, Gupy 2, Eightfold/iCIMS/Ashby/Teamtailor 1; 18 sitios bloquean bots; ~40 % del top son agencias de empleo (Adecco, Manpower, cajas) sin "portal oficial" propio |
+| Common Crawl CDX (CC-MAIN-2026-39) | Workday: ≥281 tenants en la 1.ª página; SmartRecruiters 597 slugs; Lever 27; **Greenhouse y Ashby ~0** (bloquean al crawler) |
+| Bancolombia (SuccessFactors) | `sitemap.xml` permitido por robots: 147 vacantes, 44 de Colombia (`-COL` en la URL); cada página trae `datePosted` |
+
+Conclusión: no existe una vía gratuita única para "todas las empresas". El
+embudo de D3 es: candidatos (directorio de producción + datos.gov.co + Common
+Crawl) → huella de ATS → verificación automática (tablero con ≥ 1 vacante que
+nombre Colombia **y** nombre de empresa coincidente donde el ATS lo da) →
+`employer_sources` habilitado. Corre por lotes acotados en GitHub Actions. El
+volumen grande llega con D5 (Workday/SuccessFactors/Phenom), no con más
+slugs de Greenhouse.
+
+### 8. Prioridad: la vacante oficial gana y no se repite (requisito del dueño)
+
+Medido 2026-10-19 contra producción (API pública): de 131 vacantes de bolsas
+de estas 17 empresas, **63 son copia de una oficial** (mismo título; casi
+todas LinkedIn) y 95 de las 185 oficiales ya estaban vía bolsas. Mostrar las
+oficiales aparte duplicaría. Diseño para D4 (requisito previo a mostrar nada):
+
+- Coincidencia: misma empresa **vía `employer_aliases`** (la bolsa escribe
+  "Sezzle LA") + mismo `title_key` (título normalizado). La ciudad solo
+  desempata si la empresa tiene ese título en varias ciudades. Nunca
+  fuzzy-match: un título distinto es otra vacante.
+- La vacante oficial vigente **reemplaza** a sus copias de bolsas en toda
+  lectura pública (dashboard, búsqueda, SSR, sitemap, `/empresas`): la fila de
+  bolsa no se borra (evita churn al re-scrapear), queda marcada como
+  superada y no se lista; su URL de detalle redirige (301) a la oficial.
+- El enlace de postulación es siempre el del portal de la empresa.
+- Se mide el dashboard en frío contra `DASHBOARD-PERFORMANCE-RUNBOOK.md`
+  antes de desplegar (invariante protegido).
+
+### 9. Seguridad operativa
 
 - El servidor web nunca importa `src/direct/` (lección del OOM del
   2026-07-25). Todo corre en scripts.
@@ -119,9 +164,9 @@ Magneto (incluidas sus páginas de empresa) sigue siendo una **bolsa**.
 
 ## Consecuencias
 
-- Volumen honesto de arranque (medido 2026-10-19): ~150 vacantes en Colombia en
-  11 tableros Greenhouse/Lever/Ashby; ~630 más en 7 de SmartRecruiters si se
-  habilita. El crecimiento depende de D3 (descubrir qué empresa usa qué ATS) y
-  D5 (Workday/SuccessFactors, donde están los grandes empleadores colombianos).
-- Dos corpus separados: un mismo puesto puede verse en una bolsa y en el
-  portal oficial; en UI el oficial lleva su propio sello y enlace directo.
+- Volumen honesto de arranque (medido 2026-10-19): 185 vacantes oficiales
+  vigentes en Colombia de 16 empresas (113 Greenhouse/Lever/Ashby + 72
+  SmartRecruiters), todas con fecha del ATS (la más vieja, 28,5 días). El
+  crecimiento depende de D3 y D5 (§7).
+- Dos corpus en la base; **una sola vacante en el sitio**: la oficial
+  reemplaza a sus copias de bolsas (§8, D4).

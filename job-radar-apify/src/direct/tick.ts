@@ -1,4 +1,4 @@
-import { listBoard } from "./connectors.js";
+import { canConfirmClosure, confirmPostingGone, listBoard } from "./connectors.js";
 import { isSuspectDrop, selectColombianPostings, SUSPECT_LISTINGS_BEFORE_ACCEPTING, type SelectionStats } from "./ingest.js";
 import type { EmployerSourceRow, SaveListingResult, SourceOutcome } from "../db/direct-repository.js";
 import type { DirectPosting, HttpGet } from "./types.js";
@@ -14,7 +14,11 @@ export interface TickDeps {
   http: HttpGet;
   saveListing(source: EmployerSourceRow, postings: DirectPosting[], applyClosures: boolean): Promise<SaveListingResult>;
   recordOutcome(sourceId: string, outcome: SourceOutcome): Promise<void>;
+  closeConfirmed(sourceId: string, externalIds: string[]): Promise<number>;
 }
+
+// Per-posting checks per board and tick (one request each).
+const MAX_CLOSURE_CONFIRMATIONS = 25;
 
 export interface SourceReport {
   employer: string;
@@ -48,6 +52,18 @@ export async function runSource(source: EmployerSourceRow, deps: TickDeps, now =
   // A suspicious listing still refreshes what it does show; it just can't
   // prove anything is gone.
   const saved = await deps.saveListing(source, postings, !suspect);
+  // First miss: where the ATS has a per-posting endpoint, ask it. A 404/410
+  // closes now — the apply link is already dead — instead of after a second
+  // listing. Bounded per board.
+  if (canConfirmClosure(source.atsType) && saved.missingIds.length > 0) {
+    const gone: string[] = [];
+    for (const externalId of saved.missingIds.slice(0, MAX_CLOSURE_CONFIRMATIONS)) {
+      if (await confirmPostingGone(source, externalId, deps.http)) gone.push(externalId);
+    }
+    const confirmed = await deps.closeConfirmed(source.id, gone);
+    saved.closed += confirmed;
+    saved.markedMissing -= confirmed;
+  }
   const detail = suspect ? `${drop}: no se cerró nada` : drop ? `${drop}: aceptado tras ${SUSPECT_LISTINGS_BEFORE_ACCEPTING} listados` : null;
   await deps.recordOutcome(
     source.id,

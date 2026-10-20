@@ -2,6 +2,7 @@ import "./require-isolated-database.js";
 import { readFile } from "node:fs/promises";
 import { pool } from "../src/db/client.js";
 import {
+  closeConfirmedGone,
   employerReport,
   pickDueSources,
   purgeClosedDirectJobs,
@@ -44,11 +45,16 @@ function leverPosting(id: string, location: string, daysAgo: number | null) {
 }
 
 let board: { status: number; body: unknown } = { status: 200, body: [] };
+// Per-posting endpoint (https://api.lever.co/v0/postings/acme-test/<id>):
+// 404 only for ids in `gone`, 200 otherwise.
+const gone = new Set<string>();
 const http: HttpGet = async (url) => {
-  if (url !== LEVER_URL) return { status: 404, body: "" };
-  return { status: board.status, body: JSON.stringify(board.body) };
+  if (url === LEVER_URL) return { status: board.status, body: JSON.stringify(board.body) };
+  const id = /^https:\/\/api\.lever\.co\/v0\/postings\/acme-test\/([^/?]+)$/.exec(url)?.[1];
+  if (id) return { status: gone.has(id) ? 404 : 200, body: "{}" };
+  return { status: 404, body: "" };
 };
-const deps: TickDeps = { http, saveListing, recordOutcome: recordSourceOutcome };
+const deps: TickDeps = { http, saveListing, recordOutcome: recordSourceOutcome, closeConfirmed: closeConfirmedGone };
 
 async function jobsFingerprint(): Promise<string> {
   const result = await pool.query(`SELECT COUNT(*)::text || ':' || COALESCE(md5(string_agg(id::text || title || COALESCE(company, ''), ',' ORDER BY id)), '') AS f FROM jobs`);
@@ -161,6 +167,20 @@ async function run(): Promise<void> {
     `No se cerró tras dos ausencias: ${JSON.stringify(report.saved)}`
   );
 
+  // 3b) A posting the ATS confirms gone (per-posting 404) closes on its
+  // first miss: its apply link is already dead.
+  board = { status: 200, body: [leverPosting("b", "Medellín, Colombia", null), leverPosting("c", "Cali", 10), leverPosting("e", "Bogotá", 1)] };
+  await runSource(await sourceRow(), deps);
+  gone.add("e");
+  board = { status: 200, body: [leverPosting("b", "Medellín, Colombia", null), leverPosting("c", "Cali", 10)] };
+  report = await runSource(await sourceRow(), deps);
+  rows = await openRows();
+  check(
+    report.saved?.closed === 1 && rows.find((row) => row.external_id === "e")?.closed_at !== null,
+    "Una vacante que el ATS confirma borrada (404) se cierra en la primera ausencia.",
+    `No se cerró la vacante confirmada: ${JSON.stringify(report.saved)}`
+  );
+
   // 4) Mass-drop guard: the board had 20 postings, now lists 1 → nothing closes.
   await pool.query(`UPDATE employer_sources SET last_board_total = 20 WHERE ats_ref = 'acme-test'`);
   board = { status: 200, body: [leverPosting("c", "Cali", 10)] };
@@ -211,7 +231,8 @@ async function run(): Promise<void> {
   const purged = await purgeClosedDirectJobs();
   const remaining = await pool.query(`SELECT external_id FROM direct_jobs WHERE employer_id = $1 ORDER BY external_id`, [first.employerId]);
   check(
-    purged === 1 && remaining.rows.map((row) => row.external_id).join(",") === "b,c",
+    // "e" closed minutes ago: kept a day for audit, then purged.
+    purged === 1 && remaining.rows.map((row) => row.external_id).join(",") === "b,c,e",
     "La purga borra solo cerradas; una vacante aún listada no se borra (no resucita con fecha nueva).",
     `Purga inesperada: ${purged} · quedan ${remaining.rows.map((row) => row.external_id).join(",")}`
   );

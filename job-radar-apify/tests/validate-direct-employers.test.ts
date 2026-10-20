@@ -290,14 +290,11 @@ test("mass-drop guard", () => {
   assert.equal(isSuspectDrop(5, 1), false, "small boards move a lot");
 });
 
-test("seed: references only, unique boards, SmartRecruiters disabled (ADR-0002)", () => {
+test("seed: references only, unique boards, https portals", () => {
   const seeds = parseEmployerSeed(JSON.parse(readFileSync(new URL("../data/direct-employers.seed.json", import.meta.url), "utf8")));
   assert.ok(seeds.length > 0);
   for (const seed of seeds) {
-    for (const source of seed.sources) {
-      if (source.atsType === "smartrecruiters") assert.equal(source.enabled, false, `${seed.slug} must stay opt-in`);
-      assert.match(source.portalUrl, /^https:\/\//);
-    }
+    for (const source of seed.sources) assert.match(source.portalUrl, /^https:\/\//);
   }
   assert.throws(() => parseEmployerSeed({ employers: [{ slug: "a", displayName: "A", websiteDomain: null, aliases: [], sources: [], directJobs: [] }] }));
 });

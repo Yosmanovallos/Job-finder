@@ -1,0 +1,70 @@
+name: Direct Employers Tick
+
+# Official vacancies straight from each employer's public ATS board
+# (job-radar-apify/docs/adr/0006-direct-employers.md). Writes only the
+# direct-employers tables, never `jobs`; nothing here is shown on the site
+# until phase D4. The web server never imports this code.
+on:
+  schedule:
+    # Each board is read at most every 6 h (MIN_INTERVAL_HOURS in
+    # run-direct-tick.ts); off the hour to avoid the other ticks.
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "tick | dry-run | migrate-dry-run | migrate | seed-dry-run | seed"
+        required: true
+        default: "dry-run"
+        type: choice
+        options:
+          - tick
+          - dry-run
+          - migrate-dry-run
+          - migrate
+          - seed-dry-run
+          - seed
+
+concurrency:
+  group: direct-employers-tick
+  cancel-in-progress: false
+
+jobs:
+  direct-employers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Dependencies
+        run: |
+          cd job-radar-apify
+          npm ci || npm install
+
+      # Migration and seed run only when dispatched by hand, never on the
+      # schedule (schema changes are explicit — job-radar-apify/CLAUDE.md).
+      - name: Run
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          MODE: ${{ github.event_name == 'schedule' && 'tick' || inputs.mode }}
+        run: |
+          cd job-radar-apify
+          set -o pipefail
+          case "$MODE" in
+            tick)            cmd="npx tsx scripts/run-direct-tick.ts --allow-remote-db" ;;
+            dry-run)         cmd="npx tsx scripts/run-direct-tick.ts --dry-run" ;;
+            migrate-dry-run) cmd="npx tsx scripts/migrate-direct-employers.ts --dry-run --allow-remote-db" ;;
+            migrate)         cmd="npx tsx scripts/migrate-direct-employers.ts --allow-remote-db" ;;
+            seed-dry-run)    cmd="npx tsx scripts/seed-direct-employers.ts --dry-run" ;;
+            seed)            cmd="npx tsx scripts/seed-direct-employers.ts --allow-remote-db" ;;
+            *) echo "modo desconocido: $MODE"; exit 1 ;;
+          esac
+          echo "## Direct employers — $MODE" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          $cmd 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
