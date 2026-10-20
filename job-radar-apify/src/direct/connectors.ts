@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { listPhenom, PHENOM_REF } from "./ats/phenom.js";
 import { listSuccessFactors } from "./ats/successfactors.js";
 import { listTeamtailor } from "./ats/teamtailor.js";
 import { listWorkday, WORKDAY_REF } from "./ats/workday.js";
@@ -337,6 +338,13 @@ const CONNECTORS: Record<DirectAtsType, Connector> = {
       return `https://${tenant}.${pod}.myworkdayjobs.com/${site}`;
     },
     list: listWorkday
+  },
+  // The site's own search widget (docs/source-catalog/phenom.md). A missing
+  // posting answers 410, but only under the right locale prefix: listings only.
+  phenom: {
+    refPattern: PHENOM_REF,
+    portalUrl: (ref) => `https://${ref}/search-results`,
+    list: listPhenom
   }
 };
 
