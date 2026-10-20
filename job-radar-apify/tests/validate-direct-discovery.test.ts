@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { atsLinkFromUrl, atsLinksInHtml, careersPagesInHtml } from "../src/direct/discovery/ats-links.js";
 import { curatedDomains, parseAgencyKeys, toCandidates } from "../src/direct/discovery/candidates.js";
 import { companyKey, isWeakKey } from "../src/direct/discovery/company-key.js";
-import { summarizeCoverage } from "../src/direct/discovery/coverage.js";
+import { formatDenominator, parseDenominator, summarizeCoverage } from "../src/direct/discovery/coverage.js";
 import { isPrivateAddress } from "../src/direct/discovery/html-http.js";
 import { looksLikeAgency, probeCandidate, slugVariants, verifiedBoards, type DiscoveryCandidate } from "../src/direct/discovery/probe.js";
 import { isAllowed, parseRobots } from "../src/direct/discovery/robots.js";
@@ -316,6 +316,21 @@ test("coverage: shares are always stated against what was looked at", () => {
   assert.equal(summary.probedCompanies, 100);
   assert.equal(summary.covered.companies, 20);
   assert.equal(summary.lines.find((line) => line.label.includes("sin dominio"))?.companies, 80);
+});
+
+test("coverage: the SPE denominator is stated with its unit, period and caveats", () => {
+  const raw = JSON.parse(readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "data", "coverage-denominator.json"), "utf8"));
+  const denominator = parseDenominator(raw);
+  assert.ok(denominator, "data/coverage-denominator.json must parse");
+  assert.equal(denominator.value, 144242);
+  const textOut = formatDenominator(denominator, 27079, 185);
+  assert.match(textOut, /2026-08/);
+  assert.match(textOut, /27264/);
+  assert.match(textOut, /unidades distintas/);
+  assert.match(textOut, /Sesgos/);
+  assert.equal(parseDenominator({ ...raw, value: 0 }), null);
+  assert.equal(parseDenominator({ ...raw, unit: "" }), null);
+  assert.equal(parseDenominator(null), null);
 });
 
 test("isolation (ADR 0006 §9): the web server never imports discovery or direct-employer code", () => {

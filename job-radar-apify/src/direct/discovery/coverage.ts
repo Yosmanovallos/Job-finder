@@ -72,3 +72,39 @@ export function formatCoverage(summary: CoverageSummary): string {
   }
   return out.join("\n");
 }
+
+/**
+ * External denominator (docs/source-catalog/servicio-publico-empleo.md §6):
+ * the SPE's monthly count of registered job openings. Different unit from
+ * ours (positions registered in a month vs. distinct live vacancies in a
+ * 30-day window), so the ratio is stated as an order of magnitude with its
+ * period and caveats — never as "coverage %" alone.
+ */
+export interface ExternalDenominator {
+  source: string;
+  url: string;
+  unit: string;
+  period: string;
+  value: number;
+  retrievedAt: string;
+  caveats: string;
+}
+
+export function parseDenominator(raw: unknown): ExternalDenominator | null {
+  const value = raw as Partial<ExternalDenominator> | null;
+  if (!value || typeof value !== "object") return null;
+  const strings = ["source", "url", "unit", "period", "retrievedAt", "caveats"] as const;
+  if (!strings.every((key) => typeof value[key] === "string" && value[key]!.length > 0)) return null;
+  if (typeof value.value !== "number" || !Number.isInteger(value.value) || value.value <= 0) return null;
+  return value as ExternalDenominator;
+}
+
+export function formatDenominator(denominator: ExternalDenominator, boardRows: number, liveOfficial: number): string {
+  const ours = boardRows + liveOfficial;
+  return [
+    `Denominador externo: ${denominator.value.toLocaleString("es-CO")} ${denominator.unit} — ${denominator.source}, período ${denominator.period} (consultado ${denominator.retrievedAt}).`,
+    `  BuscoTrabajo hoy: ${boardRows} vacantes de bolsas del directorio + ${liveOfficial} oficiales vigentes = ${ours} ` +
+      `(≈ ${pct(ours, denominator.value)} del flujo mensual del SPE; unidades distintas y sin descontar copias oficial/bolsa: orden de magnitud).`,
+    `  Sesgos: ${denominator.caveats}`
+  ].join("\n");
+}

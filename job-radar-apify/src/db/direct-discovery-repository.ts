@@ -2,6 +2,7 @@ import { pool } from "./client.js";
 import { companyKeySql, isPlaceholderCompanyKeySql, storedCompanyKeySql } from "../lib/company-identity.js";
 import { liveJobSql } from "../lib/job-freshness.js";
 import { portalUrl } from "../direct/connectors.js";
+import { liveDirectJobSql } from "../direct/ingest.js";
 import { companyWords } from "../direct/discovery/company-key.js";
 import { DISCOVERY_RULE_VERSION, type BoardEvidence, type DiscoveryCandidate, type ProbeOutcome } from "../direct/discovery/probe.js";
 import type { DirectAtsType } from "../direct/types.js";
@@ -431,6 +432,17 @@ export async function coverageBuckets(): Promise<CoverageBucketRow[]> {
     companies: row.companies,
     rows: row.rows
   }));
+}
+
+/** Live official vacancies of enabled boards (same predicate the tick report uses). */
+export async function liveOfficialCount(): Promise<number> {
+  const result = await pool.query(
+    `SELECT COUNT(*)::int AS n
+       FROM direct_jobs dj
+       JOIN employer_sources es ON es.id = dj.employer_source_id
+      WHERE es.enabled AND ${liveDirectJobSql("dj")}`
+  );
+  return result.rows[0].n;
 }
 
 export interface TickCapacity {
