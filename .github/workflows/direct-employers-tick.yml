@@ -13,7 +13,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "tick | dry-run | migrate-dry-run | migrate | seed-dry-run | seed | domain-census | discover-dry-run | discover | coverage"
+        description: "tick | dry-run | migrate-dry-run | migrate | seed-dry-run | seed | domain-census | discover-dry-run | discover | coverage | db-size"
         required: true
         default: "dry-run"
         type: choice
@@ -30,6 +30,8 @@ on:
           - discover-dry-run
           - discover
           - coverage
+          # Read-only size report (pg_database_size + biggest tables).
+          - db-size
 
 concurrency:
   group: direct-employers-tick
@@ -73,6 +75,7 @@ jobs:
             discover-dry-run) cmd="npx tsx scripts/discover-direct-employers.ts --dry-run --allow-remote-db --limit 100" ;;
             discover)        cmd="npx tsx scripts/discover-direct-employers.ts --allow-remote-db --limit 300 --max-enables 20 --deadline-min 14" ;;
             coverage)        cmd="npx tsx scripts/direct-coverage.ts --allow-remote-db" ;;
+            db-size)         cmd="npx tsx scripts/direct-db-size.ts --allow-remote-db" ;;
             *) echo "modo desconocido: $MODE"; exit 1 ;;
           esac
           echo "## Direct employers — $MODE" >> "$GITHUB_STEP_SUMMARY"
