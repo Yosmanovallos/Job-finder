@@ -6,10 +6,11 @@ name: Direct Employers Tick
 # until phase D4. The web server never imports this code.
 on:
   schedule:
-    # Every 6 h, off the hour to avoid the other ticks. A board is re-read
-    # once 5 h passed (MIN_INTERVAL_HOURS in src/direct/tick.ts — kept below
-    # this period on purpose so no tick is skipped).
-    - cron: "17 */6 * * *"
+    # Every hour, off the hour to avoid the other ticks. Each run reads the
+    # oldest due boards until its deadline (--deadline-min); a board is re-read
+    # once 5 h passed (MIN_INTERVAL_HOURS in src/direct/tick.ts), so each one is
+    # read every 5-6 h however many boards there are, up to what 24 runs fit.
+    - cron: "17 * * * *"
   workflow_dispatch:
     inputs:
       mode:
@@ -65,7 +66,7 @@ jobs:
           cd job-radar-apify
           set -o pipefail
           case "$MODE" in
-            tick)            cmd="npx tsx scripts/run-direct-tick.ts --allow-remote-db" ;;
+            tick)            cmd="npx tsx scripts/run-direct-tick.ts --allow-remote-db --limit 1000 --deadline-min 14" ;;
             dry-run)         cmd="npx tsx scripts/run-direct-tick.ts --dry-run" ;;
             migrate-dry-run) cmd="npx tsx scripts/migrate-direct-employers.ts --dry-run --allow-remote-db" ;;
             migrate)         cmd="npx tsx scripts/migrate-direct-employers.ts --allow-remote-db" ;;

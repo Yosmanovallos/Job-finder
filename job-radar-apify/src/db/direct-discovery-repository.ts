@@ -448,6 +448,8 @@ export async function liveOfficialCount(): Promise<number> {
 export interface TickCapacity {
   enabledBoards: number;
   neverRead: number;
+  /** Enabled boards whose last good read is older than 6 h: the tick is behind on them. */
+  behind: number;
   oldestOkAt: string | null;
 }
 
@@ -455,9 +457,23 @@ export async function tickCapacity(): Promise<TickCapacity> {
   const result = await pool.query(
     `SELECT COUNT(*) FILTER (WHERE enabled)::int AS enabled,
             COUNT(*) FILTER (WHERE enabled AND last_ok_at IS NULL)::int AS never,
+            COUNT(*) FILTER (WHERE enabled AND last_ok_at < NOW() - INTERVAL '6 hours')::int AS behind,
             MIN(last_ok_at) FILTER (WHERE enabled) AS oldest
      FROM employer_sources`
   );
   const row = result.rows[0];
-  return { enabledBoards: row.enabled, neverRead: row.never, oldestOkAt: row.oldest ? new Date(row.oldest).toISOString() : null };
+  return {
+    enabledBoards: row.enabled,
+    neverRead: row.never,
+    behind: row.behind,
+    oldestOkAt: row.oldest ? new Date(row.oldest).toISOString() : null
+  };
+}
+
+/** Measured, not computed: how many boards went more than 6 h without a good read. */
+export function formatTickCapacity(capacity: TickCapacity): string {
+  return (
+    `Tick (cada hora, tableros más viejos primero): ${capacity.enabledBoards} tableros habilitados, ` +
+    `${capacity.neverRead} sin leer aún, ${capacity.behind} con más de 6 h sin lectura OK; último OK más viejo: ${capacity.oldestOkAt ?? "—"}.`
+  );
 }

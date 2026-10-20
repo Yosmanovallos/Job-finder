@@ -8,6 +8,7 @@ import { isValidRef, listBoard, portalUrl } from "../src/direct/connectors.js";
 import { assertDirectDatabaseAllowed } from "../src/direct/db-guard.js";
 import { isSuspectDrop, isTestPosting, selectColombianPostings } from "../src/direct/ingest.js";
 import { parseEmployerSeed } from "../src/direct/seed.js";
+import { runDirectTick } from "../src/direct/tick.js";
 import type { HttpGet, RawAtsPosting } from "../src/direct/types.js";
 
 /**
@@ -72,6 +73,27 @@ test("Colombia filter: structured country as alpha-3 or a name still means Colom
   assert.deepEqual(loc(["Planta Tocancipá"], ["Colombia"], "Tocancipá"), { locationRaw: "Planta Tocancipá", city: "Tocancipá" });
   assert.equal(loc(["Bogotá Street, Houston"], ["USA"]), null);
   assert.equal(loc(["Lima"], ["PER"]), null);
+});
+
+test("tick deadline: once it passes no new board starts; the rest stay due", async () => {
+  const sources = ["a", "b"].map((id) => ({
+    id,
+    employerId: id,
+    employerSlug: id,
+    atsType: "lever" as const,
+    atsRef: id,
+    lastBoardTotal: null,
+    lastColombiaTotal: null,
+    consecutiveSuspect: 0
+  }));
+  const deps = {
+    http: fakeHttp({}),
+    saveListing: async () => ({ inserted: 0, updated: 0, closed: 0, markedMissing: 0, missingIds: [] }),
+    recordOutcome: async () => {},
+    closeConfirmed: async () => 0
+  };
+  assert.equal((await runDirectTick(sources, deps, NOW, Date.now() - 1)).length, 0);
+  assert.equal((await runDirectTick(sources, deps, NOW)).length, 2);
 });
 
 test("registry: every ATS validates its own ref and builds an https portal", async () => {

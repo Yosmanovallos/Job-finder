@@ -150,12 +150,7 @@ async function main() {
         (dryRun ? "" : ` · tableros habilitados ${enabled}${deferred ? ` · diferidas ${deferred}` : ""}`)
     );
     if (!dryRun) {
-      const capacity = await repo!.tickCapacity();
-      const hoursPerRead = Math.ceil(capacity.enabledBoards / 50) * 6;
-      console.log(
-        `[discover] Tick: ${capacity.enabledBoards} tableros habilitados (${capacity.neverRead} sin leer aún) → cada uno se lee cada ~${hoursPerRead} h ` +
-          `con el tope actual de 50 por tick; último OK más viejo: ${capacity.oldestOkAt ?? "—"}.`
-      );
+      console.log(`[discover] ${repo!.formatTickCapacity(await repo!.tickCapacity())}`);
     }
   } finally {
     await pool?.end();

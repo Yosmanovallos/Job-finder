@@ -15,16 +15,12 @@ dotenv.config();
 async function main() {
   assertDirectDatabaseAllowed(process.env.DATABASE_URL, process.argv);
   const { pool } = await import("../src/db/client.js");
-  const { coverageBuckets, liveOfficialCount, tickCapacity } = await import("../src/db/direct-discovery-repository.js");
+  const { coverageBuckets, formatTickCapacity, liveOfficialCount, tickCapacity } =await import("../src/db/direct-discovery-repository.js");
   const { formatCoverage, formatDenominator, parseDenominator, summarizeCoverage } = await import("../src/direct/discovery/coverage.js");
   try {
     const summary = summarizeCoverage(await coverageBuckets());
     console.log(formatCoverage(summary));
-    const capacity = await tickCapacity();
-    console.log(
-      `\nTick: ${capacity.enabledBoards} tableros habilitados (${capacity.neverRead} sin leer aún); ` +
-        `cada uno se lee cada ~${Math.ceil(capacity.enabledBoards / 50) * 6} h con el tope de 50 por tick; último OK más viejo: ${capacity.oldestOkAt ?? "—"}.`
-    );
+    console.log(`\n${formatTickCapacity(await tickCapacity())}`);
     const denominator = parseDenominator(
       JSON.parse(await readFile(new URL("../data/coverage-denominator.json", import.meta.url), "utf8"))
     );

@@ -7,7 +7,7 @@
  *   npx tsx scripts/run-direct-tick.ts --dry-run [--employer slug] [--include-disabled]
  *       Reads the boards listed in the seed file, prints what WOULD be stored.
  *       No database at all.
- *   npx tsx scripts/run-direct-tick.ts [--employer slug] [--limit N] [--force]
+ *   npx tsx scripts/run-direct-tick.ts [--employer slug] [--limit N] [--deadline-min M] [--force]
  *       Local database only (see src/direct/db-guard.ts); --force ignores the
  *       per-board interval.
  */
@@ -22,9 +22,12 @@ import { MIN_INTERVAL_HOURS, type SourceReport } from "../src/direct/tick.js";
 
 dotenv.config();
 
-// Boards per tick.
+// Boards per run. The real bound is the deadline (--deadline-min): a run
+// stops starting boards once it passes, and the rest wait for the next hourly
+// run, oldest first.
 const DEFAULT_LIMIT = 50;
-const MAX_LIMIT = 500;
+const MAX_LIMIT = 1000;
+const DEFAULT_DEADLINE_MIN = 14;
 
 function argValue(name: string): string | undefined {
   const index = process.argv.indexOf(name);
@@ -106,12 +109,21 @@ async function main() {
       minIntervalHours: process.argv.includes("--force") ? 0 : MIN_INTERVAL_HOURS,
       employerSlug
     });
-    const reports = await runDirectTick(sources, {
-      http: boundedGet,
-      saveListing: repository.saveListing,
-      recordOutcome: repository.recordSourceOutcome,
-      closeConfirmed: repository.closeConfirmedGone
-    });
+    const deadlineMin = Math.min(Math.max(Number(argValue("--deadline-min") ?? DEFAULT_DEADLINE_MIN) || DEFAULT_DEADLINE_MIN, 1), 18);
+    const reports = await runDirectTick(
+      sources,
+      {
+        http: boundedGet,
+        saveListing: repository.saveListing,
+        recordOutcome: repository.recordSourceOutcome,
+        closeConfirmed: repository.closeConfirmedGone
+      },
+      new Date(),
+      Date.now() + deadlineMin * 60_000
+    );
+    if (reports.length < sources.length) {
+      console.log(`[direct-tick] Plazo de ${deadlineMin} min cumplido: ${sources.length - reports.length} tableros quedan para la próxima corrida.`);
+    }
     const purged = await repository.purgeClosedDirectJobs();
     printReports(reports, purged);
   } finally {
