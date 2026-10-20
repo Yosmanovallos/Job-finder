@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { EIGHTFOLD_REF, listEightfold } from "./ats/eightfold.js";
 import { listPhenom, PHENOM_REF } from "./ats/phenom.js";
 import { listSuccessFactors } from "./ats/successfactors.js";
 import { listTeamtailor } from "./ats/teamtailor.js";
@@ -345,6 +346,14 @@ const CONNECTORS: Record<DirectAtsType, Connector> = {
     refPattern: PHENOM_REF,
     portalUrl: (ref) => `https://${ref}/search-results`,
     list: listPhenom
+  },
+  // The public career page's JSON search, explicitly allowed by robots.txt
+  // (docs/source-catalog/eightfold.md). Detail 404s are clean, but no real
+  // closed posting was checked yet: listings only.
+  eightfold: {
+    refPattern: EIGHTFOLD_REF,
+    portalUrl: (ref) => `https://${ref.split("@")[0]}/careers`,
+    list: listEightfold
   }
 };
 

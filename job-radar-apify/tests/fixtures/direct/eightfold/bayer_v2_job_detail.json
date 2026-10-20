@@ -1,0 +1,31 @@
+{
+ "id": 562949978722397,
+ "name": "Medical Scientific Liaison Oncology",
+ "posting_name": "Medical Scientific Liaison Oncology",
+ "location": "Medellin,Antioquia,Colombia",
+ "locations": [
+  "Medellin,Antioquia,Colombia"
+ ],
+ "hot": 0,
+ "department": "Medical Affairs & Pharmacovigilance",
+ "business_unit": "Pharmaceuticals",
+ "t_update": 1791812698,
+ "t_create": 1791504000,
+ "ats_job_id": "892082",
+ "display_job_id": "892082",
+ "type": "ATS",
+ "job_description": "<table style=\"width:970.0px\" border=\"0\" cellspacing=\"0\" cellpadding=\"0\"><tbody><tr><td colspan=\"4\"><table style=\"width:970.0px\" border=\"0\" cellspacing=\"0\" cellpadding=\"0\"><tbody><tr><td style=\"background-color:white\"><img src=\"https://bag-p-001.sitecorecontenthub.cloud/api/public/content/career-internal-job-postings-5f27e1850d0445ea8a1da09c224b2dd4?v=e8b61874\" border=\"0\"></td></tr></tbody></table>…[TRUNCATED]",
+ "id_locale": "892082-en_US",
+ "locale": "en_US",
+ "stars": 0,
+ "medallionProgram": null,
+ "location_flexibility": null,
+ "work_location_option": null,
+ "canonicalPositionUrl": "https://talent.bayer.com/careers/job/562949978722397",
+ "isPrivate": false,
+ "apply_redirect_url": "https://career012.successfactors.eu/career?company=C0003153479P&career_job_req_id=892082&career_ns=job_application&source=Eightfold&src=Eightfold",
+ "custom_JD": {
+  "enable": false
+ },
+ "hideUploadResumeOption": false
+}

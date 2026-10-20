@@ -1,0 +1,93 @@
+{
+ "data": {
+  "count": 3,
+  "sortBy": "distance",
+  "appliedFilters": {
+   "includeRemote": [
+    "1"
+   ],
+   "includeRelocation": [
+    "0"
+   ]
+  },
+  "positions": [
+   {
+    "id": 1970393556979096,
+    "displayJobId": "200050385",
+    "name": "Solution Engineer | Business Applications",
+    "locations": [
+     "Colombia, Distrito Capital, Bogota",
+     "Peru, Lima, Lima",
+     "Mexico City, México"
+    ],
+    "standardizedLocations": [
+     "Bogotá, Bogota, CO",
+     "Lima, Callao Region, PE",
+     "México D.F., CDMX, MX"
+    ],
+    "postedTs": 1792442669,
+    "solrScore": null,
+    "stars": 0,
+    "department": "Solution Engineering",
+    "creationTs": 1787340575,
+    "isHot": 0,
+    "workLocationOption": "onsite",
+    "locationFlexibility": null,
+    "atsJobId": "200050385",
+    "positionUrl": "/careers/job/1970393556979096"
+   },
+   {
+    "id": 1970393557008718,
+    "displayJobId": "200058339",
+    "name": "Americas Channel Partner Marketing Manager",
+    "locations": [
+     "Brazil, São Paulo, São Paulo",
+     "Colombia, Distrito Capital, Bogota",
+     "Mexico City, México",
+     "Brazil, Distrito Federal, Brasilia",
+     "Brazil, Rio de Janeiro, Rio de Janeiro",
+     "Chile, Multiple Locations, Multiple Locations"
+    ],
+    "standardizedLocations": [
+     "São Paulo, SP, BR",
+     "Bogotá, Bogota, CO",
+     "México D.F., CDMX, MX",
+     "Brasília, DF, BR",
+     "Rio de Janeiro, RJ, BR",
+     "CL"
+    ],
+    "postedTs": 1791393144,
+    "solrScore": null,
+    "stars": 0,
+    "department": "Partner Marketing",
+    "creationTs": 1790367575,
+    "isHot": 0,
+    "workLocationOption": "onsite",
+    "locationFlexibility": null,
+    "atsJobId": "200058339",
+    "positionUrl": "/careers/job/1970393557008718"
+   },
+   {
+    "id": 1970393557038980,
+    "displayJobId": "200061473",
+    "name": "Digital Solution Engineer, Cloud & AI Infra",
+    "locations": [
+     "Colombia, Distrito Capital, Bogota"
+    ],
+    "standardizedLocations": [
+     "Bogotá, Bogota, CO"
+    ],
+    "postedTs": 1792188840,
+    "solrScore": null,
+    "stars": 0,
+    "department": "Digital Solution Engineering",
+    "creationTs": 1791821965,
+    "isHot": 0,
+    "workLocationOption": "onsite",
+    "locationFlexibility": null,
+    "atsJobId": "200061473",
+    "positionUrl": "/careers/job/1970393557038980"
+   }
+  ]
+ }
+}

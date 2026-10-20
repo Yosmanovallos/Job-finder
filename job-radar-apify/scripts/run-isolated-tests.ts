@@ -32,7 +32,8 @@ const suites: Record<string, string[]> = {
     "validate-direct-discovery.test.ts",
     "validate-direct-d5.test.ts",
     "validate-direct-d5-workday.test.ts",
-    "validate-direct-d5-phenom.test.ts"
+    "validate-direct-d5-phenom.test.ts",
+    "validate-direct-d5-eightfold.test.ts"
   ],
   integration: [
     "validate-isolated-database.ts",
@@ -50,7 +51,7 @@ const suites: Record<string, string[]> = {
     "validate-direct-employers.ts",
     "validate-direct-discovery.ts"
   ],
-  direct: ["validate-direct-employers.test.ts", "validate-direct-discovery.test.ts", "validate-direct-d5.test.ts", "validate-direct-d5-workday.test.ts", "validate-direct-d5-phenom.test.ts", "validate-direct-employers.ts", "validate-direct-discovery.ts"],
+  direct: ["validate-direct-employers.test.ts", "validate-direct-discovery.test.ts", "validate-direct-d5.test.ts", "validate-direct-d5-workday.test.ts", "validate-direct-d5-phenom.test.ts", "validate-direct-d5-eightfold.test.ts", "validate-direct-employers.ts", "validate-direct-discovery.ts"],
   "source-closure": ["validate-source-closure.test.ts", "validate-source-closure.ts"],
   "job-freshness": ["validate-job-freshness.test.ts", "validate-job-freshness.ts"],
   sitemap: ["validate-sitemap-streaming.ts"],
