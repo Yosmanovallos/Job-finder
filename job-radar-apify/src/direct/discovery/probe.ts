@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { listBoard } from "../connectors.js";
+import { isValidRef, listBoard } from "../connectors.js";
 import { selectColombianPostings } from "../ingest.js";
 import { safeJson } from "../text.js";
 import { DIRECT_ATS_TYPES, type DirectAtsType, type HttpGet } from "../types.js";
@@ -182,6 +182,14 @@ export async function boardsFromSite(candidate: DiscoveryCandidate, site: Extrac
     }
     if (!isSupported(link.atsType)) {
       evidence.push({ ...base, outcome: "unsupported", reason: `${link.atsType} aún sin conector (D5)` });
+      continue;
+    }
+    // A supported ATS reached through a portal our connector doesn't read
+    // (SuccessFactors' classic career{N}.successfactors.com?company=X, which
+    // robots.txt forbids, vs. the RMK site the connector uses): evidence
+    // only, never a transient error retried forever.
+    if (!isValidRef({ atsType: link.atsType, atsRef: link.atsRef })) {
+      evidence.push({ ...base, outcome: "unsupported", reason: `${link.atsType}: este tipo de enlace no lo lee el conector` });
       continue;
     }
     const check = await checkBoard(link.atsType, link.atsRef, http, now);

@@ -265,7 +265,7 @@ test("agencies are excluded before any request", async () => {
   assert.ok(!agencyKeys.has(companyKey("Comfama")), "a caja as employer is not an agency; only its employment agency is");
 });
 
-test("site evidence: a site link to a supported board verifies; to Workday it waits for D5; to Magneto stays apart", async () => {
+test("site evidence: a site link to a supported board verifies; Workday is checked live; an unreadable portal stays evidence", async () => {
   const http = ats({ [lever("fcorp")]: [{ id: "a1", text: "Dev", hostedUrl: "https://jobs.lever.co/fcorp/a1", country: "CO", createdAt: Date.parse(RECENT), categories: { location: "Medellín" } }] });
   const site = async () => ({
     status: "done" as const,
@@ -273,13 +273,15 @@ test("site evidence: a site link to a supported board verifies; to Workday it wa
     offsiteCareersHosts: [],
     links: [
       { atsType: "lever" as const, atsRef: "fcorp", url: "https://jobs.lever.co/fcorp", pageUrl: "https://f.com/careers" },
-      { atsType: "workday" as const, atsRef: "f/wd3/F_jobs", url: "https://f.wd3.myworkdayjobs.com/F_jobs", pageUrl: "https://f.com/" }
+      { atsType: "workday" as const, atsRef: "f/wd3/F_jobs", url: "https://f.wd3.myworkdayjobs.com/F_jobs", pageUrl: "https://f.com/" },
+      { atsType: "successfactors" as const, atsRef: "FCorpCO", url: "https://career8.successfactors.com/career?company=FCorpCO", pageUrl: "https://f.com/" }
     ]
   });
   const outcome = await probeCandidate(candidate("F Corp", { websiteDomain: "f.com" }), { http, probeSite: site }, NOW);
   assert.equal(outcome.decision, "verified", "Lever verified by the employer's own link");
-  assert.deepEqual(verifiedBoards(outcome.evidence), [{ atsType: "lever", atsRef: "fcorp", method: "site" }], "Workday is never promoted");
-  assert.ok(outcome.evidence.some((entry) => entry.atsType === "workday" && entry.outcome === "unsupported"));
+  assert.deepEqual(verifiedBoards(outcome.evidence), [{ atsType: "lever", atsRef: "fcorp", method: "site" }], "an unreadable Workday board is never promoted");
+  assert.ok(outcome.evidence.some((entry) => entry.atsType === "workday" && entry.outcome !== "unsupported" && entry.outcome !== "verified"), "Workday has a connector now: checked live");
+  assert.ok(outcome.evidence.some((entry) => entry.atsType === "successfactors" && entry.outcome === "unsupported"), "classic SuccessFactors portal: evidence only");
 });
 
 test("past the curated list, a name that declares an agency never auto-verifies", async () => {
