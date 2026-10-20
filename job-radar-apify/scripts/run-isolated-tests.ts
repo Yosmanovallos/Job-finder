@@ -34,7 +34,8 @@ const suites: Record<string, string[]> = {
     "validate-direct-d5-workday.test.ts",
     "validate-direct-d5-phenom.test.ts",
     "validate-direct-d5-eightfold.test.ts",
-    "validate-direct-d5-magneto.test.ts"
+    "validate-direct-d5-magneto.test.ts",
+    "validate-magneto-robots.test.ts"
   ],
   integration: [
     "validate-isolated-database.ts",

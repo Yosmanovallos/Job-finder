@@ -16,8 +16,10 @@ export const SOURCE_CADENCE_MS: Record<string, number> = {
   LinkedIn: 4 * HOUR_MS,
   Torre: 4 * HOUR_MS,
   Computrabajo: 6 * HOUR_MS,
-  Elempleo: 6 * HOUR_MS,
-  Magneto: 6 * HOUR_MS
+  Elempleo: 6 * HOUR_MS
+  // Magneto moved to GLOBAL_SOURCE_CADENCE_MS (2026-10-20): its robots.txt
+  // forbids the keyword search (`Disallow: /*?`), so it now reads Magneto's
+  // allowed topic pages once per window (src/sources/magneto.ts).
   // Workana, Glassdoor, and Indeed (the keyword-based adapters,
   // src/sources/{workana,glassdoor,indeed}.ts) deliberately have NO entry
   // here anymore — all three still 403 on every request (see
@@ -89,7 +91,9 @@ export const GLOBAL_SOURCE_CADENCE_MS: Record<string, number> = {
   WeRemoto: 4 * HOUR_MS,
   Remotive: 4 * HOUR_MS,
   WorkanaV2: 3 * HOUR_MS,
-  Jooble: 6 * HOUR_MS
+  Jooble: 6 * HOUR_MS,
+  // ~41 page reads per pass (search + topic pages), each with jitter.
+  Magneto: 3 * HOUR_MS
 };
 
 // --- Venezuela (backlog/venezuela-expansion.md, Día 1) ----------------------
