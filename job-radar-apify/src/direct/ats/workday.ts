@@ -34,7 +34,7 @@ export const WORKDAY_REF =
   /^([a-z0-9][a-z0-9_-]{0,62})\/(wd\d{1,3})\/([A-Za-z0-9][A-Za-z0-9_-]{0,99})$/;
 
 const FacetValue = z
-  .object({ descriptor: z.string().optional(), id: z.string().optional() })
+  .object({ descriptor: z.string().optional(), id: z.string().optional(), count: z.number().optional() })
   .passthrough();
 type Facet = { facetParameter?: string; values?: unknown[] };
 
@@ -85,7 +85,7 @@ const Detail = z.object({
 /** The tenant's country facet and Colombia's id in it, wherever the facet is nested. */
 export function colombiaFacet(
   facets: unknown[] | undefined
-): { name: string; colombiaId: string | null } | null {
+): { name: string; colombiaId: string | null; count: number } | null {
   const stack = [...(facets ?? [])] as Facet[];
   while (stack.length > 0) {
     const facet = stack.shift()!;
@@ -100,7 +100,8 @@ export function colombiaFacet(
         .find((parsed) => parsed.success && /^colombia$/i.test(parsed.data.descriptor ?? ""));
       return {
         name: facet.facetParameter,
-        colombiaId: colombia?.success ? (colombia.data.id ?? null) : null
+        colombiaId: colombia?.success ? (colombia.data.id ?? null) : null,
+        count: colombia?.success ? (colombia.data.count ?? 0) : 0
       };
     }
     stack.push(

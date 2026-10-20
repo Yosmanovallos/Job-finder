@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "tick | dry-run | migrate-dry-run | migrate | seed-dry-run | seed | domain-census | discover-dry-run | discover | coverage | db-size"
+        description: "tick | dry-run | migrate-dry-run | migrate | seed-dry-run | seed | domain-census | discover-dry-run | discover | coverage | db-size | cc-tenants"
         required: true
         default: "dry-run"
         type: choice
@@ -33,6 +33,9 @@ on:
           - coverage
           # Read-only size report (pg_database_size + biggest tables).
           - db-size
+          # Read-only, no database: Workday / SmartRecruiters boards seen by
+          # Common Crawl that list postings in Colombia, for human review.
+          - cc-tenants
 
 concurrency:
   group: direct-employers-tick
@@ -74,9 +77,10 @@ jobs:
             seed)            cmd="npx tsx scripts/seed-direct-employers.ts --allow-remote-db" ;;
             domain-census)   cmd="npx tsx scripts/direct-domain-census.ts --allow-remote-db" ;;
             discover-dry-run) cmd="npx tsx scripts/discover-direct-employers.ts --dry-run --allow-remote-db --limit 100" ;;
-            discover)        cmd="npx tsx scripts/discover-direct-employers.ts --allow-remote-db --limit 300 --max-enables 20 --deadline-min 14" ;;
+            discover)        cmd="npx tsx scripts/discover-direct-employers.ts --allow-remote-db --limit 1500 --max-enables 50 --deadline-min 16" ;;
             coverage)        cmd="npx tsx scripts/direct-coverage.ts --allow-remote-db" ;;
             db-size)         cmd="npx tsx scripts/direct-db-size.ts --allow-remote-db" ;;
+            cc-tenants)      cmd="npx tsx scripts/direct-cc-tenants.ts --max-boards 500 --deadline-min 17" ;;
             *) echo "modo desconocido: $MODE"; exit 1 ;;
           esac
           echo "## Direct employers — $MODE" >> "$GITHUB_STEP_SUMMARY"

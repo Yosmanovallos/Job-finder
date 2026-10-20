@@ -4,6 +4,7 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { colombiaFacet, postedOver30Days, workdayExternalId } from "../src/direct/ats/workday.js";
+import { smartRecruitersIdFromUrl, workdayRefFromUrl } from "../src/direct/discovery/cc-refs.js";
 import { isValidRef, listBoard, portalUrl } from "../src/direct/connectors.js";
 import { selectColombianPostings } from "../src/direct/ingest.js";
 import type { HttpGet, HttpRequestInit } from "../src/direct/types.js";
@@ -48,7 +49,8 @@ test("Workday: refs, portal and the facet discovery across tenant spellings", ()
   assert.equal(portalUrl({ atsType: WD, atsRef: "galderma/wd3/External" }), `${GAL}/External`);
   assert.deepEqual(colombiaFacet(wdJson("galderma-list-page0-unfiltered.json").facets), {
     name: "alocationCountry",
-    colombiaId: "e8106cd6a3534f2dba6fdee2d41db89d"
+    colombiaId: "e8106cd6a3534f2dba6fdee2d41db89d",
+    count: 7
   });
   assert.equal(colombiaFacet(wdJson("rappi-wd12-list-page1-postings-without-location.json").facets), null, "Rappi has no country facet");
   assert.equal(workdayExternalId("/job/Bogot/Key-Account-Manager-Medellin_JR015272-1"), "Key-Account-Manager-Medellin_JR015272-1");
@@ -147,4 +149,15 @@ test("Workday: small board read whole; foreign ISO-3 prefixes need no detail; a 
   assert.equal(whole.kind, "complete");
   const short = await listBoard({ atsType: WD, atsRef: "rappi/wd12/Rappi_jobs" }, routes(24), {});
   assert.deepEqual(short, { kind: "error", detail: "se leyeron 4 de 24 vacantes: listado incompleto" });
+});
+
+test("Common Crawl refs: Workday site with or without locale, SmartRecruiters company id, nothing else", () => {
+  assert.equal(workdayRefFromUrl("https://rappi.wd12.myworkdayjobs.com/es/Rappi_jobs/job/COL-Bogot/x_JR1"), "rappi/wd12/Rappi_jobs");
+  assert.equal(workdayRefFromUrl("https://galderma.wd3.myworkdayjobs.com/External"), "galderma/wd3/External");
+  assert.equal(workdayRefFromUrl("https://accenture.wd103.myworkdayjobs.com/en-US/AccentureCareers/details/y"), "accenture/wd103/AccentureCareers");
+  assert.equal(workdayRefFromUrl("https://galderma.wd3.myworkdayjobs.com/wday/cxs/galderma/External/jobs"), null);
+  assert.equal(workdayRefFromUrl("https://evil.com/galderma/wd3/External"), null);
+  assert.equal(smartRecruitersIdFromUrl("https://jobs.smartrecruiters.com/BoschGroup/744000012345-analista"), "BoschGroup");
+  assert.equal(smartRecruitersIdFromUrl("https://jobs.smartrecruiters.com/oneclick-ui/company/x"), null);
+  assert.equal(smartRecruitersIdFromUrl("https://careers.smartrecruiters.com/BoschGroup"), null);
 });
