@@ -49,7 +49,13 @@
     "indexing:backfill": "tsx scripts/backfill-indexing-queue.ts",
     "indexing:tick": "tsx scripts/run-indexing-tick.ts",
     "seo:check-search-console": "tsx scripts/check-search-console.ts",
-    "reputation:tick": "tsx scripts/run-reputation-tick.ts"
+    "reputation:tick": "tsx scripts/run-reputation-tick.ts",
+    "db:migrate-direct-employers": "tsx scripts/migrate-direct-employers.ts",
+    "direct:seed": "tsx scripts/seed-direct-employers.ts",
+    "direct:tick": "tsx scripts/run-direct-tick.ts",
+    "direct:report": "tsx scripts/direct-report.ts",
+    "direct:local": "tsx scripts/direct-local.ts",
+    "test:direct": "tsx scripts/run-isolated-tests.ts direct"
   },
   "dependencies": {
     "@notionhq/client": "^5.1.0",

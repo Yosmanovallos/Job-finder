@@ -718,3 +718,93 @@ REVOKE ALL ON jobs, search_roles, users, social_posts, transactions,
   llm_usage_ledger, user_ai_credentials, scrape_runs, source_attempts,
   scrape_leases, expired_job_urls
   FROM anon, authenticated;
+
+-- BEGIN direct-employers
+-- Empresas y sus vacantes oficiales, leídas del ATS de cada empresa
+-- (docs/adr/0006-direct-employers.md). Aditivo e idempotente; lo aplica
+-- scripts/migrate-direct-employers.ts. Corpus separado: sin FK ni trigger
+-- hacia jobs — las vacantes oficiales nunca se mezclan con las de bolsas.
+CREATE TABLE IF NOT EXISTS employers (
+    id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    slug              VARCHAR(120) UNIQUE NOT NULL,
+    display_name      VARCHAR(255) NOT NULL,
+    company_key       TEXT NOT NULL,
+    website_domain    VARCHAR(255),
+    nit               VARCHAR(20),
+    discovery_origin  VARCHAR(30) NOT NULL DEFAULT 'manual'
+                      CHECK (discovery_origin IN ('manual', 'seed', 'datos_gov', 'commoncrawl')),
+    created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_employers_company_key ON employers (company_key);
+-- Cada forma en que las bolsas escriben a la empresa (company_key de jobs) →
+-- la empresa. Curado, nunca fuzzy-match; una clave apunta a una sola empresa.
+CREATE TABLE IF NOT EXISTS employer_aliases (
+    company_key  TEXT PRIMARY KEY,
+    employer_id  UUID NOT NULL REFERENCES employers(id) ON DELETE CASCADE,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_employer_aliases_employer ON employer_aliases (employer_id);
+CREATE TABLE IF NOT EXISTS employer_sources (
+    id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    employer_id           UUID NOT NULL REFERENCES employers(id) ON DELETE CASCADE,
+    ats_type              VARCHAR(30) NOT NULL
+                          CHECK (ats_type IN ('greenhouse', 'lever', 'ashby', 'smartrecruiters')),
+    ats_ref               VARCHAR(200) NOT NULL,
+    portal_url            TEXT NOT NULL,
+    enabled               BOOLEAN NOT NULL DEFAULT TRUE,
+    status                VARCHAR(20) NOT NULL DEFAULT 'unverified'
+                          CHECK (status IN ('unverified', 'ok', 'not_found', 'error', 'suspect')),
+    last_run_at           TIMESTAMPTZ,
+    last_ok_at            TIMESTAMPTZ,
+    last_board_total      INTEGER,
+    last_colombia_total   INTEGER,
+    consecutive_failures  INTEGER NOT NULL DEFAULT 0,
+    last_error            VARCHAR(300),
+    created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (ats_type, ats_ref)
+);
+CREATE INDEX IF NOT EXISTS idx_employer_sources_due ON employer_sources (enabled, last_run_at);
+CREATE TABLE IF NOT EXISTS direct_jobs (
+    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    employer_source_id  UUID NOT NULL REFERENCES employer_sources(id) ON DELETE CASCADE,
+    employer_id         UUID NOT NULL REFERENCES employers(id) ON DELETE CASCADE,
+    external_id         VARCHAR(200) NOT NULL,
+    title               VARCHAR(500) NOT NULL,
+    location_raw        VARCHAR(500),
+    city                VARCHAR(120),
+    country             VARCHAR(2) NOT NULL DEFAULT 'CO',
+    workplace           VARCHAR(10) CHECK (workplace IN ('onsite', 'hybrid', 'remote')),
+    apply_url           TEXT NOT NULL,
+    description_text    TEXT,
+    department          VARCHAR(255),
+    employment_type     VARCHAR(100),
+    -- Solo la fecha que declara el ATS; NULL = desconocida (nunca inventada).
+    published_at        TIMESTAMPTZ,
+    valid_through       TIMESTAMPTZ,
+    first_seen_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    last_seen_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    missing_count       SMALLINT NOT NULL DEFAULT 0,
+    closed_at           TIMESTAMPTZ,
+    content_hash        VARCHAR(64) NOT NULL,
+    UNIQUE (employer_source_id, external_id)
+);
+CREATE INDEX IF NOT EXISTS idx_direct_jobs_employer_open ON direct_jobs (employer_id) WHERE closed_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_direct_jobs_closed ON direct_jobs (closed_at) WHERE closed_at IS NOT NULL;
+ALTER TABLE employers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE employer_aliases ENABLE ROW LEVEL SECURITY;
+ALTER TABLE employer_sources ENABLE ROW LEVEL SECURITY;
+ALTER TABLE direct_jobs ENABLE ROW LEVEL SECURITY;
+-- Mismo REVOKE defensivo que el resto (bloque ROW LEVEL SECURITY de arriba;
+-- este bloque va al final porque esas tablas no existen antes). Los
+-- roles anon/authenticated solo existen en Supabase; en el Postgres desechable
+-- de las pruebas el bloque es un no-op.
+DO $revoke$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon')
+     AND EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+    REVOKE ALL ON employers, employer_aliases, employer_sources, direct_jobs FROM anon, authenticated;
+  END IF;
+END
+$revoke$;
+-- END direct-employers

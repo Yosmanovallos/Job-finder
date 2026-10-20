@@ -1,0 +1,23 @@
+{
+  "$comment": "Empresas con tablero ATS público verificado en vivo el 2026-10-19 con al menos una vacante que nombra Colombia (docs/adr/0006-direct-employers.md). Solo referencias: ninguna vacante, fecha ni reputación escrita a mano. aliases = forma exacta en que las bolsas escriben a la empresa en producción (consultado en /api/companies/search). SmartRecruiters va enabled=false por ADR-0002 hasta opt-in del dueño.",
+  "employers": [
+    { "slug": "sezzle", "displayName": "Sezzle", "websiteDomain": "sezzle.com", "aliases": ["Sezzle LA", "Sezzle Internships"], "sources": [{ "atsType": "greenhouse", "atsRef": "sezzle", "enabled": true }] },
+    { "slug": "clara", "displayName": "Clara", "websiteDomain": "clara.com", "aliases": [], "sources": [{ "atsType": "greenhouse", "atsRef": "clara", "enabled": true }] },
+    { "slug": "twilio", "displayName": "Twilio", "websiteDomain": "twilio.com", "aliases": [], "sources": [{ "atsType": "greenhouse", "atsRef": "twilio", "enabled": true }] },
+    { "slug": "wizeline", "displayName": "Wizeline", "websiteDomain": "wizeline.com", "aliases": [], "sources": [{ "atsType": "greenhouse", "atsRef": "wizeline", "enabled": true }] },
+    { "slug": "cabify", "displayName": "Cabify", "websiteDomain": "cabify.com", "aliases": [], "sources": [{ "atsType": "greenhouse", "atsRef": "cabify", "enabled": true }] },
+    { "slug": "vtex", "displayName": "VTEX", "websiteDomain": "vtex.com", "aliases": [], "sources": [{ "atsType": "greenhouse", "atsRef": "vtex", "enabled": true }] },
+    { "slug": "oowlish", "displayName": "Oowlish", "websiteDomain": "oowlish.com", "aliases": [], "sources": [{ "atsType": "lever", "atsRef": "oowlish", "enabled": true }] },
+    { "slug": "yuno", "displayName": "Yuno", "websiteDomain": "y.uno", "aliases": [], "sources": [{ "atsType": "lever", "atsRef": "yuno", "enabled": true }] },
+    { "slug": "la-haus", "displayName": "La Haus", "websiteDomain": "lahaus.com", "aliases": [], "sources": [{ "atsType": "lever", "atsRef": "lahaus", "enabled": true }] },
+    { "slug": "addi", "displayName": "Addi", "websiteDomain": "addi.com", "aliases": [], "sources": [{ "atsType": "ashby", "atsRef": "addi", "enabled": true }] },
+    { "slug": "oyster", "displayName": "Oyster", "websiteDomain": "oysterhr.com", "aliases": ["Oyster®"], "sources": [{ "atsType": "ashby", "atsRef": "oyster", "enabled": true }] },
+    { "slug": "bosch", "displayName": "Bosch", "websiteDomain": "bosch.com", "aliases": ["Bosch Group"], "sources": [{ "atsType": "smartrecruiters", "atsRef": "BoschGroup", "enabled": false }] },
+    { "slug": "sutherland", "displayName": "Sutherland", "websiteDomain": "sutherlandglobal.com", "aliases": ["Sutherland Global Services SGS"], "sources": [{ "atsType": "smartrecruiters", "atsRef": "Sutherland", "enabled": false }] },
+    { "slug": "sgs", "displayName": "SGS", "websiteDomain": "sgs.com", "aliases": [], "sources": [{ "atsType": "smartrecruiters", "atsRef": "SGS", "enabled": false }] },
+    { "slug": "nielseniq", "displayName": "NielsenIQ", "websiteDomain": "nielseniq.com", "aliases": [], "sources": [{ "atsType": "smartrecruiters", "atsRef": "NielsenIQ", "enabled": false }] },
+    { "slug": "avery-dennison", "displayName": "Avery Dennison", "websiteDomain": "averydennison.com", "aliases": [], "sources": [{ "atsType": "smartrecruiters", "atsRef": "AveryDennison", "enabled": false }] },
+    { "slug": "eurofins", "displayName": "Eurofins", "websiteDomain": "eurofins.com", "aliases": [], "sources": [{ "atsType": "smartrecruiters", "atsRef": "Eurofins", "enabled": false }] },
+    { "slug": "endava", "displayName": "Endava", "websiteDomain": "endava.com", "aliases": [], "sources": [{ "atsType": "smartrecruiters", "atsRef": "Endava", "enabled": false }] }
+  ]
+}

@@ -1,0 +1,74 @@
+import { listBoard } from "./connectors.js";
+import { isSuspectDrop, selectColombianPostings, type SelectionStats } from "./ingest.js";
+import type { EmployerSourceRow, SaveListingResult, SourceOutcome } from "../db/direct-repository.js";
+import type { DirectPosting, HttpGet } from "./types.js";
+
+/**
+ * One official-vacancy tick (ADR 0006): read each due board, keep its live
+ * Colombian postings, store them, and close only on complete evidence.
+ * Repository calls are injected so the integration test drives real SQL with
+ * fixture HTTP, and --dry-run drives no SQL at all.
+ */
+
+export interface TickDeps {
+  http: HttpGet;
+  saveListing(source: EmployerSourceRow, postings: DirectPosting[], applyClosures: boolean): Promise<SaveListingResult>;
+  recordOutcome(sourceId: string, outcome: SourceOutcome): Promise<void>;
+}
+
+export interface SourceReport {
+  employer: string;
+  board: string;
+  status: SourceOutcome["status"];
+  detail: string | null;
+  stats: SelectionStats | null;
+  saved: SaveListingResult | null;
+}
+
+// Boards read at once. The four APIs are different hosts, but one tick may
+// hold many boards of the same host; 3 keeps every host far under its limits.
+const CONCURRENCY = 3;
+
+export async function runSource(source: EmployerSourceRow, deps: TickDeps, now = new Date()): Promise<SourceReport> {
+  const board = `${source.atsType}:${source.atsRef}`;
+  const listing = await listBoard(source, deps.http);
+  if (listing.kind !== "complete") {
+    await deps.recordOutcome(source.id, { status: listing.kind, detail: listing.detail });
+    return { employer: source.employerSlug, board, status: listing.kind, detail: listing.detail, stats: null, saved: null };
+  }
+  const { postings, stats } = selectColombianPostings(listing.postings, now);
+  const suspect = isSuspectDrop(source.lastBoardTotal, listing.boardTotal);
+  // A suspicious listing still refreshes what it does show; it just can't
+  // prove anything is gone.
+  const saved = await deps.saveListing(source, postings, !suspect);
+  const detail = suspect
+    ? `el tablero pasó de ${source.lastBoardTotal} a ${listing.boardTotal} vacantes: no se cerró nada`
+    : null;
+  await deps.recordOutcome(
+    source.id,
+    suspect
+      ? { status: "suspect", boardTotal: listing.boardTotal, colombiaTotal: postings.length, detail: detail! }
+      : { status: "ok", boardTotal: listing.boardTotal, colombiaTotal: postings.length }
+  );
+  return { employer: source.employerSlug, board, status: suspect ? "suspect" : "ok", detail, stats, saved };
+}
+
+export async function runDirectTick(sources: EmployerSourceRow[], deps: TickDeps, now = new Date()): Promise<SourceReport[]> {
+  const reports: SourceReport[] = [];
+  let next = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(CONCURRENCY, sources.length) }, async () => {
+      while (next < sources.length) {
+        const source = sources[next++];
+        try {
+          reports.push(await runSource(source, deps, now));
+        } catch (error) {
+          // A database error on one board must not abort the others.
+          const detail = (error instanceof Error ? error.message : String(error)).slice(0, 200);
+          reports.push({ employer: source.employerSlug, board: `${source.atsType}:${source.atsRef}`, status: "error", detail, stats: null, saved: null });
+        }
+      }
+    })
+  );
+  return reports;
+}
