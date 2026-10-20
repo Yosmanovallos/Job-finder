@@ -1,8 +1,8 @@
 # ADR 0006 — Empresas y vacantes oficiales (directo del ATS de cada empresa)
 
 **Fecha:** 2026-10-19
-**Estado:** aceptado · D1 y D2 listas en `codex/direct-employers` (2026-10-19) ·
-**pendiente de despliegue** (push a `main` + migración por `workflow_dispatch`);
+**Estado:** aceptado · D1 y D2 **desplegadas en producción** (2026-10-20:
+migración, seed de 18 empresas y primer tick con 185 vacantes de Colombia);
 **nada visible en el sitio** hasta D4
 **Contexto:** pedido del dueño (2026-10-19): poblar BuscoTrabajo con las
 vacantes que publican las empresas de Colombia en su propio portal, sin
@@ -106,8 +106,8 @@ nulo o futuro.
 | Fase | Contenido |
 |---|---|
 | D1 ✅ | Esquema, Greenhouse, Lever, Ashby (APIs públicas documentadas) y SmartRecruiters; tick con `--dry-run`; BD local; pruebas |
-| D2 (lista, sin desplegar) | Workflow `direct-employers-tick.yml` (tick cada 6 h; migración y seed solo por `workflow_dispatch`) + migración en producción. SmartRecruiters **habilitado por opt-in explícito del dueño el 2026-10-19** (ADR-0002 §2) |
-| D3 | Descubrimiento de empresas (§7) |
+| D2 ✅ (desplegada 2026-10-20) | Workflow `direct-employers-tick.yml` (tick cada 6 h; migración y seed solo por `workflow_dispatch`) + migración en producción. SmartRecruiters **habilitado por opt-in explícito del dueño el 2026-10-19** (ADR-0002 §2) |
+| D3 | Descubrimiento de empresas (§7). Meta del dueño (2026-10-20): cubrir el 100 % de las empresas de Colombia que publiquen vacantes en un portal propio |
 | D4 | **Prioridad oficial sobre bolsas sin duplicados** (§8) y luego visibilidad en dashboard y `/empresas/:slug`. Hasta D4 nada de esto se muestra en el sitio |
 | D5 | Conectores por cobertura medida (§7): Workday CXS, SuccessFactors (sitemap + microdatos `datePosted`), Phenom, Gupy, Eightfold, Teamtailor — cada uno tras revisión `source-researcher` de robots/términos |
 
