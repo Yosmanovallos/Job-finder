@@ -68,4 +68,13 @@ export interface HttpResponse {
   status: number;
   body: string;
 }
-export type HttpGet = (url: string) => Promise<HttpResponse>;
+/**
+ * GET by default. `json` turns it into a POST with a JSON body (Workday's
+ * public search endpoint only answers POST); `accept` asks for HTML/XML
+ * (career sites read through their sitemap or JSON-LD).
+ */
+export interface HttpRequestInit {
+  json?: unknown;
+  accept?: string;
+}
+export type HttpGet = (url: string, init?: HttpRequestInit) => Promise<HttpResponse>;

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { htmlToText, isoDate, safeJson, text } from "./text.js";
-import type { BoardListing, EmployerSourceRef, HttpGet, RawAtsPosting, Workplace } from "./types.js";
+import type { BoardListing, DirectAtsType, EmployerSourceRef, HttpGet, RawAtsPosting, Workplace } from "./types.js";
 
 /**
  * Public, documented job-board APIs (ADR 0006 §5, phase D1). Each connector
@@ -11,26 +11,13 @@ import type { BoardListing, EmployerSourceRef, HttpGet, RawAtsPosting, Workplace
  */
 
 // Ref formats: a board token for Greenhouse/Lever/Ashby, the company
-// identifier for SmartRecruiters. Anything else is refused before any URL is
-// built from it.
-const REF_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/;
+// identifier for SmartRecruiters. Each connector declares its own pattern;
+// anything else is refused before any URL is built from it.
+const TOKEN_REF = /^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/;
 
 // Board pages read per run (SmartRecruiters is the only paginated API here):
 // 20 x 100 = 2,000 postings for one country, far above any board measured.
 const MAX_PAGES = 20;
-
-export function portalUrl(ref: EmployerSourceRef): string {
-  switch (ref.atsType) {
-    case "greenhouse":
-      return `https://job-boards.greenhouse.io/${ref.atsRef}`;
-    case "lever":
-      return `https://jobs.lever.co/${ref.atsRef}`;
-    case "ashby":
-      return `https://jobs.ashbyhq.com/${ref.atsRef}`;
-    case "smartrecruiters":
-      return `https://jobs.smartrecruiters.com/${ref.atsRef}`;
-  }
-}
 
 // ---------- Greenhouse: GET /v1/boards/{token}/jobs?content=true ----------
 
@@ -269,26 +256,70 @@ function smartRecruitersPosting(
   };
 }
 
-// ---------- dispatcher ----------
+// ---------- registry ----------
 
-const SINGLE_PAGE: Record<Exclude<EmployerSourceRef["atsType"], "smartrecruiters">, { url: (ref: string) => string; parse: (body: unknown) => RawAtsPosting[] | null }> = {
-  greenhouse: { url: (ref) => `https://boards-api.greenhouse.io/v1/boards/${ref}/jobs?content=true`, parse: greenhouse },
-  lever: { url: (ref) => `https://api.lever.co/v0/postings/${ref}?mode=json`, parse: lever },
-  ashby: { url: (ref) => `https://api.ashbyhq.com/posting-api/job-board/${ref}`, parse: ashby }
+/**
+ * One entry per ATS with a connector. `list` reads the whole board and never
+ * throws (listBoard wraps it); `postingUrl` exists only where the ATS answers
+ * a clean 404 once a posting is gone (measured 2026-10-19 with live and
+ * nonexistent ids). Ashby has none and its public page is an SPA that
+ * answers 200 for any id; SmartRecruiters answers 400 for an unknown id,
+ * which is not proof of closure — those close on missing listings only.
+ */
+interface Connector {
+  refPattern: RegExp;
+  portalUrl(ref: string): string;
+  list(ref: string, http: HttpGet): Promise<BoardListing>;
+  postingUrl?(ref: string, id: string): string;
+}
+
+function singlePage(url: (ref: string) => string, parse: (body: unknown) => RawAtsPosting[] | null) {
+  return async (ref: string, http: HttpGet): Promise<BoardListing> => {
+    const response = await http(url(ref));
+    if (response.status === 404) return { kind: "not_found", detail: "el ATS respondió 404 para este tablero" };
+    if (response.status !== 200) return { kind: "error", detail: `HTTP ${response.status}` };
+    const postings = parse(safeJson(response.body));
+    if (!postings) return { kind: "error", detail: "respuesta con forma inesperada" };
+    return { kind: "complete", boardTotal: postings.length, postings };
+  };
+}
+
+const CONNECTORS: Record<DirectAtsType, Connector> = {
+  greenhouse: {
+    refPattern: TOKEN_REF,
+    portalUrl: (ref) => `https://job-boards.greenhouse.io/${ref}`,
+    list: singlePage((ref) => `https://boards-api.greenhouse.io/v1/boards/${ref}/jobs?content=true`, greenhouse),
+    postingUrl: (ref, id) => `https://boards-api.greenhouse.io/v1/boards/${ref}/jobs/${id}`
+  },
+  lever: {
+    refPattern: TOKEN_REF,
+    portalUrl: (ref) => `https://jobs.lever.co/${ref}`,
+    list: singlePage((ref) => `https://api.lever.co/v0/postings/${ref}?mode=json`, lever),
+    postingUrl: (ref, id) => `https://api.lever.co/v0/postings/${ref}/${id}`
+  },
+  ashby: {
+    refPattern: TOKEN_REF,
+    portalUrl: (ref) => `https://jobs.ashbyhq.com/${ref}`,
+    list: singlePage((ref) => `https://api.ashbyhq.com/posting-api/job-board/${ref}`, ashby)
+  },
+  smartrecruiters: {
+    refPattern: TOKEN_REF,
+    portalUrl: (ref) => `https://jobs.smartrecruiters.com/${ref}`,
+    list: listSmartRecruiters
+  }
 };
 
-// Per-posting endpoints that answer a clean 404 once the posting is gone
-// (measured 2026-10-19 with live and nonexistent ids). Ashby has none and its
-// public page is an SPA that answers 200 for any id; SmartRecruiters answers
-// 400 for an unknown id, which is not proof of closure — those two close on
-// missing listings only.
-const POSTING_URL: Partial<Record<EmployerSourceRef["atsType"], (ref: string, id: string) => string>> = {
-  greenhouse: (ref, id) => `https://boards-api.greenhouse.io/v1/boards/${ref}/jobs/${id}`,
-  lever: (ref, id) => `https://api.lever.co/v0/postings/${ref}/${id}`
-};
+/** True when `ref` is a well-formed reference for that ATS. */
+export function isValidRef(ref: EmployerSourceRef): boolean {
+  return CONNECTORS[ref.atsType]?.refPattern.test(ref.atsRef) ?? false;
+}
+
+export function portalUrl(ref: EmployerSourceRef): string {
+  return CONNECTORS[ref.atsType].portalUrl(ref.atsRef);
+}
 
 export function canConfirmClosure(atsType: EmployerSourceRef["atsType"]): boolean {
-  return atsType in POSTING_URL;
+  return Boolean(CONNECTORS[atsType]?.postingUrl);
 }
 
 /**
@@ -296,8 +327,8 @@ export function canConfirmClosure(atsType: EmployerSourceRef["atsType"]): boolea
  * Errors, timeouts and anything else are "not proven" — never a closure.
  */
 export async function confirmPostingGone(ref: EmployerSourceRef, externalId: string, http: HttpGet): Promise<boolean> {
-  const build = POSTING_URL[ref.atsType];
-  if (!build || !REF_PATTERN.test(ref.atsRef) || !/^[A-Za-z0-9-]{1,100}$/.test(externalId)) return false;
+  const build = CONNECTORS[ref.atsType]?.postingUrl;
+  if (!build || !isValidRef(ref) || !/^[A-Za-z0-9-]{1,100}$/.test(externalId)) return false;
   try {
     const response = await http(build(ref.atsRef, externalId));
     return response.status === 404 || response.status === 410;
@@ -312,16 +343,11 @@ function errorDetail(error: unknown): string {
 
 /** Reads one employer board end to end. Never throws. */
 export async function listBoard(ref: EmployerSourceRef, http: HttpGet): Promise<BoardListing> {
-  if (!REF_PATTERN.test(ref.atsRef)) return { kind: "error", detail: "ats_ref con formato inválido" };
+  const connector = CONNECTORS[ref.atsType];
+  if (!connector) return { kind: "error", detail: `ATS sin conector: ${ref.atsType}` };
+  if (!connector.refPattern.test(ref.atsRef)) return { kind: "error", detail: "ats_ref con formato inválido" };
   try {
-    if (ref.atsType === "smartrecruiters") return await listSmartRecruiters(ref.atsRef, http);
-    const connector = SINGLE_PAGE[ref.atsType];
-    const response = await http(connector.url(ref.atsRef));
-    if (response.status === 404) return { kind: "not_found", detail: "el ATS respondió 404 para este tablero" };
-    if (response.status !== 200) return { kind: "error", detail: `HTTP ${response.status}` };
-    const postings = connector.parse(safeJson(response.body));
-    if (!postings) return { kind: "error", detail: "respuesta con forma inesperada" };
-    return { kind: "complete", boardTotal: postings.length, postings };
+    return await connector.list(ref.atsRef, http);
   } catch (error) {
     return { kind: "error", detail: errorDetail(error) };
   }
