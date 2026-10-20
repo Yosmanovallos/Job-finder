@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { listSuccessFactors } from "./ats/successfactors.js";
+import { listTeamtailor } from "./ats/teamtailor.js";
 import { SITE_REF } from "./ats/site.js";
 import { htmlToText, isoDate, safeJson, text } from "./text.js";
 import type { BoardListing, DirectAtsType, EmployerSourceRef, HttpGet, ListOptions, RawAtsPosting, Workplace } from "./types.js";
@@ -315,6 +316,15 @@ const CONNECTORS: Record<DirectAtsType, Connector> = {
     refPattern: SITE_REF,
     portalUrl: (ref) => `https://${ref}/`,
     list: listSuccessFactors
+  },
+  // Public RSS (docs/source-catalog/teamtailor.md). The ref is the
+  // subdomain, with its region when it has one (connectassistance.na). An
+  // unknown id answers 404, but no real closed posting was checked yet:
+  // listings only.
+  teamtailor: {
+    refPattern: /^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?(?:\.[a-z]{2})?$/,
+    portalUrl: (ref) => `https://${ref}.teamtailor.com/jobs`,
+    list: listTeamtailor
   }
 };
 

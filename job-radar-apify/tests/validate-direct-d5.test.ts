@@ -198,3 +198,85 @@ test("SuccessFactors: the real posting block yields the description as text", ()
   assert.equal(detail?.descriptionText?.includes("\r"), false);
   assert.ok((detail?.descriptionText?.length ?? 0) > 1000);
 });
+
+// ---------- Teamtailor ----------
+
+const TT = "teamtailor";
+const ttUrl = (ref: string, page: number) => `https://${ref}.teamtailor.com/jobs.rss?per_page=100&offset=${page * 100}`;
+
+test("Teamtailor: refs are a subdomain with an optional region", () => {
+  assert.ok(isValidRef({ atsType: TT, atsRef: "qualacompany" }));
+  assert.ok(isValidRef({ atsType: TT, atsRef: "connectassistance.na" }));
+  assert.equal(isValidRef({ atsType: TT, atsRef: "evil.com/x" }), false);
+  assert.equal(isValidRef({ atsType: TT, atsRef: "a.b.c" }), false);
+  assert.equal(portalUrl({ atsType: TT, atsRef: "qualacompany" }), "https://qualacompany.teamtailor.com/jobs");
+});
+
+test("Teamtailor: real feed — country by name, multi-country posting per segment, office city never used", async () => {
+  const listing = await listBoard(
+    { atsType: TT, atsRef: "empleosknaufsouthamerica" },
+    fakeHttp({ [ttUrl("empleosknaufsouthamerica", 0)]: { status: 200, body: fixture(TT, "jobs-knauf-all9.rss.xml") } }),
+    {}
+  );
+  assert.equal(listing.kind, "complete");
+  if (listing.kind !== "complete") return;
+  assert.equal(listing.boardTotal, 9);
+  const first = listing.postings[0];
+  assert.equal(first.externalId, "8527643");
+  assert.equal(first.publishedAt, "2026-10-09T19:34:31.000Z", "RFC 822 with offset");
+  assert.equal(first.workplace, "onsite");
+  assert.equal(first.companyName, "Knauf South America");
+  assert.ok(first.descriptionText && !first.descriptionText.includes("<h4>"));
+  const { postings, stats } = selectColombianPostings(listing.postings, NOW);
+  assert.equal(stats.colombia, 3);
+  assert.ok(postings.every((posting) => posting.city === null), "tt:city is the office, not the posting's city");
+  assert.ok(postings.every((posting) => posting.locationRaw.includes("Colombia")));
+});
+
+test("Teamtailor: regional ref and the 30-day window by pubDate", async () => {
+  const listing = await listBoard(
+    { atsType: TT, atsRef: "connectassistance.na" },
+    fakeHttp({ [ttUrl("connectassistance.na", 0)]: { status: 200, body: fixture(TT, "jobs-connect-all7.rss.xml") } }),
+    {}
+  );
+  assert.equal(listing.kind, "complete");
+  if (listing.kind !== "complete") return;
+  const { stats } = selectColombianPostings(listing.postings, NOW);
+  assert.equal(stats.colombia, 5);
+  assert.equal(stats.notColombia, 2, "Puerto Rico");
+  assert.ok(stats.stale > 0, "postings older than 30 days by pubDate are not stored");
+});
+
+function ttItem(id: number): string {
+  return `<item><title>Vacante ${id}</title><pubDate>Mon, 19 Oct 2026 10:00:00 -0500</pubDate><link>https://acme.teamtailor.com/jobs/${id}-vacante</link><remoteStatus>none</remoteStatus><tt:locations><tt:location><tt:city>Bogotá</tt:city><tt:country>Colombia</tt:country></tt:location></tt:locations></item>`;
+}
+const ttFeed = (ids: number[]) => `<?xml version='1.0'?><rss version="2.0"><channel><title>Acme</title>${ids.map(ttItem).join("")}</channel></rss>`;
+const range = (from: number, count: number) => Array.from({ length: count }, (_, index) => from + index);
+
+test("Teamtailor: pages until a short page; an overlap or a failed page is never complete", async () => {
+  const full = await listBoard(
+    { atsType: TT, atsRef: "acme" },
+    fakeHttp({
+      [ttUrl("acme", 0)]: { status: 200, body: ttFeed(range(1, 100)) },
+      [ttUrl("acme", 1)]: { status: 200, body: ttFeed(range(101, 100)) },
+      [ttUrl("acme", 2)]: { status: 200, body: fixture(TT, "jobs-quala-offset300-empty.rss.xml") }
+    }),
+    {}
+  );
+  assert.equal(full.kind === "complete" && full.boardTotal, 200, "an exact multiple of 100 ends on the empty page");
+  assert.equal(full.kind === "complete" && full.postings[0].workplace, null, "remoteStatus none = not stated");
+  const shifted = await listBoard(
+    { atsType: TT, atsRef: "acme" },
+    fakeHttp({ [ttUrl("acme", 0)]: { status: 200, body: ttFeed(range(1, 100)) }, [ttUrl("acme", 1)]: { status: 200, body: ttFeed(range(100, 5)) } }),
+    {}
+  );
+  assert.equal(shifted.kind, "error");
+  const broken = await listBoard(
+    { atsType: TT, atsRef: "acme" },
+    fakeHttp({ [ttUrl("acme", 0)]: { status: 200, body: ttFeed(range(1, 100)) }, [ttUrl("acme", 1)]: { status: 502, body: "" } }),
+    {}
+  );
+  assert.deepEqual(broken, { kind: "error", detail: "HTTP 502 en la página 2" });
+  const html = await listBoard({ atsType: TT, atsRef: "acme" }, fakeHttp({ [ttUrl("acme", 0)]: { status: 200, body: "<html>login</html>" } }), {});
+  assert.equal(html.kind, "error");
+});

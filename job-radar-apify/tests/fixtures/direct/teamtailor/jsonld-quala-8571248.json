@@ -1,0 +1,32 @@
+{
+ "@context": "http://schema.org/",
+ "@type": "JobPosting",
+ "title": "Vendedor Integral Autoservicios Medellín",
+ "description": "&lt;p&gt;¿Te apasiona el área comercial? En Quala Colombia contamos con varias posiciones donde podrás conocer los diferentes canales de venta desde el terreno hasta la estrategia.&lt;br&gt;Si tienes disponibilidad de movilizarte por el país, tienes mínimo de 6 meses en el área comercial y tu pasión...[truncated]",
+ "identifier": {
+  "@type": "PropertyValue",
+  "name": "Quala Internacional",
+  "value": "8571248"
+ },
+ "datePosted": "2026-10-19T10:50:01-05:00",
+ "employmentType": "FULL_TIME",
+ "hiringOrganization": {
+  "@type": "Organization",
+  "name": "Quala Internacional",
+  "logo": "https://images.teamtailor-cdn.com/images/s3/teamtailor-production/logotype-v3/image_uploads/e4c6a275-04f5-4d43-b2fc-ec79a525a71b/original.png",
+  "sameAs": "https://qualacompany.teamtailor.com"
+ },
+ "jobLocation": [
+  {
+   "@type": "Place",
+   "address": {
+    "streetAddress": "QUALA",
+    "addressLocality": "Bogotá",
+    "postalCode": "110841",
+    "addressCountry": "CO",
+    "addressRegion": null,
+    "@type": "PostalAddress"
+   }
+  }
+ ]
+}
