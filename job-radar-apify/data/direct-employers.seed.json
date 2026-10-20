@@ -1,23 +1,461 @@
 {
-  "$comment": "Empresas con tablero ATS público verificado en vivo el 2026-10-19 con al menos una vacante que nombra Colombia (docs/adr/0006-direct-employers.md). Solo referencias: ninguna vacante, fecha ni reputación escrita a mano. aliases = forma exacta en que las bolsas escriben a la empresa en producción (consultado en /api/companies/search). SmartRecruiters habilitado por opt-in explícito del dueño el 2026-10-19 (ADR-0002, ADR 0006 §5).",
+  "$comment": "Empresas con tablero ATS público verificado en vivo el 2026-10-19 con al menos una vacante que nombra Colombia (docs/adr/0006-direct-employers.md). Solo referencias: ninguna vacante, fecha ni reputación escrita a mano. aliases = forma exacta en que las bolsas escriben a la empresa en producción (consultado en /api/companies/search). SmartRecruiters habilitado por opt-in explícito del dueño el 2026-10-19 (ADR-0002, ADR 0006 §5). 2026-10-20 (fase D5): 14 tableros de SuccessFactors, Teamtailor, Workday, Phenom, Eightfold y Magneto verificados con canario en vivo (docs/source-catalog/<ats>.md §canario); Magneto solo donde el sitio propio enlaza su página (decisión del dueño). Alias consultados en /api/companies/search; se omiten los ambiguos (avianca AR, RappiPay, Connect). Microsoft (Eightfold) queda enabled=false: respondió 429 en la investigación y en el dry-run del 2026-10-20; se habilita tras un canario completo.",
   "employers": [
-    { "slug": "sezzle", "displayName": "Sezzle", "websiteDomain": "sezzle.com", "aliases": ["Sezzle LA", "Sezzle Internships"], "sources": [{ "atsType": "greenhouse", "atsRef": "sezzle", "enabled": true }] },
-    { "slug": "clara", "displayName": "Clara", "websiteDomain": "clara.com", "aliases": [], "sources": [{ "atsType": "greenhouse", "atsRef": "clara", "enabled": true }] },
-    { "slug": "twilio", "displayName": "Twilio", "websiteDomain": "twilio.com", "aliases": [], "sources": [{ "atsType": "greenhouse", "atsRef": "twilio", "enabled": true }] },
-    { "slug": "wizeline", "displayName": "Wizeline", "websiteDomain": "wizeline.com", "aliases": [], "sources": [{ "atsType": "greenhouse", "atsRef": "wizeline", "enabled": true }] },
-    { "slug": "cabify", "displayName": "Cabify", "websiteDomain": "cabify.com", "aliases": [], "sources": [{ "atsType": "greenhouse", "atsRef": "cabify", "enabled": true }] },
-    { "slug": "vtex", "displayName": "VTEX", "websiteDomain": "vtex.com", "aliases": [], "sources": [{ "atsType": "greenhouse", "atsRef": "vtex", "enabled": true }] },
-    { "slug": "oowlish", "displayName": "Oowlish", "websiteDomain": "oowlish.com", "aliases": [], "sources": [{ "atsType": "lever", "atsRef": "oowlish", "enabled": true }] },
-    { "slug": "yuno", "displayName": "Yuno", "websiteDomain": "y.uno", "aliases": [], "sources": [{ "atsType": "lever", "atsRef": "yuno", "enabled": true }] },
-    { "slug": "la-haus", "displayName": "La Haus", "websiteDomain": "lahaus.com", "aliases": [], "sources": [{ "atsType": "lever", "atsRef": "lahaus", "enabled": true }] },
-    { "slug": "addi", "displayName": "Addi", "websiteDomain": "addi.com", "aliases": [], "sources": [{ "atsType": "ashby", "atsRef": "addi", "enabled": true }] },
-    { "slug": "oyster", "displayName": "Oyster", "websiteDomain": "oysterhr.com", "aliases": ["Oyster®"], "sources": [{ "atsType": "ashby", "atsRef": "oyster", "enabled": true }] },
-    { "slug": "bosch", "displayName": "Bosch", "websiteDomain": "bosch.com", "aliases": ["Bosch Group"], "sources": [{ "atsType": "smartrecruiters", "atsRef": "BoschGroup", "enabled": true }] },
-    { "slug": "sutherland", "displayName": "Sutherland", "websiteDomain": "sutherlandglobal.com", "aliases": ["Sutherland Global Services SGS"], "sources": [{ "atsType": "smartrecruiters", "atsRef": "Sutherland", "enabled": true }] },
-    { "slug": "sgs", "displayName": "SGS", "websiteDomain": "sgs.com", "aliases": [], "sources": [{ "atsType": "smartrecruiters", "atsRef": "SGS", "enabled": true }] },
-    { "slug": "nielseniq", "displayName": "NielsenIQ", "websiteDomain": "nielseniq.com", "aliases": [], "sources": [{ "atsType": "smartrecruiters", "atsRef": "NielsenIQ", "enabled": true }] },
-    { "slug": "avery-dennison", "displayName": "Avery Dennison", "websiteDomain": "averydennison.com", "aliases": [], "sources": [{ "atsType": "smartrecruiters", "atsRef": "AveryDennison", "enabled": true }] },
-    { "slug": "eurofins", "displayName": "Eurofins", "websiteDomain": "eurofins.com", "aliases": [], "sources": [{ "atsType": "smartrecruiters", "atsRef": "Eurofins", "enabled": true }] },
-    { "slug": "endava", "displayName": "Endava", "websiteDomain": "endava.com", "aliases": [], "sources": [{ "atsType": "smartrecruiters", "atsRef": "Endava", "enabled": true }] }
+    {
+      "slug": "sezzle",
+      "displayName": "Sezzle",
+      "websiteDomain": "sezzle.com",
+      "aliases": [
+        "Sezzle LA",
+        "Sezzle Internships"
+      ],
+      "sources": [
+        {
+          "atsType": "greenhouse",
+          "atsRef": "sezzle",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "slug": "clara",
+      "displayName": "Clara",
+      "websiteDomain": "clara.com",
+      "aliases": [],
+      "sources": [
+        {
+          "atsType": "greenhouse",
+          "atsRef": "clara",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "slug": "twilio",
+      "displayName": "Twilio",
+      "websiteDomain": "twilio.com",
+      "aliases": [],
+      "sources": [
+        {
+          "atsType": "greenhouse",
+          "atsRef": "twilio",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "slug": "wizeline",
+      "displayName": "Wizeline",
+      "websiteDomain": "wizeline.com",
+      "aliases": [],
+      "sources": [
+        {
+          "atsType": "greenhouse",
+          "atsRef": "wizeline",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "slug": "cabify",
+      "displayName": "Cabify",
+      "websiteDomain": "cabify.com",
+      "aliases": [],
+      "sources": [
+        {
+          "atsType": "greenhouse",
+          "atsRef": "cabify",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "slug": "vtex",
+      "displayName": "VTEX",
+      "websiteDomain": "vtex.com",
+      "aliases": [],
+      "sources": [
+        {
+          "atsType": "greenhouse",
+          "atsRef": "vtex",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "slug": "oowlish",
+      "displayName": "Oowlish",
+      "websiteDomain": "oowlish.com",
+      "aliases": [],
+      "sources": [
+        {
+          "atsType": "lever",
+          "atsRef": "oowlish",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "slug": "yuno",
+      "displayName": "Yuno",
+      "websiteDomain": "y.uno",
+      "aliases": [],
+      "sources": [
+        {
+          "atsType": "lever",
+          "atsRef": "yuno",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "slug": "la-haus",
+      "displayName": "La Haus",
+      "websiteDomain": "lahaus.com",
+      "aliases": [],
+      "sources": [
+        {
+          "atsType": "lever",
+          "atsRef": "lahaus",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "slug": "addi",
+      "displayName": "Addi",
+      "websiteDomain": "addi.com",
+      "aliases": [],
+      "sources": [
+        {
+          "atsType": "ashby",
+          "atsRef": "addi",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "slug": "oyster",
+      "displayName": "Oyster",
+      "websiteDomain": "oysterhr.com",
+      "aliases": [
+        "Oyster®"
+      ],
+      "sources": [
+        {
+          "atsType": "ashby",
+          "atsRef": "oyster",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "slug": "bosch",
+      "displayName": "Bosch",
+      "websiteDomain": "bosch.com",
+      "aliases": [
+        "Bosch Group"
+      ],
+      "sources": [
+        {
+          "atsType": "smartrecruiters",
+          "atsRef": "BoschGroup",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "slug": "sutherland",
+      "displayName": "Sutherland",
+      "websiteDomain": "sutherlandglobal.com",
+      "aliases": [
+        "Sutherland Global Services SGS"
+      ],
+      "sources": [
+        {
+          "atsType": "smartrecruiters",
+          "atsRef": "Sutherland",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "slug": "sgs",
+      "displayName": "SGS",
+      "websiteDomain": "sgs.com",
+      "aliases": [],
+      "sources": [
+        {
+          "atsType": "smartrecruiters",
+          "atsRef": "SGS",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "slug": "nielseniq",
+      "displayName": "NielsenIQ",
+      "websiteDomain": "nielseniq.com",
+      "aliases": [],
+      "sources": [
+        {
+          "atsType": "smartrecruiters",
+          "atsRef": "NielsenIQ",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "slug": "avery-dennison",
+      "displayName": "Avery Dennison",
+      "websiteDomain": "averydennison.com",
+      "aliases": [],
+      "sources": [
+        {
+          "atsType": "smartrecruiters",
+          "atsRef": "AveryDennison",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "slug": "eurofins",
+      "displayName": "Eurofins",
+      "websiteDomain": "eurofins.com",
+      "aliases": [],
+      "sources": [
+        {
+          "atsType": "smartrecruiters",
+          "atsRef": "Eurofins",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "slug": "endava",
+      "displayName": "Endava",
+      "websiteDomain": "endava.com",
+      "aliases": [],
+      "sources": [
+        {
+          "atsType": "smartrecruiters",
+          "atsRef": "Endava",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "slug": "bancolombia",
+      "displayName": "Bancolombia",
+      "websiteDomain": "bancolombia.com",
+      "aliases": [
+        "Bancolombia"
+      ],
+      "sources": [
+        {
+          "atsType": "successfactors",
+          "atsRef": "empleo.grupobancolombia.com/bancolombia",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "slug": "avianca",
+      "displayName": "Avianca",
+      "websiteDomain": "avianca.com",
+      "aliases": [
+        "avianca",
+        "avianca cargo"
+      ],
+      "sources": [
+        {
+          "atsType": "successfactors",
+          "atsRef": "jobs.avianca.com",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "slug": "ey",
+      "displayName": "EY",
+      "websiteDomain": "ey.com",
+      "aliases": [
+        "EY Colombia (Ernst & Young)"
+      ],
+      "sources": [
+        {
+          "atsType": "successfactors",
+          "atsRef": "careers.ey.com/ey",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "slug": "quala",
+      "displayName": "Quala",
+      "websiteDomain": "quala.com.co",
+      "aliases": [
+        "Quala"
+      ],
+      "sources": [
+        {
+          "atsType": "teamtailor",
+          "atsRef": "qualacompany",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "slug": "connect-assistance",
+      "displayName": "Connect Assistance",
+      "websiteDomain": null,
+      "aliases": [],
+      "sources": [
+        {
+          "atsType": "teamtailor",
+          "atsRef": "connectassistance.na",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "slug": "galderma",
+      "displayName": "Galderma",
+      "websiteDomain": "galderma.com",
+      "aliases": [
+        "Galderma"
+      ],
+      "sources": [
+        {
+          "atsType": "workday",
+          "atsRef": "galderma/wd3/External",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "slug": "sanofi",
+      "displayName": "Sanofi",
+      "websiteDomain": "sanofi.com",
+      "aliases": [
+        "Sanofi"
+      ],
+      "sources": [
+        {
+          "atsType": "workday",
+          "atsRef": "sanofi/wd3/SanofiCareers",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "slug": "rappi",
+      "displayName": "Rappi",
+      "websiteDomain": "rappi.com",
+      "aliases": [
+        "Rappi"
+      ],
+      "sources": [
+        {
+          "atsType": "workday",
+          "atsRef": "rappi/wd12/Rappi_jobs",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "slug": "dhl",
+      "displayName": "DHL",
+      "websiteDomain": "dhl.com",
+      "aliases": [
+        "DHL",
+        "DHL Supply Chain",
+        "DHL Global Forwarding",
+        "DHL Express",
+        "Corporacion DHL"
+      ],
+      "sources": [
+        {
+          "atsType": "phenom",
+          "atsRef": "careers.dhl.com/amer/es",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "slug": "procter-gamble",
+      "displayName": "Procter & Gamble",
+      "websiteDomain": "pg.com",
+      "aliases": [
+        "Procter & Gamble"
+      ],
+      "sources": [
+        {
+          "atsType": "phenom",
+          "atsRef": "www.pgcareers.com/latam/en",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "slug": "bayer",
+      "displayName": "Bayer",
+      "websiteDomain": "bayer.com",
+      "aliases": [
+        "Bayer"
+      ],
+      "sources": [
+        {
+          "atsType": "eightfold",
+          "atsRef": "bayer.eightfold.ai@bayer.com",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "slug": "hp",
+      "displayName": "HP",
+      "websiteDomain": "hp.com",
+      "aliases": [
+        "HP"
+      ],
+      "sources": [
+        {
+          "atsType": "eightfold",
+          "atsRef": "hp.eightfold.ai@hp.com",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "slug": "microsoft",
+      "displayName": "Microsoft",
+      "websiteDomain": "microsoft.com",
+      "aliases": [
+        "Microsoft"
+      ],
+      "sources": [
+        {
+          "atsType": "eightfold",
+          "atsRef": "apply.careers.microsoft.com@microsoft.com",
+          "enabled": false
+        }
+      ]
+    },
+    {
+      "slug": "claro",
+      "displayName": "Claro",
+      "websiteDomain": "claro.com.co",
+      "aliases": [
+        "Claro Colombia"
+      ],
+      "sources": [
+        {
+          "atsType": "magneto",
+          "atsRef": "claro-colombia",
+          "enabled": true
+        }
+      ]
+    }
   ]
 }

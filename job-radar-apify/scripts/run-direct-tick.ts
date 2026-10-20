@@ -18,7 +18,7 @@ import { assertDirectDatabaseAllowed } from "../src/direct/db-guard.js";
 import { boundedGet } from "../src/direct/http.js";
 import { selectColombianPostings } from "../src/direct/ingest.js";
 import { parseEmployerSeed } from "../src/direct/seed.js";
-import { MIN_INTERVAL_HOURS, type SourceReport } from "../src/direct/tick.js";
+import { DETAIL_BUDGET, MIN_INTERVAL_HOURS, type SourceReport } from "../src/direct/tick.js";
 
 dotenv.config();
 
@@ -40,21 +40,28 @@ async function dryRun(employerSlug: string | undefined): Promise<void> {
   );
   const includeDisabled = process.argv.includes("--include-disabled");
   let total = 0;
+  let deferred = 0;
+  const started = Date.now();
   for (const seed of seeds) {
     if (employerSlug && seed.slug !== employerSlug) continue;
     for (const source of seed.sources) {
       if (!source.enabled && !includeDisabled) continue;
-      const listing = await listBoard(source, boundedGet);
+      // Same detail budget as a first real read (nothing known yet).
+      const boardStarted = Date.now();
+      const listing = await listBoard(source, boundedGet, { detailBudget: DETAIL_BUDGET });
+      const seconds = `${((Date.now() - boardStarted) / 1000).toFixed(1)} s`;
       const board = `${source.atsType}:${source.atsRef}${source.enabled ? "" : " (off)"}`;
       if (listing.kind !== "complete") {
-        console.log(`  ${seed.slug.padEnd(16)} ${board.padEnd(32)} ${listing.kind}: ${listing.detail}`);
+        console.log(`  ${seed.slug.padEnd(16)} ${board.padEnd(32)} ${listing.kind}: ${listing.detail} (${seconds})`);
         continue;
       }
+      deferred += listing.deferred ?? 0;
       const { postings, stats } = selectColombianPostings(listing.postings);
       total += postings.length;
       console.log(
         `  ${seed.slug.padEnd(16)} ${board.padEnd(32)} tablero ${String(stats.boardTotal).padStart(4)} · ` +
-          `Colombia vigentes ${String(stats.kept).padStart(3)} · fuera de Colombia ${stats.notColombia} · >30 días/vencidas ${stats.stale}`
+          `Colombia vigentes ${String(stats.kept).padStart(3)} · fuera de Colombia ${stats.notColombia} · >30 días/vencidas ${stats.stale}` +
+          `${listing.deferred ? ` · diferidas ${listing.deferred}` : ""} (${seconds})`
       );
       for (const posting of postings.slice(0, 2)) {
         console.log(
@@ -64,7 +71,10 @@ async function dryRun(employerSlug: string | undefined): Promise<void> {
       }
     }
   }
-  console.log(`[direct-tick] --dry-run: ${total} vacantes oficiales vigentes en Colombia. No se escribió nada.`);
+  console.log(
+    `[direct-tick] --dry-run: ${total} vacantes oficiales vigentes en Colombia en la primera lectura` +
+      `${deferred ? ` (+${deferred} nuevas que esperan su detalle a la siguiente)` : ""}; ${((Date.now() - started) / 1000).toFixed(0)} s en total, en serie. No se escribió nada.`
+  );
 }
 
 function printReports(reports: SourceReport[], purged: number): void {
