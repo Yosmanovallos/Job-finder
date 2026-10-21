@@ -175,7 +175,7 @@ async function revertOrphanCopies(): Promise<{ reverted: number; skipped: number
  * title_key (the trigger-maintained key, identical to the dedupe identity).
  * The city breaks ties only when the employer lists that title in several
  * cities; an ambiguous copy (country-only or remote location) is then left
- * alone. Colombia and remote rows only — Venezuela is never touched.
+ * alone — unless every official posting of that title is in one city. Colombia and remote rows only — Venezuela is never touched.
  * Exported for the scrape tick, which runs it after saving (review I1).
  */
 export async function supersedeCopies(): Promise<number> {
@@ -185,7 +185,7 @@ export async function supersedeCopies(): Promise<number> {
        FROM jobs p JOIN direct_jobs d ON d.id = p.direct_job_id
        WHERE p.direct_job_id IS NOT NULL AND p.is_active = TRUE
      ), spread AS (
-       SELECT employer_id, title_key, COUNT(*) AS n FROM projections GROUP BY 1, 2
+       SELECT employer_id, title_key, COUNT(*) AS n, COUNT(DISTINCT location_key) AS cities FROM projections GROUP BY 1, 2
      ), candidates AS (
        SELECT c.id AS copy_id, p.id AS projection_id,
               ROW_NUMBER() OVER (PARTITION BY c.id ORDER BY (c.location_key = p.location_key) DESC, p.id) AS rank
@@ -196,7 +196,11 @@ export async function supersedeCopies(): Promise<number> {
        WHERE c.is_active = TRUE AND c.direct_job_id IS NULL AND c.superseded_by IS NULL
          AND (c.country = 'CO' OR c.country IS NULL)
          AND c.title_key <> ''
-         AND (k.n = 1 OR (c.location_key = p.location_key AND c.location_key NOT IN ('colombia', 'remoto', 'remote')))
+         AND (k.n = 1
+              OR (c.location_key = p.location_key AND c.location_key NOT IN ('colombia', 'remoto', 'remote'))
+              -- A country-only copy when every official posting of that title
+              -- is in ONE city: there is only one place it can be a copy of.
+              OR (c.location_key IN ('colombia', 'remoto', 'remote') AND k.cities = 1))
      )
      SELECT copy_id, projection_id FROM candidates WHERE rank = 1`
   );
