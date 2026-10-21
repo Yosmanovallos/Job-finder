@@ -4,6 +4,7 @@ import { Badge } from "./ui/badge.js";
 import { cn } from "../lib/utils.js";
 import { Job } from "../sources/types.js";
 import { buildLocationLabel } from "../countries/index.js";
+import { jobDateLabel } from "../lib/job-date-label.js";
 
 export interface JobListItemProps {
   job: Job & { salary?: string };
@@ -55,7 +56,7 @@ export const JobListItem: React.FC<JobListItemProps> = ({ job, selected, onClick
         {isFresh(job) && <Badge variant="primary">Nueva</Badge>}
       </div>
       <p className="text-[11px] font-mono text-ink-faint">
-        {job.dateText || job.publishedAt || "Reciente"}
+        {jobDateLabel(job)}
       </p>
     </button>
   );

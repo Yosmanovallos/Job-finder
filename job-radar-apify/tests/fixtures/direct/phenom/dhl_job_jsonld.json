@@ -1,0 +1,55 @@
+{
+ "identifier": {
+  "@type": "PropertyValue",
+  "name": "DHL Global Forwarding (Colombia) S.A.S.",
+  "value": "AV-360676"
+ },
+ "hiringOrganization": {
+  "@type": "Organization",
+  "name": "DHL Global Forwarding (Colombia) S.A.S.",
+  "value": "AV-360676",
+  "sameAs": "https://careers.dhl.com/amer/es",
+  "url": "https://careers.dhl.com/amer/es/job/DPDHGLOBALAV360676ESAMEREXTERNAL/SALES-MANAGER-REGIÓN-ANDINA-O-PACIFICA",
+  "logo": "https://assets.phenompeople.com/CareerConnectResources/pp/DPDHGLOBAL/images/job_logo_config--1688119252614.png"
+ },
+ "jobLocation": [
+  {
+   "geo": {
+    "@type": "GeoCoordinates",
+    "latitude": "6.25184",
+    "longitude": "-75.56359"
+   },
+   "address": {
+    "@type": "PostalAddress",
+    "addressCountry": "Colombia",
+    "addressLocality": "Medellín",
+    "addressRegion": "Antioquia"
+   },
+   "@type": "Place"
+  },
+  {
+   "geo": {
+    "@type": "GeoCoordinates",
+    "latitude": "3.43722",
+    "longitude": "-76.5225"
+   },
+   "address": {
+    "@type": "PostalAddress",
+    "addressCountry": "Colombia",
+    "addressLocality": "Cali",
+    "addressRegion": "Valle del Cauca"
+   },
+   "@type": "Place"
+  }
+ ],
+ "@type": "JobPosting",
+ "workHours": "40 hours per week",
+ "description": "&lt;div style=\"display: inline;\"&gt;&lt;font face=\"arial\" size=\"2\"&gt;&lt;div style=\"line-height: 20px;\"&gt;&lt;h3 style=\"\"&gt;&lt;p style=\"\"&gt;POSICIÓN:&lt;span style=\"font-weight: 400;\"&gt; SALES MANAGER REGIÓN ANDINA O PACIFICA&lt;/span&gt;&lt;/p&gt;&lt;p style=\"\"&gt;UBICACIÓN: &lt;span style=\"font-weight: 400;\"&gt;CALI - MEDELLÍN&lt;/span&gt;&lt;/p&gt;&lt;p style=\"\"&gt;AREA: &lt;span style=\"f…[TRUNCATED]",
+ "title": "SALES MANAGER REGIÓN ANDINA O PACIFICA",
+ "datePosted": "2026-07-08",
+ "@context": "http://schema.org",
+ "directApply": false,
+ "employmentType": [
+  "FULL_TIME"
+ ]
+}

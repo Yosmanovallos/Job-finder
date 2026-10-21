@@ -7,7 +7,7 @@
  *   npx tsx scripts/run-direct-tick.ts --dry-run [--employer slug] [--include-disabled]
  *       Reads the boards listed in the seed file, prints what WOULD be stored.
  *       No database at all.
- *   npx tsx scripts/run-direct-tick.ts [--employer slug] [--limit N] [--force]
+ *   npx tsx scripts/run-direct-tick.ts [--employer slug] [--limit N] [--deadline-min M] [--force]
  *       Local database only (see src/direct/db-guard.ts); --force ignores the
  *       per-board interval.
  */
@@ -18,13 +18,16 @@ import { assertDirectDatabaseAllowed } from "../src/direct/db-guard.js";
 import { boundedGet } from "../src/direct/http.js";
 import { selectColombianPostings } from "../src/direct/ingest.js";
 import { parseEmployerSeed } from "../src/direct/seed.js";
-import { MIN_INTERVAL_HOURS, type SourceReport } from "../src/direct/tick.js";
+import { DETAIL_BUDGET, MIN_INTERVAL_HOURS, type SourceReport } from "../src/direct/tick.js";
 
 dotenv.config();
 
-// Boards per tick.
+// Boards per run. The real bound is the deadline (--deadline-min): a run
+// stops starting boards once it passes, and the rest wait for the next hourly
+// run, oldest first.
 const DEFAULT_LIMIT = 50;
-const MAX_LIMIT = 500;
+const MAX_LIMIT = 1000;
+const DEFAULT_DEADLINE_MIN = 14;
 
 function argValue(name: string): string | undefined {
   const index = process.argv.indexOf(name);
@@ -37,21 +40,28 @@ async function dryRun(employerSlug: string | undefined): Promise<void> {
   );
   const includeDisabled = process.argv.includes("--include-disabled");
   let total = 0;
+  let deferred = 0;
+  const started = Date.now();
   for (const seed of seeds) {
     if (employerSlug && seed.slug !== employerSlug) continue;
     for (const source of seed.sources) {
       if (!source.enabled && !includeDisabled) continue;
-      const listing = await listBoard(source, boundedGet);
+      // Same detail budget as a first real read (nothing known yet).
+      const boardStarted = Date.now();
+      const listing = await listBoard(source, boundedGet, { detailBudget: DETAIL_BUDGET });
+      const seconds = `${((Date.now() - boardStarted) / 1000).toFixed(1)} s`;
       const board = `${source.atsType}:${source.atsRef}${source.enabled ? "" : " (off)"}`;
       if (listing.kind !== "complete") {
-        console.log(`  ${seed.slug.padEnd(16)} ${board.padEnd(32)} ${listing.kind}: ${listing.detail}`);
+        console.log(`  ${seed.slug.padEnd(16)} ${board.padEnd(32)} ${listing.kind}: ${listing.detail} (${seconds})`);
         continue;
       }
+      deferred += listing.deferred ?? 0;
       const { postings, stats } = selectColombianPostings(listing.postings);
       total += postings.length;
       console.log(
         `  ${seed.slug.padEnd(16)} ${board.padEnd(32)} tablero ${String(stats.boardTotal).padStart(4)} · ` +
-          `Colombia vigentes ${String(stats.kept).padStart(3)} · fuera de Colombia ${stats.notColombia} · >30 días/vencidas ${stats.stale}`
+          `Colombia vigentes ${String(stats.kept).padStart(3)} · fuera de Colombia ${stats.notColombia} · >30 días/vencidas ${stats.stale}` +
+          `${listing.deferred ? ` · diferidas ${listing.deferred}` : ""} (${seconds})`
       );
       for (const posting of postings.slice(0, 2)) {
         console.log(
@@ -61,7 +71,10 @@ async function dryRun(employerSlug: string | undefined): Promise<void> {
       }
     }
   }
-  console.log(`[direct-tick] --dry-run: ${total} vacantes oficiales vigentes en Colombia. No se escribió nada.`);
+  console.log(
+    `[direct-tick] --dry-run: ${total} vacantes oficiales vigentes en Colombia en la primera lectura` +
+      `${deferred ? ` (+${deferred} nuevas que esperan su detalle a la siguiente)` : ""}; ${((Date.now() - started) / 1000).toFixed(0)} s en total, en serie. No se escribió nada.`
+  );
 }
 
 function printReports(reports: SourceReport[], purged: number): void {
@@ -106,14 +119,44 @@ async function main() {
       minIntervalHours: process.argv.includes("--force") ? 0 : MIN_INTERVAL_HOURS,
       employerSlug
     });
-    const reports = await runDirectTick(sources, {
-      http: boundedGet,
-      saveListing: repository.saveListing,
-      recordOutcome: repository.recordSourceOutcome,
-      closeConfirmed: repository.closeConfirmedGone
-    });
+    const deadlineMin = Math.min(Math.max(Number(argValue("--deadline-min") ?? DEFAULT_DEADLINE_MIN) || DEFAULT_DEADLINE_MIN, 1), 18);
+    const reports = await runDirectTick(
+      sources,
+      {
+        http: boundedGet,
+        saveListing: repository.saveListing,
+        recordOutcome: repository.recordSourceOutcome,
+        closeConfirmed: repository.closeConfirmedGone,
+        knownIds: repository.knownExternalIds
+      },
+      new Date(),
+      Date.now() + deadlineMin * 60_000
+    );
+    if (reports.length < sources.length) {
+      console.log(`[direct-tick] Plazo de ${deadlineMin} min cumplido: ${sources.length - reports.length} tableros quedan para la próxima corrida.`);
+    }
     const purged = await repository.purgeClosedDirectJobs();
     printReports(reports, purged);
+    // Phase D4 (ADR 0006 §10): project the live official vacancies into
+    // `jobs` and hide their job-board copies — only once the additive
+    // migration added the projection columns; before that, a clean no-op.
+    const columns = await pool.query(
+      `SELECT COUNT(*)::int AS n FROM information_schema.columns
+       WHERE table_schema = 'public' AND table_name = 'jobs' AND column_name IN ('direct_job_id', 'superseded_by')`
+    );
+    if (columns.rows[0].n !== 2) {
+      console.log("[direct-tick] Sin columnas de proyección en jobs (falta la migración D4): no se proyecta nada.");
+    } else if (process.argv.includes("--no-projection")) {
+      console.log("[direct-tick] --no-projection: no se tocó jobs.");
+    } else {
+      const { syncProjections } = await import("../src/db/direct-projection-repository.js");
+      const projection = await syncProjections();
+      console.log(
+        `[direct-tick] Proyección en jobs: +${projection.inserted} nuevas · ${projection.updated} actualizadas · ` +
+          `${projection.removed} retiradas · ${projection.superseded} copias de bolsas ocultadas · ` +
+          `${projection.reverted} copias restauradas${projection.revertSkipped ? ` (${projection.revertSkipped} pospuestas)` : ""}.`
+      );
+    }
   } finally {
     await pool.end();
   }

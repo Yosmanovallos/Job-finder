@@ -55,7 +55,7 @@ export function selectColombianPostings(
       stats.stale++;
       continue;
     }
-    const posting: Omit<DirectPosting, "contentHash"> = {
+    const posting: Omit<DirectPosting, "contentHash" | "partial"> & { partial: boolean } = {
       externalId: raw.externalId,
       title: raw.title.slice(0, 500),
       applyUrl: raw.applyUrl,
@@ -67,7 +67,8 @@ export function selectColombianPostings(
       department: raw.department?.slice(0, 255) ?? null,
       employmentType: raw.employmentType?.slice(0, 100) ?? null,
       publishedAt: raw.publishedAt,
-      validThrough: raw.validThrough
+      validThrough: raw.validThrough,
+      partial: raw.partial === true
     };
     // A board that lists the same id twice keeps one row (the upsert key).
     kept.set(raw.externalId, { ...posting, contentHash: contentHash(posting) });
@@ -76,7 +77,7 @@ export function selectColombianPostings(
   return { postings: [...kept.values()], stats };
 }
 
-function contentHash(posting: Omit<DirectPosting, "contentHash">): string {
+function contentHash(posting: Omit<DirectPosting, "contentHash" | "partial">): string {
   return createHash("sha256")
     .update(
       JSON.stringify([

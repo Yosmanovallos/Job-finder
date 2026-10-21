@@ -12,6 +12,7 @@ import { jobAnalyticsParams, trackEvent } from "../lib/analytics.js";
 import { Button } from "./ui/button.js";
 import { Badge } from "./ui/badge.js";
 import { ReputationBadges, ReputationEntryProps } from "./ReputationBadges.js";
+import { jobDateLabel } from "../lib/job-date-label.js";
 
 export interface JobDetailPanelProps {
   job:
@@ -125,7 +126,7 @@ export const JobDetailPanel: React.FC<JobDetailPanelProps> = ({
       <div className="flex justify-between gap-4">
         <span className="text-muted-foreground">Publicada</span>
         <span className="text-foreground text-right">
-          {job.dateText || job.publishedAt || "Reciente"}
+          {jobDateLabel(job)}
         </span>
       </div>
       {otherSources.length > 0 && (
@@ -222,7 +223,7 @@ export const JobDetailPanel: React.FC<JobDetailPanelProps> = ({
           <Badge style={{ background: sourceColor.bg, color: sourceColor.text }}>
             {job.source}
           </Badge>
-          {job.dateText && <Badge variant="outline">{job.dateText}</Badge>}
+          {(job.dateText || job.publishedAt) && <Badge variant="outline">{jobDateLabel(job)}</Badge>}
         </div>
 
         <Button asChild size="lg" className="w-full mb-5 font-mono">
@@ -285,8 +286,8 @@ export const JobDetailPanel: React.FC<JobDetailPanelProps> = ({
 
         <p className="text-xs text-muted-foreground mt-5">
           {job.description
-            ? `La postulación se hace en ${job.source} — el botón de arriba te lleva directo a la oferta original.`
-            : `La fuente no publicó una descripción que podamos mostrar; el detalle completo y la postulación están en ${job.source}.`}
+            ? `La postulación se hace en ${job.source === "Portal oficial" ? `el portal oficial de ${job.company || "la empresa"}` : job.source} — el botón de arriba te lleva directo a la oferta original.`
+            : `La fuente no publicó una descripción que podamos mostrar; el detalle completo y la postulación están en ${job.source === "Portal oficial" ? `el portal oficial de ${job.company || "la empresa"}` : job.source}.`}
         </p>
       </div>
     </div>

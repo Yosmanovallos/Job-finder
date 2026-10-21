@@ -1,0 +1,50 @@
+{
+ "data": {
+  "count": 2,
+  "sortBy": "distance",
+  "positions": [
+   {
+    "id": 43709338,
+    "displayJobId": "3166837",
+    "name": "Enterprise Printing Solutions Presales Technical Consultant",
+    "locations": [
+     "Bogota, Distrito Capital de Bogotá, Colombia"
+    ],
+    "standardizedLocations": [
+     "Bogotá, Bogota, CO"
+    ],
+    "postedTs": 1791244800,
+    "solrScore": null,
+    "stars": 0,
+    "department": "Sales",
+    "creationTs": 1786406400,
+    "isHot": 0,
+    "workLocationOption": "onsite",
+    "locationFlexibility": null,
+    "atsJobId": "3166837",
+    "positionUrl": "/careers/job/43709338"
+   },
+   {
+    "id": 44947450,
+    "displayJobId": "3169731",
+    "name": "Customer Operations Specialist",
+    "locations": [
+     "Bogota, Distrito Capital de Bogotá, Colombia"
+    ],
+    "standardizedLocations": [
+     "Bogotá, Bogota, CO"
+    ],
+    "postedTs": 1792022400,
+    "solrScore": null,
+    "stars": 0,
+    "department": "Sales Operations",
+    "creationTs": 1791331200,
+    "isHot": 0,
+    "workLocationOption": "onsite",
+    "locationFlexibility": null,
+    "atsJobId": "3169731",
+    "positionUrl": "/careers/job/44947450"
+   }
+  ]
+ }
+}

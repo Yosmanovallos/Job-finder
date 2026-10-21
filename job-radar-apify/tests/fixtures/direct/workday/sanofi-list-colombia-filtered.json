@@ -1,0 +1,180 @@
+{
+  "total": 8,
+  "jobPostings": [
+    {
+      "title": "Talent Acquisition Partner, Talent Services",
+      "externalPath": "/job/Bogota/Talent-Acquisition-Partner--Talent-Services_R2875356",
+      "timeType": "Full time",
+      "locationsText": "Bogota",
+      "postedOn": "Posted Yesterday",
+      "startDate": "2026-10-19",
+      "bulletFields": [
+        "R2875356"
+      ]
+    },
+    {
+      "title": "Talent Acquisition Partner, Talent Services",
+      "externalPath": "/job/Bogota/Talent-Acquisition-Partner--Talent-Services_R2874148-1",
+      "timeType": "Full time",
+      "locationsText": "Bogota",
+      "postedOn": "Posted Yesterday",
+      "startDate": "2026-10-19",
+      "bulletFields": [
+        "R2874148"
+      ]
+    },
+    {
+      "title": "Regulatory Affairs Associate",
+      "externalPath": "/job/Bogota/Regulatory-Affairs-Associate_R2875234-1",
+      "timeType": "Full time",
+      "locationsText": "Bogota",
+      "postedOn": "Posted Yesterday",
+      "startDate": "2026-10-19",
+      "bulletFields": [
+        "R2875234"
+      ]
+    },
+    {
+      "title": "Sales Manager",
+      "externalPath": "/job/Bogota/Operations-Manager_R2863894",
+      "timeType": "Full time",
+      "locationsText": "Bogota",
+      "postedOn": "Posted 11 Days Ago",
+      "startDate": "2026-10-09",
+      "bulletFields": [
+        "R2863894"
+      ]
+    },
+    {
+      "title": "Senior Medical Information Writer",
+      "externalPath": "/job/Bogota/Senior-Medical-Information-Writer_R2861935-1",
+      "timeType": "Full time",
+      "locationsText": "Bogota",
+      "postedOn": "Posted 12 Days Ago",
+      "startDate": "2026-10-08",
+      "bulletFields": [
+        "R2861935"
+      ]
+    },
+    {
+      "title": "Public Affairs Manager COPAC Vacunas",
+      "externalPath": "/job/Bogota/Public-Affairs-Manager_R2869444",
+      "timeType": "Full time",
+      "locationsText": "Bogota",
+      "postedOn": "Posted 13 Days Ago",
+      "startDate": "2026-10-07",
+      "bulletFields": [
+        "R2869444"
+      ]
+    },
+    {
+      "title": "Programa de Internship Colombia 2027",
+      "externalPath": "/job/Bogota/Programa-de-Internship-Colombia-2027_R2870993-1",
+      "timeType": "Full time",
+      "locationsText": "Bogota",
+      "postedOn": "Posted 30+ Days Ago",
+      "startDate": "2026-09-09",
+      "bulletFields": [
+        "R2870993"
+      ]
+    },
+    {
+      "title": "Banco de Talentos – Oportunidades para Personas con Discapacidad",
+      "externalPath": "/job/Bogota/Banco-de-Talentos---Oportunidades-para-Personas-con-Discapacidad_R2845331",
+      "timeType": "Full time",
+      "locationsText": "Bogota",
+      "postedOn": "Posted 30+ Days Ago",
+      "startDate": "2026-08-03",
+      "bulletFields": [
+        "R2845331"
+      ]
+    }
+  ],
+  "facets": [
+    {
+      "facetParameter": "JobFamilyGroup",
+      "descriptor": "Job Family",
+      "values": [
+        {
+          "descriptor": "Human Resources",
+          "id": "90a2915fb3eb01fbceada22a7d427d9d",
+          "count": 4
+        },
+        {
+          "descriptor": "Public Affairs",
+          "id": "daa1110ae72e10119fe5a0abdf7d0b29",
+          "count": 1
+        },
+        {
+          "descriptor": "Medical",
+          "id": "90a2915fb3eb01e2a222c42a7d42899d",
+          "count": 1
+        },
+        {
+          "descriptor": "Strategy & Business Development",
+          "id": "90a2915fb3eb01d0d8a0f82a7d429d9d",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "facetParameter": "workerSubType",
+      "descriptor": "Job Type",
+      "values": [
+        {
+          "descriptor": "Regular",
+          "id": "270085b4a8cc1010c0d18cf85c7429b6",
+          "count": 7
+        },
+        {
+          "descriptor": "Apprentice/Intern (Fixed Term)",
+          "id": "270085b4a8cc1010c0d19840d71829b8",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "facetParameter": "locationMainGroup",
+      "values": [
+        {
+          "facetParameter": "locationCountry",
+          "descriptor": "Country",
+          "values": [
+            {
+              "descriptor": "United States of America",
+              "id": "bc33aa3152ec42d4995f4791a106ed09",
+              "count": 308
+            },
+            {
+              "descriptor": "France",
+              "id": "54c5b6971ffb4bf0b116fe7651ec789a",
+              "count": 153
+            },
+            {
+              "descriptor": "China",
+              "id": "6cb77610a8a543aea2d6bc10457e35d4",
+              "count": 134
+            },
+            {
+              "descriptor": "India",
+              "id": "c4f78be1a8f14da0ab49ce1162348a5e",
+              "count": 78
+            }
+          ]
+        },
+        {
+          "facetParameter": "locations",
+          "descriptor": "Location",
+          "values": [
+            {
+              "descriptor": "Bogota",
+              "id": "4b23b979807310f2f554d6a1794682f0",
+              "count": 8
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "userAuthenticated": false
+}

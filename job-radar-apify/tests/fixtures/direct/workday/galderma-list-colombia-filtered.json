@@ -1,0 +1,156 @@
+{
+  "total": 7,
+  "jobPostings": [
+    {
+      "title": "Gerente de Demanda Retail para Medicamentos de Prescripción",
+      "externalPath": "/job/Bogot/Gerente-de-Demanda-Retail-para-Medicamentos-de-Prescripcin_JR021078",
+      "locationsText": "Bogotá",
+      "postedOn": "Posted 5 Days Ago",
+      "bulletFields": [
+        "JR021078"
+      ]
+    },
+    {
+      "title": "Banco de talentos para Personas con Discapacidad ",
+      "externalPath": "/job/Bogot/Banco-de-talentos-para-Personas-con-Discapacidad-_JR018827-1",
+      "locationsText": "Bogotá",
+      "postedOn": "Posted 30+ Days Ago",
+      "bulletFields": [
+        "JR018827"
+      ]
+    },
+    {
+      "title": "Banco de talentos para practicantes Personas con Discapacidad",
+      "externalPath": "/job/Bogot/Banco-de-talentos-para-practicantes-Personas-con-Discapacidad_JR018828-1",
+      "locationsText": "Bogotá",
+      "postedOn": "Posted 30+ Days Ago",
+      "bulletFields": [
+        "JR018828"
+      ]
+    },
+    {
+      "title": "Key Account Manager Medellin",
+      "externalPath": "/job/Bogot/Key-Account-Manager-Medellin_JR015272-1",
+      "locationsText": "Bogotá",
+      "postedOn": "Posted 30+ Days Ago",
+      "bulletFields": [
+        "JR015272"
+      ]
+    },
+    {
+      "title": "Medical Sales Representatives-1",
+      "externalPath": "/job/Bogot/Medical-Sales-Representatives-1_JR015112-1",
+      "locationsText": "Bogotá",
+      "postedOn": "Posted 30+ Days Ago",
+      "bulletFields": [
+        "JR015112"
+      ]
+    },
+    {
+      "title": "LATAM: Product Master Data Coordinator",
+      "externalPath": "/job/Bogot/LATAM--Product-Master-Data-Coordinator_JR014975-1",
+      "locationsText": "Bogotá",
+      "postedOn": "Posted 30+ Days Ago",
+      "bulletFields": [
+        "JR014975"
+      ]
+    },
+    {
+      "title": "Marketing & Education Coordinator",
+      "externalPath": "/job/Bogot/Marketing---Education-Coordinator_JR014625-1",
+      "locationsText": "Bogotá",
+      "postedOn": "Posted 30+ Days Ago",
+      "bulletFields": [
+        "JR014625"
+      ]
+    }
+  ],
+  "facets": [
+    {
+      "facetParameter": "alocationCountry",
+      "descriptor": "Country",
+      "values": [
+        {
+          "descriptor": "United States of America",
+          "id": "bc33aa3152ec42d4995f4791a106ed09",
+          "count": 66
+        },
+        {
+          "descriptor": "China",
+          "id": "6cb77610a8a543aea2d6bc10457e35d4",
+          "count": 64
+        },
+        {
+          "descriptor": "Canada",
+          "id": "a30a87ed25634629aa6c3958aa2b91ea",
+          "count": 58
+        },
+        {
+          "descriptor": "India",
+          "id": "c4f78be1a8f14da0ab49ce1162348a5e",
+          "count": 25
+        }
+      ]
+    },
+    {
+      "facetParameter": "blocations",
+      "descriptor": "Locations",
+      "values": [
+        {
+          "descriptor": "Bogotá",
+          "id": "bd2de1bd9858014acea6ac48d500d3de",
+          "count": 7
+        }
+      ]
+    },
+    {
+      "facetParameter": "cjobFamilyGroup",
+      "descriptor": "Job Category",
+      "values": [
+        {
+          "descriptor": "Commercial",
+          "id": "bd2de1bd985801eebb88c99ad3009e89",
+          "count": 3
+        },
+        {
+          "descriptor": "Marketing",
+          "id": "1c033b194a7d1001e35683b5e4670000",
+          "count": 1
+        },
+        {
+          "descriptor": "Trainee / Interns",
+          "id": "bd2de1bd98580178f59fca9ad300a289",
+          "count": 1
+        },
+        {
+          "descriptor": "Project Management",
+          "id": "bd2de1bd985801e6e203c89ad3009889",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "facetParameter": "dworkerSubType",
+      "descriptor": "Job Type",
+      "values": [
+        {
+          "descriptor": "Regular",
+          "id": "bd2de1bd9858010d60ca1ec8d400918f",
+          "count": 7
+        }
+      ]
+    },
+    {
+      "facetParameter": "etimeType",
+      "descriptor": "Full/Part-time",
+      "values": [
+        {
+          "descriptor": "Full time",
+          "id": "e49cdb8e6b5d01d8d8751f425d086300",
+          "count": 4
+        }
+      ]
+    }
+  ],
+  "userAuthenticated": false
+}

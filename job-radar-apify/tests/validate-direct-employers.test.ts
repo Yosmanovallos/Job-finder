@@ -3,11 +3,12 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { matchColombia, workplaceFromText } from "../src/direct/colombia-location.js";
-import { listBoard } from "../src/direct/connectors.js";
+import { matchColombia, normalizeCountryCode, workplaceFromText } from "../src/direct/colombia-location.js";
+import { isValidRef, listBoard, portalUrl } from "../src/direct/connectors.js";
 import { assertDirectDatabaseAllowed } from "../src/direct/db-guard.js";
 import { isSuspectDrop, isTestPosting, selectColombianPostings } from "../src/direct/ingest.js";
 import { parseEmployerSeed } from "../src/direct/seed.js";
+import { runDirectTick } from "../src/direct/tick.js";
 import type { HttpGet, RawAtsPosting } from "../src/direct/types.js";
 
 /**
@@ -61,6 +62,46 @@ test("Colombia filter: a structured country wins over the text", () => {
     city: "Zarzal"
   });
   assert.deepEqual(loc([], ["CO"], "Guayabal"), { locationRaw: "Colombia", city: "Guayabal" });
+});
+
+test("Colombia filter: structured country as alpha-3 or a name still means Colombia; other countries still veto", () => {
+  assert.equal(normalizeCountryCode("COL"), "CO");
+  assert.equal(normalizeCountryCode(" Colombia "), "CO");
+  assert.equal(normalizeCountryCode("co"), "CO");
+  assert.equal(normalizeCountryCode("USA"), "USA");
+  assert.deepEqual(loc(["Medellín"], ["COL"]), { locationRaw: "Medellín", city: "Medellín" });
+  assert.deepEqual(loc(["Planta Tocancipá"], ["Colombia"], "Tocancipá"), { locationRaw: "Planta Tocancipá", city: "Tocancipá" });
+  assert.equal(loc(["Bogotá Street, Houston"], ["USA"]), null);
+  assert.equal(loc(["Lima"], ["PER"]), null);
+});
+
+test("tick deadline: once it passes no new board starts; the rest stay due", async () => {
+  const sources = ["a", "b"].map((id) => ({
+    id,
+    employerId: id,
+    employerSlug: id,
+    atsType: "lever" as const,
+    atsRef: id,
+    lastBoardTotal: null,
+    lastColombiaTotal: null,
+    consecutiveSuspect: 0
+  }));
+  const deps = {
+    http: fakeHttp({}),
+    saveListing: async () => ({ inserted: 0, updated: 0, closed: 0, markedMissing: 0, missingIds: [] }),
+    recordOutcome: async () => {},
+    closeConfirmed: async () => 0
+  };
+  assert.equal((await runDirectTick(sources, deps, NOW, Date.now() - 1)).length, 0);
+  assert.equal((await runDirectTick(sources, deps, NOW)).length, 2);
+});
+
+test("registry: every ATS validates its own ref and builds an https portal", async () => {
+  assert.equal(isValidRef({ atsType: "greenhouse", atsRef: "sezzle" }), true);
+  assert.equal(isValidRef({ atsType: "greenhouse", atsRef: "../etc" }), false);
+  assert.equal(portalUrl({ atsType: "lever", atsRef: "addi" }), "https://jobs.lever.co/addi");
+  const unknown = await listBoard({ atsType: "nope" as never, atsRef: "x" }, fakeHttp({}));
+  assert.deepEqual(unknown, { kind: "error", detail: "ATS sin conector: nope" });
 });
 
 test("workplace only when the text states it", () => {
@@ -328,7 +369,15 @@ test("the web server never imports the direct-employer module", () => {
       const full = path.join(dir, name);
       if (statSync(full).isDirectory()) {
         if (name !== "direct") walk(full);
-      } else if (/\.(ts|tsx)$/.test(name) && full !== path.join(root, "db", "direct-repository.ts")) {
+      } else if (
+        /\.(ts|tsx)$/.test(name) &&
+        // The repositories of the module itself (scripts-only; tests/validate-direct-discovery.test.ts walks the server's import graph).
+        ![
+          path.join(root, "db", "direct-repository.ts"),
+          path.join(root, "db", "direct-discovery-repository.ts"),
+          path.join(root, "db", "direct-projection-repository.ts")
+        ].includes(full)
+      ) {
         if (/from ["'][^"']*(\/direct\/|direct-repository)/.test(readFileSync(full, "utf8"))) offenders.push(path.relative(root, full));
       }
     }

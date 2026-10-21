@@ -65,7 +65,9 @@ async function main() {
         PARTITION BY lower(trim(title)), lower(trim(COALESCE(company, 'confidencial'))), lower(trim(COALESCE(location, 'colombia')))
         ORDER BY published_at ASC, id ASC
       ) AS duplicate_rank
-      FROM jobs WHERE is_active = TRUE
+      -- Official projections and their superseded copies are owned by the
+      -- direct tick (ADR 0006 §10): never deactivated here.
+      FROM jobs WHERE is_active = TRUE AND direct_job_id IS NULL AND superseded_by IS NULL
     ) grouped WHERE duplicate_rank > 1 ORDER BY id
   `);
   let deactivated = 0;
@@ -83,7 +85,7 @@ async function main() {
   console.log("🔑 Step 4: Backfilling content_fingerprint on active rows...");
   const activeJobs = await pool.query(`
     SELECT id, title, company, location FROM jobs
-    WHERE is_active = TRUE AND content_fingerprint IS NULL
+    WHERE is_active = TRUE AND content_fingerprint IS NULL AND direct_job_id IS NULL
   `);
 
   let backfilled = 0;

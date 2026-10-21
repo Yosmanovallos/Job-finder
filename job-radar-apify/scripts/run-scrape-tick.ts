@@ -566,6 +566,22 @@ async function main() {
     console.warn("⏱️ [Tick] Sin presupuesto para la purga de vacantes antiguas — se hará en el próximo tick.");
   }
 
+  // ADR 0006 §10.6 (review I1): a job-board copy saved by THIS tick of a
+  // live official vacancy is hidden now, not up to an hour later by the
+  // official tick. Never fails the scrape tick.
+  if (!isCancelled(rootCtx)) {
+    try {
+      const { supersedeCopies } = await import("../src/db/direct-projection-repository.js");
+      const ready = await pool.query(`SELECT 1 FROM jobs WHERE direct_job_id IS NOT NULL LIMIT 1`).catch(() => ({ rowCount: 0 }));
+      if (ready.rowCount) {
+        const hidden = await supersedeCopies();
+        if (hidden > 0) console.log(`🏢 [Tick] ${hidden} copia(s) de vacantes oficiales ocultadas (la oficial reemplaza a la de la bolsa).`);
+      }
+    } catch (error) {
+      console.warn("⚠️ [Tick] Paso de copias oficiales omitido:", (error as Error)?.message || error);
+    }
+  }
+
   writeSummary(results, deletedOld);
 
   // --- Cierre acotado (P3, EXE-006) ---------------------------------------

@@ -4,6 +4,7 @@ import { pool } from "../src/db/client.js";
 import {
   closeConfirmedGone,
   employerReport,
+  knownExternalIds,
   pickDueSources,
   purgeClosedDirectJobs,
   recordSourceOutcome,
@@ -12,7 +13,7 @@ import {
 } from "../src/db/direct-repository.js";
 import { liveDirectJobSql } from "../src/direct/ingest.js";
 import { MIN_INTERVAL_HOURS, runSource, type TickDeps } from "../src/direct/tick.js";
-import type { HttpGet } from "../src/direct/types.js";
+import type { DirectPosting, HttpGet } from "../src/direct/types.js";
 
 /**
  * Official employer vacancies against the disposable Postgres
@@ -241,12 +242,12 @@ async function run(): Promise<void> {
     `Ventana incorrecta: ${live.rows.map((row) => row.external_id).join(",")}`
   );
 
-  // 6) Purge: only rows closed more than a day ago; listed rows stay even when out of the window.
-  await pool.query(`UPDATE direct_jobs SET closed_at = NOW() - INTERVAL '2 days' WHERE external_id = 'a'`);
+  // 6) Purge: only rows closed more than 30 days ago; listed rows stay even when out of the window.
+  await pool.query(`UPDATE direct_jobs SET closed_at = NOW() - INTERVAL '31 days' WHERE external_id = 'a'`);
   const purged = await purgeClosedDirectJobs();
   const remaining = await pool.query(`SELECT external_id FROM direct_jobs WHERE employer_id = $1 ORDER BY external_id`, [first.employerId]);
   check(
-    // "e" closed minutes ago: kept a day for audit, then purged.
+    // "e" closed minutes ago: kept 30 days so a reappearance reopens the same row.
     purged === 1 && remaining.rows.map((row) => row.external_id).join(",") === "b,c,e",
     "La purga borra solo cerradas; una vacante aún listada no se borra (no resucita con fecha nueva).",
     `Purga inesperada: ${purged} · quedan ${remaining.rows.map((row) => row.external_id).join(",")}`
@@ -255,6 +256,47 @@ async function run(): Promise<void> {
   // 7) Report joins the scraped boards through the aliases.
   const row = (await employerReport()).find((entry) => entry.slug === "acme-test");
   check(row?.officialLive === 1 && row?.boardsLive === 1, "El reporte cruza oficiales y bolsas por alias.", `Reporte: ${JSON.stringify(row)}`);
+
+  // 8) published_at is pinned at the first read (SuccessFactors re-stamps its
+  // reference date ~every 28 days); a partial row keeps the stored detail fields.
+  const pinSource = await sourceRow();
+  const posting = (overrides: Partial<DirectPosting>): DirectPosting => ({
+    externalId: "p",
+    title: "Analista p",
+    applyUrl: "https://example.test/p",
+    locationRaw: "Bogotá, CO",
+    city: "Bogotá",
+    country: "CO",
+    workplace: null,
+    descriptionText: "Detalle leído de la página",
+    department: null,
+    employmentType: null,
+    publishedAt: new Date(Date.now() - 20 * DAY).toISOString(),
+    validThrough: new Date(Date.now() + 5 * DAY).toISOString(),
+    contentHash: "h1",
+    partial: false,
+    ...overrides
+  });
+  await saveListing(pinSource, [posting({})], false);
+  await saveListing(pinSource, [posting({ publishedAt: new Date().toISOString(), descriptionText: null, validThrough: null, contentHash: "h2", partial: true })], false);
+  const pinned = await pool.query(
+    `SELECT published_at < NOW() - INTERVAL '19 days' AS old, description_text, valid_through IS NOT NULL AS has_valid FROM direct_jobs WHERE external_id = 'p' AND employer_source_id = $1`,
+    [pinSource.id]
+  );
+  check(
+    pinned.rows[0]?.old === true && pinned.rows[0]?.description_text === "Detalle leído de la página" && pinned.rows[0]?.has_valid === true,
+    "published_at queda fijo en la primera lectura; una fila parcial conserva descripción y validThrough.",
+    `Fecha/detalle sobrescritos: ${JSON.stringify(pinned.rows[0])}`
+  );
+  await saveListing(pinSource, [posting({ descriptionText: "Nuevo texto", validThrough: null, contentHash: "h3" })], false);
+  const full = await pool.query(`SELECT description_text, valid_through FROM direct_jobs WHERE external_id = 'p' AND employer_source_id = $1`, [pinSource.id]);
+  check(
+    full.rows[0]?.description_text === "Nuevo texto" && full.rows[0]?.valid_through === null,
+    "Una lectura completa sí reemplaza descripción y validThrough (el ATS los quitó).",
+    `Lectura completa no aplicada: ${JSON.stringify(full.rows[0])}`
+  );
+  const known = await knownExternalIds(pinSource.id);
+  check(known.has("p") && known.has("c"), "knownExternalIds devuelve los ids guardados del tablero.", `ids: ${[...known].join(",")}`);
 
   check((await jobsFingerprint()) === jobsBefore, "La tabla jobs quedó intacta.", "Se modificó la tabla jobs.");
 

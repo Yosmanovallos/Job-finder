@@ -95,6 +95,17 @@ export interface ColombiaMatch {
 }
 
 /**
+ * Structured country to ISO alpha-2 where it names Colombia: ATSs write
+ * "CO", "COL" (SuccessFactors, Workday) or "Colombia". Any other value is
+ * kept as written, so it still vetoes — it is never mistaken for "CO".
+ */
+export function normalizeCountryCode(value: string): string {
+  const folded = fold(value.trim());
+  if (folded === "co" || folded === "col" || folded === "colombia") return "CO";
+  return value.trim().toUpperCase();
+}
+
+/**
  * Null when the posting is not explicitly in Colombia. A structured country
  * list that names other countries only wins over the text: "Remote - US"
  * with country "US" is out even if a city name happens to match.
@@ -104,7 +115,7 @@ export function matchColombia(input: {
   countryCodes: string[];
   structuredCity: string | null;
 }): ColombiaMatch | null {
-  const codes = input.countryCodes.map((code) => code.toUpperCase());
+  const codes = input.countryCodes.map(normalizeCountryCode).filter((code) => code.length > 0);
   if (codes.length > 0 && !codes.includes("CO")) return null;
 
   const matched: { raw: string; city: string | null }[] = [];

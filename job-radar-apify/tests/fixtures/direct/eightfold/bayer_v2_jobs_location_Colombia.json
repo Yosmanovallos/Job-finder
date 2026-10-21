@@ -1,0 +1,99 @@
+{
+ "_note": "trimmed: 3 of 7 positions; config keys (candidate,branding,facets...) dropped",
+ "domain": "bayer.com",
+ "count": 7,
+ "location_used": "Colombia",
+ "query": {
+  "query": null,
+  "location": "Colombia",
+  "department": [],
+  "skill": [],
+  "seniority": [],
+  "pid": "",
+  "departments": [],
+  "hiring companies": [],
+  "job type": [],
+  "position_status": [],
+  "skills": [],
+  "system_id": []
+ },
+ "positions": [
+  {
+   "id": 562949978748368,
+   "name": "CX Trade Marketing",
+   "posting_name": "CX Trade Marketing",
+   "location": "Bogota,Cundinamarca,Colombia",
+   "locations": [
+    "Bogota,Cundinamarca,Colombia"
+   ],
+   "hot": 0,
+   "department": "Marketing",
+   "business_unit": "Crop Science",
+   "t_update": 1792515110,
+   "t_create": 1792022400,
+   "ats_job_id": "893524",
+   "display_job_id": "893524",
+   "type": "ATS",
+   "id_locale": "893524-en",
+   "job_description": "Develops and implements brand and product strategies to enhance market presence and drive sales within the organization. Analyzes market trends, consumer insights, and competitive landscape to identify opportunities for product development and positioning. Collaborates with cross-functional teams, including marketing, sales, and R&D, to define product requirements and ensure alignment with brand o…[TRUNCATED]",
+   "stars": 0.0,
+   "medallionProgram": null,
+   "location_flexibility": null,
+   "work_location_option": "onsite",
+   "canonicalPositionUrl": "https://talent.bayer.com/careers/job/562949978748368",
+   "isPrivate": false
+  },
+  {
+   "id": 562949978722397,
+   "name": "Medical Scientific Liaison Oncology",
+   "posting_name": "Medical Scientific Liaison Oncology",
+   "location": "Medellin,Antioquia,Colombia",
+   "locations": [
+    "Medellin,Antioquia,Colombia"
+   ],
+   "hot": 0,
+   "department": "Medical Affairs & Pharmacovigilance",
+   "business_unit": "Pharmaceuticals",
+   "t_update": 1791812698,
+   "t_create": 1791504000,
+   "ats_job_id": "892082",
+   "display_job_id": "892082",
+   "type": "ATS",
+   "id_locale": "892082-en_US",
+   "job_description": "",
+   "locale": "en_US",
+   "stars": 0.0,
+   "medallionProgram": null,
+   "location_flexibility": null,
+   "work_location_option": "onsite",
+   "canonicalPositionUrl": "https://talent.bayer.com/careers/job/562949978722397",
+   "isPrivate": false
+  },
+  {
+   "id": 562949978684244,
+   "name": "Medical Science Liaison Heart Failure",
+   "posting_name": "Medical Science Liaison Heart Failure",
+   "location": "Bogota,Cundinamarca,Colombia",
+   "locations": [
+    "Bogota,Cundinamarca,Colombia"
+   ],
+   "hot": 0,
+   "department": "Medical Affairs & Pharmacovigilance",
+   "business_unit": "Pharmaceuticals",
+   "t_update": 1791991369,
+   "t_create": 1791158400,
+   "ats_job_id": "891279",
+   "display_job_id": "891279",
+   "type": "ATS",
+   "id_locale": "891279-en_US",
+   "job_description": "",
+   "locale": "en_US",
+   "stars": 0.0,
+   "medallionProgram": null,
+   "location_flexibility": null,
+   "work_location_option": "onsite",
+   "canonicalPositionUrl": "https://talent.bayer.com/careers/job/562949978684244",
+   "isPrivate": false
+  }
+ ]
+}

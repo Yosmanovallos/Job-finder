@@ -1,0 +1,57 @@
+{
+ "identifier": {
+  "@type": "PropertyValue",
+  "name": "Procter & Gamble",
+  "value": "R000160269"
+ },
+ "hiringOrganization": {
+  "@type": "Organization",
+  "name": "Procter & Gamble",
+  "sameAs": "https://www.pgcareers.com/latam/en",
+  "url": "https://www.pgcareers.com/latam/en/job/R000160269/Sales-Representative-Talent-Pipeline-Colombia",
+  "logo": null
+ },
+ "jobLocation": [
+  {
+   "geo": {
+    "@type": "GeoCoordinates",
+    "latitude": "4.60971",
+    "longitude": "-74.08175"
+   },
+   "address": {
+    "@type": "PostalAddress",
+    "postalCode": "110111",
+    "addressCountry": "Colombia",
+    "addressLocality": "SANTAFE DE BOGOTA",
+    "addressRegion": "Distrito Capital de Bogotá"
+   },
+   "@type": "Place"
+  },
+  {
+   "geo": {
+    "@type": "GeoCoordinates",
+    "latitude": "6.25184",
+    "longitude": "-75.56359"
+   },
+   "address": {
+    "@type": "PostalAddress",
+    "postalCode": "050024",
+    "addressCountry": "Colombia",
+    "addressLocality": "MEDELLIN",
+    "addressRegion": "Antioquia"
+   },
+   "@type": "Place"
+  }
+ ],
+ "employmentType": [
+  "FULL_TIME"
+ ],
+ "@type": "JobPosting",
+ "workHours": "40 hours per week",
+ "description": "&lt;p style=\"text-align:left\"&gt;&lt;b&gt;Job Location&lt;/b&gt;&lt;/p&gt;BOGOTA GENERAL OFFICE&lt;p style=\"text-align:inherit\"&gt;&lt;/p&gt;&lt;p style=\"text-align:left\"&gt;&lt;b&gt;Job Description&lt;/b&gt;&lt;/p&gt;&lt;p&gt;&lt;b&gt;Managerial position&lt;/b&gt;&lt;/p&gt;&lt;p&gt;&lt;b&gt;Working hours:&lt;/b&gt; Full time with flexible working hours&lt;/p&gt;&lt;p&gt;&lt;b&gt;Accommodations:&l…[TRUNCATED]",
+ "title": "Sales Representative Talent Pipeline | Colombia",
+ "datePosted": "2026-10-17",
+ "@context": "http://schema.org",
+ "occupationalCategory": "Sales",
+ "directApply": false
+}

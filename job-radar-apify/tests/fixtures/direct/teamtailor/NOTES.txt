@@ -1,0 +1,1 @@
+Fixtures reales 2026-10-20 (descripciones truncadas a 400 chars; emails/telefonos reemplazados). Quala paginado con per_page=100: offset0=100 items, offset100=100, offset200=4 (ultima, corta), offset300=0. Cabeceras RSS: Content-Type application/rss+xml; charset=utf-8; cache-control max-age=5.

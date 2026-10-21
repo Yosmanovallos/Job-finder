@@ -1,0 +1,285 @@
+{
+ "refineSearch": {
+  "status": 200,
+  "hits": 10,
+  "totalHits": 10,
+  "data": {
+   "jobs": [
+    {
+     "subCategory": "Sales",
+     "type": "Full time",
+     "descriptionTeaser": "Job LocationMedellinJob DescriptionAdaptaciones: En P&G, nos comprometemos a garantizar un proceso inclusivo de reclutamiento, evaluación y selección. Si tienes una discapacidad y necesitas algún ajus",
+     "state": "Antioquia",
+     "siteType": "external",
+     "multi_category": [
+      "Sales"
+     ],
+     "reqId": "R000158222",
+     "city": "Medellin",
+     "latitude": "6.25184",
+     "multi_location": [
+      "Medellin, Antioquia, Colombia"
+     ],
+     "experienceLevel": "Entry Level",
+     "address": "Carrera 52 No. 7-72, Medellin Antioquia, 0, Colombia",
+     "applyUrl": "https://pg.wd5.myworkdayjobs.com/1000/job/Medellin/Banco-de-Talento-para-Personas-con-Discapacidad---Colombia_R000158222/apply",
+     "externalApply": true,
+     "cityState": "Medellin, Antioquia",
+     "country": "Colombia",
+     "postalCode": "0",
+     "compensationRange": "",
+     "visibilityType": "External",
+     "longitude": "-75.56359",
+     "hiringManager": "",
+     "jobId": "R000158222",
+     "locale": "en_GLOBAL",
+     "title": "Banco de Talento para Personas con Discapacidad | Colombia",
+     "jobSeqNo": "PGBPGNGLOBALR000158222EXTERNALENGLOBAL",
+     "postedDate": "2026-09-01T00:00:00.000+0000",
+     "dateCreated": "2026-08-29T00:01:22.581+0000",
+     "cityStateCountry": "Medellin, Antioquia, Colombia",
+     "jobVisibility": [
+      "external"
+     ],
+     "location": "Medellin, Antioquia, Colombia",
+     "category": "Sales",
+     "ml_skills": [
+      "adaptaciones",
+      "mentoría",
+      "trabajo en equipo",
+      "flexibilidad",
+      "comunicación",
+      "capacitación"
+     ],
+     "ml_job_parser": {
+      "descriptionTeaser": "Estamos buscando personas con discapacidad interesadas en desarrollar su carrera en P&G. Ofrecemos un ambiente de trabajo dinámico y de apoyo, con oportunidades de mentoría y capacitación. Regístrate en nuestro banco de talento para futuras oportunidades profesionales en Colombia.",
+      "descriptionTeaser_keyword": "Job Location. Medellin. Job Description. Adaptaciones: En P&G, nos comprometemos a garantizar un proceso inclusivo de reclutamiento, evaluación y selección. Si tienes una discapacidad y necesitas algú...",
+      "descriptionTeaser_first200": "Job Location. Medellin. Job Description. Adaptaciones: En P&G, nos comprometemos a garantizar un proceso inclusivo de reclutamiento, evaluación y selección. Si tienes una discapacidad y necesitas a...",
+      "descriptionTeaser_ats": "Job LocationMedellinJob DescriptionAdaptaciones: En P&G, nos comprometemos a garantizar un proceso inclusivo de reclutamiento, evaluación y selección. Si tienes una discapacidad y necesitas algún ajus"
+     },
+     "isMultiLocation": true,
+     "multi_location_array": [
+      {
+       "country": "Colombia",
+       "cityState": "Medellin, Antioquia",
+       "address": "Carrera 52 No. 7-72, Medellin Antioquia, 0, Colombia",
+       "city": "Medellin",
+       "postalCode": "0",
+       "latlong": {
+        "lon": -75.56359,
+        "lat": 6.25184
+       },
+       "latitude": "6.25184",
+       "cityStateZipCode": "Medellin, Antioquia, 0",
+       "stateCountry": "Antioquia, Colombia",
+       "locationId": "JPL0190",
+       "location": "Medellin, Antioquia, Colombia",
+       "state": "Antioquia",
+       "cityCountry": "Medellin, Colombia",
+       "cityStateCountry": "Medellin, Antioquia, Colombia",
+       "mapQueryLocation": "Carrera 52 No. 7-72, Medellin Antioquia, 0, Colombia",
+       "longitude": "-75.56359"
+      }
+     ],
+     "isMultiCategory": false,
+     "multi_category_array": [
+      {
+       "category": "Sales"
+      }
+     ],
+     "badge": ""
+    },
+    {
+     "subCategory": "Finance and Accounting",
+     "type": "Full time",
+     "descriptionTeaser": "Job LocationMEDELLIN PLANTJob DescriptionManagerial positionLocation: Medellín, ColombiaWorking hours: Full time with flexible working hoursProfile: Non-graduating university students only. Must maint",
+     "state": "Antioquia",
+     "siteType": "external",
+     "multi_category": [
+      "Finance and Accounting"
+     ],
+     "reqId": "R000155873",
+     "city": "MEDELLIN",
+     "latitude": "6.25184",
+     "multi_location": [
+      "MEDELLIN, Antioquia, Colombia"
+     ],
+     "experienceLevel": "Internships",
+     "address": "CARRERA 52 NO. 7-72, MEDELLIN Antioquia, 050024, Colombia",
+     "applyUrl": "https://pg.wd5.myworkdayjobs.com/1000/job/MEDELLIN-PLANT/Medelln-Internship-Pipeline---January-2027_R000155873/apply",
+     "externalApply": true,
+     "cityState": "MEDELLIN, Antioquia",
+     "country": "Colombia",
+     "postalCode": "050024",
+     "compensationRange": "",
+     "visibilityType": "External",
+     "longitude": "-75.56359",
+     "hiringManager": "",
+     "jobId": "R000155873",
+     "locale": "en_GLOBAL",
+     "title": "Medellín Internship Pipeline – January 2027",
+     "jobSeqNo": "PGBPGNGLOBALR000155873EXTERNALENGLOBAL",
+     "postedDate": "2026-07-27T00:00:00.000+0000",
+     "dateCreated": "2026-07-22T20:01:29.863+0000",
+     "cityStateCountry": "MEDELLIN, Antioquia, Colombia",
+     "jobVisibility": [
+      "external"
+     ],
+     "location": "MEDELLIN, Antioquia, Colombia",
+     "category": "Finance and Accounting",
+     "ml_skills": [
+      "process improvement",
+      "project management",
+      "operational excellence",
+      "business process analysis",
+      "cross-functional collaboration",
+      "leadership"
+     ],
+     "ml_job_parser": {
+      "descriptionTeaser": "We are looking for a motivated non-graduating university student to join our Medellín internship pipeline. Contribute to impactful projects and collaborate with multidisciplinary teams. Ideal for those with strong communication skills and a passion for learning, seeking hands-on experience in busine…[TRUNCATED]",
+      "descriptionTeaser_first200": "Job Location. MEDELLIN PLANT. Job Description. Managerial position. Location: Medellín, Colombia. Working hours: Full time with flexible working hours. Profile: Non-graduating university students o...",
+      "descriptionTeaser_keyword": "Job Location. MEDELLIN PLANT. Job Description. Managerial position. Location: Medellín, Colombia. Working hours: Full time with flexible working hours. Profile: Non-graduating university students only...",
+      "descriptionTeaser_ats": "Job LocationMEDELLIN PLANTJob DescriptionManagerial positionLocation: Medellín, ColombiaWorking hours: Full time with flexible working hoursProfile: Non-graduating university students only. Must maint"
+     },
+     "isMultiLocation": true,
+     "multi_location_array": [
+      {
+       "country": "Colombia",
+       "cityState": "MEDELLIN, Antioquia",
+       "address": "CARRERA 52 NO. 7-72, MEDELLIN Antioquia, 050024, Colombia",
+       "city": "MEDELLIN",
+       "postalCode": "050024",
+       "latlong": {
+        "lon": -75.56359,
+        "lat": 6.25184
+       },
+       "latitude": "6.25184",
+       "cityStateZipCode": "MEDELLIN, Antioquia, 050024",
+       "stateCountry": "Antioquia, Colombia",
+       "locationId": "2531",
+       "location": "MEDELLIN, Antioquia, Colombia",
+       "state": "Antioquia",
+       "cityCountry": "MEDELLIN, Colombia",
+       "cityStateCountry": "MEDELLIN, Antioquia, Colombia",
+       "mapQueryLocation": "CARRERA 52 NO. 7-72, MEDELLIN Antioquia, 050024, Colombia",
+       "longitude": "-75.56359"
+      }
+     ],
+     "isMultiCategory": false,
+     "multi_category_array": [
+      {
+       "category": "Finance and Accounting"
+      }
+     ],
+     "badge": ""
+    },
+    {
+     "subCategory": "Sales",
+     "type": "Full time",
+     "descriptionTeaser": "Job LocationBOGOTA GENERAL OFFICEJob DescriptionManagerial positionWorking hours .  Full time with flexible working hoursAccommodations .  At P&G, we are committed to ensuring an inclusive recruitment, as",
+     "state": "Distrito Capital de Bogotá",
+     "siteType": "external",
+     "multi_category": [
+      "Sales"
+     ],
+     "reqId": "R000160269",
+     "city": "SANTAFE DE BOGOTA",
+     "latitude": "4.60971",
+     "multi_location": [
+      "SANTAFE DE BOGOTA, Distrito Capital de Bogotá, Colombia",
+      "MEDELLIN, Antioquia, Colombia"
+     ],
+     "experienceLevel": "Internships",
+     "address": "CARRERA 7 NO. 114-33 PISO 12, SANTAFE DE BOGOTA Distrito Capital de Bogotá, 110111, Colombia",
+     "applyUrl": "https://pg.wd5.myworkdayjobs.com/1000/job/BOGOTA-GENERAL-OFFICE/Sales-Representative-Talent-Pipeline---Colombia_R000160269/apply",
+     "externalApply": true,
+     "cityState": "SANTAFE DE BOGOTA, Distrito Capital de Bogotá",
+     "country": "Colombia",
+     "postalCode": "110111",
+     "compensationRange": "",
+     "visibilityType": "External",
+     "longitude": "-74.08175",
+     "hiringManager": "",
+     "jobId": "R000160269",
+     "locale": "en_GLOBAL",
+     "title": "Sales Representative Talent Pipeline | Colombia",
+     "jobSeqNo": "PGBPGNGLOBALR000160269EXTERNALENGLOBAL",
+     "postedDate": "2026-10-06T00:00:00.000+0000",
+     "dateCreated": "2026-10-02T01:56:43.607+0000",
+     "cityStateCountry": "SANTAFE DE BOGOTA, Distrito Capital de Bogotá, Colombia",
+     "jobVisibility": [
+      "external"
+     ],
+     "location": "SANTAFE DE BOGOTA, Distrito Capital de Bogotá, Colombia",
+     "category": "Sales",
+     "ml_skills": [
+      "sales planning",
+      "key account management",
+      "negotiation",
+      "customer relationship management",
+      "business development",
+      "commercial strategy execution"
+     ],
+     "ml_job_parser": {
+      "descriptionTeaser": "We are currently hiring a Sales Representative Talent Pipeline to build and maintain strong customer relationships, develop sales plans, and identify business opportunities. Ideal candidates will have relevant sales experience and strong communication skills.",
+      "descriptionTeaser_first200": "Job Location. BOGOTA GENERAL OFFICE. Job Description. Managerial position. Working hours: Full time with flexible working hours. Accommodations: At P&G, we are committed to ensuring an inclusive re...",
+      "descriptionTeaser_keyword": "Job Location. BOGOTA GENERAL OFFICE. Job Description. Managerial position. Working hours: Full time with flexible working hours. Accommodations: At P&G, we are committed to ensuring an inclusive recru...",
+      "descriptionTeaser_ats": "Job LocationBOGOTA GENERAL OFFICEJob DescriptionManagerial positionWorking hours .  Full time with flexible working hoursAccommodations .  At P&G, we are committed to ensuring an inclusive recruitment, as"
+     },
+     "isMultiLocation": true,
+     "multi_location_array": [
+      {
+       "country": "Colombia",
+       "cityState": "SANTAFE DE BOGOTA, Distrito Capital de Bogotá",
+       "address": "CARRERA 7 NO. 114-33 PISO 12, SANTAFE DE BOGOTA Distrito Capital de Bogotá, 110111, Colombia",
+       "city": "SANTAFE DE BOGOTA",
+       "postalCode": "110111",
+       "latlong": {
+        "lon": -74.08175,
+        "lat": 4.60971
+       },
+       "latitude": "4.60971",
+       "cityStateZipCode": "SANTAFE DE BOGOTA, Distrito Capital de Bogotá, 110111",
+       "stateCountry": "Distrito Capital de Bogotá, Colombia",
+       "locationId": "4624",
+       "location": "SANTAFE DE BOGOTA, Distrito Capital de Bogotá, Colombia",
+       "state": "Distrito Capital de Bogotá",
+       "cityCountry": "SANTAFE DE BOGOTA, Colombia",
+       "cityStateCountry": "SANTAFE DE BOGOTA, Distrito Capital de Bogotá, Colombia",
+       "mapQueryLocation": "CARRERA 7 NO. 114-33 PISO 12, SANTAFE DE BOGOTA Distrito Capital de Bogotá, 110111, Colombia",
+       "longitude": "-74.08175"
+      },
+      {
+       "country": "Colombia",
+       "cityState": "MEDELLIN, Antioquia",
+       "address": "CARRERA 52 NO. 7-72, MEDELLIN Antioquia, 050024, Colombia",
+       "city": "MEDELLIN",
+       "postalCode": "050024",
+       "latlong": {
+        "lon": -75.56359,
+        "lat": 6.25184
+       },
+       "latitude": "6.25184",
+       "cityStateZipCode": "MEDELLIN, Antioquia, 050024",
+       "stateCountry": "Antioquia, Colombia",
+       "locationId": "2531",
+       "location": "MEDELLIN, Antioquia, Colombia",
+       "state": "Antioquia",
+       "cityCountry": "MEDELLIN, Colombia",
+       "cityStateCountry": "MEDELLIN, Antioquia, Colombia",
+       "mapQueryLocation": "CARRERA 52 NO. 7-72, MEDELLIN Antioquia, 050024, Colombia",
+       "longitude": "-75.56359"
+      }
+     ],
+     "isMultiCategory": false,
+     "multi_category_array": [
+      {
+       "category": "Sales"
+      }
+     ],
+     "badge": ""
+    }
+   ]
+  }
+ }
+}

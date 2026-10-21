@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { portalUrl } from "./connectors.js";
+import { isValidRef, portalUrl } from "./connectors.js";
 import { DIRECT_ATS_TYPES } from "./types.js";
 import type { EmployerSeed } from "../db/direct-repository.js";
 
@@ -17,7 +17,9 @@ const SeedFile = z.object({
             z
               .object({
                 atsType: z.enum(DIRECT_ATS_TYPES),
-                atsRef: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/),
+                // Each connector checks its own ref format (Workday refs carry
+                // slashes, Eightfold refs an @) — see parseEmployerSeed.
+                atsRef: z.string().min(1).max(200),
                 enabled: z.boolean()
               })
               .strict()
@@ -37,6 +39,7 @@ export function parseEmployerSeed(json: unknown): EmployerSeed[] {
     slugs.add(employer.slug);
     for (const source of employer.sources) {
       const board = `${source.atsType}:${source.atsRef}`;
+      if (!isValidRef(source)) throw new Error(`ats_ref inválido para ${source.atsType}: ${source.atsRef}`);
       if (boards.has(board)) throw new Error(`tablero repetido en el seed: ${board}`);
       boards.add(board);
     }

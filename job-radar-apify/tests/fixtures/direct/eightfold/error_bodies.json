@@ -1,0 +1,20 @@
+{
+ "v2_on_pcsx_tenant (HTTP 403)": {
+  "message": "Not authorized for PCSX"
+ },
+ "pcsx_on_v2_tenant (HTTP 403)": {
+  "message": "PCSX is not enabled for this user."
+ },
+ "v2_missing_job (HTTP 404)": {
+  "message": "Job with ID 562949999999999 not found"
+ },
+ "pcsx_missing (HTTP 404)": {
+  "status": 404,
+  "error": {
+   "message": "Position not found"
+  },
+  "data": {},
+  "metadata": null
+ },
+ "rate_limit (HTTP 429, text/html, no Retry-After)": "Please try again later"
+}

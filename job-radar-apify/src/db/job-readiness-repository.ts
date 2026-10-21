@@ -151,10 +151,23 @@ async function withTransaction<T>(fn: (client: PoolClient) => Promise<T>): Promi
  * caller just wrote real source content, so content_updated_at (the sitemap's
  * <lastmod>) may move — it never moves just because the row was re-evaluated.
  */
+export interface ReadinessOptions {
+  contentObtained?: boolean;
+  now?: Date;
+  /**
+   * false = persist the verdict (sitemap, JSON-LD) but never enqueue an
+   * Indexing API notification. Official-vacancy projections use it (ADR 0006
+   * §9/§10.7: they take none of the 200/day quota until the owner decides).
+   * seo_ready_at is still stamped, so enabling the API later needs an
+   * explicit backfill — firstReady will not fire again for those rows.
+   */
+  notify?: boolean;
+}
+
 export async function refreshGoogleReadinessInTransaction(
   client: PoolClient,
   jobId: string,
-  options: { contentObtained?: boolean; now?: Date } = {}
+  options: ReadinessOptions = {}
 ): Promise<RefreshOutcome | null> {
   const now = options.now ?? new Date();
   const result = await client.query<ReadinessRow>(
@@ -193,7 +206,7 @@ export async function refreshGoogleReadinessInTransaction(
   }
 
   let notified: RefreshOutcome["notified"] = null;
-  if (firstReady || changedWhileReady) {
+  if ((firstReady || changedWhileReady) && options.notify !== false) {
     // The enqueue itself skips a version Google already received (same job +
     // content_hash sent), e.g. a ready → not-ready → ready flap.
     const queued = await enqueueIndexingNotificationsWith(client, [{
@@ -210,7 +223,7 @@ export async function refreshGoogleReadinessInTransaction(
 
 export async function refreshGoogleReadiness(
   jobId: string,
-  options: { contentObtained?: boolean; now?: Date } = {}
+  options: ReadinessOptions = {}
 ): Promise<RefreshOutcome | null> {
   return withTransaction((client) => refreshGoogleReadinessInTransaction(client, jobId, options));
 }
@@ -220,14 +233,24 @@ export type ReadinessMutationPatch = Partial<Pick<ReadinessRow,
   "description" | "requirements" | "employment_type" | "salary_raw" | "salary_min" |
   "salary_max" | "salary_currency" | "description_kind" | "remote_type" |
   "applicant_countries" | "valid_through" | "is_active"
->>;
+> & {
+  /**
+   * Official-vacancy copies (ADR 0006 §10.6): written in the SAME UPDATE as
+   * is_active, so a copy is never left inactive without its pointer (it
+   * would be indistinguishable from migrate-dedupe's leftovers).
+   */
+  superseded_by: string | null;
+  /** Cleared on reversion so source closure re-verifies the copy. */
+  source_checked_at: string | null;
+}>;
 
 const MUTABLE_COLUMNS: Record<keyof ReadinessMutationPatch, string> = {
   title: "title", company: "company", location: "location", country: "country", url: "url", source: "source",
   published_at: "published_at", description: "description", requirements: "requirements", employment_type: "employment_type",
   salary_raw: "salary_raw", salary_min: "salary_min", salary_max: "salary_max", salary_currency: "salary_currency",
   description_kind: "description_kind", remote_type: "remote_type", applicant_countries: "applicant_countries",
-  valid_through: "valid_through", is_active: "is_active"
+  valid_through: "valid_through", is_active: "is_active", superseded_by: "superseded_by",
+  source_checked_at: "source_checked_at"
 };
 
 /**
@@ -237,7 +260,7 @@ const MUTABLE_COLUMNS: Record<keyof ReadinessMutationPatch, string> = {
  */
 export async function mutateReadinessRelevantJobs(
   mutations: Array<{ id: string; patch: ReadinessMutationPatch }>,
-  options: { contentObtained?: boolean; now?: Date } = {}
+  options: ReadinessOptions = {}
 ): Promise<Array<{ id: string; outcome: RefreshOutcome | null }>> {
   if (mutations.length > 500) throw new Error("Readiness mutations are bounded to 500 jobs per transaction.");
   return withTransaction(async (client) => {

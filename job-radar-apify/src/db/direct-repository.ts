@@ -1,6 +1,6 @@
 import { pool } from "./client.js";
 import { companyKeySql, storedCompanyKeySql } from "../lib/company-identity.js";
-import { liveJobSql } from "../lib/job-freshness.js";
+import { liveJobSql, MAX_JOB_AGE_DAYS } from "../lib/job-freshness.js";
 import { liveDirectJobSql, MISSING_LISTINGS_TO_CLOSE } from "../direct/ingest.js";
 import { DIRECT_ATS_TYPES, type DirectAtsType, type DirectPosting } from "../direct/types.js";
 
@@ -145,6 +145,48 @@ export interface SaveListingResult {
  * only when `applyClosures` — count a miss for every open row the listing
  * no longer has and close it at MISSING_LISTINGS_TO_CLOSE misses.
  */
+/**
+ * Upsert of one board's postings. `published_at` is pinned at the first read
+ * that states one: SuccessFactors re-stamps its "reference date" about every
+ * 28 days, and taking the new value would resurrect a months-old posting as
+ * fresh (ADR 0006 §2). A partial row (listing without the detail fields)
+ * keeps the stored description and validThrough instead of blanking them.
+ */
+function upsertDirectJobsSql(partial: boolean): string {
+  const keep = (column: string) => (partial ? `COALESCE(EXCLUDED.${column}, direct_jobs.${column})` : `EXCLUDED.${column}`);
+  return `INSERT INTO direct_jobs (employer_source_id, employer_id, external_id, title, location_raw, city,
+                                  workplace, apply_url, description_text, department, employment_type,
+                                  published_at, valid_through, content_hash)
+         SELECT $1, $2, r.external_id, r.title, r.location_raw, r.city, r.workplace, r.apply_url,
+                r.description_text, r.department, r.employment_type, r.published_at, r.valid_through, r.content_hash
+         FROM jsonb_to_recordset($3::jsonb) AS r(
+           external_id text, title text, location_raw text, city text, workplace text, apply_url text,
+           description_text text, department text, employment_type text, published_at timestamptz,
+           valid_through timestamptz, content_hash text)
+         ON CONFLICT (employer_source_id, external_id) DO UPDATE SET
+           title = EXCLUDED.title,
+           location_raw = EXCLUDED.location_raw,
+           city = EXCLUDED.city,
+           workplace = EXCLUDED.workplace,
+           apply_url = EXCLUDED.apply_url,
+           description_text = ${keep("description_text")},
+           department = EXCLUDED.department,
+           employment_type = EXCLUDED.employment_type,
+           published_at = COALESCE(direct_jobs.published_at, EXCLUDED.published_at),
+           valid_through = ${keep("valid_through")},
+           content_hash = EXCLUDED.content_hash,
+           last_seen_at = NOW(),
+           missing_count = 0,
+           closed_at = NULL
+         RETURNING (xmax = 0) AS inserted`;
+}
+
+/** External ids stored for one board, open or not yet purged. */
+export async function knownExternalIds(sourceId: string): Promise<Set<string>> {
+  const result = await pool.query<{ external_id: string }>(`SELECT external_id FROM direct_jobs WHERE employer_source_id = $1`, [sourceId]);
+  return new Set(result.rows.map((row) => row.external_id));
+}
+
 export async function saveListing(
   source: Pick<EmployerSourceRow, "id" | "employerId">,
   postings: DirectPosting[],
@@ -170,34 +212,14 @@ export async function saveListing(
         valid_through: posting.validThrough,
         content_hash: posting.contentHash
       }));
-      const upsert = await client.query<{ inserted: boolean }>(
-        `INSERT INTO direct_jobs (employer_source_id, employer_id, external_id, title, location_raw, city,
-                                  workplace, apply_url, description_text, department, employment_type,
-                                  published_at, valid_through, content_hash)
-         SELECT $1, $2, r.external_id, r.title, r.location_raw, r.city, r.workplace, r.apply_url,
-                r.description_text, r.department, r.employment_type, r.published_at, r.valid_through, r.content_hash
-         FROM jsonb_to_recordset($3::jsonb) AS r(
-           external_id text, title text, location_raw text, city text, workplace text, apply_url text,
-           description_text text, department text, employment_type text, published_at timestamptz,
-           valid_through timestamptz, content_hash text)
-         ON CONFLICT (employer_source_id, external_id) DO UPDATE SET
-           title = EXCLUDED.title,
-           location_raw = EXCLUDED.location_raw,
-           city = EXCLUDED.city,
-           workplace = EXCLUDED.workplace,
-           apply_url = EXCLUDED.apply_url,
-           description_text = EXCLUDED.description_text,
-           department = EXCLUDED.department,
-           employment_type = EXCLUDED.employment_type,
-           published_at = COALESCE(EXCLUDED.published_at, direct_jobs.published_at),
-           valid_through = EXCLUDED.valid_through,
-           content_hash = EXCLUDED.content_hash,
-           last_seen_at = NOW(),
-           missing_count = 0,
-           closed_at = NULL
-         RETURNING (xmax = 0) AS inserted`,
-        [source.id, source.employerId, JSON.stringify(rows)]
-      );
+      const upserted: { inserted: boolean }[] = [];
+      for (const partial of [false, true]) {
+        const batch = rows.filter((_, index) => (postings[index].partial === true) === partial);
+        if (batch.length === 0) continue;
+        const result = await client.query<{ inserted: boolean }>(upsertDirectJobsSql(partial), [source.id, source.employerId, JSON.stringify(batch)]);
+        upserted.push(...result.rows);
+      }
+      const upsert = { rows: upserted };
       inserted = upsert.rows.filter((row) => row.inserted).length;
       updated = upsert.rows.length - inserted;
       if (upsert.rows.length !== postings.length) {
@@ -286,11 +308,17 @@ export async function recordSourceOutcome(sourceId: string, outcome: SourceOutco
   );
 }
 
-/** Deletes postings closed more than a day ago, bounded per tick. */
+/**
+ * Deletes postings closed more than 30 days ago, bounded per tick. Kept that
+ * long on purpose (ADR 0006 §10, review I5): a posting that reappears on its
+ * board within the window reopens the SAME row — same id, so the same public
+ * URL, and its original first_seen_at, so an undated posting can't come back
+ * looking new.
+ */
 export async function purgeClosedDirectJobs(limit = 5_000): Promise<number> {
   const result = await pool.query(
     `DELETE FROM direct_jobs WHERE id IN (
-       SELECT id FROM direct_jobs WHERE closed_at < NOW() - INTERVAL '1 day' ORDER BY closed_at LIMIT $1)`,
+       SELECT id FROM direct_jobs WHERE closed_at < NOW() - INTERVAL '${MAX_JOB_AGE_DAYS} days' ORDER BY closed_at LIMIT $1)`,
     [limit]
   );
   return result.rowCount ?? 0;

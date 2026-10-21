@@ -815,132 +815,20 @@ export async function scrapeWorkana(keyword: string): Promise<Job[]> {
   return jobs;
 }
 
-// Scrape Magneto365 Colombia directly from NEXT payload and JSON-LD schema
-export async function scrapeMagneto(keyword: string): Promise<Job[]> {
-  console.log(`[Magneto] Searching for keyword "${keyword}"...`);
-  const query = encodeURIComponent(keyword);
-  const url = `https://www.magneto365.com/co/empleos?q=${query}`;
-  const jobs: Job[] = [];
-  const now = new Date();
-
-  try {
-    const response = await fetch(url, {
-      headers: {
-        "User-Agent": pickUserAgent()
-      }
-    });
-
-    if (!response.ok) {
-      console.warn(`[Magneto] Failed: ${response.status} ${response.statusText}`);
-      return [];
-    }
-
-    const html = await response.text();
-
-    // 1. Next.js payload search results (rows)
-    const matches = html.match(/self\.__next_f\.push\(\[1,"([\s\S]*?)"\]\)/g) || [];
-    let combined = "";
-    for (const m of matches) {
-      combined += m.replace('self.__next_f.push([1,"', "").replace('"])', "");
-    }
-
-    const unescaped = combined.replaceAll('\\"', '"').replaceAll("\\/", "/").replaceAll("\\n", " ");
-
-    const startKey = '"rows":[';
-    const startIdx = unescaped.indexOf(startKey);
-    if (startIdx !== -1) {
-      const arrayStartIdx = startIdx + startKey.length - 1;
-      let bracketCount = 0;
-      let endIdx = -1;
-      for (let i = arrayStartIdx; i < unescaped.length; i++) {
-        if (unescaped[i] === "[") bracketCount++;
-        else if (unescaped[i] === "]") {
-          bracketCount--;
-          if (bracketCount === 0) {
-            endIdx = i;
-            break;
-          }
-        }
-      }
-      if (endIdx !== -1) {
-        try {
-          const rows = JSON.parse(unescaped.substring(arrayStartIdx, endIdx + 1));
-          if (Array.isArray(rows)) {
-            for (const r of rows) {
-              const isRemote = r.isRemote === true;
-              const locationText = isRemote ? "Remoto" : (r.cities || []).join(", ") || "Colombia";
-              jobs.push({
-                jobId: String(r.id || Math.random()),
-                title: htmlEntities(r.title || "Oferta Magneto"),
-                company: htmlEntities(r.companyName || "Confidencial"),
-                location: htmlEntities(locationText),
-                url: `https://www.magneto365.com/co/empleos/${r.jobSlug}`,
-                dateText: "Reciente",
-                source: "Magneto",
-                publishedAt: new Date().toISOString().split("T")[0]
-              });
-            }
-          }
-        } catch (e) {}
-      }
-    }
-
-    // 2. Schema.org fallback if Next.js rows missing
-    if (jobs.length === 0) {
-      const ldJsonMatches =
-        html.match(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi) || [];
-      for (const script of ldJsonMatches) {
-        if (script.includes('"ItemList"')) {
-          try {
-            const content = script
-              .replace(/<script[^>]*>/i, "")
-              .replace(/<\/script>/i, "")
-              .trim();
-            const parsed = JSON.parse(content);
-            if (parsed.itemListElement && Array.isArray(parsed.itemListElement)) {
-              for (const el of parsed.itemListElement) {
-                if (el.url && el.url.includes("/empleos/")) {
-                  const jobUrl = el.url;
-                  const slug = jobUrl.split("/empleos/")[1] || "";
-                  const parts = slug.split("-");
-                  const titleWords = parts.filter((p) => !/^\d+$/.test(p));
-                  const title = titleWords
-                    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-                    .join(" ");
-
-                  if (title && title.length > 3) {
-                    jobs.push({
-                      jobId: slug || String(Math.random()),
-                      title: htmlEntities(title),
-                      company: "Magneto Empresa",
-                      location: "Colombia",
-                      url: jobUrl,
-                      dateText: "Hoy",
-                      source: "Magneto",
-                      publishedAt: new Date().toISOString().split("T")[0]
-                    });
-                  }
-                }
-              }
-            }
-          } catch (e) {}
-        }
-      }
-    }
-
-    console.log(`[Magneto] Found ${jobs.length} jobs.`);
-    return jobs;
-  } catch (error) {
-    console.error("[Magneto] Fetch error:", error);
-    return jobs;
-  }
+// Magneto's robots.txt forbids its keyword search (`Disallow: /*?`): the old
+// `/co/empleos?q=` scraper that lived here is gone (2026-10-20). Kept as a
+// name for the debug/fixture scripts; it reads the allowed catalog instead
+// and ignores the keyword (src/sources/magneto.ts).
+export async function scrapeMagneto(_keyword: string): Promise<Job[]> {
+  const { scrapeMagnetoCatalog } = await import("./sources/magneto-catalog.js");
+  return (await scrapeMagnetoCatalog()) as unknown as Job[];
 }
 
-// Detail-page enrichment for one Magneto job — direct fetch, no proxy
-// needed (unlike Computrabajo, Magneto doesn't block direct requests; the
-// search scraper above already fetches this way).
 export async function fetchMagnetoDetail(url: string): Promise<Partial<JobDetail> | null> {
-  const response = await fetch(url, { headers: { "User-Agent": pickUserAgent() } });
+  // Posting pages (/co/empleos/{slug}) are allowed by Magneto's robots.txt;
+  // never a URL with a query (Disallow: /*?). Identifies itself.
+  if (new URL(url).search) return null;
+  const response = await fetch(url, { headers: { "User-Agent": "BuscoTrabajoBot/1.0 (+https://buscotrabajo.co)" } });
   if (!response.ok) return null;
   return extractJobPostingDetail(await response.text());
 }

@@ -1,0 +1,10 @@
+{
+  "source": "Servicio Público de Empleo — DataEmpleo, serie \"Ofertas de empleo registradas (RED)\"",
+  "url": "https://dataempleo.serviciodeempleo.gov.co/dataempleobackend/v1/graph?page=1",
+  "doc": "docs/source-catalog/servicio-publico-empleo.md",
+  "unit": "puestos de trabajo registrados en el mes (no vacantes únicas ni empresas)",
+  "period": "2026-08",
+  "value": 144242,
+  "retrievedAt": "2026-10-20",
+  "caveats": "Subregistro (obligación sin sanción a empleadores), sin sector público, sesgo a Bogotá/Medellín/Cali y a baja calificación; un puesto puede ser varias plazas de una misma vacante. Orden de magnitud, no 100 %."
+}

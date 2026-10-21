@@ -1,0 +1,73 @@
+{
+ "reqId": "R000160269",
+ "jobId": "R000160269",
+ "jobSeqNo": "PGBPGNGLOBALR000160269EXTERNALENGLOBAL",
+ "title": "Sales Representative Talent Pipeline | Colombia",
+ "postedDate": "2026-10-06T00:00:00.000+0000",
+ "dateCreated": "2026-10-02T01:56:43.607+0000",
+ "jobUpdatedDate": "2026-10-06T15:46:18.088+0000",
+ "country": "Colombia",
+ "standardisedCountry": "Colombia",
+ "city": "SANTAFE DE BOGOTA",
+ "standardisedCity": "Bogota",
+ "state": "Distrito Capital de Bogotá",
+ "location": "SANTAFE DE BOGOTA, Distrito Capital de Bogotá, Colombia",
+ "multi_location": [
+  {
+   "country": "Colombia",
+   "cityState": "SANTAFE DE BOGOTA, Distrito Capital de Bogotá",
+   "address": "CARRERA 7 NO. 114-33 PISO 12, SANTAFE DE BOGOTA Distrito Capital de Bogotá, 110111, Colombia",
+   "city": "SANTAFE DE BOGOTA",
+   "postalCode": "110111",
+   "latlong": {
+    "lon": -74.08175,
+    "lat": 4.60971
+   },
+   "latitude": "4.60971",
+   "cityStateZipCode": "SANTAFE DE BOGOTA, Distrito Capital de Bogotá, 110111",
+   "stateCountry": "Distrito Capital de Bogotá, Colombia",
+   "locationId": "4624",
+   "location": "SANTAFE DE BOGOTA, Distrito Capital de Bogotá, Colombia",
+   "state": "Distrito Capital de Bogotá",
+   "cityCountry": "SANTAFE DE BOGOTA, Colombia",
+   "cityStateCountry": "SANTAFE DE BOGOTA, Distrito Capital de Bogotá, Colombia",
+   "mapQueryLocation": "CARRERA 7 NO. 114-33 PISO 12, SANTAFE DE BOGOTA Distrito Capital de Bogotá, 110111, Colombia",
+   "longitude": "-74.08175"
+  },
+  {
+   "country": "Colombia",
+   "cityState": "MEDELLIN, Antioquia",
+   "address": "CARRERA 52 NO. 7-72, MEDELLIN Antioquia, 050024, Colombia",
+   "city": "MEDELLIN",
+   "postalCode": "050024",
+   "latlong": {
+    "lon": -75.56359,
+    "lat": 6.25184
+   },
+   "latitude": "6.25184",
+   "cityStateZipCode": "MEDELLIN, Antioquia, 050024",
+   "stateCountry": "Antioquia, Colombia",
+   "locationId": "2531",
+   "location": "MEDELLIN, Antioquia, Colombia",
+   "state": "Antioquia",
+   "cityCountry": "MEDELLIN, Colombia",
+   "cityStateCountry": "MEDELLIN, Antioquia, Colombia",
+   "mapQueryLocation": "CARRERA 52 NO. 7-72, MEDELLIN Antioquia, 050024, Colombia",
+   "longitude": "-75.56359"
+  }
+ ],
+ "type": "Full time",
+ "hiringType": "Full time",
+ "applyUrl": "https://pg.wd5.myworkdayjobs.com/1000/job/BOGOTA-GENERAL-OFFICE/Sales-Representative-Talent-Pipeline---Colombia_R000160269/apply",
+ "externalApply": true,
+ "source": "WORKDAY",
+ "ats": "WORKDAY",
+ "isEverGreenReq": "1",
+ "postingStatus": "OPEN",
+ "companyName": "Procter & Gamble",
+ "category": "Sales",
+ "description": "<p style=\"text-align:left\"><b>Job Location</b></p>BOGOTA GENERAL OFFICE<p style=\"text-align:inherit\"></p><p style=\"text-align:left\"><b>Job Description</b></p><p><b>Managerial position</b></p><p><b>Working hours:</b> Full time with flexible working hours</p><p><b>Accommodations:</b> At P&amp;G, we are committed to ensuring an inclusive recruitment, assessment, and selection process. If you have a d…[TRUNCATED]",
+ "descriptionTeaser": "Job LocationBOGOTA GENERAL OFFICEJob DescriptionManagerial positionWorking hours: Full time with flexible working hoursAccommodations: At P&G, we are committed to ensuring an inclusive recruitment, as",
+ "isMultiLocation": null,
+ "locale": "en_GLOBAL"
+}

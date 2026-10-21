@@ -1,0 +1,262 @@
+{
+ "refineSearch": {
+  "status": 200,
+  "hits": "(trimmed fixture: real response had 50)",
+  "totalHits": 106,
+  "data": {
+   "jobs": [
+    {
+     "ml_skills": [
+      "desarrollo de mercado",
+      "gestión de cuentas estratégicas",
+      "generación de nuevos negocios",
+      "liderazgo de equipos comerciales",
+      "manejo avanzado de excel",
+      "manejo de presupuestos"
+     ],
+     "descriptionTeaser": "POSICIÓN: SALES MANAGER REGIÓN ANDINA. UBICACIÓN: CALI - MEDELLÍN. AREA: Marketing & Sales. PROPÓSITO. Desarrollar agresivamente el mercado de la Región Andina mediante prospección activa, posicion...",
+     "state": "Antioquia",
+     "siteType": "external",
+     "multi_category": [
+      "Operations",
+      "Freight Transportations and Aviation"
+     ],
+     "reqId": "AV-360676",
+     "city": "Medellín",
+     "latitude": "6.25184",
+     "multi_location": [
+      "Medellín, Antioquia, Colombia",
+      "Cali, Valle del Cauca, Colombia"
+     ],
+     "applyUrl": "https://dpdhlgroup.avature.net/es_ES/jobs/ApplicationMethods?jobId=360676&source=careers.dhl.com",
+     "ml_job_parser": {
+      "descriptionTeaser": "Estamos buscando un Gerente de Ventas para desarrollar el mercado de la Región Andina. El candidato ideal tendrá experiencia en generación de nuevos negocios y liderazgo de equipos comerciales, asegurando el cumplimiento de presupuestos y KPIs.",
+      "descriptionTeaser_first200": "POSICIÓN: SALES MANAGER REGIÓN ANDINA. UBICACIÓN: CALI - MEDELLÍN. AREA: Marketing & Sales. PROPÓSITO. Desarrollar agresivamente el mercado de la Región Andina mediante prospección activa, posicion...",
+      "descriptionTeaser_keyword": "POSICIÓN: SALES MANAGER REGIÓN ANDINA. UBICACIÓN: CALI - MEDELLÍN. AREA: Marketing & Sales. PROPÓSITO. Desarrollar agresivamente el mercado de la Región Andina mediante prospección activa, posicionami...",
+      "descriptionTeaser_ats": "<div style=\"display: inline;\"><font face=\"arial\" size=\"2\"><div style=\"line-height: 20px;\"><h3 style=\"\"><p style=\"\">POSICIÓN:<span style=\"font-weight: 400;\"> SALES MANAGER REGIÓN ANDINA</span></p><p st"
+     },
+     "externalApply": true,
+     "cityState": "Medellín, Antioquia",
+     "country": "Colombia",
+     "contractType1": "Permanent",
+     "visibilityType": "External",
+     "longitude": "-75.56359",
+     "careerLevel1": "Professionals",
+     "jobId": "AV-360676",
+     "workHours": "Full-time",
+     "locale": "en_GLOBAL",
+     "title": "SALES MANAGER REGIÓN ANDINA O PACIFICA",
+     "jobSeqNo": "DPDHGLOBALAV360676ENGLOBALEXTERNAL",
+     "postedDate": "2026-06-25T16:06:48.533+0000",
+     "dateCreated": "2026-06-25T15:57:54.469+0000",
+     "cityStateCountry": "Medellín, Antioquia, Colombia",
+     "hoursPerWeek": "",
+     "jobVisibility": [
+      "internal",
+      "external"
+     ],
+     "workHours1": "Full-time",
+     "careerLevel": "Professionals",
+     "location": "Medellín, Antioquia, Colombia",
+     "isMultiLocation": true,
+     "multi_location_array": [
+      {
+       "latlong": {
+        "lon": -75.56359,
+        "lat": 6.25184
+       },
+       "location": "Medellín, Antioquia, Colombia"
+      },
+      {
+       "latlong": {
+        "lon": -76.5225,
+        "lat": 3.43722
+       },
+       "location": "Cali, Valle del Cauca, Colombia"
+      }
+     ],
+     "isMultiCategory": true,
+     "multi_category_array": [
+      {
+       "category": "Operations"
+      },
+      {
+       "category": "Freight Transportations and Aviation"
+      }
+     ],
+     "badge": ""
+    },
+    {
+     "ml_skills": [
+      "microsoft office",
+      "comunicación",
+      "trabajo en equipo",
+      "organización",
+      "análisis",
+      "inglés intermedio"
+     ],
+     "descriptionTeaser": "En DHL, creemos que el talento joven impulsa la innovación y la transformación de los negocios. Por eso, buscamos estudiantes con alto potencial, disposición para aprender y motivación para desarro...",
+     "state": "Antioquia",
+     "siteType": "external",
+     "multi_category": [
+      "Operations"
+     ],
+     "reqId": "AV-377390",
+     "city": "Medellín",
+     "latitude": "6.25184",
+     "multi_location": [
+      "Medellín, Antioquia, Colombia"
+     ],
+     "applyUrl": "https://dpdhlgroup.avature.net/es_ES/jobs/ApplicationMethods?jobId=377390&source=careers.dhl.com",
+     "ml_job_parser": {
+      "descriptionTeaser_keyword": "En DHL, creemos que el talento joven impulsa la innovación y la transformación de los negocios. Por eso, buscamos estudiantes con alto potencial, disposición para aprender y motivación para desarrolla...",
+      "descriptionTeaser_first200": "En DHL, creemos que el talento joven impulsa la innovación y la transformación de los negocios. Por eso, buscamos estudiantes con alto potencial, disposición para aprender y motivación para desarro...",
+      "descriptionTeaser_ats": "En DHL, creemos que el talento joven impulsa la innovación y la transformación de los n",
+      "descriptionTeaser": "Estamos buscando estudiantes con alto potencial para unirse a nuestro equipo como Aprendiz Técnico o Tecnólogo en Comercio Exterior. Tendrás la oportunidad de adquirir experiencia práctica y desarrollar tus habilidades en un entorno dinámico y retador."
+     },
+     "externalApply": true,
+     "cityState": "Medellín, Antioquia",
+     "country": "Colombia",
+     "contractType1": "Temporary",
+     "visibilityType": "External",
+     "longitude": "-75.56359",
+     "careerLevel1": "Students & Graduates",
+     "jobId": "AV-377390",
+     "workHours": "Full-time",
+     "locale": "en_GLOBAL",
+     "title": "Aprendiz Técnico o Tecnólogo Comercio Exterior",
+     "jobSeqNo": "DPDHGLOBALAV377390ENGLOBALEXTERNAL",
+     "postedDate": "2026-10-19T20:06:35.670+0000",
+     "dateCreated": "2026-09-11T17:57:51.699+0000",
+     "cityStateCountry": "Medellín, Antioquia, Colombia",
+     "hoursPerWeek": "",
+     "jobVisibility": [
+      "internal",
+      "external"
+     ],
+     "workHours1": "Full-time",
+     "careerLevel": "Students & Graduates",
+     "location": "Medellín, Antioquia, Colombia",
+     "isMultiLocation": true,
+     "multi_location_array": [
+      {
+       "latlong": {
+        "lon": -75.56359,
+        "lat": 6.25184
+       },
+       "location": "Medellín, Antioquia, Colombia"
+      }
+     ],
+     "isMultiCategory": true,
+     "multi_category_array": [
+      {
+       "category": "Operations"
+      }
+     ],
+     "badge": ""
+    },
+    {
+     "ml_skills": [
+      "cold chain logistics",
+      "ocean freight management",
+      "product management",
+      "business development",
+      "customer relationship management",
+      "sales planning"
+     ],
+     "descriptionTeaser": "What makes DHL a great company? Our people and our culture, based on respect and results! DHL's #1 global logistics service company is present in more than 220 countries, making it the most interna...",
+     "state": "Región Metropolitana de Santiago",
+     "siteType": "external",
+     "multi_category": [
+      "Operations"
+     ],
+     "reqId": "AV-365967",
+     "city": "Santiago",
+     "latitude": "-33.45694",
+     "multi_location": [
+      "Santiago, Región Metropolitana de Santiago, Chile",
+      "Mexico City, Ciudad de Mexico, Mexico",
+      "Buenos Aires, Ciudad Autónoma de Buenos Aires, Argentina",
+      "Lima, Municipalidad Metropolitana de Lima, Peru",
+      "Bogotá, Distrito Capital de Bogotá, Colombia"
+     ],
+     "applyUrl": "https://dpdhlgroup.avature.net/es_ES/jobs/ApplicationMethods?jobId=365967&source=careers.dhl.com",
+     "ml_job_parser": {
+      "descriptionTeaser": "Take on the role of Regional Ocean Reefer Manager, driving the regional Ocean Reefer strategy to enhance market competitiveness and operational excellence. Lead product strategy, support customer onboarding, and collaborate with cross-functional teams. Ideal for experienced professionals in cold cha…[TRUNCATED]",
+      "descriptionTeaser_first200": "What makes DHL a great company? Our people and our culture, based on respect and results! DHL's #1 global logistics service company is present in more than 220 countries, making it the most interna...",
+      "descriptionTeaser_keyword": "What makes DHL a great company? Our people and our culture, based on respect and results! DHL's #1 global logistics service company is present in more than 220 countries, making it the most internatio...",
+      "descriptionTeaser_ats": "<div><p><font size=\"2\" face=\"arial\"><strong>What makes DHL a great company?</strong></font></p><p><font size=\"2\" face=\"arial\">Our people and our culture, based on respect and results!</font></p><p><fo"
+     },
+     "externalApply": true,
+     "cityState": "Mexico City, Ciudad de Mexico",
+     "country": "Chile",
+     "contractType1": "Permanent",
+     "visibilityType": "External",
+     "longitude": "-70.64827",
+     "careerLevel1": "Managers",
+     "jobId": "AV-365967",
+     "workHours": "Full-time",
+     "locale": "en_GLOBAL",
+     "title": "Regional Ocean Reefer Manager",
+     "jobSeqNo": "DPDHGLOBALAV365967ENGLOBALEXTERNAL",
+     "postedDate": "2026-09-10T13:50:29.629+0000",
+     "dateCreated": "2026-07-24T21:03:40.790+0000",
+     "cityStateCountry": "Mexico City, Ciudad de Mexico, Mexico",
+     "hoursPerWeek": "48",
+     "jobVisibility": [
+      "internal",
+      "external"
+     ],
+     "workHours1": "Full-time",
+     "careerLevel": "Managers",
+     "location": "Santiago, Región Metropolitana de Santiago, Chile",
+     "isMultiLocation": true,
+     "multi_location_array": [
+      {
+       "latlong": {
+        "lon": -70.64827,
+        "lat": -33.45694
+       },
+       "location": "Santiago, Región Metropolitana de Santiago, Chile"
+      },
+      {
+       "latlong": {
+        "lon": -99.12766,
+        "lat": 19.42847
+       },
+       "location": "Mexico City, Ciudad de Mexico, Mexico"
+      },
+      {
+       "latlong": {
+        "lon": -58.37723,
+        "lat": -34.61315
+       },
+       "location": "Buenos Aires, Ciudad Autónoma de Buenos Aires, Argentina"
+      },
+      {
+       "latlong": {
+        "lon": -77.02824,
+        "lat": -12.04318
+       },
+       "location": "Lima, Municipalidad Metropolitana de Lima, Peru"
+      },
+      {
+       "latlong": {
+        "lon": -74.08175,
+        "lat": 4.60971
+       },
+       "location": "Bogotá, Distrito Capital de Bogotá, Colombia"
+      }
+     ],
+     "isMultiCategory": true,
+     "multi_category_array": [
+      {
+       "category": "Operations"
+      }
+     ],
+     "badge": ""
+    }
+   ]
+  }
+ }
+}

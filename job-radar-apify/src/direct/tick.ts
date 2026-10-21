@@ -15,16 +15,22 @@ export interface TickDeps {
   saveListing(source: EmployerSourceRow, postings: DirectPosting[], applyClosures: boolean): Promise<SaveListingResult>;
   recordOutcome(sourceId: string, outcome: SourceOutcome): Promise<void>;
   closeConfirmed(sourceId: string, externalIds: string[]): Promise<number>;
+  /** External ids already stored for the board (connectors fetch details only for new ones). */
+  knownIds?(sourceId: string): Promise<Set<string>>;
 }
+
+// Posting pages fetched per board and read, for connectors whose listing
+// lacks the date or the description. New postings beyond it wait a read.
+export const DETAIL_BUDGET = 25;
 
 // Per-posting checks per board and tick (one request each).
 const MAX_CLOSURE_CONFIRMATIONS = 25;
 
 /**
- * Minimum hours between two reads of the same board. Deliberately BELOW the
- * workflow's 6 h cron: last_run_at is stamped minutes after a tick starts,
- * so an interval equal to the period would skip every other tick (12 h
- * effective, worse with GitHub's schedule delays).
+ * Minimum hours between two reads of the same board. The workflow runs every
+ * hour and each run reads the oldest due boards until its deadline, so a
+ * board is re-read every 5-6 h as long as one day of runs can read every
+ * board 4 times (the report prints the oldest last_ok_at to prove it).
  */
 export const MIN_INTERVAL_HOURS = 5;
 
@@ -43,7 +49,8 @@ const CONCURRENCY = 3;
 
 export async function runSource(source: EmployerSourceRow, deps: TickDeps, now = new Date()): Promise<SourceReport> {
   const board = `${source.atsType}:${source.atsRef}`;
-  const listing = await listBoard(source, deps.http);
+  const knownIds = deps.knownIds ? await deps.knownIds(source.id) : new Set<string>();
+  const listing = await listBoard(source, deps.http, { knownIds, detailBudget: DETAIL_BUDGET });
   if (listing.kind !== "complete") {
     await deps.recordOutcome(source.id, { status: listing.kind, detail: listing.detail });
     return { employer: source.employerSlug, board, status: listing.kind, detail: listing.detail, stats: null, saved: null };
@@ -82,12 +89,23 @@ export async function runSource(source: EmployerSourceRow, deps: TickDeps, now =
   return { employer: source.employerSlug, board, status: suspect ? "suspect" : "ok", detail, stats, saved };
 }
 
-export async function runDirectTick(sources: EmployerSourceRow[], deps: TickDeps, now = new Date()): Promise<SourceReport[]> {
+/**
+ * Reads the due boards, oldest first. `deadline` bounds the run: once it
+ * passes no new board starts (the ones in flight finish), and the rest stay
+ * due for the next hourly run — the workflow's 20-minute timeout never cuts a
+ * board in the middle of its writes.
+ */
+export async function runDirectTick(
+  sources: EmployerSourceRow[],
+  deps: TickDeps,
+  now = new Date(),
+  deadline: number = Number.POSITIVE_INFINITY
+): Promise<SourceReport[]> {
   const reports: SourceReport[] = [];
   let next = 0;
   await Promise.all(
     Array.from({ length: Math.min(CONCURRENCY, sources.length) }, async () => {
-      while (next < sources.length) {
+      while (next < sources.length && Date.now() < deadline) {
         const source = sources[next++];
         try {
           reports.push(await runSource(source, deps, now));

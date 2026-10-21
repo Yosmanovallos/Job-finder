@@ -6,14 +6,15 @@ name: Direct Employers Tick
 # until phase D4. The web server never imports this code.
 on:
   schedule:
-    # Every 6 h, off the hour to avoid the other ticks. A board is re-read
-    # once 5 h passed (MIN_INTERVAL_HOURS in src/direct/tick.ts — kept below
-    # this period on purpose so no tick is skipped).
-    - cron: "17 */6 * * *"
+    # Every hour, off the hour to avoid the other ticks. Each run reads the
+    # oldest due boards until its deadline (--deadline-min); a board is re-read
+    # once 5 h passed (MIN_INTERVAL_HOURS in src/direct/tick.ts), so each one is
+    # read every 5-6 h however many boards there are, up to what 24 runs fit.
+    - cron: "17 * * * *"
   workflow_dispatch:
     inputs:
       mode:
-        description: "tick | dry-run | migrate-dry-run | migrate | seed-dry-run | seed"
+        description: "tick | dry-run | migrate-dry-run | migrate | seed-dry-run | seed | domain-census | discover-dry-run | discover | coverage | db-size | cc-tenants"
         required: true
         default: "dry-run"
         type: choice
@@ -24,6 +25,17 @@ on:
           - migrate
           - seed-dry-run
           - seed
+          # Phase D3 (ADR 0006 §7.1). domain-census, discover-dry-run and
+          # coverage only READ the database; discover writes (insert-only).
+          - domain-census
+          - discover-dry-run
+          - discover
+          - coverage
+          # Read-only size report (pg_database_size + biggest tables).
+          - db-size
+          # Read-only, no database: Workday / SmartRecruiters boards seen by
+          # Common Crawl that list postings in Colombia, for human review.
+          - cc-tenants
 
 concurrency:
   group: direct-employers-tick
@@ -47,8 +59,8 @@ jobs:
           cd job-radar-apify
           npm ci || npm install
 
-      # Migration and seed run only when dispatched by hand, never on the
-      # schedule (schema changes are explicit — job-radar-apify/CLAUDE.md).
+      # Migration, seed and discovery run only when dispatched by hand, never
+      # on the schedule (schema changes are explicit — job-radar-apify/CLAUDE.md).
       - name: Run
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
@@ -57,12 +69,18 @@ jobs:
           cd job-radar-apify
           set -o pipefail
           case "$MODE" in
-            tick)            cmd="npx tsx scripts/run-direct-tick.ts --allow-remote-db" ;;
+            tick)            cmd="npx tsx scripts/run-direct-tick.ts --allow-remote-db --limit 1000 --deadline-min 14" ;;
             dry-run)         cmd="npx tsx scripts/run-direct-tick.ts --dry-run" ;;
             migrate-dry-run) cmd="npx tsx scripts/migrate-direct-employers.ts --dry-run --allow-remote-db" ;;
             migrate)         cmd="npx tsx scripts/migrate-direct-employers.ts --allow-remote-db" ;;
             seed-dry-run)    cmd="npx tsx scripts/seed-direct-employers.ts --dry-run" ;;
             seed)            cmd="npx tsx scripts/seed-direct-employers.ts --allow-remote-db" ;;
+            domain-census)   cmd="npx tsx scripts/direct-domain-census.ts --allow-remote-db" ;;
+            discover-dry-run) cmd="npx tsx scripts/discover-direct-employers.ts --dry-run --allow-remote-db --limit 100" ;;
+            discover)        cmd="npx tsx scripts/discover-direct-employers.ts --allow-remote-db --limit 1500 --max-enables 50 --deadline-min 16" ;;
+            coverage)        cmd="npx tsx scripts/direct-coverage.ts --allow-remote-db" ;;
+            db-size)         cmd="npx tsx scripts/direct-db-size.ts --allow-remote-db" ;;
+            cc-tenants)      cmd="npx tsx scripts/direct-cc-tenants.ts --max-boards 500 --deadline-min 17" ;;
             *) echo "modo desconocido: $MODE"; exit 1 ;;
           esac
           echo "## Direct employers — $MODE" >> "$GITHUB_STEP_SUMMARY"

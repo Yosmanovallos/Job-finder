@@ -108,8 +108,10 @@ async function main() {
   }
 
   const unevaluated = await pool.query<{ id: string }>(
+    // Official-vacancy projections are evaluated by their own tick without
+    // notifying (ADR 0006 §10.7): never here, where refresh would enqueue.
     `SELECT id FROM jobs
-     WHERE is_active = TRUE AND detail_status IS NOT NULL AND seo_evaluated_at IS NULL
+     WHERE is_active = TRUE AND detail_status IS NOT NULL AND seo_evaluated_at IS NULL AND direct_job_id IS NULL
      ORDER BY created_at DESC LIMIT $1`,
     [RECONCILE_EVALUATE_LIMIT]
   );
@@ -129,6 +131,8 @@ async function main() {
      FROM jobs j
      WHERE ${seoReadySql("j")}
        AND ${withinApiWindowSql("j")}
+       -- ADR 0006 §9/§10.7: official projections take no Indexing API quota.
+       AND j.direct_job_id IS NULL
        AND NOT EXISTS (
          SELECT 1 FROM indexing_queue q
          WHERE q.notification_type = 'URL_UPDATED'
