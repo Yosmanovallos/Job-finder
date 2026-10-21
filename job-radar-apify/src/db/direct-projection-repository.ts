@@ -61,12 +61,16 @@ export interface ProjectionResult {
 async function upsertProjections(): Promise<{ inserted: number; updated: number; changedIds: string[] }> {
   const result = await pool.query<{ id: string; inserted: boolean }>(
     `INSERT INTO jobs (id, direct_job_id, url_hash, content_fingerprint, title, company, location, url,
-                       source, sources, published_at, last_seen_at, is_active, country, description,
+                       source, sources, date_text, published_at, last_seen_at, is_active, country, description,
                        employment_type, description_kind, description_source, remote_type,
                        applicant_countries, valid_through, detail_status)
      SELECT d.id, d.id, ${PROJECTION_HASH_SQL}, ${PROJECTION_HASH_SQL}, d.title, e.display_name,
             CASE WHEN d.city IS NOT NULL THEN d.city || ', Colombia' ELSE 'Colombia' END,
-            d.apply_url, $1::text, jsonb_build_array($1::text), COALESCE(d.published_at, d.first_seen_at), NOW(), TRUE, 'CO',
+            d.apply_url, $1::text, jsonb_build_array($1::text),
+            -- The ATS stated no date (Google): say so instead of letting
+            -- "first seen" read like a posting date ("hace menos de 1 h").
+            CASE WHEN d.published_at IS NULL THEN 'Fecha no indicada' END,
+            COALESCE(d.published_at, d.first_seen_at), NOW(), TRUE, 'CO',
             d.description_text, d.employment_type,
             CASE WHEN d.description_text IS NOT NULL THEN 'full' END,
             CASE WHEN d.description_text IS NOT NULL THEN 'listing' END,
@@ -88,14 +92,15 @@ async function upsertProjections(): Promise<{ inserted: number; updated: number;
        valid_through = EXCLUDED.valid_through,
        detail_status = CASE WHEN COALESCE(EXCLUDED.description, jobs.description) IS NOT NULL THEN 'complete' ELSE 'unsupported' END,
        published_at = LEAST(jobs.published_at, EXCLUDED.published_at),
+       date_text = EXCLUDED.date_text,
        last_seen_at = NOW()
      WHERE jobs.direct_job_id IS NOT NULL
        AND (jobs.title, jobs.location, jobs.url, COALESCE(jobs.description, ''), COALESCE(jobs.employment_type, ''),
-            COALESCE(jobs.remote_type, ''), jobs.valid_through, jobs.published_at)
+            COALESCE(jobs.remote_type, ''), jobs.valid_through, jobs.published_at, COALESCE(jobs.date_text, ''))
            IS DISTINCT FROM
            (EXCLUDED.title, EXCLUDED.location, EXCLUDED.url, COALESCE(EXCLUDED.description, jobs.description, ''),
             COALESCE(EXCLUDED.employment_type, ''), COALESCE(EXCLUDED.remote_type, ''), EXCLUDED.valid_through,
-            LEAST(jobs.published_at, EXCLUDED.published_at))
+            LEAST(jobs.published_at, EXCLUDED.published_at), COALESCE(EXCLUDED.date_text, ''))
      RETURNING id, (xmax = 0) AS inserted`,
     [OFFICIAL_SOURCE]
   );

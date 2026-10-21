@@ -12,6 +12,7 @@ import { Button } from "./ui/button.js";
 import { Badge } from "./ui/badge.js";
 import { cn } from "../lib/utils.js";
 import { ReputationEntryProps } from "./ReputationBadges.js";
+import { jobDateLabel } from "../lib/job-date-label.js";
 
 export interface JobCardProps {
   job: Job & {
@@ -160,7 +161,7 @@ export const JobCard: React.FC<JobCardProps> = ({
 
             <p className="text-[11px] font-mono text-ink-faint">
               {otherSources.length > 0 && <>también en: {otherSources.join(", ")} · </>}
-              {job.dateText || job.publishedAt || "Reciente"}
+              {jobDateLabel(job)}
             </p>
           </div>
         </div>
