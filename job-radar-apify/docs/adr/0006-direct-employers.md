@@ -3,7 +3,11 @@
 **Fecha:** 2026-10-19
 **Estado:** aceptado · D1 y D2 **desplegadas en producción** (2026-10-20:
 migración, seed de 18 empresas y primer tick con 185 vacantes de Colombia);
-D3 **en código, no desplegada** (2026-10-20, §7.1); **nada visible en el sitio** hasta D4
+D3, D4 y D5 **en código, verificadas, sin desplegar** (rama
+`codex/direct-employers-full`, 2026-10-21): 11 tipos de ATS, seed de 64
+empresas, proyección en `jobs` (§10). Medido sobre un snapshot de producción:
+634 vacantes oficiales vigentes proyectadas, 287 copias de bolsas ocultadas, sin
+regresión de performance en frío (`docs/direct/baseline-2026-10-20.md`)
 **Contexto:** pedido del dueño (2026-10-19): poblar BuscoTrabajo con las
 vacantes que publican las empresas de Colombia en su propio portal, sin
 mezclarlas con las que traen los scrapers de bolsas, con las empresas bien
@@ -107,9 +111,9 @@ nulo o futuro.
 |---|---|
 | D1 ✅ | Esquema, Greenhouse, Lever, Ashby (APIs públicas documentadas) y SmartRecruiters; tick con `--dry-run`; BD local; pruebas |
 | D2 ✅ (desplegada 2026-10-20) | Workflow `direct-employers-tick.yml` (tick cada 6 h; migración y seed solo por `workflow_dispatch`) + migración en producción. SmartRecruiters **habilitado por opt-in explícito del dueño el 2026-10-19** (ADR-0002 §2) |
-| D3 | Descubrimiento de empresas (§7, decisión en §7.1). Meta del dueño (2026-10-20): cubrir el 100 % de las empresas de Colombia que publiquen vacantes en un portal propio — medido por vía y con denominador explícito, nunca afirmado sin evidencia |
-| D4 | **Prioridad oficial sobre bolsas sin duplicados** (§8) y luego visibilidad en dashboard y `/empresas/:slug`. Hasta D4 nada de esto se muestra en el sitio |
-| D5 | Conectores por cobertura medida (§7): Workday CXS, SuccessFactors (sitemap + microdatos `datePosted`), Phenom, Gupy, Eightfold, Teamtailor — cada uno tras revisión `source-researcher` de robots/términos |
+| D3 ✅ código | Descubrimiento de empresas (§7, decisión en §7.1). Meta del dueño (2026-10-20): cubrir el 100 % de las empresas de Colombia que publiquen vacantes en un portal propio — medido por vía y con denominador explícito, nunca afirmado sin evidencia |
+| D4 ✅ código | **Prioridad oficial sobre bolsas sin duplicados** (§8) y visibilidad en todo el sitio: proyección materializada en `jobs` (§10). Verificación visual en `docs/direct/f5/` |
+| D5 ✅ código | Conectores con revisión `source-researcher` (`docs/source-catalog/<ats>.md`), fixtures, pruebas contractuales y canario: SuccessFactors (búsqueda RMK + microdatos), Teamtailor (RSS), Workday (CXS, faceta de país o de ubicaciones colombianas), Phenom (widget de búsqueda), Eightfold (PCSX/v2), Magneto como portal oficial (≤ 20 filas, decisión del dueño) y Google Careers (página 1). Diferidos con evidencia: Gupy (términos), Buk (robots), iCIMS (volumen), Avature (volumen), Oracle Recruiting Cloud (decisión del dueño), Amazon/Meta/IBM (términos), Globant (robots) |
 
 Magneto (incluidas sus páginas de empresa) sigue siendo una **bolsa** — con
 una pregunta abierta: para Éxito, Claro, Colombina o Vanti la página de
