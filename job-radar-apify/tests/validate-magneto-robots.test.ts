@@ -4,7 +4,7 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { isAllowed, parseRobots } from "../src/lib/robots-txt.js";
-import { magnetoRows, magnetoRowToJob, magnetoTopicPaths } from "../src/sources/magneto-catalog.js";
+import { magnetoRows, magnetoRowToJob, magnetoTopicPaths, rotateTopics } from "../src/sources/magneto-catalog.js";
 
 /**
  * Magneto as a job board within its robots.txt (owner decision 2026-10-20).
@@ -42,4 +42,16 @@ test("Magneto rows: the date is Magneto's publishDate — a row without it is sk
   assert.equal(magnetoRowToJob({ ...rows[0], publishDate: undefined }), null);
   assert.equal(magnetoRowToJob({ ...rows[0], confidential: true })?.company, "Confidencial");
   assert.equal(magnetoRowToJob({ ...rows[0], jobSlug: "../x?q=1" }), null);
+});
+
+test("Magneto topic pages rotate every 3-hour window so the 3-minute catalog budget still covers all of them", () => {
+  const paths = Array.from({ length: 26 }, (_, index) => `/co/trabajos/t${index}`);
+  const window = 3 * 60 * 60 * 1000;
+  const first = rotateTopics(paths, 0);
+  const second = rotateTopics(paths, window);
+  assert.equal(first.length, 15);
+  assert.deepEqual(first.slice(0, 2), ["/co/trabajos/t0", "/co/trabajos/t1"]);
+  assert.equal(second[0], "/co/trabajos/t15", "the next window starts where this one ended");
+  assert.equal(new Set([...first, ...second]).size, 26, "two windows cover every page");
+  assert.deepEqual(rotateTopics(paths.slice(0, 5), 0), paths.slice(0, 5));
 });

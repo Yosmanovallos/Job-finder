@@ -23,8 +23,19 @@ import { DISALLOW_ALL, ALLOW_ALL, isAllowed, parseRobots, type RobotsPolicy } fr
 const ORIGIN = 'https://www.magneto365.com';
 const USER_AGENT = 'BuscoTrabajoBot/1.0 (+https://buscotrabajo.co)';
 const SEARCH_PATH = '/co/trabajos/buscar';
-// Topic pages read per pass (each ~20 newest postings), besides the search page.
-const MAX_TOPIC_PAGES = 40;
+// Topic pages read per pass (each ~20 newest postings), besides the search
+// page. Catalog sources share a 3-minute budget per scrape tick
+// (MAX_GLOBAL_CATALOG_MS): ~15 pages at 0.5-1.5 s jitter is ~30 s. The pages
+// read rotate every cadence window, so successive passes cover all of them.
+const MAX_TOPIC_PAGES = 15;
+const WINDOW_MS = 3 * 60 * 60 * 1000;
+
+/** This window's slice of the topic pages: a different slice each 3-hour window, wrapping around. */
+export function rotateTopics(paths: string[], now: number, size = MAX_TOPIC_PAGES): string[] {
+  if (paths.length <= size) return paths;
+  const start = (Math.floor(now / WINDOW_MS) * size) % paths.length;
+  return [...paths.slice(start), ...paths.slice(0, start)].slice(0, size);
+}
 
 interface MagnetoRow {
   id?: number;
@@ -107,9 +118,9 @@ export async function scrapeMagnetoCatalog(): Promise<Job[]> {
     return [];
   }
   const pages = [search.body];
-  const topics = magnetoTopicPaths(search.body).filter((path) => isAllowed(robots, path)).slice(0, MAX_TOPIC_PAGES);
+  const topics = rotateTopics(magnetoTopicPaths(search.body).filter((path) => isAllowed(robots, path)), Date.now());
   for (const path of topics) {
-    await jitterDelay();
+    await jitterDelay(500, 1500);
     try {
       const response = await get(`${ORIGIN}${path}`);
       if (response.status === 200) pages.push(response.body);

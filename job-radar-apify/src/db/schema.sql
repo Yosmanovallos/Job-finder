@@ -871,4 +871,7 @@ ALTER TABLE jobs ADD COLUMN IF NOT EXISTS direct_job_id UUID;
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS superseded_by UUID;
 CREATE INDEX IF NOT EXISTS idx_jobs_direct_job_id ON jobs (direct_job_id) WHERE direct_job_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_jobs_superseded_by ON jobs (superseded_by) WHERE superseded_by IS NOT NULL;
+-- saveJobs() folds a re-scrape into a hidden copy by fingerprint (§10.6): the
+-- copy branch of that lookup must not scan every hidden copy.
+CREATE INDEX IF NOT EXISTS idx_jobs_superseded_fingerprint ON jobs (content_fingerprint) WHERE superseded_by IS NOT NULL;
 -- END direct-projection
