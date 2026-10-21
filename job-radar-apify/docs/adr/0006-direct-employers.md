@@ -3,8 +3,8 @@
 **Fecha:** 2026-10-19
 **Estado:** aceptado · D1 y D2 **desplegadas en producción** (2026-10-20:
 migración, seed de 18 empresas y primer tick con 185 vacantes de Colombia);
-D3, D4 y D5 **en código, verificadas, sin desplegar** (rama
-`codex/direct-employers-full`, 2026-10-21): 11 tipos de ATS, seed de 64
+D3, D4 y D5 **desplegadas en producción** (PR #3 y #4, 2026-10-21; primer tick:
+678 vacantes oficiales proyectadas, 306 copias ocultadas): 11 tipos de ATS, seed de 64
 empresas, proyección en `jobs` (§10). Medido sobre un snapshot de producción:
 634 vacantes oficiales vigentes proyectadas, 287 copias de bolsas ocultadas, sin
 regresión de performance en frío (`docs/direct/baseline-2026-10-20.md`)
