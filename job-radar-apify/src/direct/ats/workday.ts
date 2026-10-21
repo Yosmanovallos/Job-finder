@@ -192,7 +192,9 @@ async function readRows(
     if (page === 0) {
       total = parsed.data.total;
       facets = parsed.data.facets;
-      if (total > MAX_PAGES * PAGE_SIZE && Object.keys(appliedFacets).length === 0)
+      // Above MAX_FULL_LISTING the caller reads through the Colombia facet
+      // instead: paging the whole board first only wastes requests.
+      if (total > MAX_FULL_LISTING && Object.keys(appliedFacets).length === 0)
         return { total, rows, facets };
     }
     rows.push(...parsed.data.jobPostings);

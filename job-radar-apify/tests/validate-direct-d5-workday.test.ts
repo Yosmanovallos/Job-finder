@@ -197,3 +197,22 @@ test("Workday: a page answered with 429, 5xx or an unexpected body is asked once
   const notFound = await run([{ status: 404, body: "" }]);
   assert.equal(notFound.listCalls, 1, "a 404 is not retried");
 });
+
+test("Workday: a board of 201-300 goes straight to the Colombia facet, without paging it whole first", async () => {
+  const facets = wdJson("galderma-list-page0-unfiltered.json").facets;
+  const page = wdJson("rappi-wd12-list-page1-postings-without-location.json");
+  const RAPPI = "https://rappi.wd12.myworkdayjobs.com";
+  const base = `${RAPPI}/wday/cxs/rappi/Rappi_jobs`;
+  const http = fakeHttp({
+    [`${RAPPI}/robots.txt`]: { status: 404, body: "" },
+    [`${base}/jobs`]: (init) => {
+      const { appliedFacets } = init?.json as { appliedFacets: Record<string, string[]> };
+      if (Object.keys(appliedFacets).length === 0) return { status: 200, body: JSON.stringify({ ...page, total: 250, facets }) };
+      return { status: 200, body: JSON.stringify({ total: 0, jobPostings: [] }) };
+    }
+  });
+  const listing = await listBoard({ atsType: WD, atsRef: "rappi/wd12/Rappi_jobs" }, http, {});
+  assert.equal(listing.kind, "complete");
+  const unfiltered = http.calls.filter((c) => c.startsWith("POST") && c.includes('"appliedFacets":{}'));
+  assert.equal(unfiltered.length, 1, "one unfiltered page, then the facet");
+});
