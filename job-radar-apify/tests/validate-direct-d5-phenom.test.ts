@@ -106,3 +106,23 @@ test("Phenom: known postings need no page; the budget defers the rest", async ()
   assert.ok(listing.kind === "complete" && listing.postings.length === 2 && listing.deferred === 1);
   assert.equal(http.calls.filter((call) => call.includes("/job/")).length, 1);
 });
+
+test("Phenom: a listing shifted while paging is read once more; shifted twice is never complete", async () => {
+  const widgets = JSON.parse(raw("dhl_widgets_refineSearch_colombia.json"));
+  const clean = { ...widgets, refineSearch: { ...widgets.refineSearch, totalHits: 3 } };
+  const jobsList = widgets.refineSearch.data.jobs;
+  const shifted = { ...clean, refineSearch: { ...clean.refineSearch, data: { jobs: [jobsList[0], jobsList[0], jobsList[1]] } } };
+  const run = async (answers: unknown[]) => {
+    let call = 0;
+    const routes: Record<string, Route> = {
+      [`${DHL}/robots.txt`]: { status: 200, body: raw("robots_careers.dhl.com.txt") },
+      [`${DHL}/amer/es/search-results`]: { status: 200, body: raw("dhl_search_results_params.html") },
+      [`${DHL}/widgets`]: () => ({ status: 200, body: JSON.stringify(answers[Math.min(call++, answers.length - 1)]) })
+    };
+    return listBoard({ atsType: "phenom", atsRef: "careers.dhl.com/amer/es" }, fakeHttp(routes), {});
+  };
+  const recovered = await run([shifted, clean]);
+  assert.equal(recovered.kind === "complete" && recovered.boardTotal, 3);
+  const stillShifted = await run([shifted, shifted]);
+  assert.deepEqual(stillShifted, { kind: "error", detail: "ids repetidos en el listado" });
+});
