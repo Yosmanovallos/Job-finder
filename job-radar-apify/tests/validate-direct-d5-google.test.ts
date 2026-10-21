@@ -4,7 +4,7 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { parseGoogleResults } from "../src/direct/ats/google.js";
-import { colombiaFacet } from "../src/direct/ats/workday.js";
+import { colombiaFacet, colombianLocationFacet } from "../src/direct/ats/workday.js";
 import { isValidRef, listBoard } from "../src/direct/connectors.js";
 import { selectColombianPostings } from "../src/direct/ingest.js";
 import type { HttpGet } from "../src/direct/types.js";
@@ -58,6 +58,29 @@ test("Google: more than page 1 is never complete (robots.txt forbids ?page=); a 
   assert.deepEqual(reshaped, { kind: "error", detail: "forma inesperada en la página de resultados" });
   const banned = await listBoard({ atsType: "google", atsRef: "google" }, fakeHttp(page, "User-agent: *\nDisallow: /about/careers/\n"), {});
   assert.deepEqual(banned, { kind: "error", detail: "robots.txt no permite la búsqueda de empleos" });
+});
+
+test("Workday without a country facet: only the location values the Colombia filter accepts", () => {
+  const facets = [
+    {
+      facetParameter: "locationMainGroup",
+      values: [
+        {
+          facetParameter: "locations",
+          descriptor: "Locations",
+          values: [
+            { descriptor: "Bogota, Colombia", id: "bog", count: 7 },
+            { descriptor: "COL-Medellín", id: "med", count: 2 },
+            { descriptor: "Colorado Springs, CO, United States", id: "colorado", count: 40 },
+            { descriptor: "San Francisco, California", id: "sf", count: 30 },
+            { descriptor: "LATAM Remote", id: "latam", count: 9 }
+          ]
+        }
+      ]
+    }
+  ];
+  assert.deepEqual(colombianLocationFacet(facets), { name: "locations", ids: ["bog", "med"], count: 9 });
+  assert.equal(colombianLocationFacet([{ facetParameter: "locations", values: [{ descriptor: "Lima, Peru", id: "lim" }] }]), null);
 });
 
 test("Workday: a custom-named country facet is found by its descriptor (Salesforce)", () => {

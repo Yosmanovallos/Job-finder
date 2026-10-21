@@ -130,7 +130,7 @@ test("Workday: a big board without a country facet is reported, not guessed", as
     }),
     {}
   );
-  assert.deepEqual(listing, { kind: "error", detail: "tablero de 1122 vacantes sin faceta de país: no se puede leer completo" });
+  assert.deepEqual(listing, { kind: "error", detail: "tablero de 1122 vacantes sin faceta de país ni ubicaciones colombianas: no se puede leer completo" });
 });
 
 test("Workday: small board read whole; foreign ISO-3 prefixes need no detail; a short read is incomplete", async () => {

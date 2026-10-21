@@ -3,6 +3,7 @@ import { isAllowed } from "../discovery/robots.js";
 import { htmlToText, isoDate, safeJson, text } from "../text.js";
 import type { BoardListing, HttpGet, ListOptions, RawAtsPosting } from "../types.js";
 import { readRobots } from "./site.js";
+import { matchColombia } from "../colombia-location.js";
 
 /**
  * Workday career sites through the JSON endpoint their own public page uses
@@ -118,6 +119,34 @@ export function colombiaFacet(
   return null;
 }
 
+/**
+ * Fallback for tenants without a country facet (J&J, PwC…): the values of
+ * the tenant's location facet that the Colombia filter itself accepts
+ * ("Bogota, Colombia", "COL-Bogotá"), applied together (Workday ORs the
+ * values of one facet). Only that subset is read, so a posting the tenant
+ * lists without a location is not seen — never claimed otherwise.
+ */
+export function colombianLocationFacet(facets: unknown[] | undefined): { name: string; ids: string[]; count: number } | null {
+  const stack = [...(facets ?? [])] as Facet[];
+  while (stack.length > 0) {
+    const facet = stack.shift()!;
+    if (!facet || typeof facet !== "object") continue;
+    const values = Array.isArray(facet.values) ? facet.values : [];
+    if (typeof facet.facetParameter === "string" && /(^|[a-z_])locations?$/i.test(facet.facetParameter)) {
+      const colombian = values
+        .map((value) => FacetValue.safeParse(value))
+        .filter((parsed) => parsed.success && parsed.data.id && parsed.data.descriptor)
+        .map((parsed) => parsed.data!)
+        .filter((value) => matchColombia({ locationTexts: [value.descriptor!.replace(/^COL(?=[-\s])[-\s]*/, "Colombia, ")], countryCodes: [], structuredCity: null }));
+      if (colombian.length > 0) {
+        return { name: facet.facetParameter, ids: colombian.map((value) => value.id!), count: colombian.reduce((sum, value) => sum + (value.count ?? 0), 0) };
+      }
+    }
+    stack.push(...(values.filter((value) => value && typeof value === "object" && "facetParameter" in (value as object)) as Facet[]));
+  }
+  return null;
+}
+
 /** "Posted 30+ Days Ago" is already outside the 30-day window. */
 export function postedOver30Days(postedOn: string | null | undefined): boolean {
   return /30\+/.test(postedOn ?? "");
@@ -200,15 +229,17 @@ export async function listWorkday(
   let listing = first;
   if (first.total > MAX_FULL_LISTING) {
     const facet = colombiaFacet(first.facets);
-    if (!facet)
+    const locations = facet ? null : colombianLocationFacet(first.facets);
+    if (!facet && !locations)
       return {
         kind: "error",
-        detail: `tablero de ${first.total} vacantes sin faceta de país: no se puede leer completo`
+        detail: `tablero de ${first.total} vacantes sin faceta de país ni ubicaciones colombianas: no se puede leer completo`
       };
-    // Colombia absent from the facet = no Colombian posting today.
-    if (!facet.colombiaId) return { kind: "complete", boardTotal: 0, postings: [] };
+    // Colombia absent from the country facet = no Colombian posting today.
+    if (facet && !facet.colombiaId) return { kind: "complete", boardTotal: 0, postings: [] };
     await pause();
-    const filtered = await readRows(base, { [facet.name]: [facet.colombiaId] }, http);
+    const applied = facet ? { [facet.name]: [facet.colombiaId!] } : { [locations!.name]: locations!.ids };
+    const filtered = await readRows(base, applied, http);
     if ("error" in filtered) return { kind: "error", detail: `faceta Colombia: ${filtered.error}` };
     listing = filtered;
   }
