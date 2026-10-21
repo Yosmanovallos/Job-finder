@@ -16,8 +16,15 @@ import { allowedUrl, readRobots } from "./site.js";
  * ats_ref = host + locale path (`careers.dhl.com/amer/es`, `www.pgcareers.com/latam/en`).
  */
 
-const PAGE_SIZE = 50;
+// The widget answers up to 200 per request (2026-10-21, DHL): most Colombia
+// searches fit in one page, and one page can't be shifted by a posting
+// published mid-read. `from` advances by what was actually returned, so a
+// tenant that caps the size lower is still read whole.
+const PAGE_SIZE = 200;
 const MAX_PAGES = 20;
+// A shifted listing is read again up to this many times, pausing in between.
+const SHIFT_RETRIES = 2;
+const SHIFT_PAUSE_MS = 5_000;
 
 export const PHENOM_REF = /^(?!\d+\.\d+\.\d+\.\d+(\/|$))[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?)+(?:\/[a-z]{2,10}(?:-[a-z]{2,10})?){1,2}$/;
 
@@ -108,7 +115,7 @@ async function readSearch(site: PhenomSite, http: HttpGet): Promise<{ jobs: z.in
         ddoKey: "refineSearch",
         sortBy: "",
         subsearch: "",
-        from: index * PAGE_SIZE,
+        from: jobs.length,
         jobs: true,
         counts: true,
         all_fields: ["category", "country", "state", "city", "type"],
@@ -152,8 +159,8 @@ export async function listPhenom(ref: string, http: HttpGet, options: ListOption
   if (!allowedUrl(robots, site.endpoint)) return { kind: "error", detail: "robots.txt no permite /widgets" };
 
   let read = await readSearch(site, http);
-  if ("shifted" in read && read.shifted) {
-    await new Promise((resolve) => setTimeout(resolve, 3_000));
+  for (let retry = 0; retry < SHIFT_RETRIES && "shifted" in read && read.shifted; retry++) {
+    await new Promise((resolve) => setTimeout(resolve, SHIFT_PAUSE_MS));
     read = await readSearch(site, http);
   }
   if ("error" in read) return { kind: "error", detail: read.error };

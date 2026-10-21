@@ -107,7 +107,7 @@ test("Phenom: known postings need no page; the budget defers the rest", async ()
   assert.equal(http.calls.filter((call) => call.includes("/job/")).length, 1);
 });
 
-test("Phenom: a listing shifted while paging is read once more; shifted twice is never complete", async () => {
+test("Phenom: a listing shifted while paging is read again (up to twice more); always shifted is never complete", async () => {
   const widgets = JSON.parse(raw("dhl_widgets_refineSearch_colombia.json"));
   const clean = { ...widgets, refineSearch: { ...widgets.refineSearch, totalHits: 3 } };
   const jobsList = widgets.refineSearch.data.jobs;
@@ -123,6 +123,28 @@ test("Phenom: a listing shifted while paging is read once more; shifted twice is
   };
   const recovered = await run([shifted, clean]);
   assert.equal(recovered.kind === "complete" && recovered.boardTotal, 3);
-  const stillShifted = await run([shifted, shifted]);
+  const recoveredLate = await run([shifted, shifted, clean]);
+  assert.equal(recoveredLate.kind === "complete" && recoveredLate.boardTotal, 3);
+  const stillShifted = await run([shifted, shifted, shifted]);
   assert.deepEqual(stillShifted, { kind: "error", detail: "ids repetidos en el listado" });
+});
+
+test("Phenom: one request of up to 200; a tenant that answers fewer is paged by what it returned", async () => {
+  const widgets = JSON.parse(raw("dhl_widgets_refineSearch_colombia.json"));
+  const jobsList = widgets.refineSearch.data.jobs;
+  const requests: { from: number; size: number }[] = [];
+  const routes: Record<string, Route> = {
+    [`${DHL}/robots.txt`]: { status: 200, body: raw("robots_careers.dhl.com.txt") },
+    [`${DHL}/amer/es/search-results`]: { status: 200, body: raw("dhl_search_results_params.html") },
+    // A tenant capping each answer at 2 rows, whatever size was asked.
+    [`${DHL}/widgets`]: (init) => {
+      const { from, size } = init?.json as { from: number; size: number };
+      requests.push({ from, size });
+      const page = jobsList.slice(from, from + 2);
+      return { status: 200, body: JSON.stringify({ refineSearch: { ...widgets.refineSearch, totalHits: 3, data: { jobs: page } } }) };
+    }
+  };
+  const listing = await listBoard({ atsType: "phenom", atsRef: "careers.dhl.com/amer/es" }, fakeHttp(routes), {});
+  assert.equal(listing.kind === "complete" && listing.boardTotal, 3);
+  assert.deepEqual(requests, [{ from: 0, size: 200 }, { from: 2, size: 200 }]);
 });
