@@ -11,6 +11,10 @@ on:
     # once 5 h passed (MIN_INTERVAL_HOURS in src/direct/tick.ts), so each one is
     # read every 5-6 h however many boards there are, up to what 24 runs fit.
     - cron: "17 * * * *"
+    # Daily employer discovery (ADR 0006 §7.1, owner request 2026-10-21: no
+    # manual runs). Insert-only, at most 50 verified boards enabled per run,
+    # 16-minute deadline; the hourly tick reads whatever it enables.
+    - cron: "47 4 * * *"
   workflow_dispatch:
     inputs:
       mode:
@@ -59,12 +63,13 @@ jobs:
           cd job-radar-apify
           npm ci || npm install
 
-      # Migration, seed and discovery run only when dispatched by hand, never
-      # on the schedule (schema changes are explicit — job-radar-apify/CLAUDE.md).
+      # Migration and seed run only when dispatched by hand, never on the
+      # schedule (schema changes are explicit — job-radar-apify/CLAUDE.md).
+      # Discovery runs daily (insert-only) and by hand.
       - name: Run
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          MODE: ${{ github.event_name == 'schedule' && 'tick' || inputs.mode }}
+          MODE: ${{ github.event_name == 'schedule' && (github.event.schedule == '47 4 * * *' && 'discover' || 'tick') || inputs.mode }}
         run: |
           cd job-radar-apify
           set -o pipefail
