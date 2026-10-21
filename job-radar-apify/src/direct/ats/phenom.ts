@@ -90,19 +90,12 @@ export function phenomDescription(html: string): string | null {
   return null;
 }
 
-export async function listPhenom(ref: string, http: HttpGet, options: ListOptions): Promise<BoardListing> {
-  const slash = ref.indexOf("/");
-  const origin = `https://${ref.slice(0, slash)}`;
-  const base = `https://${ref}`;
-  const robots = await readRobots(origin, http);
-  const searchPage = `${base}/search-results`;
-  if (!allowedUrl(robots, searchPage)) return { kind: "error", detail: "robots.txt no permite search-results" };
-  const page = await http(searchPage, { accept: "text/html" });
-  if (page.status !== 200) return { kind: page.status === 404 ? "not_found" : "error", detail: `HTTP ${page.status} en search-results` };
-  const site = phenomSiteParams(page.body, origin);
-  if (!site) return { kind: "error", detail: "no se hallaron los parámetros del sitio Phenom" };
-  if (!allowedUrl(robots, site.endpoint)) return { kind: "error", detail: "robots.txt no permite /widgets" };
-
+/**
+ * Every page of the site's Colombia search. A posting published while paging
+ * shifts the offsets (a repeated id, or a total that changes between pages):
+ * such a read is never complete — the caller reads once more.
+ */
+async function readSearch(site: PhenomSite, http: HttpGet): Promise<{ jobs: z.infer<typeof Job>[]; total: number } | { error: string; shifted?: boolean }> {
   const jobs: z.infer<typeof Job>[] = [];
   let total = -1;
   for (let index = 0; index < MAX_PAGES; index++) {
@@ -131,17 +124,40 @@ export async function listPhenom(ref: string, http: HttpGet, options: ListOption
         locationData: {}
       }
     });
-    if (response.status !== 200) return { kind: "error", detail: `HTTP ${response.status} en la página ${index + 1}` };
+    if (response.status !== 200) return { error: `HTTP ${response.status} en la página ${index + 1}` };
     const parsed = Page.safeParse(safeJson(response.body));
-    if (!parsed.success || parsed.data.refineSearch.status !== 200) return { kind: "error", detail: `forma inesperada en la página ${index + 1}` };
+    if (!parsed.success || parsed.data.refineSearch.status !== 200) return { error: `forma inesperada en la página ${index + 1}` };
     const search = parsed.data.refineSearch;
-    if (total >= 0 && search.totalHits !== total) return { kind: "error", detail: "el total cambió entre páginas: listado inconsistente" };
+    if (total >= 0 && search.totalHits !== total) return { error: "el total cambió entre páginas: listado inconsistente", shifted: true };
     total = search.totalHits;
     jobs.push(...search.data.jobs);
     if (search.data.jobs.length === 0 || jobs.length >= total) break;
   }
-  if (jobs.length !== total) return { kind: "error", detail: `se leyeron ${jobs.length} de ${total} vacantes: listado incompleto` };
-  if (new Set(jobs.map((job) => job.jobSeqNo)).size !== jobs.length) return { kind: "error", detail: "ids repetidos en el listado" };
+  if (jobs.length !== total) return { error: `se leyeron ${jobs.length} de ${total} vacantes: listado incompleto` };
+  if (new Set(jobs.map((job) => job.jobSeqNo)).size !== jobs.length) return { error: "ids repetidos en el listado", shifted: true };
+  return { jobs, total };
+}
+
+export async function listPhenom(ref: string, http: HttpGet, options: ListOptions): Promise<BoardListing> {
+  const slash = ref.indexOf("/");
+  const origin = `https://${ref.slice(0, slash)}`;
+  const base = `https://${ref}`;
+  const robots = await readRobots(origin, http);
+  const searchPage = `${base}/search-results`;
+  if (!allowedUrl(robots, searchPage)) return { kind: "error", detail: "robots.txt no permite search-results" };
+  const page = await http(searchPage, { accept: "text/html" });
+  if (page.status !== 200) return { kind: page.status === 404 ? "not_found" : "error", detail: `HTTP ${page.status} en search-results` };
+  const site = phenomSiteParams(page.body, origin);
+  if (!site) return { kind: "error", detail: "no se hallaron los parámetros del sitio Phenom" };
+  if (!allowedUrl(robots, site.endpoint)) return { kind: "error", detail: "robots.txt no permite /widgets" };
+
+  let read = await readSearch(site, http);
+  if ("shifted" in read && read.shifted) {
+    await new Promise((resolve) => setTimeout(resolve, 3_000));
+    read = await readSearch(site, http);
+  }
+  if ("error" in read) return { kind: "error", detail: read.error };
+  const { jobs, total } = read;
 
   const known = options.knownIds ?? new Set<string>();
   let budget = options.detailBudget ?? 0;
