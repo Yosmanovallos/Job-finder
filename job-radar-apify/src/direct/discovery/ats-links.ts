@@ -8,7 +8,7 @@
 /** ATS types discovery can recognise; only some have a connector (src/direct/types.ts). */
 export const DETECTABLE_ATS_TYPES = [
   "greenhouse", "lever", "ashby", "smartrecruiters",
-  "workday", "successfactors", "gupy", "buk", "teamtailor", "eightfold", "icims", "magneto", "phenom"
+  "workday", "successfactors", "gupy", "buk", "teamtailor", "eightfold", "icims", "magneto", "phenom", "google"
 ] as const;
 export type DetectableAtsType = (typeof DETECTABLE_ATS_TYPES)[number];
 

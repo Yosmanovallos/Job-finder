@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { EIGHTFOLD_REF, listEightfold } from "./ats/eightfold.js";
+import { listGoogle } from "./ats/google.js";
 import { listMagneto, MAGNETO_REF } from "./ats/magneto.js";
 import { listPhenom, PHENOM_REF } from "./ats/phenom.js";
 import { listSuccessFactors } from "./ats/successfactors.js";
@@ -363,6 +364,14 @@ const CONNECTORS: Record<DirectAtsType, Connector> = {
     refPattern: MAGNETO_REF,
     portalUrl: (ref) => `https://www.magneto365.com/co/empresas/${ref}/empleos`,
     list: listMagneto
+  },
+  // Google Careers' results page (docs/source-catalog/google.md): one board,
+  // page 1 only (robots.txt forbids ?page=). A missing posting answers 200
+  // with a generic page: listings only.
+  google: {
+    refPattern: /^google$/,
+    portalUrl: () => "https://www.google.com/about/careers/applications/jobs/results?location=Colombia",
+    list: listGoogle
   }
 };
 

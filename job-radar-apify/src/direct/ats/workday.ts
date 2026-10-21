@@ -36,7 +36,7 @@ export const WORKDAY_REF =
 const FacetValue = z
   .object({ descriptor: z.string().optional(), id: z.string().optional(), count: z.number().optional() })
   .passthrough();
-type Facet = { facetParameter?: string; values?: unknown[] };
+type Facet = { facetParameter?: string; descriptor?: string; values?: unknown[] };
 
 const ListPage = z.object({
   total: z.number(),
@@ -95,7 +95,10 @@ export function colombiaFacet(
       typeof facet.facetParameter === "string" &&
       // Spelled per tenant: locationCountry, alocationCountry (letter-prefixed),
       // Location_Country, Country (2026-10-20, international-employers research).
-      /(location_?country|^[a-z]?country)$/i.test(facet.facetParameter)
+      (/(location_?country|^[a-z]?country)$/i.test(facet.facetParameter) ||
+        // Custom field names (Salesforce: CF_-_REC_-_..._Country_from_Job_Posting_Location_Extended)
+        // still carry the descriptor "Country".
+        /^(country|pa[ií]s)$/i.test(facet.descriptor ?? ""))
     ) {
       const colombia = values
         .map((value) => FacetValue.safeParse(value))
