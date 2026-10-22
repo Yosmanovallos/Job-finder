@@ -30,6 +30,10 @@ const PAGE_SIZE = 20; // the endpoint rejects more (HTTP 400)
 const MAX_FULL_LISTING = 200;
 const MAX_PAGES = 15;
 const PAUSE_MS = 1_000; // per board, between requests: some tenants throttle hard
+// A listing page answered with 429, 5xx or an unexpected body is asked once
+// more after this pause: tenants answer that way now and then (Kyndryl page 1,
+// TransUnion page 12 on 2026-10-21) and read fine the next time.
+const RETRY_PAUSE_MS = 4_000;
 
 export const WORKDAY_REF =
   /^([a-z0-9][a-z0-9_-]{0,62})\/(wd\d{1,3})\/([A-Za-z0-9][A-Za-z0-9_-]{0,99})$/;
@@ -170,18 +174,27 @@ async function readRows(
   let facets: unknown[] | undefined;
   for (let page = 0; page < MAX_PAGES; page++) {
     if (page > 0) await pause();
-    const response = await http(`${base}/jobs`, {
-      json: { appliedFacets, limit: PAGE_SIZE, offset: page * PAGE_SIZE, searchText: "" }
-    });
+    const request = () =>
+      http(`${base}/jobs`, {
+        json: { appliedFacets, limit: PAGE_SIZE, offset: page * PAGE_SIZE, searchText: "" }
+      });
+    let response = await request();
+    let parsed = ListPage.safeParse(safeJson(response.body));
+    if (response.status === 429 || response.status >= 500 || (response.status === 200 && !parsed.success)) {
+      await new Promise((resolve) => setTimeout(resolve, RETRY_PAUSE_MS));
+      response = await request();
+      parsed = ListPage.safeParse(safeJson(response.body));
+    }
     if (response.status !== 200)
       return { error: `HTTP ${response.status} en la página ${page + 1}` };
-    const parsed = ListPage.safeParse(safeJson(response.body));
     if (!parsed.success) return { error: `forma inesperada en la página ${page + 1}` };
     // `total` is only reliable on the first page (later pages may say 0).
     if (page === 0) {
       total = parsed.data.total;
       facets = parsed.data.facets;
-      if (total > MAX_PAGES * PAGE_SIZE && Object.keys(appliedFacets).length === 0)
+      // Above MAX_FULL_LISTING the caller reads through the Colombia facet
+      // instead: paging the whole board first only wastes requests.
+      if (total > MAX_FULL_LISTING && Object.keys(appliedFacets).length === 0)
         return { total, rows, facets };
     }
     rows.push(...parsed.data.jobPostings);
