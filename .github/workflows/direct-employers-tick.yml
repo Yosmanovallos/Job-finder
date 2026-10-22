@@ -18,7 +18,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "tick | dry-run | migrate-dry-run | migrate | seed-dry-run | seed | domain-census | discover-dry-run | discover | coverage | db-size | cc-tenants"
+        description: "tick | dry-run | migrate-dry-run | migrate | seed-dry-run | seed | domain-census | discover-dry-run | discover | coverage | db-size | cc-tenants | review-list | review-approve-dry-run | review-approve | cv-purge-dry-run | cv-purge"
         required: true
         default: "dry-run"
         type: choice
@@ -40,6 +40,25 @@ on:
           # Read-only, no database: Workday / SmartRecruiters boards seen by
           # Common Crawl that list postings in Colombia, for human review.
           - cc-tenants
+          # Human review of discovery (scripts/direct-discovery-review.ts):
+          # list reads; approve promotes ONE board the evidence shows, after
+          # re-listing it (insert-only). Needs company_key and board below.
+          - review-list
+          - review-approve-dry-run
+          - review-approve
+          # Not direct-employer work, but this is the workflow that can be
+          # dispatched from a branch: empties the rows of the removed CV
+          # Generator tables (scripts/purge-cv-data.ts, owner 2026-10-22).
+          - cv-purge-dry-run
+          - cv-purge
+      company_key:
+        description: "review-approve: company_key del candidato"
+        required: false
+        type: string
+      board:
+        description: "review-approve: ats_type:ats_ref (p. ej. lever:despegar)"
+        required: false
+        type: string
 
 concurrency:
   group: direct-employers-tick
@@ -70,6 +89,8 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           MODE: ${{ github.event_name == 'schedule' && (github.event.schedule == '47 4 * * *' && 'discover' || 'tick') || inputs.mode }}
+          COMPANY_KEY: ${{ inputs.company_key }}
+          BOARD: ${{ inputs.board }}
         run: |
           cd job-radar-apify
           set -o pipefail
@@ -86,6 +107,15 @@ jobs:
             coverage)        cmd="npx tsx scripts/direct-coverage.ts --allow-remote-db" ;;
             db-size)         cmd="npx tsx scripts/direct-db-size.ts --allow-remote-db" ;;
             cc-tenants)      cmd="npx tsx scripts/direct-cc-tenants.ts --max-boards 500 --deadline-min 17" ;;
+            review-list)     cmd="npx tsx scripts/direct-discovery-review.ts list --decision needs_review --limit 100 --allow-remote-db" ;;
+            review-approve-dry-run|review-approve)
+              # Inputs arrive through env, never interpolated into the script.
+              [[ "$COMPANY_KEY" =~ ^[a-z0-9]{1,120}$ ]] || { echo "company_key inválido"; exit 1; }
+              [[ "$BOARD" =~ ^[a-z]+:[A-Za-z0-9._@/-]{1,200}$ ]] || { echo "board inválido"; exit 1; }
+              cmd="npx tsx scripts/direct-discovery-review.ts approve $COMPANY_KEY $BOARD --allow-remote-db"
+              [ "$MODE" = "review-approve-dry-run" ] && cmd="$cmd --dry-run" ;;
+            cv-purge-dry-run) cmd="npx tsx scripts/purge-cv-data.ts --dry-run --allow-remote-db" ;;
+            cv-purge)         cmd="npx tsx scripts/purge-cv-data.ts --execute --allow-remote-db" ;;
             *) echo "modo desconocido: $MODE"; exit 1 ;;
           esac
           echo "## Direct employers — $MODE" >> "$GITHUB_STEP_SUMMARY"
