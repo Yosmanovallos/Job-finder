@@ -8,7 +8,8 @@
  *   npx tsx scripts/purge-cv-data.ts --dry-run [--allow-remote-db]   counts only, READ ONLY
  *   npx tsx scripts/purge-cv-data.ts --execute [--allow-remote-db]   TRUNCATE, one transaction
  *
- * The five tables only reference each other and `users`/`jobs`, and nothing
+ * cv_profile_embeddings (production only, not in schema.sql) belongs to the
+ * same feature. The tables only reference each other and `users`/`jobs`, and nothing
  * else references them, so they are truncated together without CASCADE: if
  * some other table ever pointed at one of them, Postgres refuses instead of
  * silently emptying it too. Local database only unless --allow-remote-db.
@@ -18,7 +19,7 @@ import { assertDirectDatabaseAllowed } from "../src/direct/db-guard.js";
 
 dotenv.config();
 
-export const CV_TABLES = ["cv_profiles", "cv_generations", "llm_response_cache", "llm_usage_ledger", "user_ai_credentials"] as const;
+export const CV_TABLES = ["cv_profiles", "cv_profile_embeddings", "cv_generations", "llm_response_cache", "llm_usage_ledger", "user_ai_credentials"] as const;
 
 async function main() {
   const execute = process.argv.includes("--execute");
