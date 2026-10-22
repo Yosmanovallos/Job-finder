@@ -7,7 +7,7 @@ import { useAuth } from "../auth/auth-provider.js";
 import { usePageMeta } from "../lib/use-page-meta.js";
 import { Button } from "../components/ui/button.js";
 import { Job } from "../sources/types.js";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ExternalLink } from "lucide-react";
 
 type LoadState = "loading" | "found" | "not-found";
 
@@ -31,6 +31,7 @@ export default function CompanyLanding() {
   const [companyName, setCompanyName] = useState<string | null>(null);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [reputation, setReputation] = useState<ReputationEntryProps[]>([]);
+  const [officialCareersUrl, setOfficialCareersUrl] = useState<string | null>(null);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [total, setTotal] = useState(0);
   const [state, setState] = useState<LoadState>("loading");
@@ -61,6 +62,7 @@ export default function CompanyLanding() {
       setCompanyName(ssrCompany.companyName);
       setLogoUrl(ssrCompany.logoUrl || null);
       setReputation(ssrCompany.reputation || []);
+      setOfficialCareersUrl(ssrCompany.officialCareersUrl || null);
       setJobs(ssrCompany.jobs || []);
       setTotal(ssrCompany.total || 0);
       setState("found");
@@ -76,6 +78,7 @@ export default function CompanyLanding() {
           setCompanyName(data.companyName);
           setLogoUrl(data.logoUrl || null);
           setReputation(data.reputation || []);
+          setOfficialCareersUrl(data.officialCareersUrl || null);
           setJobs(data.jobs || []);
           setTotal(data.total || 0);
           setState("found");
@@ -142,6 +145,20 @@ export default function CompanyLanding() {
               <div className="mb-6">
                 <ReputationBadges entries={reputation} />
               </div>
+            )}
+
+            {/* Employers whose own vacancies can't be read: a link to their
+                careers site, nothing copied (src/data/official-careers-links.ts). */}
+            {officialCareersUrl && (
+              <a
+                href={officialCareersUrl}
+                target="_blank"
+                rel="nofollow noopener noreferrer"
+                className="mb-6 inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+              >
+                Ver todas sus vacantes en su portal oficial
+                <ExternalLink className="h-4 w-4" aria-hidden="true" />
+              </a>
             )}
 
             {jobs.length === 0 ? (

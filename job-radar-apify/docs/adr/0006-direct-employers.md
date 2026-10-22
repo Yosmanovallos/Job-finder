@@ -311,6 +311,22 @@ tick escribe y borra. Las consultas públicas no cambian (ya filtran por
     activa nueva, reapertura con el mismo id, cero `URL_UPDATED` oficiales,
     Venezuela intacta, idempotencia.
 
+### 11. Empleadores que no se pueden leer: enlace, no copia (2026-10-22)
+
+Amazon, Meta e IBM (sus términos prohíben la recolección automatizada sin
+permiso escrito), Globant (robots.txt veta su único listado), Accenture (429),
+los tenants de Oracle Recruiting Cloud (endpoint documentado como interno de
+Oracle), Deloitte (sin tablero colombiano identificado) y Tiendas D1 (solo un
+formulario de hoja de vida, sin listado) quedan **fuera del conector**.
+Decisión del dueño: "usar otras alternativas". La alternativa elegida no lee
+nada de esos sitios: su página `/empresas/:slug` enlaza a su buscador oficial
+de empleo ("Ver todas sus vacantes en su portal oficial", `rel="nofollow"`),
+desde un mapa curado a mano (`src/data/official-careers-links.ts`, clave
+`companyKey`). Sus copias de bolsas siguen igual. Descartado: proxies o
+reintentos contra el 429/robots, y feeds pagos (regla de gasto cero). Si una
+empresa concede permiso escrito o publica un ATS público, pasa al seed normal
+y sale del mapa.
+
 ## Consecuencias
 
 - Volumen honesto de arranque (medido 2026-10-19): 185 vacantes oficiales

@@ -28,6 +28,7 @@ import {
 import type { ReputationEntry } from "./db/company-reputation-repository.js";
 import type { JobFilterParams } from "./lib/job-filters.js";
 import { COMPANY_LOGO_DOMAINS, getCompanyLogoUrl } from "./data/company-logo-domains.js";
+import { getOfficialCareersUrl } from "./data/official-careers-links.js";
 import { getCountryConfig } from "./countries/index.js";
 import {
   escapeHtml,
@@ -259,6 +260,8 @@ interface CompanyView {
   displayName: string;
   logoUrl: string | null;
   reputation: ReputationEntry[];
+  /** The employer's own careers search, for employers whose vacancies can't be read (src/data/official-careers-links.ts). */
+  officialCareersUrl: string | null;
 }
 
 // Company page (API + SSR): one employer, whatever spelling the slug came
@@ -281,7 +284,7 @@ async function resolveCompanyView(resolvedName: string, country: string | undefi
     }
   }
   const logoUrl = names.map((name) => getCompanyLogoUrl(name)).find(Boolean) ?? null;
-  return { displayName, logoUrl, reputation };
+  return { displayName, logoUrl, reputation, officialCareersUrl: getOfficialCareersUrl(names) };
 }
 
 // Mirrors ReputationBadges.tsx's SOURCE_LABELS exactly (that file's own
@@ -641,6 +644,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
         companyName,
         logoUrl: companyView.logoUrl,
         reputation: companyView.reputation,
+        officialCareersUrl: companyView.officialCareersUrl,
         jobs: page,
         total: matched.total
       })
@@ -1555,6 +1559,9 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     const ssrSnippet =
       `<h1>${escapeHtml(companyName)}</h1>\n` +
       (reputationItems ? `<ul aria-label="Reputación">\n${reputationItems}\n</ul>` : "") +
+      (companyView.officialCareersUrl
+        ? `<p><a href="${escapeHtml(companyView.officialCareersUrl)}" rel="nofollow noopener" target="_blank">Ver todas sus vacantes en su portal oficial</a></p>\n`
+        : "") +
       `<nav aria-label="Vacantes"><ul>\n${jobItems}\n</ul></nav>`;
     indexHtml = indexHtml.replace('<div id="app"></div>', `<div id="app">${ssrSnippet}</div>`);
 
@@ -1564,6 +1571,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       companyName,
       logoUrl: companyView.logoUrl,
       reputation,
+      officialCareersUrl: companyView.officialCareersUrl,
       jobs: page,
       total: matched.total
     });
