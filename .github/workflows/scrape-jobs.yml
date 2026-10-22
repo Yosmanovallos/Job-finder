@@ -56,6 +56,9 @@ jobs:
           # aquí honra la declaración existente en vez de relajarla, y de
           # paso hace la instalación reproducible entre ejecuciones.
           node-version: "24.18.0"
+          # v5 caches by the root package.json's packageManager (pnpm, for
+          # job-radar-local), which the runner lacks: off, as in v4.
+          package-manager-cache: false
 
       - name: Install Dependencies
         run: |

@@ -26,6 +26,9 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: "24.18.0"
+          # v5 caches by the root package.json's packageManager (pnpm, for
+          # job-radar-local), which the runner lacks: off, as in v4.
+          package-manager-cache: false
 
       - name: Install Dependencies
         run: |
