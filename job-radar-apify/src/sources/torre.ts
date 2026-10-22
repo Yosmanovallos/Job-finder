@@ -17,6 +17,14 @@ import type { FetchContext } from '../engine/fetch-context.js';
  * `fetch` stays as a one-line delegation so every existing caller keeps
  * working unchanged.
  */
+/**
+ * Keyword variants searched per role. Torre's search is semantic, so the
+ * seniority/word-order variants after the first few return the same postings
+ * or none: production ticks 2026-10-21/22 sent ~11 variants per role and the
+ * Spanish non-tech roles came back 0 on every one of them.
+ */
+export const TORRE_MAX_KEYWORDS = 3;
+
 export const torreAdapter: SourceAdapter = {
   name: 'Torre',
 
@@ -29,7 +37,7 @@ export const torreAdapter: SourceAdapter = {
     let requests = 0;
     let lastFailure: SourceFetchResult<Job> | null = null;
 
-    for (const kw of keywords) {
+    for (const kw of keywords.slice(0, TORRE_MAX_KEYWORDS)) {
       const result = await executeWithResilienceResult<Job>(
         'Torre',
         'listing',

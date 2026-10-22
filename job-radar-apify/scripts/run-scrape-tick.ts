@@ -254,7 +254,7 @@ async function runBatched(
 }
 
 /**
- * Runs catalog-wide sources (RemoteOK, GetOnBoard, WeRemoto, Jooble) once
+ * Runs catalog-wide sources (RemoteOK, GetOnBoard, WeRemoto, WorkanaV2, Magneto) once
  * per due source, not once per role — see getDueGlobalSources. Reuses the
  * RoleResult shape purely so the existing writeSummary/reporting path can
  * fold this in without a second code path.

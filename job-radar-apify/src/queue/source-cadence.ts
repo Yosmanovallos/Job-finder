@@ -85,16 +85,46 @@ export const SOURCE_CADENCE_MS: Record<string, number> = {
 // while each call spent the key's fixed ~500-request budget. Re-add only with
 // a key that verifiably returns Colombian locations, AND add 'Jooble' to
 // KNOWN_SOURCES in src/db/job-validator.ts in the same change.
+//
+// That unscheduling never took effect: the same commit (16e8868) re-added
+// `Jooble: 6 * HOUR_MS` at the end of the map. Removed again 2026-10-22 after
+// production logs showed the same result on every run: co.jooble.org 403,
+// jooble.org "Colombia" totalCount=0.
+//
+// Remotive retired 2026-10-22: its public API's legal notice forbids
+// submitting its jobs to third-party sites (Google Jobs and LinkedIn among
+// them), and it now returns ~10 postings delayed by days, all older than the
+// 2-day filter (0 kept on every production tick 2026-10-21/22). The adapter
+// stays registered, like Workana's (reversible); its stored rows age out.
 export const GLOBAL_SOURCE_CADENCE_MS: Record<string, number> = {
   RemoteOK: 1 * HOUR_MS,
   GetOnBoard: 1 * HOUR_MS,
   WeRemoto: 4 * HOUR_MS,
-  Remotive: 4 * HOUR_MS,
   WorkanaV2: 3 * HOUR_MS,
-  Jooble: 6 * HOUR_MS,
-  // ~41 page reads per pass (search + topic pages), each with jitter.
+  // ~16 page reads per pass (search + topic pages), each with jitter.
   Magneto: 3 * HOUR_MS
 };
+
+/**
+ * Order of the due catalog sources: the one that went longest without a
+ * successful run first (never run counts as oldest), map order on ties.
+ *
+ * The catalog step runs them one after another inside a shared budget
+ * (MAX_GLOBAL_CATALOG_MS), and a source is marked as run only when it
+ * finishes. In map order the last source (Magneto) started with seconds left
+ * on almost every tick, timed out, stayed due and came last again (6 of 7
+ * production ticks, 2026-10-21/22). Oldest-first makes a starved source go
+ * first on the next tick instead.
+ */
+export function orderDueGlobalSources(
+  due: string[],
+  lastRunAt: ReadonlyMap<string, number>
+): string[] {
+  return due
+    .map((source, index) => ({ source, index, last: lastRunAt.get(source) ?? -Infinity }))
+    .sort((a, b) => a.last - b.last || a.index - b.index)
+    .map(({ source }) => source);
+}
 
 // --- Venezuela (backlog/venezuela-expansion.md, Día 1) ----------------------
 //

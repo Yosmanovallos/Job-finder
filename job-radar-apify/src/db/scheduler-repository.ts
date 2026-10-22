@@ -3,6 +3,7 @@ import { buildJobUrl, isPubliclyDescribable } from "../lib/job-seo.js";
 import { apiNotifiedUrls, DELETE_NOT_API_NOTIFIED, enqueueIndexingNotifications, INDEXING_PRIORITY } from "./indexing-repository.js";
 import { pruneExpiredUrlHashes, recordExpiredUrlHashes } from "./expired-job-repository.js";
 import { liveJobSql, MAX_JOB_AGE_DAYS } from "../lib/job-freshness.js";
+import { orderDueGlobalSources } from "../queue/source-cadence.js";
 
 /**
  * Idempotent upsert of the known role list into `search_roles` — safe to
@@ -113,10 +114,11 @@ export async function getDueGlobalSources(cadenceMs: Record<string, number>): Pr
   }
 
   const now = Date.now();
-  return sourceNames.filter((source) => {
+  const due = sourceNames.filter((source) => {
     const lastRunAt = lastRun.get(source);
     return lastRunAt === undefined || now - lastRunAt >= cadenceMs[source];
   });
+  return orderDueGlobalSources(due, lastRun);
 }
 
 export async function markGlobalSourceRun(sourceName: string): Promise<void> {
