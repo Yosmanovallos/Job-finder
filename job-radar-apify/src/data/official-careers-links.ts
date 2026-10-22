@@ -5,9 +5,10 @@ import { companyKey } from "../lib/company-key.js";
 // alternatives"), so their company page links a person to the employer's own
 // careers search instead. A link only — nothing is fetched from these sites,
 // no posting is copied or projected, and their job-board copies stay as they
-// are. Each URL was opened on 2026-10-22 and is the employer's own careers
-// site (docs/source-catalog/{amazon,meta,ibm,globant,oracle-recruiting-cloud}.md
-// for why each one isn't read).
+// are. Each URL is on the employer's own careers domain and answered 200 on
+// 2026-10-22, except metacareers.com, which answers 400 to any non-browser
+// client (the domain is Meta's, docs/source-catalog/meta.md). Why each one
+// isn't read: docs/source-catalog/{amazon,meta,ibm,globant,oracle-recruiting-cloud}.md.
 //
 // Keyed by companyKey() (case, accents, legal form and a trailing country
 // folded), so "Accenture Colombia" and "ACCENTURE S.A.S." share one entry.
