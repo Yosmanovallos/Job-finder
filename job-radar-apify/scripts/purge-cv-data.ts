@@ -41,6 +41,25 @@ async function main() {
       console.log(`  ${table.padEnd(22)} ${counts[table]} filas`);
     }
     const present = Object.keys(counts);
+    // Foreign keys from tables OUTSIDE the set into it: TRUNCATE refuses them
+    // (no CASCADE on purpose), so they are listed with their ON DELETE action
+    // and how many of their rows point in — the owner decides what to do.
+    const external = await client.query<{ child: string; parent: string; constraint_name: string; on_delete: string; columns: string }>(
+      `SELECT c.conrelid::regclass::text AS child, c.confrelid::regclass::text AS parent, c.conname AS constraint_name,
+              CASE c.confdeltype WHEN 'a' THEN 'NO ACTION' WHEN 'r' THEN 'RESTRICT' WHEN 'c' THEN 'CASCADE' WHEN 'n' THEN 'SET NULL' ELSE 'SET DEFAULT' END AS on_delete,
+              (SELECT string_agg(a.attname, ',') FROM unnest(c.conkey) k JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = k) AS columns
+         FROM pg_constraint c
+        WHERE c.contype = 'f' AND c.confrelid::regclass::text = ANY($1) AND NOT (c.conrelid::regclass::text = ANY($1))`,
+      [present]
+    );
+    for (const ref of external.rows) {
+      const where = ref.columns.split(",").map((column) => `${column} IS NOT NULL`).join(" AND ");
+      const pointing = await client.query<{ n: string }>(`SELECT count(*)::text AS n FROM ${ref.child} WHERE ${where}`);
+      console.log(`  referencia externa: ${ref.child}(${ref.columns}) -> ${ref.parent} [${ref.constraint_name}, ON DELETE ${ref.on_delete}] — ${pointing.rows[0].n} filas apuntan`);
+    }
+    if (execute && external.rows.length > 0) {
+      throw new Error(`${external.rows.length} tabla(s) fuera del conjunto referencian estas tablas: no se vacía nada (ver arriba).`);
+    }
     if (execute && present.length > 0) {
       await client.query(`TRUNCATE ${present.join(", ")}`);
       await client.query("COMMIT");
