@@ -5,7 +5,8 @@ import {
   SOURCE_CADENCE_MS,
   GLOBAL_SOURCE_CADENCE_MS,
   SOURCE_CADENCE_MS_VE,
-  GLOBAL_SOURCE_CADENCE_MS_VE
+  GLOBAL_SOURCE_CADENCE_MS_VE,
+  countsAsGlobalRun
 } from "../src/queue/source-cadence.js";
 import { DEFAULT_ROLES_200 } from "../src/queue/scheduler.js";
 import { ScrapeWorker, type SourceRunResult } from "../src/queue/scrape-worker.js";
@@ -315,7 +316,9 @@ async function runGlobalCatalogSources(
       savedCount += listing.savedCount;
       duplicateCount += listing.duplicateCount;
 
-      await markGlobalSourceRun(sourceName);
+      // A source cut off by the catalog budget did not run: left unmarked, it
+      // stays the oldest and leads the next tick (orderDueGlobalSources).
+      if (countsAsGlobalRun(listingStatus())) await markGlobalSourceRun(sourceName);
     } catch (err: any) {
       console.error(`❌ [Tick] Fuente global ${sourceName} falló:`, err?.message || err);
       perSource[sourceName] = { fetched: 0, error: err?.message || String(err), status: listingStatus() };

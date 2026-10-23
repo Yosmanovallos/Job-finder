@@ -106,15 +106,28 @@ export const GLOBAL_SOURCE_CADENCE_MS: Record<string, number> = {
 };
 
 /**
+ * Whether a catalog source's attempt counts as its run for the cadence. A
+ * `timeout` is the shared catalog budget running out before the source could
+ * finish — not an answer from the source — so it doesn't: unmarked, the
+ * source keeps the oldest run and leads the next tick. Every other outcome
+ * (success, empty, failed...) counts, so a broken source still waits out its
+ * cadence instead of being retried on every tick.
+ */
+export function countsAsGlobalRun(status: string | undefined): boolean {
+  return status !== "timeout";
+}
+
+/**
  * Order of the due catalog sources: the one that went longest without a
  * successful run first (never run counts as oldest), map order on ties.
  *
  * The catalog step runs them one after another inside a shared budget
- * (MAX_GLOBAL_CATALOG_MS), and a source is marked as run only when it
- * finishes. In map order the last source (Magneto) started with seconds left
- * on almost every tick, timed out, stayed due and came last again (6 of 7
- * production ticks, 2026-10-21/22). Oldest-first makes a starved source go
- * first on the next tick instead.
+ * (MAX_GLOBAL_CATALOG_MS). In map order the last source (Magneto) started
+ * with seconds left on almost every tick and timed out (6 of 7 production
+ * ticks, 2026-10-21/22). Oldest-first, together with not marking a timed-out
+ * source as run (countsAsGlobalRun), makes a starved source go first on the
+ * next tick. Ordering alone did not: the timeout was still marked as a run,
+ * so Magneto kept the newest mark and stayed last (tick 2026-10-22 18:12).
  */
 export function orderDueGlobalSources(
   due: string[],

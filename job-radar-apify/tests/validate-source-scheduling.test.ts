@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { GLOBAL_SOURCE_CADENCE_MS, orderDueGlobalSources } from "../src/queue/source-cadence.js";
+import { countsAsGlobalRun, GLOBAL_SOURCE_CADENCE_MS, orderDueGlobalSources } from "../src/queue/source-cadence.js";
 
 /**
  * Catalog-step scheduling (2026-10-22): the starved source goes first, and
@@ -36,4 +36,11 @@ test("Remotive (terms) and Jooble (US-only key) are not scheduled", () => {
   assert.equal("Remotive" in GLOBAL_SOURCE_CADENCE_MS, false);
   assert.equal("Jooble" in GLOBAL_SOURCE_CADENCE_MS, false);
   assert.ok("Magneto" in GLOBAL_SOURCE_CADENCE_MS);
+});
+
+test("a catalog source cut off by the budget does not count as run; any real answer does", () => {
+  assert.equal(countsAsGlobalRun("timeout"), false);
+  for (const status of ["success", "partial", "empty", "failed", "misconfigured", undefined]) {
+    assert.equal(countsAsGlobalRun(status), true, String(status));
+  }
 });
