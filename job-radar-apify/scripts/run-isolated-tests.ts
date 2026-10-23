@@ -39,6 +39,7 @@ const suites: Record<string, string[]> = {
     "validate-magneto-robots.test.ts",
     "validate-job-date-label.test.ts",
     "validate-source-scheduling.test.ts",
+    "validate-varchar-clip.test.ts",
     "validate-official-careers-links.test.ts"
   ],
   integration: [
