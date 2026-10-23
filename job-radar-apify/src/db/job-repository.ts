@@ -15,6 +15,7 @@ import { seoReadySql } from "../lib/google-job-readiness.js";
 import { liveJobSql } from "../lib/job-freshness.js";
 import { findExpiredUrlHashes } from "./expired-job-repository.js";
 import { StaleWhileRevalidateCache } from "../lib/stale-while-revalidate-cache.js";
+import { clipVarchar } from "../lib/varchar.js";
 import {
   VACANCY_IDENTITY_KEYS,
   companyKeySql,
@@ -202,13 +203,13 @@ export async function saveJobs(
       [
         hash,
         job.title,
-        job.company,
-        job.location,
+        clipVarchar(job.company),
+        clipVarchar(job.location),
         job.url,
         job.source,
         job.dateText,
         publishedAt,
-        roleOrigin,
+        clipVarchar(roleOrigin),
         job.source,
         fingerprint,
         // undefined -> NULL (pg driver), same as any other unset field —
@@ -225,7 +226,7 @@ export async function saveJobs(
         job.salaryMin ?? null,
         job.salaryMax ?? null,
         job.salaryCurrency ?? null,
-        job.salaryRaw ?? null,
+        clipVarchar(job.salaryRaw ?? null),
         job.applicantCount ?? null,
         job.description ? job.descriptionKind ?? "full" : null,
         job.remoteType ?? null,
