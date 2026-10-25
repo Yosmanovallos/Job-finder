@@ -940,10 +940,25 @@ async function runHttpTests() {
     );
 
     const pagesRes = await fetch(`${BASE_URL}/sitemap-pages.xml`);
+    const pagesXml = await pagesRes.text();
     check(
-      pagesRes.status === 200 && (await pagesRes.text()).includes("<urlset"),
+      pagesRes.status === 200 && pagesXml.includes("<urlset"),
       "/sitemap-pages.xml responde 200 con un <urlset> válido.",
       `/sitemap-pages.xml respondió ${pagesRes.status} o no es un urlset.`
+    );
+
+    // /pricing is hidden while the paywall is off: out of the sitemap, and
+    // a 301 home instead of a checkout for plans that unlock nothing.
+    check(
+      !pagesXml.includes("/pricing<"),
+      "/sitemap-pages.xml ya no lista /pricing.",
+      "/sitemap-pages.xml todavía lista /pricing."
+    );
+    const pricingRes = await fetch(`${BASE_URL}/pricing`, { redirect: "manual" });
+    check(
+      pricingRes.status === 301 && pricingRes.headers.get("location") === "/",
+      "GET /pricing responde 301 a / con el paywall apagado.",
+      `GET /pricing respondió ${pricingRes.status} (Location: ${pricingRes.headers.get("location")}) en vez de 301 a /.`
     );
 
     const jobsSitemapRes = await fetch(`${BASE_URL}/sitemap-jobs.xml`);

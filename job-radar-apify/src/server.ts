@@ -31,6 +31,7 @@ import { isPlaceholderEmployer } from "./lib/company-key.js";
 import { COMPANY_LOGO_DOMAINS, getCompanyLogoUrl } from "./data/company-logo-domains.js";
 import { getOfficialCareersUrl } from "./data/official-careers-links.js";
 import { getCountryConfig } from "./countries/index.js";
+import { PAYWALL_ENABLED } from "./config.js";
 import {
   escapeHtml,
   escapeJsonForScriptTag,
@@ -2086,6 +2087,17 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       },
       indexHtml
     );
+    return;
+  }
+
+  // /pricing sells the Pro plans, which unlock nothing while the paywall is
+  // off (job-repository.ts gives every tier every job). Send old links and
+  // bookmarks home instead of to a live checkout for an empty plan. Same
+  // flag as the client route, so turning the paywall back on restores the
+  // page; the bounded max-age keeps browsers from pinning the 301 forever.
+  if (pathname === "/pricing" && !PAYWALL_ENABLED && (method === "GET" || method === "HEAD")) {
+    res.writeHead(301, { Location: "/", "Cache-Control": "public, max-age=3600" });
+    res.end();
     return;
   }
 

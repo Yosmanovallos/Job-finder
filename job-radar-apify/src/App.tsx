@@ -17,6 +17,7 @@ import {
   isCountryScopedUnprefixed,
   isVePrefixed
 } from "./lib/country-context.js";
+import { PAYWALL_ENABLED } from "./config.js";
 import { AuthProvider } from "./auth/auth-provider.js";
 import RequireAuth from "./auth/require-auth.js";
 import { registerBuscoTrabajoWebMcp } from "./lib/webmcp.js";
@@ -126,7 +127,9 @@ function AppRoutes() {
       <Route path="/login" element={<><PageMeta {...ROUTE_META["/login"]!} /><Login /></>} />
       <Route path="/reset-password" element={<><PageMeta {...ROUTE_META["/reset-password"]!} /><ResetPassword /></>} />
       <Route path="/auth/callback" element={<><PageMeta {...ROUTE_META["/auth/callback"]!} /><AuthCallback /></>} />
-      <Route path="/pricing" element={<Pricing />} />
+      {/* Pro plans unlock nothing while the paywall is off — server.ts 301s
+          this path to "/" under the same flag. */}
+      <Route path="/pricing" element={PAYWALL_ENABLED ? <Pricing /> : <Navigate to="/" replace />} />
       <Route path="/legal/terminos" element={<Legal type="terminos" />} />
       <Route path="/legal/privacidad" element={<Legal type="privacidad" />} />
       <Route path="/legal/uso-aceptable" element={<Legal type="uso-aceptable" />} />
