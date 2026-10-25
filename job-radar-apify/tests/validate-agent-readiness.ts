@@ -47,7 +47,7 @@ async function main(): Promise<void> {
     assert.match(home.headers.get("cache-control") || "", /no-store/);
     assert.ok(textLength(homeHtml) >= 500);
     assert.equal((homeHtml.match(/<h1\b/g) || []).length, 1);
-    assert.match(homeHtml, /<title>Busco trabajo en Colombia \| Vacantes de empleo \| BuscoTrabajo<\/title>/);
+    assert.match(homeHtml, /<title>Busco trabajo en Colombia: ofertas de empleo \| BuscoTrabajo<\/title>/);
     assert.match(homeHtml, /<h1>Busco trabajo en Colombia: todas las ofertas de empleo en un solo lugar<\/h1>/);
     assert.match(homeHtml, /"alternateName": \["Busco Trabajo", "BuscoTrabajo\.co"\]/);
     assert.match(homeHtml, /https:\/\/x\.com\/Buscotrabajoco/);
@@ -61,7 +61,7 @@ async function main(): Promise<void> {
     const veHome = await fetch(`${base}/ve`, { headers: { Accept: "text/html" } });
     const veHomeHtml = await veHome.text();
     assert.equal(veHome.status, 200);
-    assert.match(veHomeHtml, /<title>Busco trabajo en Venezuela \| Vacantes de empleo \| BuscoTrabajo<\/title>/);
+    assert.match(veHomeHtml, /<title>Busco trabajo en Venezuela: ofertas de empleo \| BuscoTrabajo<\/title>/);
     assert.match(veHomeHtml, /<h1>Busco trabajo en Venezuela: todas las ofertas de empleo en un solo lugar<\/h1>/);
     assert.match(veHomeHtml, /<meta property="og:locale" content="es_VE" \/>/);
 
