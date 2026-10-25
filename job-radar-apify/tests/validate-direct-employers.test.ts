@@ -337,6 +337,9 @@ test("seed: references only, unique boards, https portals", () => {
   for (const seed of seeds) {
     for (const source of seed.sources) assert.match(source.portalUrl, /^https:\/\//);
   }
+  const cemex = seeds.find((seed) => seed.slug === "cemex");
+  assert.deepEqual(cemex?.aliases, []);
+  assert.deepEqual(cemex?.sources.map((source) => `${source.atsType}:${source.atsRef}`), ["successfactors:jobs.cemex.com"]);
   assert.throws(() => parseEmployerSeed({ employers: [{ slug: "a", displayName: "A", websiteDomain: null, aliases: [], sources: [], directJobs: [] }] }));
 });
 

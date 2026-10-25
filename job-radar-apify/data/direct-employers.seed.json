@@ -972,6 +972,19 @@
           "enabled": true
         }
       ]
+    },
+    {
+      "slug": "cemex",
+      "displayName": "Cemex",
+      "websiteDomain": "cemex.com",
+      "aliases": [],
+      "sources": [
+        {
+          "atsType": "successfactors",
+          "atsRef": "jobs.cemex.com",
+          "enabled": true
+        }
+      ]
     }
   ]
 }

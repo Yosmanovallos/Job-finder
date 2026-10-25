@@ -16,7 +16,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "tick | dry-run | migrate-dry-run | migrate | seed-dry-run | seed | domain-census | discover-dry-run | discover | coverage | computrabajo-coverage | db-size | cc-tenants | review-list | review-approve-dry-run | review-approve | cv-purge-dry-run | cv-purge"
+        description: "tick | dry-run | migrate-dry-run | migrate | seed-dry-run | seed | seed-one-dry-run | seed-one | domain-census | discover-dry-run | discover | coverage | computrabajo-coverage | db-size | cc-tenants | review-list | review-approve-dry-run | review-approve | cv-purge-dry-run | cv-purge"
         required: true
         default: "dry-run"
         type: choice
@@ -27,6 +27,8 @@ on:
           - migrate
           - seed-dry-run
           - seed
+          - seed-one-dry-run
+          - seed-one
           # Phase D3 (ADR 0006 §7.1). domain-census, discover-dry-run and
           # coverage only READ the database; discover writes (insert-only).
           - domain-census
@@ -56,6 +58,10 @@ on:
         type: string
       board:
         description: "review-approve: ats_type:ats_ref (p. ej. lever:despegar)"
+        required: false
+        type: string
+      seed_slug:
+        description: "seed-one: slug exacto del seed (p. ej. cemex)"
         required: false
         type: string
 
@@ -93,6 +99,7 @@ jobs:
           MODE: ${{ github.event_name == 'schedule' && 'tick' || inputs.mode }}
           COMPANY_KEY: ${{ inputs.company_key }}
           BOARD: ${{ inputs.board }}
+          SEED_SLUG: ${{ inputs.seed_slug }}
         run: |
           cd job-radar-apify
           set -o pipefail
@@ -103,6 +110,10 @@ jobs:
             migrate)         cmd="npx tsx scripts/migrate-direct-employers.ts --allow-remote-db" ;;
             seed-dry-run)    cmd="npx tsx scripts/seed-direct-employers.ts --dry-run" ;;
             seed)            cmd="npx tsx scripts/seed-direct-employers.ts --allow-remote-db" ;;
+            seed-one-dry-run|seed-one)
+              [[ "$SEED_SLUG" =~ ^[a-z0-9]+(-[a-z0-9]+)*$ ]] || { echo "seed_slug inválido"; exit 1; }
+              cmd="npx tsx scripts/seed-direct-employers.ts --slug $SEED_SLUG --allow-remote-db"
+              [ "$MODE" = "seed-one-dry-run" ] && cmd="$cmd --dry-run" ;;
             domain-census)   cmd="npx tsx scripts/direct-domain-census.ts --allow-remote-db" ;;
             discover-dry-run) cmd="npx tsx scripts/discover-direct-employers.ts --dry-run --allow-remote-db --limit 100" ;;
             discover)        cmd="npx tsx scripts/discover-direct-employers.ts --allow-remote-db --limit 1500 --max-enables 50 --deadline-min 16" ;;
