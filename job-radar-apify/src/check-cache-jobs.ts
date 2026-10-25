@@ -12,7 +12,7 @@ async function checkCacheJobs() {
   console.log(`Total runs in cache: ${data.runs ? data.runs.length : 0}`);
   console.log(`Total jobs in cache: ${data.jobs ? data.jobs.length : 0}\n`);
 
-  const ctJobs = (data.jobs || []).filter((j: any) => j.source === 'Computrabajo' || (j.url && j.url.includes('computrabajo')));
+  const ctJobs = (data.jobs || []).filter((j: { source?: string; url?: string }) => j.source === 'Computrabajo' || (j.url && j.url.includes('computrabajo')));
   console.log(`Found ${ctJobs.length} Computrabajo jobs in cache.\n`);
 
   for (let i = 0; i < Math.min(ctJobs.length, 10); i++) {

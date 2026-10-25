@@ -264,7 +264,7 @@ export async function saveJobs(
   // let this file balloon; the full detail already lives in Postgres.
   try {
     const runId = `run_${Date.now()}`;
-    const lightweightJobs = (jobs as any[]).map(({ description: _description, requirements: _requirements, ...rest }) => rest);
+    const lightweightJobs = jobs.map(({ description: _description, requirements: _requirements, ...rest }) => rest);
     saveRunToCache({
       id: runId,
       name: `${roleOrigin} (${jobs.length} Vacantes)`,
@@ -305,7 +305,7 @@ const DEFAULT_JOBS_LIMIT = 5000;
 export async function getJobs(
   limit: number = DEFAULT_JOBS_LIMIT,
   offset: number = 0
-): Promise<any[]> {
+) {
   // DISTINCT ON (title, company, location) ensures the dashboard never shows
   // visual duplicates, regardless of how many URL variants exist in the table.
   // The subquery deduplicates, picking the most-recently-published row for
@@ -367,7 +367,7 @@ export async function getJobs(
 export async function getJobsLight(
   limit: number = DEFAULT_JOBS_LIMIT,
   offset: number = 0
-): Promise<any[]> {
+) {
   const result = await pool.query(
     `SELECT * FROM (
        SELECT DISTINCT ON (${VACANCY_IDENTITY_KEYS})
@@ -1052,7 +1052,7 @@ export async function getSupersedingTarget(
   
   ).catch((error: { code?: string }) => {
     // Before the additive migration (column missing): no copy exists yet.
-    if (error?.code === "42703") return { rows: [] as any[] };
+    if (error?.code === "42703") return { rows: [] as { id: string | null; title: string | null; location: string | null }[] };
     throw error;
   });
   if (result.rows.length === 0) return undefined;
@@ -1075,7 +1075,7 @@ export async function isJobExpiredInPlace(id: string): Promise<boolean> {
  * row getJobs()'s dedupe would have returned, without re-deduping 10k rows
  * to find it.
  */
-export async function getJobById(id: string): Promise<any | null> {
+export async function getJobById(id: string) {
   const result = await pool.query(
     `SELECT candidate.id, candidate.url_hash, candidate.title, candidate.company, candidate.location,
             candidate.url, candidate.source, candidate.sources, candidate.date_text,
@@ -1186,13 +1186,13 @@ function buildSalaryLabel(row: {
  * fields nulled out on locked (< 48h) jobs, keeping title/source visible so
  * the frontend can render a truthful (not invented) teaser.
  */
-export function maskLockedFields(jobs: any[], tier: SubscriptionTier): any[] {
+export function maskLockedFields<T extends object>(jobs: T[], tier: SubscriptionTier): T[] {
   if (!PAYWALL_ENABLED || tier === "pro" || tier === "pro_max") {
-    for (const job of jobs) job.isLocked = false;
+    for (const job of jobs) (job as { isLocked?: unknown }).isLocked = false;
     return jobs;
   }
   return jobs.map((job) => {
-    if (!job.isLocked) return job;
+    if (!(job as { isLocked?: unknown }).isLocked) return job;
     return {
       ...job,
       company: null,
