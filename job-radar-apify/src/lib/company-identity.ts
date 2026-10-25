@@ -90,7 +90,7 @@ export function titleKeySql(column = "title"): string {
  * must never appear in the company directory as if they were one employer.
  */
 export function isPlaceholderCompanyKeySql(keyExpr: string): string {
-  return `(${keyExpr} LIKE '%confidencial%' OR ${keyExpr} IN ('', 'anonima', 'anonimo', 'reservado', 'nodisponible', 'noespecificado'))`;
+  return `(${keyExpr} LIKE '%confidencial%' OR ${keyExpr} LIKE '%confidential%' OR ${keyExpr} IN ('', 'anonima', 'anonimo', 'empresaanonima', 'empresaanonimo', 'reservado', 'reservada', 'empresareservada', 'nodisponible', 'noespecificado', 'reserved', 'anonymous', 'undisclosed'))`;
 }
 
 /** Read-path employer key of a `jobs` row: the stored column, cheap. */

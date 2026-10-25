@@ -631,6 +631,24 @@ async function runHttpTests() {
       "/fuentes conserva metadata social genérica de la portada."
     );
 
+    for (const placeholderPath of ["/empresas/confidential-careers", "/empresas/confidencial", "/ve/empresas/confidencial"]) {
+      const placeholderRes = await fetch(`${BASE_URL}${placeholderPath}`, { redirect: "manual" });
+      const placeholderHtml = await placeholderRes.text();
+      check(
+        placeholderRes.status === 410 &&
+          placeholderHtml.includes('content="noindex"') &&
+          !placeholderHtml.includes('"@type":"Organization"'),
+        `${placeholderPath} (empleador no revelado) responde 410 noindex, sin perfil de empresa.`,
+        `${placeholderPath} no respondió 410 noindex (status=${placeholderRes.status}).`
+      );
+    }
+    const placeholderApiRes = await fetch(`${BASE_URL}/api/companies/confidential-careers`);
+    check(
+      placeholderApiRes.status === 404,
+      "/api/companies/confidential-careers responde 404: un placeholder no es una empresa.",
+      `/api/companies/confidential-careers respondió ${placeholderApiRes.status}.`
+    );
+
     const elempleoRes = await fetch(`${BASE_URL}/empresas/elempleo`, { redirect: "manual" });
     check(
       elempleoRes.status === 301 && elempleoRes.headers.get("location") === "/fuentes",

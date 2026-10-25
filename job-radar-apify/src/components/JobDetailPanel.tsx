@@ -6,6 +6,7 @@ import { getSourceColor } from "../lib/source-colors.js";
 import { getModalityLabel } from "../lib/job-filters.js";
 import { extractTechnologies } from "../lib/extract-technologies.js";
 import { buildCompanyPath } from "../lib/job-seo.js";
+import { isPlaceholderEmployer } from "../lib/company-key.js";
 import { buildLocationLabel } from "../countries/index.js";
 import { useAuth } from "../auth/auth-provider.js";
 import { jobAnalyticsParams, trackEvent } from "../lib/analytics.js";
@@ -169,7 +170,7 @@ export const JobDetailPanel: React.FC<JobDetailPanelProps> = ({
                 {job.title}
               </TitleTag>
               <p className="text-sm text-foreground/80">
-                {job.company ? (
+                {job.company && !isPlaceholderEmployer(job.company) ? (
                   // Every real company resolves — see JobCard.tsx's
                   // identical link for the reasoning.
                   <Link
@@ -179,7 +180,7 @@ export const JobDetailPanel: React.FC<JobDetailPanelProps> = ({
                     {job.company}
                   </Link>
                 ) : (
-                  "Confidencial"
+                  job.company || "Confidencial"
                 )}
                 <span className="text-muted-foreground"> · {buildLocationLabel(job, country)}</span>
               </p>

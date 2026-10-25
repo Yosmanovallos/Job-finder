@@ -33,9 +33,19 @@ export function companyKey(name: string | null): string {
   return companyWords(name).join("");
 }
 
+// Exact keys of undisclosed-employer placeholders. Substrings stay limited
+// to "confidencial"/"confidential": "confiden" alone would also catch real
+// employers such as "Confidence Group".
+const PLACEHOLDER_KEYS = ["", "anonima", "anonimo", "empresaanonima", "empresaanonimo", "reservado", "reservada", "empresareservada", "nodisponible", "noespecificado", "reserved", "anonymous", "undisclosed"];
+
 /** Same set as isPlaceholderCompanyKeySql(). */
 export function isPlaceholderKey(key: string): boolean {
-  return key.includes("confidencial") || ["", "anonima", "anonimo", "reservado", "nodisponible", "noespecificado"].includes(key);
+  return key.includes("confidencial") || key.includes("confidential") || PLACEHOLDER_KEYS.includes(key);
+}
+
+/** True when the employer text names no real company ("Confidential Careers", "Empresa Reservada", null). */
+export function isPlaceholderEmployer(name: string | null | undefined): boolean {
+  return isPlaceholderKey(companyKey(name ?? null));
 }
 
 // Keys too generic to identify one employer by name alone: a board whose
