@@ -11,9 +11,15 @@ function textLength(html: string): number {
   return html.replace(/<script[\s\S]*?<\/script>/g, " ").replace(/<style[\s\S]*?<\/style>/g, " ").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().length;
 }
 
-async function json(pathname: string, init?: RequestInit): Promise<{ response: Response; body: any }> {
+/** Error envelope returned by the public API. */
+interface ApiErrorBody {
+  error: { code: string; requestId?: string; resolution?: string };
+}
+
+// Each caller states the response fields it asserts on.
+async function json<T>(pathname: string, init?: RequestInit): Promise<{ response: Response; body: T }> {
   const response = await fetch(`${base}${pathname}`, { signal: AbortSignal.timeout(10000), ...init });
-  return { response, body: await response.json() };
+  return { response, body: (await response.json()) as T };
 }
 
 async function main(): Promise<void> {
@@ -105,18 +111,18 @@ async function main(): Promise<void> {
     assert.ok((await missingMarkdown.text()).length >= 20);
     assert.equal((await fetch(`${base}/login`)).status, 200);
 
-    const unknownApi = await json("/api/not-real");
+    const unknownApi = await json<ApiErrorBody>("/api/not-real");
     assert.equal(unknownApi.response.status, 404);
     assert.match(unknownApi.response.headers.get("content-type") || "", /^application\/json/);
     assert.equal(unknownApi.body.error.code, "route_not_found");
     assert.ok(unknownApi.body.error.requestId);
 
-    const invalid = await json("/api/v1/jobs?limit=51");
+    const invalid = await json<ApiErrorBody>("/api/v1/jobs?limit=51");
     assert.equal(invalid.response.status, 400);
     assert.equal(invalid.body.error.code, "invalid_parameter");
     assert.ok(invalid.body.error.resolution);
 
-    const listed = await json("/api/v1/jobs?country=CO&limit=2");
+    const listed = await json<{ jobs: ({ id: string } & Record<string, unknown>)[]; pagination: { limit: number } }>("/api/v1/jobs?country=CO&limit=2");
     assert.equal(listed.response.status, 200);
     assert.ok(listed.body.jobs.length > 0 && listed.body.jobs.length <= 2);
     assert.ok(listed.body.pagination.limit === 2);
@@ -125,21 +131,21 @@ async function main(): Promise<void> {
     for (const field of forbiddenFields) assert.equal(field in listed.body.jobs[0], false, field);
 
     const jobId = listed.body.jobs[0].id;
-    const detail = await json(`/api/v1/jobs/${jobId}`);
+    const detail = await json<{ job: { id: string } }>(`/api/v1/jobs/${jobId}`);
     assert.equal(detail.response.status, 200);
     assert.equal(detail.body.job.id, jobId);
-    const absent = await json(`/api/v1/jobs/${randomUUID()}`);
+    const absent = await json<ApiErrorBody>(`/api/v1/jobs/${randomUUID()}`);
     assert.equal(absent.response.status, 404);
     assert.equal(absent.body.error.code, "job_not_found");
 
-    const countries = await json("/api/v1/countries");
+    const countries = await json<{ countries: { code: string }[] }>("/api/v1/countries");
     assert.equal(countries.response.status, 200);
-    assert.deepEqual(countries.body.countries.map((country: any) => country.code), ["CO", "VE"]);
+    assert.deepEqual(countries.body.countries.map((country) => country.code), ["CO", "VE"]);
 
-    const openapi = await json("/openapi.json");
+    const openapi = await json<{ openapi: string; paths: Record<string, { get: { operationId: string } }> }>("/openapi.json");
     assert.equal(openapi.response.status, 200);
     assert.equal(openapi.body.openapi, "3.1.2");
-    const operationIds = Object.values(openapi.body.paths).map((pathItem: any) => pathItem.get.operationId);
+    const operationIds = Object.values(openapi.body.paths).map((pathItem) => pathItem.get.operationId);
     assert.equal(new Set(operationIds).size, operationIds.length);
 
     const llms = await fetch(`${base}/llms.txt`);
@@ -155,7 +161,7 @@ async function main(): Promise<void> {
     const sitemapText = await sitemap.text();
     for (const pathname of ["/docs", "/about", "/contact", "/privacy"]) assert.match(sitemapText, new RegExp(`<loc>https://buscotrabajo.co${pathname}</loc>`));
 
-    const catalog = await json("/.well-known/api-catalog");
+    const catalog = await json<{ linkset: unknown }>("/.well-known/api-catalog");
     assert.equal(catalog.response.status, 200);
     assert.equal(catalog.response.headers.get("content-type"), 'application/linkset+json; profile="https://www.rfc-editor.org/info/rfc9727"');
     assert.ok(Array.isArray(catalog.body.linkset));
@@ -170,7 +176,7 @@ async function main(): Promise<void> {
       await response.json();
     }
 
-    const skillIndex = (await json("/.well-known/agent-skills/index.json")).body;
+    const skillIndex = (await json<{ skills: { url: string; digest: string }[] }>("/.well-known/agent-skills/index.json")).body;
     for (const skill of skillIndex.skills) {
       const skillResponse = await fetch(skill.url.replace("https://buscotrabajo.co", base));
       assert.equal(skillResponse.status, 200);
@@ -179,25 +185,30 @@ async function main(): Promise<void> {
     }
 
     const mcpHeaders = { "Content-Type": "application/json", Accept: "application/json, text/event-stream" };
-    const initialized = await json("/mcp", { method: "POST", headers: mcpHeaders, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "test", version: "1.0.0" } } }) });
+    const initialized = await json<{ result: { protocolVersion: string } }>("/mcp", { method: "POST", headers: mcpHeaders, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "test", version: "1.0.0" } } }) });
     assert.equal(initialized.response.status, 200);
     assert.equal(initialized.body.result.protocolVersion, "2025-06-18");
-    const tools = await json("/mcp", { method: "POST", headers: mcpHeaders, body: JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/list", params: {} }) });
-    assert.deepEqual(tools.body.result.tools.map((tool: any) => tool.name), ["search_jobs", "get_job", "list_supported_countries"]);
-    const toolCall = await json("/mcp", { method: "POST", headers: mcpHeaders, body: JSON.stringify({ jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "search_jobs", arguments: { country: "CO", limit: 1 } } }) });
+    const tools = await json<{ result: { tools: { name: string }[] } }>("/mcp", { method: "POST", headers: mcpHeaders, body: JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/list", params: {} }) });
+    assert.deepEqual(tools.body.result.tools.map((tool) => tool.name), ["search_jobs", "get_job", "list_supported_countries"]);
+    const toolCall = await json<{ result: { isError: boolean; structuredContent: { jobs: unknown[] } } }>("/mcp", { method: "POST", headers: mcpHeaders, body: JSON.stringify({ jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "search_jobs", arguments: { country: "CO", limit: 1 } } }) });
     assert.equal(toolCall.response.status, 200);
     assert.equal(toolCall.body.result.isError, false);
     assert.equal(toolCall.body.result.structuredContent.jobs.length, 1);
     assert.equal((await fetch(`${base}/mcp`, { headers: { Accept: "text/event-stream" } })).status, 405);
 
-    const a2a = await json("/a2a", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: "a2a-1", method: "message/send", params: { message: { kind: "message", messageId: randomUUID(), role: "user", parts: [{ kind: "data", data: { action: "search_jobs", country: "CO", limit: 1 } }] } } }) });
+    const a2a = await json<{ result: { kind: string; parts: { data: { jobs: unknown[] } }[] } }>("/a2a", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: "a2a-1", method: "message/send", params: { message: { kind: "message", messageId: randomUUID(), role: "user", parts: [{ kind: "data", data: { action: "search_jobs", country: "CO", limit: 1 } }] } } }) });
     assert.equal(a2a.response.status, 200);
     assert.equal(a2a.body.result.kind, "message");
     assert.equal(a2a.body.result.parts[0].data.jobs.length, 1);
 
     // RFC 9728: el resource identifier debe ser idéntico a aquel en el que se
     // insertó el sufijo well-known. Servido en la raíz => origen sin ruta.
-    const protectedResource = await json("/.well-known/oauth-protected-resource");
+    const protectedResource = await json<{
+      resource: string;
+      authorization_servers: string[];
+      bearer_methods_supported: string[];
+      scopes_supported: unknown;
+    }>("/.well-known/oauth-protected-resource");
     assert.equal(protectedResource.response.status, 200);
     assert.match(protectedResource.response.headers.get("content-type") || "", /^application\/json/);
     assert.equal(protectedResource.response.headers.get("access-control-allow-origin"), "*");

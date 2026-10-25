@@ -98,6 +98,20 @@ function extractBalancedObject(html: string, fromIdx: number): string | null {
   return null;
 }
 
+// Fields of an Indeed mosaic job card that parseJobcards reads.
+interface IndeedJobCard {
+  jobkey?: string;
+  title?: string;
+  pubDate?: number;
+  remoteLocation?: boolean;
+  formattedLocation?: string;
+  company?: string;
+  formattedRelativeTime?: string;
+}
+interface IndeedMosaicData {
+  metaData?: { mosaicProviderJobCardsModel?: { results?: IndeedJobCard[] } };
+}
+
 function parseJobcards(html: string, now: number, subdomain: string, fallbackLocation: string): IndeedJob[] {
   const jobs: IndeedJob[] = [];
   const marker = 'window.mosaic.providerData["mosaic-provider-jobcards"]=';
@@ -107,7 +121,7 @@ function parseJobcards(html: string, now: number, subdomain: string, fallbackLoc
   const jsonStr = extractBalancedObject(html, markerIdx + marker.length);
   if (!jsonStr) return jobs;
 
-  let data: any;
+  let data: IndeedMosaicData | null;
   try {
     data = JSON.parse(jsonStr);
   } catch {

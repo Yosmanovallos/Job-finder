@@ -61,7 +61,7 @@ async function runDedupeTest() {
   }
 
   // Verify merged sources array on first job
-  const firstJob = storedJobs[0] as any;
+  const firstJob = storedJobs[0];
   console.log(`\n📌 [Test] Verificando vacante deduplicada #${firstJob.jobId}:`);
   console.log(`   Título: "${firstJob.title}"`);
   console.log(`   Fuente primaria: "${firstJob.source}"`);

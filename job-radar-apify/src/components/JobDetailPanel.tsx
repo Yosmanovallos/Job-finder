@@ -91,8 +91,8 @@ export const JobDetailPanel: React.FC<JobDetailPanelProps> = ({
 
   const otherSources =
     job.alsoIn ||
-    (Array.isArray((job as any).sources)
-      ? (job as any).sources.filter((s: string) => s !== job.source)
+    (Array.isArray(job.sources)
+      ? job.sources.filter((s: string) => s !== job.source)
       : []);
   const modality = getModalityLabel(job.location);
   const sourceColor = getSourceColor(job.source);

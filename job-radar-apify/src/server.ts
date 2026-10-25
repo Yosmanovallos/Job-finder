@@ -1023,7 +1023,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       // hub linking into the individual job pages, unlike the job-detail
       // branch below (which only needs JSON-LD in <head>, no visible list).
       const items = page
-        .map((job: any) => {
+        .map((job) => {
           const href = buildJobPath(job);
           const title = escapeHtml(job.title);
           const company = escapeHtml(job.company || "Confidencial");
@@ -1565,7 +1565,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       })
       .join("\n");
     const jobItems = page
-      .map((job: any) => {
+      .map((job) => {
         const href = buildJobPath(job);
         return `<li><a href="${href}">${escapeHtml(job.title)}</a> — ${escapeHtml(job.location || countryConfig.name)}</li>`;
       })
@@ -1708,8 +1708,8 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     // fields, same as /api/jobs) since the client already knows how to
     // render PaywallCard for those.
     const items = firstPage
-      .filter((job: any) => isPubliclyDescribable(job))
-      .map((job: any) => {
+      .filter((job) => isPubliclyDescribable(job))
+      .map((job) => {
         const href = buildJobPath(job);
         const title = escapeHtml(job.title);
         const company = escapeHtml(job.company || "Confidencial");

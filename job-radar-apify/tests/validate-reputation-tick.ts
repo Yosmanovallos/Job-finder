@@ -473,7 +473,7 @@ async function runCompanyEndpointTests() {
       `GET respondió ${res.status} o con forma inesperada: ${JSON.stringify(body).slice(0, 300)}`
     );
     check(
-      body.reputation.some((r: any) => r.source === "merco" && typeof r.score === "number"),
+      body.reputation.some((r: { source?: string; score?: unknown }) => r.source === "merco" && typeof r.score === "number"),
       "La reputación de Bancolombia incluye el score real de Merco Talento.",
       `No se encontró la entrada de Merco esperada: ${JSON.stringify(body.reputation)}`
     );
@@ -494,7 +494,7 @@ async function runCompanyEndpointTests() {
     const jobsRes = await fetch(`${BASE_URL}/api/jobs?limit=50`);
     const jobsBody = await jobsRes.json();
     const noReputationJob = jobsBody.jobs.find(
-      (j: any) => j.company && (j.reputation || []).length === 0
+      (j: { company?: string | null; reputation?: unknown[] }) => j.company && (j.reputation || []).length === 0
     );
     if (noReputationJob) {
       const fallbackSlug = buildCompanyPath(noReputationJob.company).replace("/empresas/", "");

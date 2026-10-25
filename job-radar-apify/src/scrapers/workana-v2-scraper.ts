@@ -202,6 +202,23 @@ function parseRelativeDate(dateText: string): string | null {
  * @param maxPages  Maximum pages to fetch (default: 10, ~20 results/page).
  * @returns Array of WorkanaJob objects from the last 24 hours.
  */
+// Fields of a Workana catalog page item that scrapeWorkanaV2 reads.
+interface WorkanaCatalogItem {
+  title?: string;
+  slug?: string;
+  authorName?: string;
+  country?: string;
+  publishedDate?: string;
+  description?: string;
+  skills?: unknown;
+  isHourly?: unknown;
+  budget?: unknown;
+}
+interface WorkanaCatalogPage {
+  results?: WorkanaCatalogItem[];
+  pagination?: { pages?: number };
+}
+
 export async function scrapeWorkanaV2(
   maxPages: number = 10
 ): Promise<WorkanaJob[]> {
@@ -255,7 +272,7 @@ export async function scrapeWorkanaV2(
       .replaceAll("&quot;", '"')
       .replaceAll("&#39;", "'");
 
-    let parsed: any;
+    let parsed: WorkanaCatalogPage;
     try {
       parsed = JSON.parse(decodedValue);
     } catch {
@@ -312,7 +329,7 @@ export async function scrapeWorkanaV2(
 
       const { description, requirements } = extractStructuredFromHtml(item.description || "");
       const skills: string[] = Array.isArray(item.skills)
-        ? item.skills.map((s: any) => s?.anchorText).filter((n: unknown): n is string => typeof n === "string")
+        ? item.skills.map((s: { anchorText?: unknown } | null) => s?.anchorText).filter((n: unknown): n is string => typeof n === "string")
         : [];
 
       jobs.push({

@@ -133,7 +133,7 @@ function runPureFunctionTests() {
     "isPubliclyDescribable() rechazó una vacante completa."
   );
 
-  const posting = buildJobPosting(openJob) as any;
+  const posting = buildJobPosting(openJob);
   check(
     posting !== null,
     "buildJobPosting() genera JobPosting para una vacante apta para Google.",
@@ -194,9 +194,10 @@ function runPureFunctionTests() {
   const lockedJob: SeoJob = {
     ...openJob,
     jobId: "test-locked-1",
-    company: null as any,
-    location: null as any,
-    url: null as any
+    // Deliberately violates SeoJob: this is the masked shape a locked job has.
+    company: null as unknown as string,
+    location: null as unknown as string,
+    url: null as unknown as string
   };
   check(
     !isPubliclyDescribable(lockedJob),
@@ -225,7 +226,9 @@ function runPureFunctionTests() {
     remoteType: "fully_remote",
     applicantCountries: ["VE"]
   };
-  const statedRemotePosting = buildJobPosting(statedRemoteJob) as any;
+  const statedRemotePosting = buildJobPosting(statedRemoteJob) as
+    | (Record<string, unknown> & { applicantLocationRequirements?: { name?: string }[] })
+    | null;
   check(
     statedRemotePosting?.jobLocationType === "TELECOMMUTE" &&
       statedRemotePosting.applicantLocationRequirements?.[0]?.name === "Venezuela" &&
@@ -821,7 +824,7 @@ async function runHttpTests() {
     const ldJsonBlocks = [
       ...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)
     ];
-    let jobPosting: any = null;
+    let jobPosting: { title?: string; hiringOrganization?: { name?: string } } | null = null;
     for (const block of ldJsonBlocks) {
       try {
         const parsed = JSON.parse(block[1]);
@@ -959,8 +962,8 @@ async function runHttpTests() {
     const cityLdJsonBlocks = [
       ...cityHtml.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)
     ];
-    let cityBreadcrumb: any = null;
-    let cityItemList: any = null;
+    let cityBreadcrumb: { itemListElement?: { item: string }[] } | null = null;
+    let cityItemList: { itemListElement?: { url?: string }[] } | null = null;
     for (const block of cityLdJsonBlocks) {
       try {
         const parsed = JSON.parse(block[1]);
@@ -1104,7 +1107,7 @@ async function runHttpTests() {
       const companyLdBlocks = [
         ...companyHtml.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)
       ];
-      let organizationSchema: any = null;
+      let organizationSchema: { name?: string } | null = null;
       for (const block of companyLdBlocks) {
         try {
           const parsed = JSON.parse(block[1]);
@@ -1123,7 +1126,7 @@ async function runHttpTests() {
         `No se encontró un JSON-LD Organization válido (o con el nombre correcto) en /empresas/${companySlug}.`
       );
       check(
-        organizationSchema && !("aggregateRating" in organizationSchema),
+        (organizationSchema && !("aggregateRating" in organizationSchema)) as boolean,
         `/empresas/${companySlug} nunca inventa un aggregateRating (fuentes con escalas distintas, nunca promediadas).`,
         `/empresas/${companySlug} incluye un aggregateRating fabricado — Merco/GPTW/Computrabajo usan escalas distintas, promediarlas inventa un dato.`
       );
