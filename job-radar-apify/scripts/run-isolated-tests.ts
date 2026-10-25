@@ -37,6 +37,7 @@ const suites: Record<string, string[]> = {
     "validate-direct-d5-eightfold.test.ts",
     "validate-direct-d5-magneto.test.ts",
     "validate-direct-d5-google.test.ts",
+    "validate-direct-tp.test.ts",
     "validate-magneto-robots.test.ts",
     "validate-job-date-label.test.ts",
     "validate-source-scheduling.test.ts",
@@ -64,7 +65,7 @@ const suites: Record<string, string[]> = {
     "validate-direct-discovery.ts",
     "validate-direct-projection.ts"
   ],
-  direct: ["validate-direct-employers.test.ts", "validate-direct-discovery.test.ts", "validate-direct-d5.test.ts", "validate-direct-d5-workday.test.ts", "validate-direct-d5-phenom.test.ts", "validate-direct-d5-eightfold.test.ts", "validate-direct-d5-magneto.test.ts", "validate-direct-d5-google.test.ts", "validate-direct-employers.ts", "validate-direct-discovery.ts", "validate-direct-projection.ts"],
+  direct: ["validate-direct-employers.test.ts", "validate-direct-discovery.test.ts", "validate-direct-d5.test.ts", "validate-direct-d5-workday.test.ts", "validate-direct-d5-phenom.test.ts", "validate-direct-d5-eightfold.test.ts", "validate-direct-d5-magneto.test.ts", "validate-direct-d5-google.test.ts", "validate-direct-tp.test.ts", "validate-direct-employers.ts", "validate-direct-discovery.ts", "validate-direct-projection.ts"],
   "source-closure": ["validate-source-closure.test.ts", "validate-source-closure.ts"],
   "job-freshness": ["validate-job-freshness.test.ts", "validate-job-freshness.ts"],
   sitemap: ["validate-sitemap-streaming.ts"],

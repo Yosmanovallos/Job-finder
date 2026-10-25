@@ -8,7 +8,7 @@
 /** ATS types discovery can recognise; only some have a connector (src/direct/types.ts). */
 export const DETECTABLE_ATS_TYPES = [
   "greenhouse", "lever", "ashby", "smartrecruiters",
-  "workday", "successfactors", "gupy", "buk", "teamtailor", "eightfold", "icims", "magneto", "phenom", "google"
+  "workday", "successfactors", "gupy", "buk", "teamtailor", "eightfold", "icims", "magneto", "phenom", "google", "tp"
 ] as const;
 export type DetectableAtsType = (typeof DETECTABLE_ATS_TYPES)[number];
 
@@ -72,6 +72,9 @@ export function atsLinkFromUrl(raw: string): AtsLink | null {
   if (host === "magneto365.com" || host === "www.magneto365.com") {
     const match = /^\/co\/empresas\/([A-Za-z0-9][A-Za-z0-9._-]{0,99})/.exec(url.pathname);
     return found("magneto", match?.[1] ?? null);
+  }
+  if (host === "www.tp.com" && /^\/es-co\/ubicaciones\/colombia\/carreras\/?$/.test(url.pathname)) {
+    return found("tp", "colombia");
   }
   const bySubdomain: [string, DetectableAtsType][] = [
     [".gupy.io", "gupy"],
