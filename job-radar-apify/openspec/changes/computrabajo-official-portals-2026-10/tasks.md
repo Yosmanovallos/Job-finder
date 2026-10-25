@@ -5,3 +5,4 @@
 - [x] Pasar lint de los archivos modificados, TypeScript, build, unitarias e integración aislada (CI; Docker local no disponible).
 - [x] Ejecutar el censo en producción y registrar empresas y vacantes pendientes.
 - [ ] Revisar las 11 empresas con dominio curado y separar portales propios de páginas alojadas por Computrabajo.
+- [ ] Concentrar el descubrimiento programado en empresas de Computrabajo Colombia, conservando el modo manual de todas las fuentes; verificar en CI y con una corrida acotada.

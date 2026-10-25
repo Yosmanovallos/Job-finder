@@ -218,6 +218,36 @@ export async function pickDueCandidates(limit: number, minCount: number): Promis
   }));
 }
 
+/** Due candidates ordered by current Computrabajo Colombia vacancies. The
+ * caller supplies a fresh read-only census; no source-specific state is saved. */
+export async function pickDueComputrabajoCandidates(
+  focus: DirectoryCandidateRow[],
+  limit: number,
+  minCount: number
+): Promise<(DirectoryCandidateRow & { websiteDomain: string | null; attempts: number })[]> {
+  if (focus.length === 0) return [];
+  const result = await pool.query(
+    `WITH focused AS (
+       SELECT * FROM unnest($1::text[], $2::int[]) AS f(company_key, computrabajo_count)
+     )
+     SELECT d.company_key, d.company_name, d.directory_count, d.website_domain, d.attempts
+     FROM employer_discovery d JOIN focused f ON f.company_key = d.company_key
+     WHERE d.decision IN ('pending', 'not_found', 'unsupported_ats', 'magneto')
+       AND (d.next_probe_at IS NULL OR d.next_probe_at <= NOW())
+       AND d.directory_count >= $4
+     ORDER BY f.computrabajo_count DESC, d.company_key
+     LIMIT $3`,
+    [focus.map((row) => row.companyKey), focus.map((row) => row.directoryCount), limit, minCount]
+  );
+  return result.rows.map((row) => ({
+    companyKey: row.company_key,
+    companyName: row.company_name,
+    directoryCount: row.directory_count,
+    websiteDomain: row.website_domain,
+    attempts: row.attempts
+  }));
+}
+
 /** The evidence column: board checks plus what the site probe read (URLs only, never HTML). */
 export interface EvidenceDocument {
   boards: BoardEvidence[];

@@ -7,6 +7,7 @@ import {
   loadComputrabajoCoverage,
   loadDirectoryCandidates,
   pickDueCandidates,
+  pickDueComputrabajoCandidates,
   promoteCandidate,
   recordProbe,
   rejectCandidate,
@@ -114,6 +115,15 @@ async function run(): Promise<void> {
       due.some((row) => row.companyKey === "otraprueba"),
     "Los cubiertos no se re-sondean y una empresa con una vacante sigue siendo elegible.",
     `Due: ${due.map((row) => row.companyKey).join(",")}`
+  );
+  const focused = await pickDueComputrabajoCandidates([
+    { companyKey: "discotest", companyName: "Disco Test", directoryCount: 1 },
+    { companyKey: "otraprueba", companyName: "Otra Prueba", directoryCount: 5 }
+  ], 10, 1);
+  check(
+    focused.map((row) => row.companyKey).join(",") === "otraprueba,discotest",
+    "El foco Computrabajo solo elige sus empresas y prioriza sus vacantes, no el volumen de otras bolsas.",
+    `Foco: ${focused.map((row) => row.companyKey).join(",")}`
   );
   await recordProbe(candidate("Otra Prueba", 1), outcome("not_found"), 0);
   const retired = await retireMissingCandidates(["discotest", "seededco", "slugthief", "boardthief"]);
