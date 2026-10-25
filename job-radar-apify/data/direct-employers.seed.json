@@ -1,5 +1,5 @@
 {
-  "$comment": "Empresas con tablero ATS público verificado en vivo el 2026-10-19 con al menos una vacante que nombra Colombia (docs/adr/0006-direct-employers.md). Solo referencias: ninguna vacante, fecha ni reputación escrita a mano. aliases = forma exacta en que las bolsas escriben a la empresa en producción (consultado en /api/companies/search). SmartRecruiters habilitado por opt-in explícito del dueño el 2026-10-19 (ADR-0002, ADR 0006 §5). 2026-10-20 (fase D5): 14 tableros de SuccessFactors, Teamtailor, Workday, Phenom, Eightfold y Magneto verificados con canario en vivo (docs/source-catalog/<ats>.md §canario); Magneto solo donde el sitio propio enlaza su página (decisión del dueño). Alias consultados en /api/companies/search; se omiten los ambiguos (avianca AR, RappiPay, Connect). Microsoft (Eightfold) queda enabled=false: respondió 429 en la investigación y en el dry-run del 2026-10-20; se habilita tras un canario completo. 2026-10-20 (internacionales que contratan en Colombia): 20 tableros verificados con canario por source-researcher (docs/source-catalog/international-employers.md) y re-verificados tras corregir la faceta de país de Workday (Location_Country/Country). Propiedad: enlace desde el sitio de carreras de la empresa o hiringOrganization de su filial colombiana. Turing queda fuera (propiedad media). Merck & Co. opera en Colombia como MSD (no confundir con Merck KGaA: 'Merck Group'/'Merck Healthcare' no son alias). 2026-10-20 (big tech): Google (página de resultados, solo página 1 por robots.txt; sin fecha declarada → null) y Salesforce (Workday, faceta de país por descriptor) agregados; Microsoft habilitado (respondió 200 con 3 vacantes; un 429 en el tick solo deja el listado incompleto). Accenture queda enabled=false: 429 en todos los intentos y 'forma inesperada' sin diagnosticar; se habilita tras un canario completo. Amazon, Meta e IBM no se agregan: sus términos prohíben la recolección automatizada sin permiso escrito. 2026-10-20 (multinacionales, segunda tanda): UPS, Medtronic, HPE, Mondelez, ABB, Pfizer y GSK (propiedad: el 100 % de sus vacantes colombianas nombra a la empresa, mismo criterio que la decisión 3 del dueño) y J&J y Maersk (Workday sin faceta de país: filtro por las ubicaciones colombianas del propio tenant). docs/source-catalog/multinationals.md.",
+  "$comment": "Empresas con tablero ATS público verificado en vivo el 2026-10-19 con al menos una vacante que nombra Colombia (docs/adr/0006-direct-employers.md). Solo referencias: ninguna vacante, fecha ni reputación escrita a mano. aliases = forma exacta en que las bolsas escriben a la empresa en producción (consultado en /api/companies/search). SmartRecruiters habilitado por opt-in explícito del dueño el 2026-10-19 (ADR-0002, ADR 0006 §5). 2026-10-20 (fase D5): 14 tableros de SuccessFactors, Teamtailor, Workday, Phenom, Eightfold y Magneto verificados con canario en vivo (docs/source-catalog/<ats>.md §canario); Magneto solo donde el sitio propio enlaza su página (decisión del dueño). Alias consultados en /api/companies/search; se omiten los ambiguos (avianca AR, RappiPay, Connect). Microsoft (Eightfold) queda enabled=false: respondió 429 en la investigación y en el dry-run del 2026-10-20; se habilita tras un canario completo. 2026-10-20 (internacionales que contratan en Colombia): 20 tableros verificados con canario por source-researcher (docs/source-catalog/international-employers.md) y re-verificados tras corregir la faceta de país de Workday (Location_Country/Country). Propiedad: enlace desde el sitio de carreras de la empresa o hiringOrganization de su filial colombiana. Turing queda fuera (propiedad media). Merck & Co. opera en Colombia como MSD (no confundir con Merck KGaA: 'Merck Group'/'Merck Healthcare' no son alias). 2026-10-20 (big tech): Google (página de resultados, solo página 1 por robots.txt; sin fecha declarada → null) y Salesforce (Workday, faceta de país por descriptor) agregados; Microsoft habilitado (respondió 200 con 3 vacantes; un 429 en el tick solo deja el listado incompleto). Accenture queda enabled=false: 429 en todos los intentos y 'forma inesperada' sin diagnosticar; se habilita tras un canario completo. Amazon, Meta e IBM no se agregan: sus términos prohíben la recolección automatizada sin permiso escrito. 2026-10-20 (multinacionales, segunda tanda): UPS, Medtronic, HPE, Mondelez, ABB, Pfizer y GSK (propiedad: el 100 % de sus vacantes colombianas nombra a la empresa, mismo criterio que la decisión 3 del dueño) y J&J y Maersk (Workday sin faceta de país: filtro por las ubicaciones colombianas del propio tenant). docs/source-catalog/multinationals.md. 2026-10-25 (palanca A, vacantes atascadas sin descripción en bolsas): MetLife (Lever 'metlife', 39/39 vacantes en Colombia y el texto se identifica como MetLife) y Softtek (Eightfold PCSX, 64 vacantes en Colombia, robots.txt permite /api/pcsx; softtek.com/jobs enlaza softtek.eightfold.ai). Alias consultados en producción.",
   "employers": [
     {
       "slug": "sezzle",
@@ -938,6 +938,37 @@
         {
           "atsType": "workday",
           "atsRef": "maersk/wd3/Maersk_Careers",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "slug": "metlife",
+      "displayName": "MetLife",
+      "websiteDomain": "metlife.com.co",
+      "aliases": [
+        "MetLife Colombia",
+        "METLIFE ASEGURADORA"
+      ],
+      "sources": [
+        {
+          "atsType": "lever",
+          "atsRef": "metlife",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "slug": "softtek",
+      "displayName": "Softtek",
+      "websiteDomain": "softtek.com",
+      "aliases": [
+        "Softtek Colombia"
+      ],
+      "sources": [
+        {
+          "atsType": "eightfold",
+          "atsRef": "softtek.eightfold.ai@softtek.com",
           "enabled": true
         }
       ]
