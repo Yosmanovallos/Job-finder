@@ -1,4 +1,4 @@
-import { ReputationScoreInput, ReputationSourceAdapter } from "./types.js";
+import type { ReputationScoreInput, ReputationSourceAdapter } from "./types.js";
 import { decodeNumericHtmlEntities } from "./html-entities.js";
 
 const MERCO_TALENTO_URL = "https://www.merco.info/co/ranking-merco-talento";

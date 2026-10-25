@@ -1,4 +1,4 @@
-import { SocialDigest } from "./digest-generator.js";
+import type { SocialDigest } from "./digest-generator.js";
 import { SITE_DOMAIN } from "../config.js";
 
 /**

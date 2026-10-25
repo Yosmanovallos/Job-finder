@@ -1,4 +1,5 @@
-import { allAdapters, SourceAdapter } from "../sources/index.js";
+import type { SourceAdapter } from "../sources/index.js";
+import { allAdapters } from "../sources/index.js";
 import { markRoleSourceRun } from "../db/scheduler-repository.js";
 import { generateRoleKeywordsWithAI } from "../ai-role-agent.js";
 import { DEFAULT_COUNTRY, resolveJobCountry } from "../countries/index.js";

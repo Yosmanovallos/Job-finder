@@ -1,4 +1,4 @@
-import { Job } from "../sources/types.js";
+import type { Job } from "../sources/types.js";
 import { DEFAULT_ROLES_200 } from "../queue/scheduler.js";
 import { TRANSLATION_MAP } from "../ai-role-agent.js";
 import { getCountryConfig } from "../countries/index.js";

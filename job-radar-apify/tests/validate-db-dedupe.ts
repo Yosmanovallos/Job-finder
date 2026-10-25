@@ -1,5 +1,5 @@
 import { saveJobs, getJobs, clearRepository, computeUrlHash } from '../src/db/job-repository.js';
-import { Job } from '../src/sources/types.js';
+import type { Job } from '../src/sources/types.js';
 import { pool } from '../src/db/client.js';
 
 async function runDedupeTest() {

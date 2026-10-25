@@ -1,5 +1,5 @@
 import { pool } from "./client.js";
-import { ReputationScoreInput } from "../sources/reputation/types.js";
+import type { ReputationScoreInput } from "../sources/reputation/types.js";
 import { slugify } from "../lib/job-seo.js";
 
 export interface ReputationAliasInput {

@@ -1,5 +1,5 @@
 import { extractStructuredFromHtml, htmlEntities } from "../utils.js";
-import { JobDetail } from "../sources/types.js";
+import type { JobDetail } from "../sources/types.js";
 import { toCountryCodes } from "./country-codes.js";
 
 // Google for Jobs requires site owners to embed a schema.org `JobPosting`

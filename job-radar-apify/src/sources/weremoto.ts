@@ -1,4 +1,5 @@
-import { SourceAdapter, Job, deduplicateJobs } from "./types.js";
+import type { SourceAdapter, Job } from "./types.js";
+import { deduplicateJobs } from "./types.js";
 import { scrapeWeRemoto } from "../index.js";
 import { executeWithResilience } from "../engine/resilient-fetch.js";
 

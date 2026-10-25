@@ -1,6 +1,9 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import type {
+  Job
+} from '../src/index.js';
 import {
   scrapeLinkedIn,
   scrapeComputrabajo,
@@ -13,8 +16,7 @@ import {
   scrapeRemoteOK,
   scrapeRemotive,
   scrapeIndeedLocal,
-  scrapeGlassdoor,
-  Job
+  scrapeGlassdoor
 } from '../src/index.js';
 
 const __filename = fileURLToPath(import.meta.url);

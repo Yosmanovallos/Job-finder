@@ -1,6 +1,6 @@
 import type { PoolClient } from "pg";
 import { pool } from "./client.js";
-import { NotificationType } from "../lib/google-indexing.js";
+import type { NotificationType } from "../lib/google-indexing.js";
 import { buildJobUrl, buildJobUrlPrefix } from "../lib/job-seo.js";
 import { canonicalSql, seoReadySql } from "../lib/google-job-readiness.js";
 import type { LaneQueues, QueueLane, Schedulable } from "../lib/indexing-scheduler.js";

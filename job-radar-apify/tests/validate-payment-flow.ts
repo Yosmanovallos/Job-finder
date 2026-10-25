@@ -13,7 +13,8 @@ import {
   createPendingTransaction,
   getUserTier
 } from "../src/db/job-repository.js";
-import { handleWompiWebhook, WompiEventPayload } from "../src/payments/webhook.js";
+import type { WompiEventPayload } from "../src/payments/webhook.js";
+import { handleWompiWebhook } from "../src/payments/webhook.js";
 import { PRO_MONTHLY_PRICE_COP_CENTS, PRO_MAX_MONTHLY_PRICE_COP_CENTS } from "../src/config.js";
 
 dotenv.config();

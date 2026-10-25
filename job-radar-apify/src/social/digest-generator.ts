@@ -1,4 +1,4 @@
-import { Job } from "../sources/types.js";
+import type { Job } from "../sources/types.js";
 import { SITE_DOMAIN } from "../config.js";
 
 export interface SocialDigest {

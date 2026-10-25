@@ -1,4 +1,4 @@
-import { Job } from './types.js';
+import type { Job } from './types.js';
 import { jitterDelay } from '../engine/jitter-delay.js';
 import { htmlEntities } from '../utils.js';
 import { flightStream, objectAfter } from '../lib/next-flight.js';

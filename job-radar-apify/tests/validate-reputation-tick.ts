@@ -29,7 +29,8 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { spawn, ChildProcess } from "child_process";
+import type { ChildProcess } from "child_process";
+import { spawn } from "child_process";
 import dotenv from "dotenv";
 import { pool } from "../src/db/client.js";
 import { executeWithResilience, isSourceDegraded } from "../src/engine/resilient-fetch.js";
@@ -40,7 +41,7 @@ import {
   resolveCompanyBySlug
 } from "../src/db/company-reputation-repository.js";
 import { REPUTATION_SOURCES } from "../src/sources/reputation/index.js";
-import { ReputationScoreInput } from "../src/sources/reputation/types.js";
+import type { ReputationScoreInput } from "../src/sources/reputation/types.js";
 import { parseMercoTalentoHtml } from "../src/sources/reputation/merco.js";
 import { filterCurrentCertifications } from "../src/sources/reputation/gptw.js";
 import {

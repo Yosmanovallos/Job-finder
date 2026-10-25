@@ -1,10 +1,11 @@
-import { spawn, ChildProcess } from "child_process";
+import type { ChildProcess } from "child_process";
+import { spawn } from "child_process";
 import path from "path";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 import { createClient } from "@supabase/supabase-js";
 import { saveJobs, clearRepository, getJobs, maskLockedFields } from "../src/db/job-repository.js";
-import { Job } from "../src/sources/types.js";
+import type { Job } from "../src/sources/types.js";
 
 dotenv.config();
 

@@ -2,7 +2,7 @@ import { saveJobs, clearRepository } from '../src/db/job-repository.js';
 import { generateSocialDigest } from '../src/social/digest-generator.js';
 import { generateCardSvg } from '../src/social/card-generator.js';
 import { publishPendingDigests, getSocialPostHistory } from '../src/social/publisher.js';
-import { Job } from '../src/sources/types.js';
+import type { Job } from '../src/sources/types.js';
 
 async function runSocialPublisherValidation() {
   console.log(`\n==================================================`);

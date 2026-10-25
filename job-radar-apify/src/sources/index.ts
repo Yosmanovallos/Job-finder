@@ -1,4 +1,4 @@
-import { SourceAdapter } from "./types.js";
+import type { SourceAdapter } from "./types.js";
 import { linkedinAdapter } from "./linkedin.js";
 import { computrabajoAdapter } from "./computrabajo.js";
 import { elempleoAdapter } from "./elempleo.js";

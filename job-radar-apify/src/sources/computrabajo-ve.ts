@@ -1,4 +1,5 @@
-import { SourceAdapter, Job, JobDetail, deduplicateJobs } from './types.js';
+import type { SourceAdapter, Job, JobDetail } from './types.js';
+import { deduplicateJobs } from './types.js';
 import { scrapeComputrabajo, fetchComputrabajoDetail } from '../index.js';
 import { executeWithResilience } from '../engine/resilient-fetch.js';
 import { jitterDelay } from '../engine/jitter-delay.js';

@@ -1,6 +1,7 @@
 import fs from "fs";
 import dotenv from "dotenv";
-import { allAdapters, SourceAdapter } from "../src/sources/index.js";
+import type { SourceAdapter } from "../src/sources/index.js";
+import { allAdapters } from "../src/sources/index.js";
 import {
   SOURCE_CADENCE_MS,
   GLOBAL_SOURCE_CADENCE_MS,

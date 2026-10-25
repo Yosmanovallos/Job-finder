@@ -1,10 +1,14 @@
 import "./require-isolated-database.js";
-import { spawn, ChildProcess } from "child_process";
+import type { ChildProcess } from "child_process";
+import { spawn } from "child_process";
 import path from "path";
 import { fileURLToPath } from "url";
 import crypto from "crypto";
 import dotenv from "dotenv";
 import { getJobs, maskLockedFields } from "../src/db/job-repository.js";
+import type {
+  SeoJob
+} from "../src/lib/job-seo.js";
 import {
   slugify,
   escapeHtml,
@@ -25,7 +29,6 @@ import {
   buildCategoryPath,
   buildCategoriesSitemapXml,
   buildJobUrlPrefix,
-  SeoJob,
   SITE_URL
 } from "../src/lib/job-seo.js";
 import { CITY_OPTIONS } from "../src/lib/job-filters.js";
