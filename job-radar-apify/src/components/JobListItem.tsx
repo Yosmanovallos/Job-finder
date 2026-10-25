@@ -5,6 +5,7 @@ import { cn } from "../lib/utils.js";
 import { Job } from "../sources/types.js";
 import { buildLocationLabel } from "../countries/index.js";
 import { jobDateLabel } from "../lib/job-date-label.js";
+import { isAvailabilityUnverified } from "../lib/job-availability.js";
 
 export interface JobListItemProps {
   job: Job & { salary?: string };
@@ -19,6 +20,7 @@ const MODALITY_VARIANT: Record<string, "remote" | "hybrid" | "default"> = {
 };
 
 function isFresh(job: JobListItemProps["job"]): boolean {
+  if (isAvailabilityUnverified(job.source)) return false;
   if (!job.publishedAt) return false;
   const ageHours = (Date.now() - new Date(job.publishedAt).getTime()) / (1000 * 60 * 60);
   return ageHours <= 48;
@@ -54,6 +56,7 @@ export const JobListItem: React.FC<JobListItemProps> = ({ job, selected, onClick
         {modality && <Badge variant={MODALITY_VARIANT[modality]}>{modality}</Badge>}
         {job.salary && <Badge>{job.salary}</Badge>}
         {isFresh(job) && <Badge variant="primary">Nueva</Badge>}
+        {isAvailabilityUnverified(job.source) && <Badge variant="hybrid">Vigencia no verificada</Badge>}
       </div>
       <p className="text-[11px] font-mono text-ink-faint">
         {jobDateLabel(job)}

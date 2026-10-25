@@ -14,6 +14,7 @@ import { detailFaultFor } from "./sources/detail-http.js";
 import { extractJobPostingDetail, extractFullJobPosting } from "./lib/job-posting-jsonld.js";
 import { jitterDelay } from "./engine/jitter-delay.js";
 import { filterKnownTechnologyTags } from "./lib/extract-technologies.js";
+import { parseDateText } from "./lib/source-date.js";
 
 dotenv.config();
 
@@ -122,71 +123,6 @@ function getDateRangeConfig(range: string = process.env.DATE_RANGE || "48h") {
   }
 }
 
-// Convert date text to standard YYYY-MM-DD
-// Returns a full ISO timestamp (not just a calendar date) — `published_at` is
-// TIMESTAMPTZ, and the dashboard's 24h/48h freshness filter computes an exact
-// age-in-hours from it. Truncating to YYYY-MM-DD (the previous behavior)
-// collapsed everything from "1 hour ago" to "23 hours ago" into the same
-// midnight-UTC bucket, throwing away the very precision that filter needs —
-// a job scraped at 23:00 could get recorded as if posted at 00:00 that same
-// day, shifting its computed age by up to a day at the boundary.
-function parseDateText(
-  dateText: string,
-  source: string,
-  maxDays: number = 2
-): { date: string; valid: boolean } {
-  const now = new Date();
-  let hoursAgo = 0;
-  let valid = false;
-
-  const text = dateText.toLowerCase();
-  const numMatch = text.match(/(\d+)/);
-  const num = numMatch ? parseInt(numMatch[1], 10) : 1;
-
-  if (
-    text.includes("second") ||
-    text.includes("segundo") ||
-    text.includes("minute") ||
-    text.includes("minuto") ||
-    text.includes("now") ||
-    text.includes("hoy")
-  ) {
-    hoursAgo = 0;
-    valid = true;
-  } else if (text.includes("hour") || text.includes("hora")) {
-    hoursAgo = num;
-    valid = hoursAgo <= maxDays * 24;
-  } else if (
-    text.includes("yesterday") ||
-    text.includes("ayer") ||
-    text.includes("1 day") ||
-    text.includes("1 día") ||
-    text.includes("1 dia")
-  ) {
-    hoursAgo = 24;
-    valid = true;
-  } else if (text.includes("day") || text.includes("día") || text.includes("dia")) {
-    hoursAgo = num * 24;
-    valid = num <= maxDays;
-  } else if (text.includes("week") || text.includes("semana")) {
-    hoursAgo = num * 7 * 24;
-    valid = num * 7 <= maxDays;
-  } else if (text.includes("month") || text.includes("mes")) {
-    hoursAgo = num * 30 * 24;
-    valid = num * 30 <= maxDays;
-  } else {
-    hoursAgo = 0;
-    valid = true;
-  }
-
-  if (!valid) {
-    return { date: "", valid: false };
-  }
-
-  const targetDate = new Date(now.getTime() - hoursAgo * 60 * 60 * 1000);
-  return { date: targetDate.toISOString(), valid: true };
-}
-
 // Scrape LinkedIn Guest Jobs API (paginated with dynamic DATE_RANGE filter)
 // `locationQuery` defaults to "Colombia" — every existing call site (the CLI
 // main() below, src/sources/linkedin.ts) keeps its exact current behavior
@@ -243,12 +179,12 @@ export async function scrapeLinkedIn(
           : locationQuery;
 
         const dateMatch = item.match(/<time[^>]*>([^<]+)<\/time>/);
-        const dateText = dateMatch ? htmlEntities(dateMatch[1].trim()) : "1 day ago";
+        const dateText = dateMatch ? htmlEntities(dateMatch[1].trim()) : "";
 
         const urlMatch = item.match(/href="([^"]+)"/);
         const jobUrl = urlMatch ? urlMatch[1].split("?")[0] : "";
 
-        const dateParsed = parseDateText(dateText, "LinkedIn", rangeConfig.maxDays);
+        const dateParsed = parseDateText(dateText, rangeConfig.maxDays);
 
         if (jobId && title && dateParsed.valid) {
           jobs.push({
@@ -387,9 +323,9 @@ export async function scrapeComputrabajo(keyword: string, country: string = "CO"
           : domainConfig.fallbackLocation;
 
         const dateMatch = item.match(/<p class="fs13 fc_aux mt15">\s*([^<]+)\s*<\/p>/i);
-        const dateText = dateMatch ? htmlEntities(dateMatch[1].trim()) : "Hoy";
+        const dateText = dateMatch ? htmlEntities(dateMatch[1].trim()) : "";
 
-        const dateParsed = parseDateText(dateText, "Computrabajo", rangeConfig.maxDays);
+        const dateParsed = parseDateText(dateText, rangeConfig.maxDays);
 
         if (jobId && title && dateParsed.valid) {
           jobs.push({
@@ -498,9 +434,9 @@ export async function scrapeElempleo(keyword: string): Promise<Job[]> {
           const jobUrl = `https://www.elempleo.com${relativeUrl}`;
 
           const dateMatch = item.match(/js-offer-date[^>]*>[^]*?<\/i>\s*([^<]+)\s*<\/span>/);
-          const dateText = dateMatch ? htmlEntities(dateMatch[1].trim()) : "Hoy";
+          const dateText = dateMatch ? htmlEntities(dateMatch[1].trim()) : "";
 
-          const dateParsed = parseDateText(dateText, "Elempleo");
+          const dateParsed = parseDateText(dateText);
 
           if (data.id && data.title && dateParsed.valid) {
             jobs.push({
@@ -767,8 +703,8 @@ export async function scrapeWorkana(keyword: string): Promise<Job[]> {
         const countryText = item.country ? item.country.replace(/<[^>]+>/g, "").trim() : "Colombia";
         const dateText = item.publishedDate
           ? htmlEntities(item.publishedDate.replace("Publicado: ", "").trim())
-          : "Hoy";
-        const dateParsed = parseDateText(dateText, "Workana");
+          : "";
+        const dateParsed = parseDateText(dateText);
 
         if (title && dateParsed.valid) {
           jobs.push({

@@ -14,6 +14,7 @@ import { Button } from "./ui/button.js";
 import { Badge } from "./ui/badge.js";
 import { ReputationBadges, ReputationEntryProps } from "./ReputationBadges.js";
 import { jobDateLabel } from "../lib/job-date-label.js";
+import { isAvailabilityUnverified } from "../lib/job-availability.js";
 
 export interface JobDetailPanelProps {
   job:
@@ -125,7 +126,7 @@ export const JobDetailPanel: React.FC<JobDetailPanelProps> = ({
         <span className="text-foreground text-right">{job.source}</span>
       </div>
       <div className="flex justify-between gap-4">
-        <span className="text-muted-foreground">Publicada</span>
+        <span className="text-muted-foreground">{isAvailabilityUnverified(job.source) ? "Fecha según fuente" : "Publicada"}</span>
         <span className="text-foreground text-right">
           {jobDateLabel(job)}
         </span>
@@ -145,12 +146,7 @@ export const JobDetailPanel: React.FC<JobDetailPanelProps> = ({
     </div>
   );
 
-  const handleApplyClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    if (!isAuthenticated && onApplyClick) {
-      e.preventDefault();
-      onApplyClick(job);
-      return;
-    }
+  const trackOutboundApply = () => {
     const surface = headingLevel === "h1" ? "job_page" : "dashboard_detail";
     trackEvent("outbound_apply", jobAnalyticsParams(job, surface));
   };
@@ -225,13 +221,25 @@ export const JobDetailPanel: React.FC<JobDetailPanelProps> = ({
             {job.source}
           </Badge>
           {(job.dateText || job.publishedAt) && <Badge variant="outline">{jobDateLabel(job)}</Badge>}
+          {isAvailabilityUnverified(job.source) && <Badge variant="hybrid">Vigencia no verificada</Badge>}
         </div>
 
-        <Button asChild size="lg" className="w-full mb-5 font-mono">
-          <a href={job.url} target="_blank" rel="noopener noreferrer" onClick={handleApplyClick}>
+        {isAuthenticated ? (
+          <Button asChild size="lg" className="w-full mb-5 font-mono">
+            <a href={job.url} target="_blank" rel="noopener noreferrer" onClick={trackOutboundApply}>
+              Aplicar en {job.source} <ArrowUpRight className="h-4 w-4" />
+            </a>
+          </Button>
+        ) : (
+          <Button type="button" size="lg" className="w-full mb-5 font-mono" onClick={() => onApplyClick?.(job)}>
             Aplicar en {job.source} <ArrowUpRight className="h-4 w-4" />
-          </a>
-        </Button>
+          </Button>
+        )}
+        {isAvailabilityUnverified(job.source) && (
+          <p className="text-xs text-muted-foreground -mt-3 mb-5">
+            Computrabajo puede retirar una oferta después de publicarla. Comprueba su disponibilidad al abrir la fuente.
+          </p>
+        )}
 
         <div className="ticket-seam mb-5" />
 
