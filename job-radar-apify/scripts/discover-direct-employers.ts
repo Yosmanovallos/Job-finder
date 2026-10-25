@@ -57,7 +57,8 @@ function line(candidate: DiscoveryCandidate, outcome: ProbeOutcome): string {
 async function main() {
   const dryRun = process.argv.includes("--dry-run");
   const limit = intArg("--limit", 100, 1_000);
-  const minCount = intArg("--min-count", 3, 1_000_000);
+  // Every company with a visible job belongs to the Colombia coverage census.
+  const minCount = intArg("--min-count", 1, 1_000_000);
   const maxEnables = intArg("--max-enables", 20, 200);
   const deadlineAt = Date.now() + intArg("--deadline-min", 15, 60) * 60_000;
   const candidatesFile = argValue("--candidates-file");

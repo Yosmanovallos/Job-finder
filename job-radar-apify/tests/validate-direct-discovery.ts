@@ -84,7 +84,13 @@ async function run(): Promise<void> {
   const sync = await syncCandidates([candidate("Disco Test", 3), candidate("Otra Prueba", 1), candidate("Seeded Co", 5), candidate("Slug Thief", 2), candidate("Board Thief", 2)]);
   check(sync.inserted === 5 && sync.known === 1, "Sincronizar inserta candidatos y marca 'known' a los ya cubiertos.", `Sync: ${JSON.stringify(sync)}`);
   const due = await pickDueCandidates(10, 1);
-  check(!due.some((row) => row.companyKey === "seededco") && due[0]?.companyKey === "discotest", "Los cubiertos no se re-sondean; el orden es por vacantes.", `Due: ${due.map((row) => row.companyKey).join(",")}`);
+  check(
+    !due.some((row) => row.companyKey === "seededco") &&
+      due[0]?.companyKey === "discotest" &&
+      due.some((row) => row.companyKey === "otraprueba"),
+    "Los cubiertos no se re-sondean y una empresa con una vacante sigue siendo elegible.",
+    `Due: ${due.map((row) => row.companyKey).join(",")}`
+  );
 
   // Promotion: insert-only, idempotent.
   const promoted = await promoteCandidate(candidate("Disco Test"), [{ atsType: "greenhouse", atsRef: "discotest", method: "name" }], "auto", null);
