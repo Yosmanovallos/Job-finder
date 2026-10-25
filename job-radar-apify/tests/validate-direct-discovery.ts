@@ -4,6 +4,7 @@ import { pool } from "../src/db/client.js";
 import {
   coverageBuckets,
   getCandidate,
+  loadComputrabajoCoverage,
   loadDirectoryCandidates,
   pickDueCandidates,
   promoteCandidate,
@@ -76,11 +77,27 @@ async function run(): Promise<void> {
     `INSERT INTO jobs (url_hash, title, company, location, url, source, country, published_at, direct_job_id)
      VALUES (md5(random()::text), 'Cargo oficial', 'Solo Oficial', 'Bogotá', 'https://example.com/official', 'Portal oficial', 'CO', NOW(), gen_random_uuid())`
   );
+  await pool.query(
+    `INSERT INTO jobs (url_hash, title, company, location, url, source, sources, country, published_at)
+     VALUES
+       (md5(random()::text), 'Cargo CT', 'Disco Test', 'Bogotá', 'https://example.com/ct', 'Computrabajo', '[]', 'CO', NOW()),
+       (md5(random()::text), 'Cargo deduplicado', 'Otra Prueba', 'Bogotá', 'https://example.com/dedupe', 'LinkedIn', '["Computrabajo"]', 'CO', NOW()),
+       (md5(random()::text), 'Cargo VE', 'Solo Venezuela', 'Caracas', 'https://example.com/ve', 'Computrabajo', '[]', 'VE', NOW()),
+       (md5(random()::text), 'Cargo anónimo', 'Confidencial', 'Bogotá', 'https://example.com/anonymous', 'Computrabajo', '[]', 'CO', NOW())`
+  );
   const jobsBefore = await jobsFingerprint();
+  const computrabajo = await loadComputrabajoCoverage();
+  check(
+    computrabajo.length === 2 &&
+      computrabajo.find((row) => row.companyKey === "discotest")?.directoryCount === 1 &&
+      computrabajo.find((row) => row.companyKey === "otraprueba")?.directoryCount === 1,
+    "El censo Computrabajo incluye fuente primaria y deduplicada de CO; excluye VE, proyecciones y anónimas.",
+    `Censo inesperado: ${JSON.stringify(computrabajo)}`
+  );
   const directory = await loadDirectoryCandidates(100);
   const disco = directory.find((row) => row.companyKey === "discotest");
   check(
-    disco?.directoryCount === 3 && disco.companyName === "Disco Test" &&
+    disco?.directoryCount === 4 && disco.companyName === "Disco Test" &&
       !directory.some((row) => row.companyKey.includes("confidencial") || row.companyKey === "solooficial"),
     "El directorio agrupa por company_key y omite relleno y proyecciones oficiales.",
     `Directorio inesperado: ${JSON.stringify(directory)}`
@@ -122,6 +139,10 @@ async function run(): Promise<void> {
     "Un candidato verificado crea empresa + alias + tablero habilitado una sola vez.",
     `Promoción: ${JSON.stringify({ promoted, again, ...rows.rows[0] })}`
   );
+  const coveredByComputrabajo = (await loadComputrabajoCoverage()).find((row) => row.companyKey === "discotest");
+  check(coveredByComputrabajo?.enabledBoards === 1 && coveredByComputrabajo.liveOfficialJobs === 0,
+    "El censo separa un tablero oficial habilitado de sus vacantes oficiales vigentes.",
+    `Cobertura Computrabajo: ${JSON.stringify(coveredByComputrabajo)}`);
 
   // Conflicts never overwrite: an existing slug of another company…
   await upsertEmployer({ slug: "slug-thief", displayName: "Another Company", websiteDomain: null, origin: "seed", aliases: [], sources: [] });
@@ -179,7 +200,7 @@ async function run(): Promise<void> {
 
   await pool.query(`DELETE FROM employer_discovery`);
   await pool.query(`DELETE FROM employers WHERE slug IN ('disco-test', 'slug-thief', 'seeded-co', 'case-owner')`);
-  await pool.query(`DELETE FROM jobs WHERE company IN ('Disco Test', 'DISCO TEST S.A.S.', 'Otra Prueba', 'Confidencial', 'Solo Oficial')`);
+  await pool.query(`DELETE FROM jobs WHERE company IN ('Disco Test', 'DISCO TEST S.A.S.', 'Otra Prueba', 'Confidencial', 'Solo Oficial', 'Solo Venezuela')`);
 }
 
 run()
