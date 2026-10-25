@@ -60,7 +60,7 @@ function pct(part: number, whole: number): string {
 export function formatCoverage(summary: CoverageSummary): string {
   const out: string[] = [];
   out.push(
-    `Directorio (candidatos sincronizados): ${summary.totalCompanies} empresas · ${summary.totalRows} vacantes de bolsas vigentes`,
+    `Directorio activo (candidatos sincronizados): ${summary.totalCompanies} empresas · ${summary.totalRows} vacantes de bolsas vigentes`,
     `Revisadas: ${summary.probedCompanies} de ${summary.totalCompanies} empresas (${pct(summary.probedCompanies, summary.totalCompanies)}) · ` +
       `${pct(summary.probedRows, summary.totalRows)} de las vacantes`,
     `Cubiertas con tablero oficial: ${summary.covered.companies} empresas (${pct(summary.covered.companies, summary.totalCompanies)} del directorio, ` +

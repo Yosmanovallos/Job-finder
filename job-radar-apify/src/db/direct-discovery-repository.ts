@@ -23,8 +23,8 @@ export interface DirectoryCandidateRow {
 }
 
 /**
- * The directory as the site builds it: live `jobs` rows of Colombia (or
- * remote) grouped by the stored employer key, most rows first. Read-only.
+ * Live job-board rows of Colombia (or remote), grouped by the stored employer
+ * key. Official projections are already covered and do not enter the search.
  * The name is the most frequent spelling of the key.
  */
 export async function loadDirectoryCandidates(limit: number): Promise<DirectoryCandidateRow[]> {
@@ -34,7 +34,7 @@ export async function loadDirectoryCandidates(limit: number): Promise<DirectoryC
     `WITH keyed AS (
        SELECT ${storedCompanyKeySql()} AS company_key, company
        FROM jobs
-       WHERE is_active = TRUE AND ${liveJobSql()} AND (country = 'CO' OR country IS NULL)
+       WHERE is_active = TRUE AND direct_job_id IS NULL AND ${liveJobSql()} AND (country = 'CO' OR country IS NULL)
      ), spellings AS (
        SELECT company_key, company, COUNT(*)::int AS n
        FROM keyed
@@ -77,6 +77,10 @@ export async function syncCandidates(
        ON CONFLICT (company_key) DO UPDATE SET
          company_name = EXCLUDED.company_name,
          directory_count = EXCLUDED.directory_count,
+         next_probe_at = CASE
+           WHEN employer_discovery.directory_count = 0 AND EXCLUDED.directory_count > 0
+             AND employer_discovery.decision IN ('pending', 'not_found', 'unsupported_ats', 'magneto')
+           THEN NULL ELSE employer_discovery.next_probe_at END,
          website_domain = COALESCE(employer_discovery.website_domain, EXCLUDED.website_domain),
          domain_origin = CASE WHEN employer_discovery.website_domain IS NULL THEN EXCLUDED.domain_origin ELSE employer_discovery.domain_origin END,
          updated_at = NOW()
@@ -109,6 +113,18 @@ export async function syncCandidates(
   } finally {
     client.release();
   }
+}
+
+/** Retires rows absent from a complete live job-board snapshot without losing
+ * their evidence or sticky decisions. A later sighting reactivates the row. */
+export async function retireMissingCandidates(activeKeys: string[]): Promise<number> {
+  if (activeKeys.length === 0) return 0; // an empty/failed snapshot is not evidence of mass disappearance
+  const result = await pool.query(
+    `UPDATE employer_discovery SET directory_count = 0, updated_at = NOW()
+     WHERE directory_count > 0 AND NOT (company_key = ANY($1::text[]))`,
+    [activeKeys]
+  );
+  return result.rowCount ?? 0;
 }
 
 /** Candidates to probe now: open decisions whose retry time came, most job-board rows first. */
@@ -423,7 +439,7 @@ export interface CoverageBucketRow {
 export async function coverageBuckets(): Promise<CoverageBucketRow[]> {
   const result = await pool.query(
     `SELECT decision, name_probe_status, site_probe_status, COUNT(*)::int AS companies, COALESCE(SUM(directory_count), 0)::int AS rows
-     FROM employer_discovery GROUP BY 1, 2, 3 ORDER BY 1, 2, 3`
+     FROM employer_discovery WHERE directory_count > 0 GROUP BY 1, 2, 3 ORDER BY 1, 2, 3`
   );
   return result.rows.map((row) => ({
     decision: row.decision,

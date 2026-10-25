@@ -2,12 +2,14 @@ import "./require-isolated-database.js";
 import { readFile } from "node:fs/promises";
 import { pool } from "../src/db/client.js";
 import {
+  coverageBuckets,
   getCandidate,
   loadDirectoryCandidates,
   pickDueCandidates,
   promoteCandidate,
   recordProbe,
   rejectCandidate,
+  retireMissingCandidates,
   syncCandidates
 } from "../src/db/direct-discovery-repository.js";
 import { upsertEmployer } from "../src/db/direct-repository.js";
@@ -49,7 +51,7 @@ async function run(): Promise<void> {
   console.log("\n--- Descubrimiento de empresas (D3) ---\n");
 
   const schema = await readFile(new URL("../src/db/schema.sql", import.meta.url), "utf8");
-  for (const name of ["direct-employers", "direct-discovery"]) {
+  for (const name of ["direct-employers", "direct-discovery", "direct-projection"]) {
     const block = new RegExp(`-- BEGIN ${name}\\r?\\n([\\s\\S]*?)-- END ${name}`).exec(schema)?.[1];
     check(Boolean(block), `schema.sql contiene el bloque ${name}.`, `Falta el bloque ${name}.`);
     await pool.query(block!);
@@ -70,12 +72,17 @@ async function run(): Promise<void> {
      SELECT md5(random()::text || g), 'Cargo ' || g, c, 'Bogotá', 'https://example.com/d/' || md5(random()::text), 'LinkedIn', 'CO', NOW() - INTERVAL '1 day'
      FROM unnest(ARRAY['Disco Test', 'DISCO TEST S.A.S.', 'Disco Test', 'Otra Prueba', 'Confidencial']) AS c, generate_series(1, 1) AS g`
   );
+  await pool.query(
+    `INSERT INTO jobs (url_hash, title, company, location, url, source, country, published_at, direct_job_id)
+     VALUES (md5(random()::text), 'Cargo oficial', 'Solo Oficial', 'Bogotá', 'https://example.com/official', 'Portal oficial', 'CO', NOW(), gen_random_uuid())`
+  );
   const jobsBefore = await jobsFingerprint();
   const directory = await loadDirectoryCandidates(100);
   const disco = directory.find((row) => row.companyKey === "discotest");
   check(
-    disco?.directoryCount === 3 && disco.companyName === "Disco Test" && !directory.some((row) => row.companyKey.includes("confidencial")),
-    "El directorio agrupa por company_key, usa la grafía más frecuente y omite nombres de relleno.",
+    disco?.directoryCount === 3 && disco.companyName === "Disco Test" &&
+      !directory.some((row) => row.companyKey.includes("confidencial") || row.companyKey === "solooficial"),
+    "El directorio agrupa por company_key y omite relleno y proyecciones oficiales.",
     `Directorio inesperado: ${JSON.stringify(directory)}`
   );
 
@@ -91,6 +98,15 @@ async function run(): Promise<void> {
     "Los cubiertos no se re-sondean y una empresa con una vacante sigue siendo elegible.",
     `Due: ${due.map((row) => row.companyKey).join(",")}`
   );
+  await recordProbe(candidate("Otra Prueba", 1), outcome("not_found"), 0);
+  const retired = await retireMissingCandidates(["discotest", "seededco", "slugthief", "boardthief"]);
+  const afterRetire = await pickDueCandidates(10, 1);
+  check(retired === 1 && !afterRetire.some((row) => row.companyKey === "otraprueba"), "Una empresa ausente del snapshot no consume sondeos.", `Retired: ${retired}; due: ${afterRetire.map((row) => row.companyKey).join(",")}`);
+  const activeCount = (await coverageBuckets()).reduce((total, bucket) => total + bucket.companies, 0);
+  check(activeCount === 4, "La cobertura excluye empresas retiradas del directorio activo.", `Cobertura activa: ${activeCount}`);
+  await syncCandidates([candidate("Otra Prueba", 1)]);
+  const afterReappear = await pickDueCandidates(10, 1);
+  check(afterReappear.some((row) => row.companyKey === "otraprueba"), "Una empresa que reaparece con una vacante vuelve a la cola.", `Due: ${afterReappear.map((row) => row.companyKey).join(",")}`);
 
   // Promotion: insert-only, idempotent.
   const promoted = await promoteCandidate(candidate("Disco Test"), [{ atsType: "greenhouse", atsRef: "discotest", method: "name" }], "auto", null);
@@ -163,7 +179,7 @@ async function run(): Promise<void> {
 
   await pool.query(`DELETE FROM employer_discovery`);
   await pool.query(`DELETE FROM employers WHERE slug IN ('disco-test', 'slug-thief', 'seeded-co', 'case-owner')`);
-  await pool.query(`DELETE FROM jobs WHERE company IN ('Disco Test', 'DISCO TEST S.A.S.', 'Otra Prueba', 'Confidencial')`);
+  await pool.query(`DELETE FROM jobs WHERE company IN ('Disco Test', 'DISCO TEST S.A.S.', 'Otra Prueba', 'Confidencial', 'Solo Oficial')`);
 }
 
 run()
