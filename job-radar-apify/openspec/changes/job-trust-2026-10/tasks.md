@@ -7,5 +7,5 @@
 - [x] Añadir auditoría agregada de solo lectura (`npm run audit:job-trust`).
 - [x] Lint de archivos cambiados, TypeScript, build y suite unitaria.
 - [ ] Integración PostgreSQL desechable en CI: Docker Desktop local no está disponible.
-- [ ] Ejecutar auditoría agregada en producción y registrar conteos por fuente.
+- [x] Ejecutar auditoría agregada en producción y registrar conteos por fuente.
 - [ ] Conseguir un canal permitido para verificar cierres de Computrabajo antes de afirmar que sus enlaces están activos.

@@ -10,6 +10,7 @@ const NOW = new Date("2026-10-21T12:00:00Z");
 
 test("job date label: relative source text ages with its stored timestamp", () => {
   assert.equal(jobDateLabel({ dateText: "51 minutes ago", publishedAt: "2026-10-01T00:00:00Z" }, NOW), "hace 20 días");
+  assert.equal(jobDateLabel({ dateText: "37 minutos", publishedAt: "2026-10-01T00:00:00Z" }, NOW), "hace 20 días");
   assert.equal(jobDateLabel({ dateText: "Fecha no indicada", publishedAt: "2026-10-21T11:30:00Z" }, NOW), "Fecha no indicada");
   assert.equal(jobDateLabel({ dateText: "", publishedAt: "2026-10-21T11:30:00Z" }, NOW), "hace 30 min");
   assert.equal(jobDateLabel({ dateText: "Hoy", publishedAt: "2026-10-21T11:30:00Z" }, NOW), "Hoy");

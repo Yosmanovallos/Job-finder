@@ -16,6 +16,8 @@ async function main(): Promise<void> {
         COUNT(*) FILTER (WHERE date_text IS NULL OR btrim(date_text) = '')::integer AS missing_source_date,
         COUNT(*) FILTER (WHERE published_at > NOW() + INTERVAL '1 hour')::integer AS future_publication_date,
         COUNT(*) FILTER (WHERE date_text ~* '(minute|minuto)' AND published_at < NOW() - INTERVAL '1 day')::integer AS old_stored_minute_text,
+        COUNT(*) FILTER (WHERE last_seen_at < NOW() - INTERVAL '7 days')::integer AS not_seen_7d,
+        COUNT(*) FILTER (WHERE last_seen_at < NOW() - INTERVAL '14 days')::integer AS not_seen_14d,
         COUNT(*) FILTER (WHERE source_checked_at IS NULL)::integer AS never_source_checked
       FROM jobs
       WHERE is_active = TRUE AND ${liveJobSql()}

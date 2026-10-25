@@ -3,7 +3,8 @@
 export function jobDateLabel(job: { dateText?: string | null; publishedAt?: string | Date | null }, now: Date = new Date()): string {
   const sourceText = job.dateText?.trim();
   const published = job.publishedAt ? new Date(job.publishedAt) : null;
-  if (sourceText && !/\b(?:ago|hace|hoy|today|ayer|yesterday|now|ahora)\b/i.test(sourceText)) return sourceText;
+  const relative = sourceText && /\b(?:ago|hace|hoy|today|ayer|yesterday|now|ahora|seconds?|segundos?|minutes?|minutos?|hours?|horas?|days?|d[ií]as?|weeks?|semanas?|months?|meses?)\b/i.test(sourceText);
+  if (sourceText && !relative) return sourceText;
   if (!published || !Number.isFinite(published.getTime())) return sourceText || "Fecha no indicada";
   const hours = Math.max(0, (now.getTime() - published.getTime()) / 3_600_000);
   if (/^(?:hoy|today)$/i.test(sourceText || "") && hours < 24) return sourceText!;
