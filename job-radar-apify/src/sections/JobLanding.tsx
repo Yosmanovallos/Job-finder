@@ -9,12 +9,14 @@ import { buildJobMeta } from "../lib/job-seo.js";
 import { Button } from "../components/ui/button.js";
 import { ArrowLeft } from "lucide-react";
 import { jobAnalyticsParams, trackEvent } from "../lib/analytics.js";
+import { readSsrJob, isMissingJobResponse } from "../lib/job-page-state.js";
+import type { Job } from "../sources/types.js";
 
-type LoadState = "loading" | "found" | "not-found";
+type LoadState = "loading" | "found" | "not-found" | "error";
 
 // Client-side counterpart of server.ts's /empleos/:id/:slug SSR route —
-// what a real visitor sees after React hydrates (a crawler only ever sees
-// the server-rendered HTML). Deliberately does NOT call usePageMeta until
+// what visitors and rendering crawlers see after React mounts.
+// Deliberately does NOT call usePageMeta until
 // the job has actually loaded: calling it earlier with a placeholder title
 // would let the post-hydration DOM disagree with what the server already
 // sent, and Googlebot's rendering pass reads the DOM after JS runs.
@@ -23,37 +25,69 @@ export default function JobLanding() {
   const { accessToken } = useAuth();
   const navigate = useNavigate();
 
-  const [job, setJob] = useState<any | null>(null);
-  const [state, setState] = useState<LoadState>("loading");
+  const [load, setLoad] = useState<{ id?: string; job: Job | null; state: LoadState }>(() => {
+    const snapshot = readSsrJob(id, window.__SSR_JOB__);
+    return { id, job: snapshot, state: snapshot ? "found" : "loading" };
+  });
+  const job = load.id === id ? load.job : null;
+  const state = load.id === id ? load.state : "loading";
+  const [retry, setRetry] = useState(0);
   const [isSaved, setIsSaved] = useState(false);
   const [isApplied, setIsApplied] = useState(false);
-  const [applyGateJob, setApplyGateJob] = useState<any | null>(null);
+  const [applyGateJob, setApplyGateJob] = useState<Job | null>(null);
 
   useEffect(() => {
     if (!id) {
-      setState("not-found");
+      setLoad({ id, job: null, state: "not-found" });
       return;
     }
-    setState("loading");
+    const snapshot = !accessToken ? readSsrJob(id, window.__SSR_JOB__) : null;
+    if (snapshot) {
+      setLoad({ id, job: snapshot, state: "found" });
+      trackEvent("view_job", { ...jobAnalyticsParams(snapshot, "job_page"), surface: "job_page" });
+      return;
+    }
+    const controller = new AbortController();
+    setLoad((current) =>
+      current.id === id && current.job
+        ? { ...current, state: "found" }
+        : { id, job: null, state: "loading" }
+    );
     const headers: Record<string, string> = {};
     if (accessToken) headers["Authorization"] = `Bearer ${accessToken}`;
 
-    fetch(`/api/jobs/${encodeURIComponent(id)}`, { headers })
-      .then((res) => (res.ok ? res.json() : null))
+    fetch(`/api/jobs/${encodeURIComponent(id)}`, { headers, signal: controller.signal })
+      .then(async (res) => {
+        if (isMissingJobResponse(res.status)) return null;
+        if (!res.ok) throw new Error("Job detail temporarily unavailable");
+        const data = (await res.json()) as { job?: Job };
+        if (!data.job || typeof data.job.jobId !== "string" || !data.job.title) {
+          throw new Error("Invalid job detail response");
+        }
+        return data;
+      })
       .then((data) => {
+        if (controller.signal.aborted) return;
         if (data?.job) {
-          setJob(data.job);
-          setState("found");
+          setLoad({ id, job: data.job, state: "found" });
           trackEvent("view_job", {
             ...jobAnalyticsParams(data.job, "job_page"),
             surface: "job_page"
           });
         } else {
-          setState("not-found");
+          setLoad({ id, job: null, state: "not-found" });
         }
       })
-      .catch(() => setState("not-found"));
-  }, [id, accessToken]);
+      .catch(() => {
+        if (!controller.signal.aborted)
+          setLoad((current) => ({
+            id,
+            job: current.id === id ? current.job : null,
+            state: "error"
+          }));
+      });
+    return () => controller.abort();
+  }, [id, accessToken, retry]);
 
   // Calling this unconditionally (never behind an `if`) matters: React
   // requires the same hooks in the same order on every render. It re-runs
@@ -98,7 +132,14 @@ export default function JobLanding() {
           </div>
         )}
 
-        {state === "found" &&
+        {state === "error" && (
+          <div role="alert" className="rounded-xl p-5 border border-[#e6e8e4] bg-[#ffffff]">
+            <p>No pudimos actualizar la vacante. Intenta de nuevo.</p>
+            <Button onClick={() => setRetry((value) => value + 1)}>Reintentar</Button>
+          </div>
+        )}
+
+        {(state === "found" || state === "error") &&
           job &&
           (job.isLocked ? (
             <PaywallCard job={job} onUnlockClick={() => navigate("/pricing")} />

@@ -13,6 +13,7 @@ const root = fileURLToPath(new URL("../", import.meta.url));
 const postgresImage =
   "postgres@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685";
 const suites: Record<string, string[]> = {
+  "job-render": ["validate-job-render.test.ts"],
   unit: [
     "validate-google-readiness.test.ts",
     "validate-indexing-scheduler.test.ts",
@@ -76,9 +77,10 @@ const suites: Record<string, string[]> = {
   ]
 };
 const selection = process.argv[2] || "unit";
+const offline = selection === "unit" || selection === "job-render";
 if (!Object.hasOwn(suites, selection) || process.argv.slice(3).some((arg) => arg !== "--dry-run")) {
   throw new Error(
-    "[P0] Suite inválida. Usa unit, integration, sitemap, observability, pagination, seo, companies, baseline, agent-readiness, job-seo, source-closure, job-freshness o direct; --dry-run es opcional."
+    "[P0] Suite inválida. Usa unit, integration, job-render, sitemap, observability, pagination, seo, companies, baseline, agent-readiness, job-seo, source-closure, job-freshness o direct; --dry-run es opcional."
   );
 }
 
@@ -183,7 +185,7 @@ async function main(): Promise<void> {
         {
           selection,
           suites: suites[selection],
-          postgresImage: selection === "unit" ? null : postgresImage,
+          postgresImage: offline ? null : postgresImage,
           externalSources: false
         },
         null,
@@ -202,7 +204,7 @@ async function main(): Promise<void> {
     directory,
     databaseUrl: `postgresql://job_radar_test:${password}@127.0.0.1:55432/${database}`,
     httpPort,
-    mode: selection === "unit" ? "offline" : "integration"
+    mode: offline ? "offline" : "integration"
   });
   let container: string | undefined;
   let pool: Pool | undefined;
@@ -214,7 +216,7 @@ async function main(): Promise<void> {
   const results: { suite: string; status: string; durationMs: number }[] = [];
   console.log(`[P0] Entorno temporal: ${directory}`);
   try {
-    if (selection === "baseline") {
+    if (selection === "baseline" || selection === "job-render") {
       const buildOptions = {
         root,
         envDir: false,
@@ -236,7 +238,7 @@ async function main(): Promise<void> {
         { cwd: root, env: { ...env, NODE_ENV: "production" }, stdio: "inherit", timeout: 120000 }
       );
     }
-    if (selection !== "unit") {
+    if (!offline) {
       const endpoint = docker(
         ["context", "inspect", "--format", "{{.Endpoints.docker.Host}}"],
         env
@@ -345,7 +347,7 @@ async function main(): Promise<void> {
               ? "passed"
               : "failed",
           nodeVersion: process.version,
-          postgresImage: selection === "unit" ? null : postgresImage,
+          postgresImage: offline ? null : postgresImage,
           capturedAt: new Date().toISOString(),
           results,
           syntheticFixture: "production-baseline.sql",
