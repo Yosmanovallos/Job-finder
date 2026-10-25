@@ -815,7 +815,9 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
             keywords = parsed.keywords;
           }
         }
-      } catch (e) {}
+      } catch {
+        // Malformed body: keep the default keywords below.
+      }
 
       if (keywords.length === 0) {
         res.writeHead(400, { "Content-Type": "application/json" });
@@ -2068,7 +2070,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     );
     return;
   }
-  let filePath = path.join(PUBLIC_DIR, hasFileExtension ? pathname : "index.html");
+  const filePath = path.join(PUBLIC_DIR, hasFileExtension ? pathname : "index.html");
 
   const ext = path.extname(filePath);
   const mimeTypes: Record<string, string> = {
