@@ -403,6 +403,60 @@ const STEPS = [
   { n: "04", text: "Te postulas en la fuente original", bg: "bg-[#fde8dc]", fg: "text-[#9a3d0c]" }
 ];
 
+// "Lite embed": until the visitor clicks, this is a self-hosted thumbnail
+// (YouTube's own maxresdefault, so it matches what plays) inside a plain
+// link to the video — no YouTube script, cookie or connection on page load.
+// The click swaps in the youtube-nocookie iframe with autoplay. Without JS
+// the link still opens the video on YouTube.
+const YOUTUBE_ID = "R0qO40Sbtw0";
+const YOUTUBE_TITLE = "Busca empleo sin abrir diez portales | buscotrabajo.co";
+
+function YouTubeLite() {
+  const [playing, setPlaying] = useState(false);
+  return (
+    <div className="relative aspect-video bg-white">
+      {playing ? (
+        <iframe
+          src={`https://www.youtube-nocookie.com/embed/${YOUTUBE_ID}?autoplay=1&rel=0&playsinline=1`}
+          title={YOUTUBE_TITLE}
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          referrerPolicy="strict-origin-when-cross-origin"
+          allowFullScreen
+          className="absolute inset-0 w-full h-full border-0"
+        />
+      ) : (
+        <a
+          href={`https://www.youtube.com/watch?v=${YOUTUBE_ID}`}
+          onClick={(event) => {
+            event.preventDefault();
+            setPlaying(true);
+          }}
+          aria-label="Reproducir video: cómo funciona BuscoTrabajo"
+          className="group absolute inset-0 block"
+        >
+          <img
+            src="/home/como-funciona-video.webp"
+            alt=""
+            width={1280}
+            height={720}
+            loading="lazy"
+            decoding="async"
+            className="block w-full h-full object-cover"
+          />
+          <span
+            aria-hidden="true"
+            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-14 h-14 md:w-20 md:h-20 rounded-full bg-primary border-2 border-white shadow-[3px_3px_0_hsl(var(--foreground))] md:shadow-[5px_5px_0_hsl(var(--foreground))] grid place-items-center transition-transform group-hover:scale-110 group-focus-visible:scale-110"
+          >
+            <svg viewBox="0 0 24 24" className="w-6 h-6 md:w-8 md:h-8 ml-1 fill-white">
+              <path d="M8 5v14l11-7z" />
+            </svg>
+          </span>
+        </a>
+      )}
+    </div>
+  );
+}
+
 function Video() {
   return (
     <section className="sr-host order-7 md:order-5 bg-foreground text-white md:border-t-2 md:border-foreground">
@@ -424,15 +478,7 @@ function Video() {
           </ol>
         </div>
         <div className="sr md:flex-[1.6_1_560px] min-w-0 overflow-hidden rounded-2xl md:rounded-[22px] border-2 border-gold-2 shadow-[5px_5px_0_hsl(var(--primary))] md:shadow-[10px_10px_0_hsl(var(--primary))]">
-          <video
-            src="/home/como-funciona.mp4"
-            poster="/home/como-funciona-poster.webp"
-            controls
-            playsInline
-            preload="none"
-            aria-label="Video: cómo funciona BuscoTrabajo"
-            className="block w-full bg-white"
-          />
+          <YouTubeLite />
         </div>
         <ol className="sr-stagger md:hidden grid grid-cols-2 gap-2">
           {STEPS.map((step) => (
