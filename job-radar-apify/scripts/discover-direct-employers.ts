@@ -96,6 +96,12 @@ async function main() {
     } else {
       const sync = await repo!.syncCandidates(all);
       console.log(`[discover] Sincronizados: ${sync.inserted} nuevos, ${sync.refreshed} actualizados, ${sync.known} ya cubiertos por una empresa.`);
+      if (!fileEntries && entries.length > 0 && entries.length < DIRECTORY_LIMIT) {
+        const retired = await repo!.retireMissingCandidates(all.map((candidate) => candidate.companyKey));
+        console.log(`[discover] Fuera del directorio activo: ${retired} candidatos conservados con contador 0.`);
+      } else {
+        console.log("[discover] No se retiran candidatos: snapshot vacío, parcial o al límite.");
+      }
       const due = await repo!.pickDueCandidates(limit, minCount);
       queue = due.map((row) => ({ ...row, isAgency: agencyKeys.has(row.companyKey) }));
     }
