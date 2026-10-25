@@ -143,7 +143,6 @@ export const JobCard: React.FC<JobCardProps> = ({
               <Badge style={{ background: sourceColor.bg, color: sourceColor.text }}>
                 {job.source}
               </Badge>
-              {isAvailabilityUnverified(job.source) && <Badge variant="hybrid">Vigencia no verificada</Badge>}
             </div>
 
             <p className="text-[11px] font-mono text-ink-faint">
