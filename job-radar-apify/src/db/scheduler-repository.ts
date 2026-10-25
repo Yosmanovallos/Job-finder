@@ -1,4 +1,5 @@
 import { pool } from "./client.js";
+import type { QueryResultRow } from "pg";
 import { buildJobUrl, isPubliclyDescribable } from "../lib/job-seo.js";
 import { apiNotifiedUrls, DELETE_NOT_API_NOTIFIED, enqueueIndexingNotifications, INDEXING_PRIORITY } from "./indexing-repository.js";
 import { pruneExpiredUrlHashes, recordExpiredUrlHashes } from "./expired-job-repository.js";
@@ -212,7 +213,7 @@ export async function deleteClosedJobs(jobIds: string[]): Promise<number> {
   return result.rowCount ?? 0;
 }
 
-async function recordRemovedJobs(rows: any[], caller: string): Promise<void> {
+async function recordRemovedJobs(rows: QueryResultRow[], caller: string): Promise<void> {
   const deleted = rows
     .map((row) => ({
       jobId: row.id,

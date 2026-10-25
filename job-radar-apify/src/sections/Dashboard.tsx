@@ -16,8 +16,14 @@ import { getCountryConfig } from "../countries/index.js";
 import { Input } from "../components/ui/input.js";
 import { Button } from "../components/ui/button.js";
 import { Search, SlidersHorizontal, Unlock, ArrowUpRight, X } from "lucide-react";
+import type { Job } from "../sources/types.js";
 
 type CheckoutBannerState = "confirming" | "success" | "pending" | null;
+
+// Shape of the first-page payload the server inlines for anonymous SSR.
+type SsrJobsWindow = Window & {
+  __SSR_JOBS__?: { country?: string; jobs?: Job[]; total?: number; hasMore?: boolean };
+};
 
 const PAGE_SIZE = 24;
 // Debounce the free-text search box so we don't fire a request per keystroke
@@ -59,7 +65,7 @@ export default function Dashboard() {
     company: searchParams.get("company") || ""
   }));
   const [debouncedSearch, setDebouncedSearch] = useState(() => searchParams.get("search") || "");
-  const [jobs, setJobs] = useState<any[]>([]);
+  const [jobs, setJobs] = useState<Job[]>([]);
   const [total, setTotal] = useState(0);
   const [hasMore, setHasMore] = useState(false);
   const [savedJobIds, setSavedJobIds] = useState<Set<string>>(new Set());
@@ -73,11 +79,11 @@ export default function Dashboard() {
   // Job the apply-gate modal is currently open for (null = closed). Shared
   // between the mobile JobCard list and the desktop detail panel so both
   // trigger the exact same modal instead of each owning a copy.
-  const [applyGateJob, setApplyGateJob] = useState<any | null>(null);
+  const [applyGateJob, setApplyGateJob] = useState<Job | null>(null);
   // Set once the apply_job=<id> effect (below) resolves — renders a banner
   // with a real, user-clicked link to the job the visitor registered to
   // apply for, since auto-opening it isn't reliable (see that effect).
-  const [applyContinueJob, setApplyContinueJob] = useState<any | null>(null);
+  const [applyContinueJob, setApplyContinueJob] = useState<Job | null>(null);
   // Filters live behind this "Filtros" sheet at every breakpoint now (see
   // the top bar below) — a persistent sidebar column would put filters,
   // list and detail side by side as three separate columns, which is what
@@ -173,8 +179,8 @@ export default function Dashboard() {
     // must never be trusted for a country==="VE" mount, or vice versa.
     // Delete it either way so it can never be picked up by a later mount
     // (e.g. a filter change re-running this effect).
-    const ssrJobs = (window as any).__SSR_JOBS__;
-    delete (window as any).__SSR_JOBS__;
+    const ssrJobs = (window as SsrJobsWindow).__SSR_JOBS__;
+    delete (window as SsrJobsWindow).__SSR_JOBS__;
     const isDefaultFilterRequest = filterKey === JSON.stringify(EMPTY_FILTERS);
     const hasMatchingSsrPage = ssrJobs && ssrJobs.country === country && isDefaultFilterRequest;
     if (hasMatchingSsrPage) {

@@ -185,7 +185,7 @@ async function browserFetchOnce(url: string, timeoutMs: number): Promise<string>
 }
 
 export async function browserFetch(url: string, timeoutMs = 30_000, maxRetries = 2): Promise<string> {
-  let lastError: any;
+  let lastError: unknown;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       return await browserFetchOnce(url, timeoutMs);

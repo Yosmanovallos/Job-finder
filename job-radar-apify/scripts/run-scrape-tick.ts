@@ -123,7 +123,7 @@ async function runRoleWithBudget(
   item: RoleItem,
   parentCtx: FetchContext,
   budgetMs: number,
-  trackedPromises: Promise<any>[],
+  trackedPromises: Promise<unknown>[],
   recorder: RunRecorder,
   runId: string
 ): Promise<RoleResult> {
@@ -225,7 +225,7 @@ async function runBatched(
   parentCtx: FetchContext,
   plan: TickBudgetPlan,
   startedAt: number,
-  trackedPromises: Promise<any>[],
+  trackedPromises: Promise<unknown>[],
   recorder: RunRecorder,
   runId: string
 ): Promise<RoleResult[]> {
@@ -343,7 +343,7 @@ async function runGlobalCatalogSources(
  * "timeout", which is what made the budget overrun invisible.
  */
 async function runGlobalCatalogWithBudget(
-  trackedPromises: Promise<any>[],
+  trackedPromises: Promise<unknown>[],
   recorder: RunRecorder,
   parentCtx: FetchContext,
   budgetMs: number,
@@ -481,7 +481,7 @@ async function main() {
 
   await seedSearchRoles(DEFAULT_ROLES_200);
 
-  const trackedPromises: Promise<any>[] = [];
+  const trackedPromises: Promise<unknown>[] = [];
 
   // Independent of per-role due-ness below: these sources ignore role and
   // keywords entirely, so they run on their own source-level cadence

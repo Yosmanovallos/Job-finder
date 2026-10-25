@@ -11,6 +11,20 @@ import { ArrowLeft, ExternalLink } from "lucide-react";
 
 type LoadState = "loading" | "found" | "not-found";
 
+// Shape of the company payload the server inlines for anonymous SSR.
+type SsrCompanyWindow = Window & {
+  __SSR_COMPANY__?: {
+    slug?: string;
+    country?: string;
+    companyName: string | null;
+    logoUrl?: string | null;
+    reputation?: ReputationEntryProps[];
+    officialCareersUrl?: string | null;
+    jobs?: Job[];
+    total?: number;
+  };
+};
+
 // Reached from JobDetailPanel/JobCard's company-name link
 // (buildCompanyPath(job.company)) — and, since SEO-IMPROVEMENT-PLAN.md
 // §1.16, also a real SSR-backed landing page in its own right
@@ -56,8 +70,8 @@ export default function CompanyLanding() {
     // view, so a signed-in visitor still needs the real fetch below to get
     // their own unmasked tier. Deleted immediately after one read so a later
     // slug/filter change can never reuse stale data.
-    const ssrCompany = (window as any).__SSR_COMPANY__;
-    delete (window as any).__SSR_COMPANY__;
+    const ssrCompany = (window as SsrCompanyWindow).__SSR_COMPANY__;
+    delete (window as SsrCompanyWindow).__SSR_COMPANY__;
     if (ssrCompany && ssrCompany.slug === slug && ssrCompany.country === country && !accessToken) {
       setCompanyName(ssrCompany.companyName);
       setLogoUrl(ssrCompany.logoUrl || null);

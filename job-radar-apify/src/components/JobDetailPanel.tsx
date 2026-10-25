@@ -36,7 +36,7 @@ export interface JobDetailPanelProps {
     | null;
   onSaveToggle?: (jobId: string) => void;
   onAppliedToggle?: (jobId: string) => void;
-  onApplyClick?: (job: any) => void;
+  onApplyClick?: (job: NonNullable<JobDetailPanelProps["job"]>) => void;
   // Dashboard context ("CO"/"VE") — see JobCard.tsx's identical prop for why
   // this, not job.country, decides the company link's prefix.
   country?: string;
