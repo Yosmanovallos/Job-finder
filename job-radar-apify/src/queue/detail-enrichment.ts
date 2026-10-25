@@ -36,10 +36,24 @@ export interface EnrichmentCounters {
   noDetail: number;
   failed: number;
   stoppedEarly: boolean;
+  /** Fault classes recorded for this source (e.g. rate_limited, HTTP_403), for the tick log only. */
+  faultClasses: Record<string, number>;
 }
 
 function emptyCounters(): EnrichmentCounters {
-  return { claimed: 0, complete: 0, rejected: 0, retry: 0, noDetail: 0, failed: 0, stoppedEarly: false };
+  return { claimed: 0, complete: 0, rejected: 0, retry: 0, noDetail: 0, failed: 0, stoppedEarly: false, faultClasses: {} };
+}
+
+function noteFault(counters: EnrichmentCounters, errorClass: string): void {
+  counters.faultClasses[errorClass] = (counters.faultClasses[errorClass] ?? 0) + 1;
+}
+
+/** "rate_limited×3, timeout×1", most frequent first; "" when there were none. */
+export function formatFaultClasses(faultClasses: Record<string, number>): string {
+  return Object.entries(faultClasses)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([name, count]) => `${name}×${count}`)
+    .join(", ");
 }
 
 export function detailCapFor(adapterName: string): number {
@@ -76,25 +90,29 @@ async function runClaimed(
     // state and becomes claimable again when the lease expires.
     if (STOP_REASONS.has(result.reason) || STOP_OUTCOMES.has(result.outcome)) {
       if (STOP_OUTCOMES.has(result.outcome)) {
+        const errorClass = result.error?.class ?? result.outcome;
         await recordDetailOutcome(job.id, {
           kind: "fault",
-          errorClass: result.error?.class ?? result.outcome,
+          errorClass,
           retryAfterMs: result.error?.retryAfterMs
         });
         counters.retry++;
+        noteFault(counters, errorClass);
       }
       counters.stoppedEarly = true;
       break;
     }
 
     const detail = result.data[0];
+    const faultClass = !detail && result.outcome !== "empty" ? result.error?.class ?? result.outcome : null;
+    if (faultClass) noteFault(counters, faultClass);
     const status = detail
       ? await recordDetailOutcome(job.id, { kind: "success", detail })
-      : result.outcome === "empty"
+      : faultClass === null
         ? await recordDetailOutcome(job.id, { kind: "no_detail" })
         : await recordDetailOutcome(job.id, {
             kind: "fault",
-            errorClass: result.error?.class ?? result.outcome,
+            errorClass: faultClass,
             retryAfterMs: result.error?.retryAfterMs
           });
     if (status === "complete") counters.complete++;
