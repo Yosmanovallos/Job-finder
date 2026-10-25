@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import { Link } from "react-router-dom";
 import { hoverStyle } from "../lib/hover-style.js";
 import { PAYWALL_ENABLED } from "../config.js";
@@ -93,10 +94,9 @@ export default function Footer() {
               color: "#fafafa",
               minHeight: "44px",
               borderRadius: "8px",
-              // @ts-ignore
               "--tw-ring-color": "#0f6b4c",
               "--tw-ring-offset-color": "#fafafa"
-            }}
+            } as CSSProperties}
             {...hoverStyle<HTMLAnchorElement>(
               { backgroundColor: "#14805a" },
               { backgroundColor: "#0f6b4c" }
@@ -149,10 +149,9 @@ export default function Footer() {
                       style={{
                         color: "#5b5f5c",
                         fontSize: "0.9375rem",
-                        // @ts-ignore
                         "--tw-ring-color": "#0f6b4c",
                         "--tw-ring-offset-color": "#ffffff"
-                      }}
+                      } as CSSProperties}
                       {...hoverStyle<HTMLAnchorElement>({ color: "#0e0f10" }, { color: "#5b5f5c" })}
                     >
                       {link.label}
@@ -185,10 +184,9 @@ export default function Footer() {
                       style={{
                         color: "#5b5f5c",
                         fontSize: "0.9375rem",
-                        // @ts-ignore
                         "--tw-ring-color": "#0f6b4c",
                         "--tw-ring-offset-color": "#ffffff"
-                      }}
+                      } as CSSProperties}
                       {...hoverStyle<HTMLAnchorElement>({ color: "#0e0f10" }, { color: "#5b5f5c" })}
                     >
                       {link.label}
@@ -221,10 +219,9 @@ export default function Footer() {
                       style={{
                         color: "#5b5f5c",
                         fontSize: "0.9375rem",
-                        // @ts-ignore
                         "--tw-ring-color": "#0f6b4c",
                         "--tw-ring-offset-color": "#ffffff"
-                      }}
+                      } as CSSProperties}
                       {...hoverStyle<HTMLAnchorElement>({ color: "#0e0f10" }, { color: "#5b5f5c" })}
                     >
                       {link.label}
@@ -260,10 +257,9 @@ export default function Footer() {
                         fontFamily: link.label.includes("@")
                           ? 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace'
                           : "inherit",
-                        // @ts-ignore
                         "--tw-ring-color": "#0f6b4c",
                         "--tw-ring-offset-color": "#ffffff"
-                      }}
+                      } as CSSProperties}
                       {...hoverStyle<HTMLAnchorElement>({ color: "#0e0f10" }, { color: "#5b5f5c" })}
                     >
                       {link.label}
@@ -313,10 +309,9 @@ export default function Footer() {
                   className="text-xs transition-colors duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 rounded-sm"
                   style={{
                     color: "#9a9d98",
-                    // @ts-ignore
                     "--tw-ring-color": "#0f6b4c",
                     "--tw-ring-offset-color": "#ffffff"
-                  }}
+                  } as CSSProperties}
                   {...hoverStyle<HTMLAnchorElement>({ color: "#5b5f5c" }, { color: "#9a9d98" })}
                 >
                   {link.label}

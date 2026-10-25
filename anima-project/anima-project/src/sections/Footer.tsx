@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import { useState } from "react";
 
 // Navigation data
@@ -105,10 +106,9 @@ export default function Footer() {
               color: "#0A0B0D",
               minHeight: "44px",
               borderRadius: "8px",
-              // @ts-ignore
               "--tw-ring-color": "#34D399",
               "--tw-ring-offset-color": "#0A0B0D",
-            }}
+            } as CSSProperties}
             onMouseEnter={(e) => {
               (e.currentTarget as HTMLAnchorElement).style.backgroundColor =
                 "#6EE7B7";
@@ -169,10 +169,9 @@ export default function Footer() {
                       style={{
                         color: "#9AA1AC",
                         fontSize: "0.9375rem",
-                        // @ts-ignore
                         "--tw-ring-color": "#34D399",
                         "--tw-ring-offset-color": "#131519",
-                      }}
+                      } as CSSProperties}
                       onMouseEnter={(e) => {
                         (e.currentTarget as HTMLAnchorElement).style.color =
                           "#F4F5F7";
@@ -212,10 +211,9 @@ export default function Footer() {
                       style={{
                         color: "#9AA1AC",
                         fontSize: "0.9375rem",
-                        // @ts-ignore
                         "--tw-ring-color": "#34D399",
                         "--tw-ring-offset-color": "#131519",
-                      }}
+                      } as CSSProperties}
                       onMouseEnter={(e) => {
                         (e.currentTarget as HTMLAnchorElement).style.color =
                           "#F4F5F7";
@@ -255,10 +253,9 @@ export default function Footer() {
                       style={{
                         color: "#9AA1AC",
                         fontSize: "0.9375rem",
-                        // @ts-ignore
                         "--tw-ring-color": "#34D399",
                         "--tw-ring-offset-color": "#131519",
-                      }}
+                      } as CSSProperties}
                       onMouseEnter={(e) => {
                         (e.currentTarget as HTMLAnchorElement).style.color =
                           "#F4F5F7";
@@ -301,10 +298,9 @@ export default function Footer() {
                         fontFamily: link.label.includes("@")
                           ? 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace'
                           : "inherit",
-                        // @ts-ignore
                         "--tw-ring-color": "#34D399",
                         "--tw-ring-offset-color": "#131519",
-                      }}
+                      } as CSSProperties}
                       onMouseEnter={(e) => {
                         (e.currentTarget as HTMLAnchorElement).style.color =
                           "#F4F5F7";
@@ -384,10 +380,9 @@ export default function Footer() {
                         minHeight: "44px",
                         fontFamily:
                           'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
-                        // @ts-ignore
                         "--tw-ring-color": "#34D399",
                         "--tw-ring-offset-color": "#131519",
-                      }}
+                      } as CSSProperties}
                       onFocus={(e) => {
                         (
                           e.currentTarget as HTMLInputElement
@@ -408,10 +403,9 @@ export default function Footer() {
                         color: "#0A0B0D",
                         borderRadius: "8px",
                         minHeight: "44px",
-                        // @ts-ignore
                         "--tw-ring-color": "#34D399",
                         "--tw-ring-offset-color": "#131519",
-                      }}
+                      } as CSSProperties}
                       onMouseEnter={(e) => {
                         if (!e.currentTarget.disabled)
                           (
@@ -502,10 +496,9 @@ export default function Footer() {
                   className="text-xs transition-colors duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 rounded-sm"
                   style={{
                     color: "#646B75",
-                    // @ts-ignore
                     "--tw-ring-color": "#34D399",
                     "--tw-ring-offset-color": "#131519",
-                  }}
+                  } as CSSProperties}
                   onMouseEnter={(e) => {
                     (e.currentTarget as HTMLAnchorElement).style.color =
                       "#9AA1AC";
