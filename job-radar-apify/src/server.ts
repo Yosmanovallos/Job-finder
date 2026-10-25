@@ -51,6 +51,8 @@ import {
   buildCategoryMeta,
   buildCategoryInsights,
   buildCategoryInternalLinks,
+  buildRelatedCityLinks,
+  buildCategorySectionHeadings,
   buildCategoryPath,
   buildCategoryBreadcrumbList,
   buildCategoryItemList,
@@ -1020,6 +1022,8 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       const meta = buildCategoryMeta(category, total);
       const insights = buildCategoryInsights(category, total, page);
       const internalLinks = buildCategoryInternalLinks(category);
+      const relatedCityLinks = buildRelatedCityLinks(category);
+      const sectionHeadings = buildCategorySectionHeadings(category);
 
       // Same "real links in the raw HTML" pattern /dashboard already uses
       // (see 7c below) — this page's whole SEO value is being a crawlable
@@ -1051,7 +1055,12 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
   ${insights.latestPublishedLabel ? `<p><strong>Última publicación visible:</strong> ${escapeHtml(insights.latestPublishedLabel)}.</p>` : ""}
   <nav aria-label="Explorar más empleos">${internalLinks.map((link) => `<a href="${escapeHtml(link.href)}">${escapeHtml(link.label)}</a>`).join(" · ")}</nav>
 </section>`;
-      const ssrSnippet = `<h1>${escapeHtml(meta.heading)}</h1>\n${emptyNotice}${overviewHtml}<nav aria-label="Vacantes"><ul>\n${items}\n</ul></nav>`;
+      const jobsHeading = page.length > 0 ? `<h2>${escapeHtml(sectionHeadings.jobs)}</h2>\n` : "";
+      const relatedCitiesHtml =
+        relatedCityLinks.length > 0
+          ? `\n<section data-related-cities aria-label="${escapeHtml(sectionHeadings.relatedCities)}"><h2>${escapeHtml(sectionHeadings.relatedCities)}</h2><ul>${relatedCityLinks.map((link) => `<li><a href="${escapeHtml(link.href)}">${escapeHtml(link.label)}</a></li>`).join("")}</ul></section>`
+          : "";
+      const ssrSnippet = `<h1>${escapeHtml(meta.heading)}</h1>\n${emptyNotice}${overviewHtml}${jobsHeading}<nav aria-label="Vacantes"><ul>\n${items}\n</ul></nav>${relatedCitiesHtml}`;
       indexHtml = indexHtml.replace('<div id="app"></div>', `<div id="app">${ssrSnippet}</div>`);
 
       // Same fix /dashboard already had (Fase 1, §5.4) applied here too —
