@@ -2046,6 +2046,15 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       (canonicalTag) => `${canonicalTag}\n${hreflangTags}`
     );
 
+    // The homepage's desktop LCP is its dashboard screenshot
+    // (HomeLanding.tsx), which the client-rendered page would otherwise
+    // only request after the JS bundle runs. Wide screens only: phones
+    // never render that art.
+    indexHtml = indexHtml.replace(
+      "</head>",
+      `    <link rel="preload" as="image" href="/home/dash-desktop.webp" imagesrcset="/home/dash-desktop-960.webp 960w, /home/dash-desktop.webp 1600w" imagesizes="680px" type="image/webp" media="(min-width: 768px)" fetchpriority="high" />\n</head>`
+    );
+
     if (isVe) {
       // Real, already-established facts only (AGENTS.md #5): VE's own
       // source list (SOURCES_BY_COUNTRY.VE — 7 sources, not CO's 10; no

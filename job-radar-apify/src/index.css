@@ -173,4 +173,200 @@
       animation: none;
     }
   }
+
+  /* ---- Homepage design (approved 2026-10-25, canvas R3): ink outline +
+     hard offset shadow, shared by every home card/button so the look is
+     defined once instead of per-section inline styles. ---- */
+  .ink-card {
+    border: 2px solid hsl(var(--foreground));
+    box-shadow: 4px 4px 0 hsl(var(--foreground));
+  }
+  .ink-card-sm {
+    border: 2px solid hsl(var(--foreground));
+    box-shadow: 3px 3px 0 hsl(var(--foreground));
+  }
+  .ink-lift {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .ink-lift:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: 6px 6px 0 hsl(var(--foreground));
+  }
+
+  /* Horizontal swipe rail for phones: scroll-snap, no visible scrollbar,
+     bleeds to the screen edge so the next card peeks in. Becomes a normal
+     grid at md+ via the caller's own md: classes. */
+  .home-rail {
+    /* proximity, not mandatory: a rail whose items sit inside
+       display:contents wrappers (the companies grid on desktop) has no
+       snap point per card, and mandatory snapping then kept yanking the
+       phone carousel back to the first card. Cards carry snap-start
+       themselves. */
+    scroll-snap-type: x proximity;
+    scroll-padding-inline: 1rem;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .home-rail::-webkit-scrollbar {
+    display: none;
+  }
+  .home-rail > * {
+    scroll-snap-align: start;
+  }
+
+  /* Every looping animation below is transform/opacity only, so it runs on
+     the compositor and never repaints while the page scrolls. The big
+     blurred glows are deliberately static: animating them was a visible
+     scroll-jank source on phones. */
+  .home-float {
+    animation: home-float 7s ease-in-out infinite;
+    will-change: transform;
+  }
+  .marquee-track {
+    will-change: transform;
+  }
+  .home-live-dot {
+    position: relative;
+  }
+  .home-live-dot::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 9999px;
+    background: currentColor;
+    color: hsl(var(--primary));
+    animation: home-live-ring 2s ease-out infinite;
+  }
+  @keyframes home-float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-10px);
+    }
+  }
+  @keyframes home-live-ring {
+    0% {
+      transform: scale(1);
+      opacity: 0.6;
+    }
+    100% {
+      transform: scale(2.6);
+      opacity: 0;
+    }
+  }
+
+  /* Scroll-driven reveal (App.tsx's RevealMain puts .scroll-reveal on
+     <main> for every page but the dashboard). Pure CSS on a view()
+     timeline: no JS, no observers, runs off the main thread, and plays in
+     both directions — sections fade/rise in as they enter from below and
+     settle back when you scroll up and they leave again. The first section
+     (the hero/LCP) is never animated. A fixed 240px range instead of a %
+     keeps tall sections from staying translucent for a whole screen.
+     Browsers without scroll timelines (Firefox today) just show content. */
+  @supports (animation-timeline: view()) {
+    @media (prefers-reduced-motion: no-preference) {
+      /* Generic, whole-section reveal for pages that don't tag items. */
+      .scroll-reveal section:not(:first-of-type):not(section section):not(.sr-host) {
+        animation: scroll-reveal linear both;
+        animation-timeline: view();
+        animation-range: entry 0% entry 240px;
+      }
+
+      /* Item-level reveal (cards, headings, rows) inside .sr-host sections:
+         rises + fades in while entering from the bottom, fades back out
+         only while actually leaving at the top — so scrolling up brings
+         items back in from above, and scrolling down again replays them.
+         The range is the item's own cover range, so short and tall items
+         both animate over a comparable scroll distance. */
+      .sr {
+        animation: sr-y linear both;
+        animation-timeline: view();
+        animation-range: cover 0% cover 100%;
+      }
+      /* Small per-column offset so a grid row cascades instead of moving
+         as one block. */
+      .sr-stagger > .sr:nth-child(4n + 2) {
+        animation-range: cover 2% cover 100%;
+      }
+      .sr-stagger > .sr:nth-child(4n + 3) {
+        animation-range: cover 4% cover 100%;
+      }
+      .sr-stagger > .sr:nth-child(4n + 4) {
+        animation-range: cover 6% cover 100%;
+      }
+
+      @media (max-width: 767px) {
+        /* Phone rails: the rail itself rises in vertically, and each card
+           slides/scales in as it enters the rail while swiping. */
+        .sr-m {
+          animation: sr-y linear both;
+          animation-timeline: view();
+          animation-range: cover 0% cover 100%;
+        }
+        .sr-card {
+          animation: sr-x linear both;
+          animation-timeline: view(inline);
+          animation-range: entry 0% entry 100%;
+        }
+      }
+      @media (min-width: 768px) {
+        .sr-card {
+          animation: sr-y linear both;
+          animation-timeline: view();
+          animation-range: cover 0% cover 100%;
+        }
+      }
+    }
+  }
+  @keyframes sr-y {
+    0% {
+      opacity: 0;
+      transform: translate3d(0, 48px, 0) scale(0.96);
+    }
+    20% {
+      opacity: 1;
+      transform: none;
+    }
+    92% {
+      opacity: 1;
+      transform: none;
+    }
+    100% {
+      opacity: 0;
+      transform: translate3d(0, -32px, 0) scale(0.97);
+    }
+  }
+  @keyframes sr-x {
+    from {
+      opacity: 0;
+      transform: translate3d(56px, 0, 0) scale(0.9);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes scroll-reveal {
+    from {
+      opacity: 0;
+      transform: translateY(56px) scale(0.97);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .home-float,
+    .home-live-dot::after,
+    .marquee-track {
+      animation: none;
+    }
+    .ink-lift {
+      transition: none;
+    }
+  }
 }

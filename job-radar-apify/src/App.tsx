@@ -1,10 +1,9 @@
-import { Suspense, lazy, useEffect, useRef } from "react";
+import { Suspense, lazy, useEffect, useRef, type ReactNode } from "react";
 import { BrowserRouter, Routes, Route, useLocation, Navigate } from "react-router-dom";
 import Header from "./sections/Header.js";
-import HeroDemo from "./sections/HeroDemo.js";
+import HomeLanding from "./sections/HomeLanding.js";
 import SourcesAndProblem from "./sections/SourcesAndProblem.js";
 import ComparisonAndProcess from "./sections/ComparisonAndProcess.js";
-import ProductFeaturesPricingFaq from "./sections/ProductFeaturesPricingFaq.js";
 import Faq from "./sections/Faq.js";
 import Footer from "./sections/Footer.js";
 import ScrollToTop from "./components/ScrollToTop.js";
@@ -56,14 +55,7 @@ function Landing() {
     description: homeContent.description
   });
 
-  return (
-    <>
-      <HeroDemo country={country} />
-      <SourcesAndProblem country={country} />
-      <ComparisonAndProcess />
-      <ProductFeaturesPricingFaq country={country} />
-    </>
-  );
+  return <HomeLanding country={country} />;
 }
 
 // Wraps <Routes> instead of sitting beside it as a plain redirect
@@ -187,6 +179,15 @@ function AppRoutes() {
   );
 }
 
+// Scroll-driven section reveal (index.css `.scroll-reveal`) for every page
+// except the dashboard, whose first-entry latency and sticky split pane are
+// protected (docs/DASHBOARD-PERFORMANCE-RUNBOOK.md).
+function RevealMain({ children }: { children: ReactNode }) {
+  const { pathname } = useLocation();
+  const isDashboard = /^\/(ve\/)?dashboard/.test(pathname);
+  return <main className={isDashboard ? undefined : "scroll-reveal"}>{children}</main>;
+}
+
 function RouteFallback() {
   return (
     <div
@@ -224,11 +225,11 @@ export default function App() {
             overflow-x-hidden locally instead. */}
         <div className="min-h-screen bg-background text-foreground font-sans">
           <Header />
-          <main>
+          <RevealMain>
             <Suspense fallback={<RouteFallback />}>
               <AppRoutes />
             </Suspense>
-          </main>
+          </RevealMain>
           <Footer />
         </div>
       </BrowserRouter>

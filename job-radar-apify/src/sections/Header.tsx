@@ -309,7 +309,7 @@ export default function Header() {
                 <Link to={loginHref}>Iniciar sesión</Link>
               </Button>
               <Button size="lg" asChild>
-                <Link to={dashboardHref}>Probar gratis</Link>
+                <Link to={dashboardHref}>Ver vacantes</Link>
               </Button>
             </>
           )}
@@ -451,7 +451,7 @@ export default function Header() {
                 </Button>
                 <Button size="lg" className="text-base" asChild>
                   <Link to={dashboardHref} onClick={handleNavClick}>
-                    Probar gratis
+                    Ver vacantes
                   </Link>
                 </Button>
               </>
