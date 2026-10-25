@@ -8,6 +8,7 @@ on:
       - ".github/workflows/direct-employers-tick.yml"
       - ".github/workflows/verify-official-coverage.yml"
       - "job-radar-apify/scripts/discover-direct-employers.ts"
+      - "job-radar-apify/scripts/direct-computrabajo-coverage.ts"
       - "job-radar-apify/src/db/direct-discovery-repository.ts"
       - "job-radar-apify/src/direct/discovery/coverage.ts"
       - "job-radar-apify/tests/validate-direct-discovery.ts"

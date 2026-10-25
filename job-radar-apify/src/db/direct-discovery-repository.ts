@@ -51,6 +51,76 @@ export async function loadDirectoryCandidates(limit: number): Promise<DirectoryC
   return result.rows.map((row) => ({ companyKey: row.company_key, companyName: row.company.trim(), directoryCount: row.n }));
 }
 
+export interface ComputrabajoCoverageRow extends DirectoryCandidateRow {
+  decision: string | null;
+  websiteDomain: string | null;
+  enabledBoards: number;
+  liveOfficialJobs: number;
+}
+
+/**
+ * Colombia-only Computrabajo companies, including jobs whose primary source
+ * changed during deduplication. Read-only: this is the target census for
+ * finding those companies' own employment portals, not a job import.
+ */
+export async function loadComputrabajoCoverage(): Promise<ComputrabajoCoverageRow[]> {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY");
+    await client.query("SET LOCAL statement_timeout = '180s'");
+    const candidates = await client.query<{ company_key: string; company: string; n: number }>(
+      `WITH keyed AS (
+         SELECT ${storedCompanyKeySql()} AS company_key, company
+         FROM jobs
+         WHERE is_active = TRUE AND direct_job_id IS NULL AND ${liveJobSql()}
+           AND country = 'CO'
+           AND (source = 'Computrabajo' OR sources @> '["Computrabajo"]'::jsonb)
+       ), spellings AS (
+         SELECT company_key, company, COUNT(*)::int AS n
+         FROM keyed
+         WHERE company_key <> '' AND NOT ${isPlaceholderCompanyKeySql("company_key")}
+         GROUP BY company_key, company
+       )
+       SELECT company_key, (array_agg(company ORDER BY n DESC, length(company), company))[1] AS company, SUM(n)::int AS n
+       FROM spellings GROUP BY company_key ORDER BY n DESC, company_key`
+    );
+    const boards = await client.query<{ company_key: string; n: number }>(
+      `SELECT a.company_key, COUNT(*)::int AS n
+       FROM employer_aliases a JOIN employer_sources s ON s.employer_id = a.employer_id
+       WHERE s.enabled = TRUE GROUP BY a.company_key`
+    );
+    const official = await client.query<{ company_key: string; n: number }>(
+      `SELECT a.company_key, COUNT(DISTINCT dj.id)::int AS n
+       FROM employer_aliases a
+       JOIN employer_sources s ON s.employer_id = a.employer_id AND s.enabled = TRUE
+       JOIN direct_jobs dj ON dj.employer_source_id = s.id
+       WHERE ${liveDirectJobSql("dj")}
+       GROUP BY a.company_key`
+    );
+    const discovery = await client.query<{ company_key: string; decision: string; website_domain: string | null }>(
+      `SELECT company_key, decision, website_domain FROM employer_discovery`
+    );
+    await client.query("COMMIT");
+    const boardCounts = new Map(boards.rows.map((row) => [row.company_key, row.n]));
+    const officialCounts = new Map(official.rows.map((row) => [row.company_key, row.n]));
+    const decisions = new Map(discovery.rows.map((row) => [row.company_key, row]));
+    return candidates.rows.map((row) => ({
+      companyKey: row.company_key,
+      companyName: row.company.trim(),
+      directoryCount: row.n,
+      decision: decisions.get(row.company_key)?.decision ?? null,
+      websiteDomain: decisions.get(row.company_key)?.website_domain ?? null,
+      enabledBoards: boardCounts.get(row.company_key) ?? 0,
+      liveOfficialJobs: officialCounts.get(row.company_key) ?? 0
+    }));
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 export interface SyncResult {
   inserted: number;
   refreshed: number;
