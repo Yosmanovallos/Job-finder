@@ -68,7 +68,9 @@ export class ScrapeWorker {
       if (global.gc) {
         try {
           global.gc();
-        } catch (e) {}
+        } catch {
+          // gc is best-effort; nothing to recover if it throws
+        }
       }
     }
   }

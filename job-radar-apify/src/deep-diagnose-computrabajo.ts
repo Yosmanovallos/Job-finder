@@ -1,5 +1,3 @@
-import { gotScraping } from 'got-scraping';
-
 async function deepDiagnose() {
   console.log('=== DEEP DIAGNOSTIC OF COMPUTRABAJO FAILING URLS ===\n');
 

@@ -30,7 +30,7 @@ export function loadCache(): CacheSchema {
   try {
     const raw = fs.readFileSync(CACHE_FILE, 'utf-8');
     return JSON.parse(raw);
-  } catch (e) {
+  } catch {
     return { runs: [] };
   }
 }

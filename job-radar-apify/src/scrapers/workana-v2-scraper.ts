@@ -258,7 +258,7 @@ export async function scrapeWorkanaV2(
     let parsed: any;
     try {
       parsed = JSON.parse(decodedValue);
-    } catch (parseError) {
+    } catch {
       console.warn(
         `[WorkanaV2] JSON parse failed on page ${page} — stopping pagination.`
       );

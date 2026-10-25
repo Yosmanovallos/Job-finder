@@ -1,5 +1,5 @@
 import { getJobs } from '../db/job-repository.js';
-import { generateSocialDigest, SocialDigest } from './digest-generator.js';
+import { generateSocialDigest } from './digest-generator.js';
 import { generateCardSvg } from './card-generator.js';
 
 export interface SocialPostRecord {

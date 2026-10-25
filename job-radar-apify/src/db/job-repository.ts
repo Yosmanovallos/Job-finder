@@ -264,7 +264,7 @@ export async function saveJobs(
   // let this file balloon; the full detail already lives in Postgres.
   try {
     const runId = `run_${Date.now()}`;
-    const lightweightJobs = (jobs as any[]).map(({ description, requirements, ...rest }) => rest);
+    const lightweightJobs = (jobs as any[]).map(({ description: _description, requirements: _requirements, ...rest }) => rest);
     saveRunToCache({
       id: runId,
       name: `${roleOrigin} (${jobs.length} Vacantes)`,

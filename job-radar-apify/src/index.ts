@@ -17,7 +17,6 @@ dotenv.config();
 
 const NOTION_TOKEN = process.env.NOTION_TOKEN;
 const NOTION_DATABASE_ID = process.env.NOTION_DATABASE_ID;
-const APIFY_TOKEN = process.env.APIFY_TOKEN;
 
 if (!NOTION_TOKEN || !NOTION_DATABASE_ID) {
   console.error("Error: NOTION_TOKEN or NOTION_DATABASE_ID is not defined in .env file.");
@@ -86,55 +85,6 @@ export interface Job {
   applicantCountries?: string[];
   validThrough?: string;
 }
-
-// Store available database properties
-let dbProperties: Record<string, string> = {};
-
-async function fetchDatabaseSchema() {
-  try {
-    const response = await (notion as any).dataSources.retrieve({
-      data_source_id: NOTION_DATABASE_ID!
-    });
-    console.log("[Notion] Connected successfully as Data Source! Schema retrieved.");
-    dbProperties = {};
-    const raw = response.properties ?? {};
-    for (const [key, val] of Object.entries(raw)) {
-      dbProperties[key] = (val as any).type;
-    }
-    console.log("[Notion] Available properties:", Object.keys(dbProperties).join(", "));
-  } catch (error) {
-    console.error(
-      "[Notion] Error fetching data source schema. Check NOTION_TOKEN and NOTION_DATABASE_ID:",
-      error
-    );
-    process.exit(1);
-  }
-}
-
-// Check if a job already exists in Notion
-async function jobExists(url: string): Promise<boolean> {
-  try {
-    if (!dbProperties["URL"]) {
-      return false;
-    }
-    const response = await (notion as any).dataSources.query({
-      data_source_id: NOTION_DATABASE_ID!,
-      filter: {
-        property: "URL",
-        url: {
-          equals: url
-        }
-      }
-    });
-    return response.results.length > 0;
-  } catch (error) {
-    console.error(`Error querying Notion for URL ${url}:`, error);
-    return false;
-  }
-}
-
-// Date Range Configuration Helper
-const DATE_RANGE = process.env.DATE_RANGE || "48h";
 
 function getDateRangeConfig(range: string = process.env.DATE_RANGE || "48h") {
   switch (range) {
@@ -556,7 +506,7 @@ export async function scrapeElempleo(keyword: string): Promise<Job[]> {
               publishedAt: dateParsed.date
             });
           }
-        } catch (e) {
+        } catch {
           // Skip
         }
       }
@@ -808,7 +758,7 @@ export async function scrapeWorkana(keyword: string): Promise<Job[]> {
 
       const totalPages = parsed.pagination?.pages ?? page;
       if (page >= totalPages) break;
-    } catch (e) {
+    } catch {
       break;
     }
   }
@@ -1612,105 +1562,6 @@ export async function scrapeGlassdoor(keyword: string): Promise<Job[]> {
 export async function fetchGlassdoorDetail(url: string): Promise<Partial<JobDetail> | null> {
   const html = await gsFetch(url, "Glassdoor-detail");
   return extractJobPostingDetail(html);
-}
-
-// Scrape Indeed via Apify (Optimized single run with combined query)
-async function scrapeIndeedCombined(combinedKeyword: string): Promise<Job[]> {
-  if (!APIFY_TOKEN) {
-    console.log("[Indeed] APIFY_TOKEN not set. Skipping Indeed.");
-    return [];
-  }
-
-  console.log(`[Indeed] Triggering single Apify run with combined query: "${combinedKeyword}"...`);
-
-  const input = {
-    includeKeyword: combinedKeyword,
-    locationName: "Colombia",
-    datePosted: "3days",
-    maxItems: 30
-  };
-
-  const startUrl = `https://api.apify.com/v2/acts/orgupdate~indeed-jobs-scraper/runs?token=${APIFY_TOKEN}`;
-
-  try {
-    const response = await fetch(startUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(input)
-    });
-
-    if (!response.ok) {
-      console.warn(`[Indeed] Failed to trigger run: ${response.status}`);
-      return [];
-    }
-
-    const startData = await response.json();
-    const runId = startData.data.id;
-    const datasetId = startData.data.defaultDatasetId;
-
-    console.log(`[Indeed] Apify run ${runId} started. Waiting for results...`);
-
-    // Poll status until done (max 2 minutes)
-    let attempts = 0;
-    while (attempts < 15) {
-      await new Promise((r) => setTimeout(r, 8000));
-      const statusUrl = `https://api.apify.com/v2/actor-runs/${runId}?token=${APIFY_TOKEN}`;
-      const statusResp = await fetch(statusUrl);
-      if (!statusResp.ok) break;
-      const statusData = await statusResp.json();
-
-      const status = statusData.data.status;
-      console.log(`[Indeed] Run status: ${status}`);
-
-      if (status === "SUCCEEDED") {
-        const datasetUrl = `https://api.apify.com/v2/datasets/${datasetId}/items?token=${APIFY_TOKEN}`;
-        const datasetResp = await fetch(datasetUrl);
-        if (datasetResp.ok) {
-          const items = await datasetResp.json();
-          const jobs: Job[] = [];
-          const now = new Date();
-
-          for (const item of items) {
-            const location = item.location || "";
-            const title = item.job_title || "";
-
-            const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-            const yyyy = yesterday.getFullYear();
-            const mm = String(yesterday.getMonth() + 1).padStart(2, "0");
-            const dd = String(yesterday.getDate()).padStart(2, "0");
-
-            const urlStr = item.URL || "";
-            const jkMatch = urlStr.match(/jk=([a-f0-9]+)/);
-            const jobId = jkMatch ? jkMatch[1] : Math.random().toString(36).substring(7);
-
-            jobs.push({
-              jobId,
-              title: htmlEntities(title),
-              company: htmlEntities(item.company_name || "Confidencial"),
-              location: htmlEntities(location),
-              url: urlStr,
-              dateText: "Reciente",
-              source: "Indeed",
-              publishedAt: `${yyyy}-${mm}-${dd}`
-            });
-          }
-          console.log(`[Indeed] Found ${jobs.length} jobs.`);
-          return jobs;
-        }
-        break;
-      } else if (status === "FAILED" || status === "ABORTED" || status === "TIMED-OUT") {
-        console.warn(`[Indeed] Run failed with status: ${status}`);
-        break;
-      }
-      attempts++;
-    }
-    return [];
-  } catch (error) {
-    console.error("[Indeed] Fetch error:", error);
-    return [];
-  }
 }
 
 import { generateRoleKeywordsWithAI } from "./ai-role-agent.js";

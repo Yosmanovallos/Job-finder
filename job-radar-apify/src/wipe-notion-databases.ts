@@ -4,7 +4,6 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const NOTION_TOKEN = process.env.NOTION_TOKEN;
-const NOTION_DATABASE_ID = process.env.NOTION_DATABASE_ID;
 
 const notion = new Client({ auth: NOTION_TOKEN });
 
@@ -45,7 +44,9 @@ async function wipeAllDatabasesAndPages() {
           page_id: page.id,
           archived: true
         });
-      } catch (e) {}
+      } catch {
+        // skip pages that cannot be archived and keep going
+      }
     }
 
     console.log('=== CLEAN SLATE COMPLETE! Notion is 100% clean and ready for fresh runs. ===');

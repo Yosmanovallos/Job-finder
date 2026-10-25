@@ -39,7 +39,6 @@ import {
   enqueueIndexingNotifications,
   getPendingIndexingBatch,
   markIndexingSent,
-  markIndexingFailed,
   getIndexingBudgetRemaining,
   wasJobPurged
 } from "../src/db/indexing-repository.js";
