@@ -62,6 +62,8 @@ async function main() {
   const maxEnables = intArg("--max-enables", 20, 200);
   const deadlineAt = Date.now() + intArg("--deadline-min", 15, 60) * 60_000;
   const candidatesFile = argValue("--candidates-file");
+  const focusComputrabajo = process.argv.includes("--focus-computrabajo");
+  if (focusComputrabajo && candidatesFile) throw new Error("--focus-computrabajo requiere el directorio vivo, no --candidates-file");
 
   const agencyKeys = parseAgencyKeys(JSON.parse(await readFile(new URL("../data/direct-discovery-agencies.json", import.meta.url), "utf8")));
   const domains = curatedDomains();
@@ -81,6 +83,8 @@ async function main() {
   try {
     const entries = fileEntries ?? (await repo!.loadDirectoryCandidates(DIRECTORY_LIMIT));
     const all = toCandidates(entries, agencyKeys, domains);
+    const computrabajoRows = focusComputrabajo ? await repo!.loadComputrabajoCoverage() : [];
+    const computrabajoCounts = new Map(computrabajoRows.map((row) => [row.companyKey, row.directoryCount]));
     console.log(
       `[discover] Directorio: ${all.length} empresas (${all.filter((candidate) => candidate.websiteDomain).length} con dominio curado, ` +
         `${all.filter((candidate) => candidate.isAgency).length} agencias).`
@@ -89,8 +93,10 @@ async function main() {
     let queue: (DiscoveryCandidate & { attempts: number })[];
     if (dryRun) {
       queue = all
-        .filter((candidate) => candidate.directoryCount >= minCount)
-        .sort((a, b) => b.directoryCount - a.directoryCount)
+        .filter((candidate) => candidate.directoryCount >= minCount && (!focusComputrabajo || computrabajoCounts.has(candidate.companyKey)))
+        .sort((a, b) => focusComputrabajo
+          ? (computrabajoCounts.get(b.companyKey)! - computrabajoCounts.get(a.companyKey)!) || a.companyKey.localeCompare(b.companyKey)
+          : b.directoryCount - a.directoryCount)
         .slice(0, limit)
         .map((candidate) => ({ ...candidate, attempts: 0 }));
     } else {
@@ -102,10 +108,12 @@ async function main() {
       } else {
         console.log("[discover] No se retiran candidatos: snapshot vacío, parcial o al límite.");
       }
-      const due = await repo!.pickDueCandidates(limit, minCount);
+      const due = focusComputrabajo
+        ? await repo!.pickDueComputrabajoCandidates(computrabajoRows, limit, minCount)
+        : await repo!.pickDueCandidates(limit, minCount);
       queue = due.map((row) => ({ ...row, isAgency: agencyKeys.has(row.companyKey) }));
     }
-    console.log(`[discover] A revisar en esta corrida: ${queue.length} (mínimo ${minCount} vacantes en bolsas).${dryRun ? " --dry-run: no se escribe nada." : ""}\n`);
+    console.log(`[discover] A revisar en esta corrida: ${queue.length} (mínimo ${minCount} vacantes en bolsas; foco: ${focusComputrabajo ? "Computrabajo Colombia" : "todas las fuentes"}).${dryRun ? " --dry-run: no se escribe nada." : ""}\n`);
 
     const tally: Record<string, number> = {};
     let enabled = 0;
