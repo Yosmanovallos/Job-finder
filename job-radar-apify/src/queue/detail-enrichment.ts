@@ -56,6 +56,13 @@ export function formatFaultClasses(faultClasses: Record<string, number>): string
     .join(", ");
 }
 
+/** One tick-log line for a drained source; null when nothing was claimed. */
+export function formatDrainLine(name: string, counters: EnrichmentCounters): string | null {
+  if (counters.claimed === 0) return null;
+  const faults = formatFaultClasses(counters.faultClasses);
+  return `🧾 [Tick] Detalle ${name}: ${counters.claimed} reclamadas → ${counters.complete} completas, ${counters.rejected} rechazadas, ${counters.retry} reintento, ${counters.noDetail} sin detalle, ${counters.failed} agotadas${counters.stoppedEarly ? " (fuente detenida por política/plazo)" : ""}.${faults ? ` Fallos: ${faults}.` : ""}`;
+}
+
 export function detailCapFor(adapterName: string): number {
   return resolvePolicy(adapterName, "detail").maxRequestsPerAttempt ?? DEFAULT_DETAIL_CAP;
 }
@@ -147,6 +154,13 @@ export async function enrichInsertedJobs(
   return counters;
 }
 
+/** The given adapters that can drain detail, in DETAIL_ADAPTER_NAMES order. */
+export function drainOrder(adapters: SourceAdapter[]): SourceAdapter[] {
+  return DETAIL_ADAPTER_NAMES.map((name) => adapters.find((candidate) => candidate.name === name)).filter(
+    (adapter): adapter is SourceAdapter => Boolean(adapter?.fetchDetail)
+  );
+}
+
 /**
  * Bounded drain of due 'pending'/'retry' rows, one adapter at a time, each
  * capped by its own detail policy. Never touches legacy 'backlog' rows.
@@ -156,18 +170,25 @@ export async function drainDetailQueue(
   ctx?: FetchContext
 ): Promise<Record<string, EnrichmentCounters>> {
   const report: Record<string, EnrichmentCounters> = {};
-  for (const name of DETAIL_ADAPTER_NAMES) {
-    const adapter = adapters.find((candidate) => candidate.name === name);
-    if (!adapter?.fetchDetail) continue;
+  const order = drainOrder(adapters);
+  for (let i = 0; i < order.length; i++) {
+    const adapter = order[i];
     if (!hasBudget(ctx, BUDGET_ESTIMATES.detailFetch) || isCancelled(ctx)) break;
-    const counters = emptyCounters();
-    const claimed = await claimDueDetailJobs(
-      { source: name.replace(/-VE$/, ""), market: name.endsWith("-VE") ? "VE" : "OTHER" },
-      detailCapFor(name)
-    );
-    counters.claimed = claimed.length;
-    if (claimed.length > 0) await runClaimed(adapter, claimed, counters, ctx);
-    report[name] = counters;
+    // Fair slice of what is left, so the first source can't take the whole
+    // budget; a source that finishes early hands its surplus to the next.
+    const slice = ctx ? ctx.child(Math.floor(ctx.remainingMs() / (order.length - i))) : undefined;
+    try {
+      const counters = emptyCounters();
+      const claimed = await claimDueDetailJobs(
+        { source: adapter.name.replace(/-VE$/, ""), market: adapter.name.endsWith("-VE") ? "VE" : "OTHER" },
+        detailCapFor(adapter.name)
+      );
+      counters.claimed = claimed.length;
+      if (claimed.length > 0) await runClaimed(adapter, claimed, counters, slice);
+      report[adapter.name] = counters;
+    } finally {
+      slice?.dispose();
+    }
   }
   return report;
 }

@@ -75,6 +75,22 @@ export const SOURCE_POLICIES: readonly SourcePolicy[] = [
     ...DEFAULT_SOURCE_POLICY,
     maxRequestsPerAttempt: 8
   },
+  // Healthy, robots-allowed detail pages (JSON-LD). A larger ceiling than the
+  // default 8 so the dedicated drain step can work through their backlog;
+  // still bounded per attempt, jittered, and stopped by any refusal
+  // (src/sources/detail-http.ts). LinkedIn/Computrabajo keep the default.
+  {
+    source: "Magneto",
+    stage: "detail",
+    ...DEFAULT_SOURCE_POLICY,
+    maxRequestsPerAttempt: 30
+  },
+  {
+    source: "Elempleo",
+    stage: "detail",
+    ...DEFAULT_SOURCE_POLICY,
+    maxRequestsPerAttempt: 20
+  },
   // The browser route: Glassdoor and Indeed are Cloudflare-blocked from
   // datacenter IPs, which is why the residential proxy exists for them and
   // for nothing else. Declaring it here is what keeps `WEBSHARE_PROXY_URL`

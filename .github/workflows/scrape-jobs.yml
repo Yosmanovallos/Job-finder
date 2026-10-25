@@ -32,7 +32,8 @@ jobs:
     # margin above that plus checkout/install overhead so GitHub's hard kill
     # is a last resort, not the normal way a run ends (a hard kill mid-run
     # already caused a real data-loss bug once, see scrape-worker.ts).
-    timeout-minutes: 27
+    # 27 (tick) + 9 (detail drain step below). $0 USD in a public repo.
+    timeout-minutes: 36
     steps:
       - name: Checkout Code
         uses: actions/checkout@v5
@@ -75,3 +76,20 @@ jobs:
         run: |
           cd job-radar-apify
           npx tsx scripts/run-scrape-tick.ts
+
+      # Descriptions get their own budget instead of whatever the listings
+      # leave (which was none: Magneto had 0 detail attempts in 48 h). Never
+      # fails the tick: listing ingestion above is already persisted.
+      - name: Drain Job Details
+        if: always()
+        continue-on-error: true
+        timeout-minutes: 9
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
+          TICK_COUNTRY: CO
+          DETAIL_DRAIN_BUDGET_MS: "420000"
+        run: |
+          cd job-radar-apify
+          npx tsx scripts/run-detail-drain.ts
