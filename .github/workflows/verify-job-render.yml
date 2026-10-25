@@ -39,3 +39,13 @@ jobs:
       - run: npm run test:unit
       - run: npm run test:integration
       - run: npm run test:baseline
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: job-render-verification
+          retention-days: 7
+          path: |
+            /tmp/job-radar-test-*/results.json
+            /tmp/job-radar-test-*/public-baseline.json
+            /tmp/job-radar-test-*/baseline-*.png
+            /tmp/job-radar-test-*/job-render-*.png
