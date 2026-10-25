@@ -669,6 +669,12 @@ CREATE TRIGGER trg_jobs_identity_keys
   FOR EACH ROW EXECUTE FUNCTION jobs_set_identity_keys();
 -- END company-identity
 
+-- Supabase Security Advisor "Function Search Path Mutable" (2026-10-25):
+-- the trigger only calls pg_catalog built-ins, so an empty search_path is
+-- behavior-neutral (verified on production with a rolled-back probe). Kept
+-- outside the generated company-identity block, which must stay byte-equal.
+ALTER FUNCTION jobs_set_identity_keys() SET search_path = '';
+
 -- =============================================================================
 -- ROW LEVEL SECURITY: every read/write from this app goes through the `pool`
 -- (direct `pg` connection as the `postgres` role, which has BYPASSRLS — see
