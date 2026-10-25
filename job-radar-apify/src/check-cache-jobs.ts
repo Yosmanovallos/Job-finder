@@ -36,8 +36,8 @@ async function checkCacheJobs() {
       } else {
         console.log('  ✅ WORKING PAGE!');
       }
-    } catch (e: any) {
-      console.log(`  Fetch Error: ${e.message}`);
+    } catch (e) {
+      console.log(`  Fetch Error: ${(e as Error).message}`);
     }
     console.log('--------------------------------------------------');
   }

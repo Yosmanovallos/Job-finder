@@ -80,9 +80,9 @@ async function runSource(
       async () => deduplicateJobs(await fetcher())
     );
     return { label, fetched, savedCount, duplicateCount, status: listingStatus() };
-  } catch (err: any) {
-    console.error(`❌ [BrowserTick] ${label} failed:`, err?.message || err);
-    return { label, fetched: 0, savedCount: 0, duplicateCount: 0, error: err?.message || String(err), status: listingStatus() };
+  } catch (err) {
+    console.error(`❌ [BrowserTick] ${label} failed:`, (err as Error)?.message || err);
+    return { label, fetched: 0, savedCount: 0, duplicateCount: 0, error: (err as Error)?.message || String(err), status: listingStatus() };
   }
 }
 

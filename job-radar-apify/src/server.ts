@@ -711,7 +711,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
             subscriptionEnd: updated.subscriptionEnd
           })
         );
-      } catch (e: any) {
+      } catch (e) {
         respondToUnexpectedError(res, e, "PATCH /api/me", "No se pudo actualizar el nombre.");
       }
     });
@@ -762,7 +762,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
             preferredRoles: updated.preferredRoles
           })
         );
-      } catch (e: any) {
+      } catch (e) {
         respondToUnexpectedError(
           res,
           e,
@@ -871,7 +871,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       });
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify(checkout));
-    } catch (e: any) {
+    } catch (e) {
       respondToUnexpectedError(
         res,
         e,
@@ -900,7 +900,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
         }
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ status: "ok" }));
-      } catch (e: any) {
+      } catch (e) {
         respondToUnexpectedError(res, e, "POST /api/webhooks/wompi", "Payload inválido.");
       }
     });

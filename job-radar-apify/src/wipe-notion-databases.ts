@@ -26,8 +26,8 @@ async function wipeAllDatabasesAndPages() {
           block_id: ds.id
         });
         console.log(`Deleted DB block: ${ds.id}`);
-      } catch (e: any) {
-        console.warn(`Could not delete DB block ${ds.id}:`, e.message);
+      } catch (e) {
+        console.warn(`Could not delete DB block ${ds.id}:`, (e as Error).message);
       }
     }
 
@@ -50,8 +50,8 @@ async function wipeAllDatabasesAndPages() {
     }
 
     console.log('=== CLEAN SLATE COMPLETE! Notion is 100% clean and ready for fresh runs. ===');
-  } catch (error: any) {
-    console.error('Wipe error:', error.message);
+  } catch (error) {
+    console.error('Wipe error:', (error as Error).message);
   }
 }
 

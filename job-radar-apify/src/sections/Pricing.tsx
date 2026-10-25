@@ -72,8 +72,8 @@ export default function Pricing() {
 
       document.body.appendChild(form);
       form.submit();
-    } catch (e: any) {
-      setError(e?.message || "Ocurrió un error iniciando el pago.");
+    } catch (e) {
+      setError((e as Error)?.message || "Ocurrió un error iniciando el pago.");
       setBusy(false);
     }
   };

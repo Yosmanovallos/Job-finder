@@ -24,14 +24,14 @@ async function wipeAllCreatedPagesAndDatabases() {
           block_id: child.id
         });
         console.log(`Successfully deleted block: ${child.id}`);
-      } catch (e: any) {
-        console.warn(`Could not delete block ${child.id}:`, e.message);
+      } catch (e) {
+        console.warn(`Could not delete block ${child.id}:`, (e as Error).message);
       }
     }
 
     console.log('=== CLEAN SLATE COMPLETED SUCCESSFULLY! "radar de empleo" is 100% empty. ===');
-  } catch (error: any) {
-    console.error('Clean slate error:', error.message);
+  } catch (error) {
+    console.error('Clean slate error:', (error as Error).message);
   }
 }
 

@@ -31,8 +31,8 @@ export default function ResetPassword() {
         return;
       }
       setDone(true);
-    } catch (e: any) {
-      setError(translateAuthError(e?.message));
+    } catch (e) {
+      setError(translateAuthError((e as Error)?.message));
     } finally {
       setBusy(false);
     }

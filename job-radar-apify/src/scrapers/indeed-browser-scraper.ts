@@ -150,8 +150,8 @@ export async function scrapeIndeedBrowser(country: Country = "CO"): Promise<Inde
     const countryJobs = parseJobcards(html, now, config.subdomain, config.countryName);
     jobs.push(...countryJobs);
     console.log(`[IndeedBrowser:${country}] ${config.countryName} (country-wide): ${countryJobs.length} jobs within 1 day.`);
-  } catch (error: any) {
-    console.error(`[IndeedBrowser:${country}] Country-wide query failed: ${error.message}`);
+  } catch (error) {
+    console.error(`[IndeedBrowser:${country}] Country-wide query failed: ${(error as Error).message}`);
     // P2: a swallowed failure must not read as an empty source in run telemetry.
     reportSourceSignal("swallowed_error");
   }
@@ -164,8 +164,8 @@ export async function scrapeIndeedBrowser(country: Country = "CO"): Promise<Inde
       const cityJobs = parseJobcards(html, now, config.subdomain, config.countryName);
       jobs.push(...cityJobs);
       console.log(`[IndeedBrowser:${country}] ${city}: ${cityJobs.length} jobs within 1 day (${jobs.length} total so far).`);
-    } catch (error: any) {
-      console.warn(`[IndeedBrowser:${country}] ${city} failed, skipping: ${error.message}`);
+    } catch (error) {
+      console.warn(`[IndeedBrowser:${country}] ${city} failed, skipping: ${(error as Error).message}`);
       reportSourceSignal("swallowed_error");
     }
   }

@@ -59,8 +59,8 @@ async function runFixtureCapture() {
       fs.writeFileSync(fixturePath, JSON.stringify(jobs, null, 2), 'utf-8');
       summary[name] = jobs.length;
       console.log(`✅ [Fixture] ${name}: ${jobs.length} vacantes guardadas en ${fixturePath}`);
-    } catch (err: any) {
-      console.error(`❌ [Fixture] ${name} falló:`, err?.message || err);
+    } catch (err) {
+      console.error(`❌ [Fixture] ${name} falló:`, (err as Error)?.message || err);
       summary[name] = 0;
       const fixturePath = path.join(FIXTURES_DIR, `${name}.json`);
       fs.writeFileSync(fixturePath, JSON.stringify([], null, 2), 'utf-8');

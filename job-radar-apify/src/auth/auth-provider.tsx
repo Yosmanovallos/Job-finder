@@ -245,8 +245,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setTier(data.tier);
       setSubscriptionEnd(data.subscriptionEnd);
       return {};
-    } catch (e: any) {
-      return { error: e?.message || "No se pudo actualizar el nombre" };
+    } catch (e) {
+      return { error: (e as Error)?.message || "No se pudo actualizar el nombre" };
     }
   };
 
@@ -265,8 +265,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!res.ok) return { error: data?.error || "No se pudieron guardar los puestos" };
       setPreferredRoles(Array.isArray(data.preferredRoles) ? data.preferredRoles : []);
       return {};
-    } catch (e: any) {
-      return { error: e?.message || "No se pudieron guardar los puestos" };
+    } catch (e) {
+      return { error: (e as Error)?.message || "No se pudieron guardar los puestos" };
     }
   };
 

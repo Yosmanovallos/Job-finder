@@ -336,8 +336,8 @@ export async function scrapeComputrabajo(keyword: string, country: string = "CO"
         if (proxyRes.ok) {
           html = await proxyRes.text();
         }
-      } catch (proxyErr: any) {
-        console.warn(`[Computrabajo] Proxy fetch error: ${proxyErr.message}`);
+      } catch (proxyErr) {
+        console.warn(`[Computrabajo] Proxy fetch error: ${(proxyErr as Error).message}`);
       }
 
       if (!html) break;
@@ -869,8 +869,8 @@ export async function scrapeWeRemoto(): Promise<Job[]> {
           applicantCountries: posting.applicantCountries,
           validThrough: posting.validThrough
         });
-      } catch (jobErr: any) {
-        console.warn(`[WeRemoto] Failed fetching ${url}:`, jobErr?.message || jobErr);
+      } catch (jobErr) {
+        console.warn(`[WeRemoto] Failed fetching ${url}:`, (jobErr as Error)?.message || jobErr);
       }
     }
   } catch (error) {
@@ -1339,12 +1339,12 @@ async function gsFetch(url: string, label: string, attempts = 3): Promise<string
       // Backoff before a fresh-fingerprint retry (1.5s, 3s, 4.5s, ...) — only
       // reached for transient statuses (429/5xx), never for a 401/403 deny.
       await new Promise((r) => setTimeout(r, 1500 * attempt));
-    } catch (error: any) {
+    } catch (error) {
       if (error instanceof FetchBlockedError) throw error;
       if (attempt === attempts) {
         console.error(
           `[${label}] Fetch error after ${attempts} attempts:`,
-          error?.message || error
+          (error as Error)?.message || error
         );
         throw error;
       }
@@ -1445,8 +1445,8 @@ export async function scrapeIndeedLocal(keyword: string): Promise<Job[]> {
         publishedAt
       });
     }
-  } catch (error: any) {
-    console.error("[Indeed] Parse error:", error?.message || error);
+  } catch (error) {
+    console.error("[Indeed] Parse error:", (error as Error)?.message || error);
     return [];
   }
   console.log(`[Indeed] Found ${jobs.length} jobs (filtered by date).`);
@@ -1533,8 +1533,8 @@ export async function scrapeGlassdoor(keyword: string): Promise<Job[]> {
         publishedAt
       });
     }
-  } catch (error: any) {
-    console.error("[Glassdoor] Parse error:", error?.message || error);
+  } catch (error) {
+    console.error("[Glassdoor] Parse error:", (error as Error)?.message || error);
     return [];
   }
   console.log(`[Glassdoor] Found ${jobs.length} jobs (filtered by date).`);
@@ -1839,8 +1839,8 @@ async function main() {
       console.log(
         `[Notion] Successfully created dedicated database with ID: ${targetDataSourceId}`
       );
-    } catch (e: any) {
-      console.error("[Notion] Error creating dedicated database:", e.message);
+    } catch (e) {
+      console.error("[Notion] Error creating dedicated database:", (e as Error).message);
     }
   }
 

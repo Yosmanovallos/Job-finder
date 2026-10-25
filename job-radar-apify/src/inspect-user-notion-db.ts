@@ -46,14 +46,14 @@ async function inspectNotionDb() {
           } else {
             console.log('  ✅ WORKING URL!');
           }
-        } catch (e: any) {
-          console.log(`  Fetch error: ${e.message}`);
+        } catch (e) {
+          console.log(`  Fetch error: ${(e as Error).message}`);
         }
         console.log('--------------------------------------------------');
       }
     }
-  } catch (e: any) {
-    console.error('Error inspecting Notion DB:', e.message);
+  } catch (e) {
+    console.error('Error inspecting Notion DB:', (e as Error).message);
   }
 }
 

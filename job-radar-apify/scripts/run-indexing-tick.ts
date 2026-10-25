@@ -79,11 +79,11 @@ async function main() {
         await markIndexingSent(row.id);
         sent++;
         consecutiveFailures = 0;
-      } catch (err: any) {
-        await markIndexingFailed(row.id, String(err?.message ?? err));
+      } catch (err) {
+        await markIndexingFailed(row.id, String((err as Error)?.message ?? err));
         failed++;
         consecutiveFailures++;
-        console.warn(`   ⚠️ Failed: ${row.url} (${row.notification_type}) — ${err?.message ?? err}`);
+        console.warn(`   ⚠️ Failed: ${row.url} (${row.notification_type}) — ${(err as Error)?.message ?? err}`);
 
         if (consecutiveFailures >= CONSECUTIVE_FAILURE_LIMIT) {
           console.error(

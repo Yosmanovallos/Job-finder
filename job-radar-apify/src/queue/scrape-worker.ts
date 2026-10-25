@@ -182,12 +182,12 @@ export class ScrapeWorker {
         }
 
         await markRoleSourceRun(roleName, adapter.name);
-      } catch (err: any) {
+      } catch (err) {
         console.error(
           `❌ [ScrapeWorker] Error en adaptador ${adapter.name} procesando "${roleName}":`,
-          err?.message || err
+          (err as Error)?.message || err
         );
-        perSource[adapter.name] = { fetched: 0, error: err?.message || String(err), status: listingStatus() };
+        perSource[adapter.name] = { fetched: 0, error: (err as Error)?.message || String(err), status: listingStatus() };
       }
     }
 

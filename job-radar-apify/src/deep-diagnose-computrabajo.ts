@@ -33,8 +33,8 @@ async function deepDiagnose() {
       if (body1.includes('oferta caducada') || body1.includes('no está disponible')) {
         console.log('  ⚠️ EXPIRED / INACTIVE OFFER!');
       }
-    } catch (e: any) {
-      console.error(`  Fetch error:`, e.message);
+    } catch (e) {
+      console.error(`  Fetch error:`, (e as Error).message);
     }
 
     console.log('\n--------------------------------------------------\n');

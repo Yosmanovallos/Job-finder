@@ -320,9 +320,9 @@ async function runGlobalCatalogSources(
       // A source cut off by the catalog budget did not run: left unmarked, it
       // stays the oldest and leads the next tick (orderDueGlobalSources).
       if (countsAsGlobalRun(listingStatus())) await markGlobalSourceRun(sourceName);
-    } catch (err: any) {
-      console.error(`❌ [Tick] Fuente global ${sourceName} falló:`, err?.message || err);
-      perSource[sourceName] = { fetched: 0, error: err?.message || String(err), status: listingStatus() };
+    } catch (err) {
+      console.error(`❌ [Tick] Fuente global ${sourceName} falló:`, (err as Error)?.message || err);
+      perSource[sourceName] = { fetched: 0, error: (err as Error)?.message || String(err), status: listingStatus() };
     } finally {
       await releaseLease(GLOBAL_LEASE_ROLE, sourceName, runId);
     }

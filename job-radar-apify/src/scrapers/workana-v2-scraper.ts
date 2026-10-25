@@ -113,12 +113,12 @@ async function gsFetchV2(url: string, attempts = 3): Promise<string> {
         `[WorkanaV2] HTTP ${response.statusCode}, retrying in ${backoffMs / 1000}s (attempt ${attempt}/${attempts})...`
       );
       await sleep(backoffMs);
-    } catch (error: any) {
-      if (error.message?.includes("Blocked")) throw error;
+    } catch (error) {
+      if ((error as Error).message?.includes("Blocked")) throw error;
       if (attempt === attempts) {
         console.error(
           `[WorkanaV2] Fetch error after ${attempts} attempts:`,
-          error?.message || error
+          (error as Error)?.message || error
         );
         throw error;
       }
@@ -217,15 +217,15 @@ export async function scrapeWorkanaV2(
     let html: string;
     try {
       html = await gsFetchV2(url);
-    } catch (error: any) {
+    } catch (error) {
       if (page === 1) {
         // If page 1 fails, nothing to return — propagate
-        console.error(`[WorkanaV2] Page 1 failed — aborting: ${error.message}`);
+        console.error(`[WorkanaV2] Page 1 failed — aborting: ${(error as Error).message}`);
         throw error;
       }
       // Pages 2+ failing just means no more results
       console.warn(
-        `[WorkanaV2] Page ${page} failed, stopping pagination: ${error.message}`
+        `[WorkanaV2] Page ${page} failed, stopping pagination: ${(error as Error).message}`
       );
       break;
     }
@@ -409,9 +409,9 @@ async function main() {
     console.log(`  Unique companies: ${companies.size}`);
     console.log(`  Unique locations: ${locations.size}`);
     console.log("─".repeat(40));
-  } catch (error: any) {
-    console.error(`\n❌ FAILED: ${error.message}`);
-    if (error.message.includes("Blocked")) {
+  } catch (error) {
+    console.error(`\n❌ FAILED: ${(error as Error).message}`);
+    if ((error as Error).message.includes("Blocked")) {
       console.error(
         "\n   got-scraping was also blocked by Cloudflare.\n" +
           "   Next step: try session cookie authentication.\n"

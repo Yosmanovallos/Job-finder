@@ -32,8 +32,8 @@ async function gsFetchV2(url: string, attempts = 3): Promise<string> {
       }
       if (attempt === attempts) throw new Error(`HTTP ${response.statusCode}`);
       await sleep(2000 * attempt);
-    } catch (error: any) {
-      if (error.message?.includes("Blocked")) throw error;
+    } catch (error) {
+      if ((error as Error).message?.includes("Blocked")) throw error;
       if (attempt === attempts) throw error;
       await sleep(2000 * attempt);
     }
@@ -112,8 +112,8 @@ async function testCountry(countryCode: string, countryName: string, publication
         allCategories[cat] = (allCategories[cat] || 0) + count;
       }
       console.log(`  📊 Page ${page}/${first.totalPages}: ${result.jobCount} jobs (${totalSampled} sampled so far)`);
-    } catch (err: any) {
-      console.log(`  ⚠️  Page ${page} failed: ${err.message}`);
+    } catch (err) {
+      console.log(`  ⚠️  Page ${page} failed: ${(err as Error).message}`);
       break;
     }
   }
@@ -170,8 +170,8 @@ async function main() {
     } else {
       console.log("  ⚠️  No results-initials found for remote filter");
     }
-  } catch (err: any) {
-    console.log(`  ⚠️  Remote filter test failed: ${err.message}`);
+  } catch (err) {
+    console.log(`  ⚠️  Remote filter test failed: ${(err as Error).message}`);
   }
 
   // Summary table

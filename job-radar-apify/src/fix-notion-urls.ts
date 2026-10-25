@@ -47,14 +47,14 @@ async function fixAllNotionUrls() {
             fixedCount++;
           }
         }
-      } catch (e: any) {
-        console.warn(`Error processing data source ${ds.id}:`, e.message);
+      } catch (e) {
+        console.warn(`Error processing data source ${ds.id}:`, (e as Error).message);
       }
     }
 
     console.log(`\n=== SUCCESS: Fixed ${fixedCount} broken Computrabajo URLs in Notion ===`);
-  } catch (e: any) {
-    console.error('Error searching Notion:', e.message);
+  } catch (e) {
+    console.error('Error searching Notion:', (e as Error).message);
   }
 }
 
