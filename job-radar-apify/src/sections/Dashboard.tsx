@@ -225,7 +225,7 @@ export default function Dashboard() {
       .finally(() => {
         if (myRequestId === requestIdRef.current) setIsLoading(false);
       });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Dependencies intentionally limited to the list below.
   }, [accessToken, filterKey, retryNonce]);
 
   const loadMore = useCallback(() => {
@@ -319,7 +319,7 @@ export default function Dashboard() {
     }, 2000);
 
     return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Dependencies intentionally limited to the list below.
   }, []);
 
   useEffect(() => {
@@ -370,7 +370,7 @@ export default function Dashboard() {
           { replace: true }
         );
       });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Dependencies intentionally limited to the list below.
   }, [accessToken]);
 
   const handleSaveToggle = (jobId: string) => {
@@ -405,7 +405,7 @@ export default function Dashboard() {
     if (selectedJobId && visibleJobs.some((j) => j.jobId === selectedJobId)) return;
     const firstUnlocked = visibleJobs.find((j) => !j.isLocked) || visibleJobs[0];
     setSelectedJobId(firstUnlocked.jobId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Dependencies intentionally limited to the list below.
   }, [visibleJobs]);
   const selectedJob = visibleJobs.find((j) => j.jobId === selectedJobId) || null;
 
