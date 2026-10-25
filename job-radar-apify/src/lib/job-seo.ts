@@ -4,6 +4,7 @@ import { DEFAULT_ROLES_200 } from "../queue/scheduler.js";
 import { getCountryConfig, DEFAULT_COUNTRY } from "../countries/index.js";
 import { isGoogleReadyNow, resolveGoogleLocation } from "./google-job-readiness.js";
 import { countryNameFor } from "./country-codes.js";
+import { isPlaceholderEmployer } from "./company-key.js";
 
 export const SITE_URL = "https://buscotrabajo.co";
 // Job SEO V2 (docs/JOBPOSTING-GOOGLE-CONTRACT.md): there is deliberately no
@@ -653,7 +654,8 @@ export function buildCategoryInsights(
   let latestPublishedMs: number | null = null;
 
   for (const job of jobs) {
-    if (job.company) incrementCount(companies, job.company);
+    // An undisclosed employer is not one more company in the sample.
+    if (job.company && !isPlaceholderEmployer(job.company)) incrementCount(companies, job.company);
     const jobSources =
       Array.isArray(job.sources) && job.sources.length > 0 ? job.sources : [job.source];
     for (const source of jobSources) if (source) incrementCount(sources, source);
