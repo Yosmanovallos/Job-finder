@@ -7,6 +7,8 @@ import {
   buildCategoryMeta,
   buildCategoryInsights,
   buildCategoryInternalLinks,
+  buildRelatedCityLinks,
+  buildCategorySectionHeadings,
   type CategoryInsights
 } from "../lib/job-seo.js";
 import { isVePrefixed } from "../lib/country-context.js";
@@ -116,6 +118,8 @@ export default function CategoryLanding() {
 
   const meta = category ? buildCategoryMeta(category, total) : null;
   const internalLinks = category ? buildCategoryInternalLinks(category) : [];
+  const relatedCityLinks = category ? buildRelatedCityLinks(category) : [];
+  const sectionHeadings = category ? buildCategorySectionHeadings(category) : null;
   usePageMeta({
     title: meta?.title ?? "Cargando vacantes... | BuscoTrabajo",
     description: meta?.description ?? "Cargando vacantes de esta categoría."
@@ -252,11 +256,42 @@ export default function CategoryLanding() {
             )}
 
             {state === "found" && jobs.length > 0 && (
-              <div className="space-y-3">
-                {jobs.map((job) => (
-                  <CategoryJobRow key={job.jobId} job={job} />
-                ))}
-              </div>
+              <>
+                {sectionHeadings && (
+                  <h2 className="font-heading font-semibold text-lg text-foreground mb-3">
+                    {sectionHeadings.jobs}
+                  </h2>
+                )}
+                <div className="space-y-3">
+                  {jobs.map((job) => (
+                    <CategoryJobRow key={job.jobId} job={job} />
+                  ))}
+                </div>
+              </>
+            )}
+
+            {state === "found" && sectionHeadings && relatedCityLinks.length > 0 && (
+              <section
+                data-related-cities
+                aria-label={sectionHeadings.relatedCities}
+                className="mt-10 rounded-2xl border border-[#e6e8e4] bg-white p-5 sm:p-6"
+              >
+                <h2 className="font-heading font-semibold text-lg text-foreground mb-3">
+                  {sectionHeadings.relatedCities}
+                </h2>
+                <ul className="flex flex-wrap gap-x-4 gap-y-2">
+                  {relatedCityLinks.map((link) => (
+                    <li key={link.href}>
+                      <Link
+                        to={link.href}
+                        className="text-sm font-medium text-primary hover:underline"
+                      >
+                        {link.label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </section>
             )}
           </>
         )}
