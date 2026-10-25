@@ -742,7 +742,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
           return;
         }
         const roles = Array.from(
-          new Set(
+          new Set<string>(
             parsed.roles
               .filter((r: unknown) => typeof r === "string")
               .map((r: string) => r.trim())

@@ -1858,7 +1858,7 @@ async function main() {
     scrapeWeRemoto(),
     scrapeGetOnBoard(),
     scrapeRemoteOK(),
-    scrapeRemotive(searchTerms)
+    scrapeRemotive()
   ]);
   allJobs = allJobs.concat(weRemotoJobs, getOnBoardJobs, remoteOkJobs, remotiveJobs);
 

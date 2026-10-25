@@ -42,7 +42,7 @@ async function runFixtureCapture() {
     { name: 'weremoto', runner: () => scrapeWeRemoto() },
     { name: 'getonboard', runner: () => scrapeGetOnBoard() },
     { name: 'remoteok', runner: () => scrapeRemoteOK() },
-    { name: 'remotive', runner: () => scrapeRemotive([TEST_KEYWORD]) },
+    { name: 'remotive', runner: () => scrapeRemotive() },
     { name: 'indeed', runner: () => scrapeIndeedLocal(TEST_KEYWORD) },
     { name: 'glassdoor', runner: () => scrapeGlassdoor(TEST_KEYWORD) }
   ];

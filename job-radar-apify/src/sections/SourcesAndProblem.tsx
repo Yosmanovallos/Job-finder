@@ -1,4 +1,6 @@
-import { Browsers, Copy, LinkBreak } from "@phosphor-icons/react";
+import { BrowsersIcon as Browsers } from "@phosphor-icons/react/dist/csr/Browsers";
+import { CopyIcon as Copy } from "@phosphor-icons/react/dist/csr/Copy";
+import { LinkBreakIcon as LinkBreak } from "@phosphor-icons/react/dist/csr/LinkBreak";
 import { SOURCES_BY_COUNTRY } from "../countries/index.js";
 import {
   SOURCES_PAGE_DISCLOSURES,

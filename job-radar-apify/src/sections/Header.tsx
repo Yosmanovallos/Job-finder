@@ -257,9 +257,7 @@ export default function Header() {
           to={homeHref}
           className="flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 rounded-sm"
           style={{
-            color: "#0e0f10",
-            ringColor: "#0f6b4c",
-            ringOffsetColor: "#fafafa"
+            color: "#0e0f10"
           }}
           aria-label="BuscoTrabajo — inicio"
         >
