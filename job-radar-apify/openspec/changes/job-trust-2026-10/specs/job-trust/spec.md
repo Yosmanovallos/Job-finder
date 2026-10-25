@@ -9,7 +9,7 @@
 
 ## Availability
 
-- A Computrabajo listing MUST remain visible under the owner's current decision, with a clear unverified-availability label.
+- A Computrabajo listing MUST remain visible under the owner's current decision. Its detail MUST explain near **Aplicar** that the date does not confirm availability, without a prominent unverified-availability badge.
 - A Computrabajo listing MUST NOT gain a “Nueva” badge merely from an unverified date.
 - A failed, blocked or inconclusive source response MUST NOT be treated as proof of closure.
 - The system MUST NOT extend an anti-bot bypass to check availability.

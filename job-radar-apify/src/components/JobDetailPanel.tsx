@@ -221,7 +221,6 @@ export const JobDetailPanel: React.FC<JobDetailPanelProps> = ({
             {job.source}
           </Badge>
           {(job.dateText || job.publishedAt) && <Badge variant="outline">{jobDateLabel(job)}</Badge>}
-          {isAvailabilityUnverified(job.source) && <Badge variant="hybrid">Vigencia no verificada</Badge>}
         </div>
 
         {isAuthenticated ? (
@@ -237,7 +236,7 @@ export const JobDetailPanel: React.FC<JobDetailPanelProps> = ({
         )}
         {isAvailabilityUnverified(job.source) && (
           <p className="text-xs text-muted-foreground -mt-3 mb-5">
-            Computrabajo puede retirar una oferta después de publicarla. Comprueba su disponibilidad al abrir la fuente.
+            La fecha no confirma que siga abierta. Podrás comprobar su disponibilidad en Computrabajo al aplicar.
           </p>
         )}
 

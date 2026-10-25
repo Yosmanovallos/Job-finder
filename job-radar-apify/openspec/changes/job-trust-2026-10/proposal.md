@@ -8,7 +8,7 @@ Una fecha relativa de origen queda congelada en la interfaz. El parser equipara 
 
 ## Decisión del propietario
 
-El detalle público de la vacante sigue abierto. Solo el clic en **Aplicar** pide registro o inicio de sesión. Las vacantes de Computrabajo permanecen visibles, identificadas como **Vigencia no verificada**. No se amplía la ruta de proxy que evita el bloqueo de la fuente.
+El detalle público de la vacante sigue abierto. Solo el clic en **Aplicar** pide registro o inicio de sesión. Las vacantes de Computrabajo permanecen visibles; la aclaración de disponibilidad aparece junto a **Aplicar**, sin una insignia prominente en cada resultado. No se amplía la ruta de proxy que evita el bloqueo de la fuente.
 
 ## Contrato
 

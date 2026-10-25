@@ -56,7 +56,6 @@ export const JobListItem: React.FC<JobListItemProps> = ({ job, selected, onClick
         {modality && <Badge variant={MODALITY_VARIANT[modality]}>{modality}</Badge>}
         {job.salary && <Badge>{job.salary}</Badge>}
         {isFresh(job) && <Badge variant="primary">Nueva</Badge>}
-        {isAvailabilityUnverified(job.source) && <Badge variant="hybrid">Vigencia no verificada</Badge>}
       </div>
       <p className="text-[11px] font-mono text-ink-faint">
         {jobDateLabel(job)}
