@@ -22,17 +22,39 @@ const SCHEMA_EMPLOYMENT_TYPE_LABELS: Record<string, string> = {
   // OTHER deliberately unmapped — not informative enough to show as a badge.
 };
 
-function findJobPostingNode(html: string): any | null {
+/**
+ * The JobPosting fields this module reads. JSON-LD is external input, so
+ * every field is optional and anything not shape-checked below is unknown.
+ */
+interface JobPostingNode {
+  "@type"?: unknown;
+  title?: unknown;
+  description?: unknown;
+  skills?: unknown;
+  employmentType?: unknown;
+  baseSalary?: {
+    value?: { minValue?: unknown; maxValue?: unknown; value?: unknown } | number | string | null;
+    currency?: unknown;
+  } | null;
+  salaryCurrency?: unknown;
+  jobLocationType?: unknown;
+  jobLocation?: { address?: { addressLocality?: unknown; addressRegion?: unknown } | string | null } | null;
+  applicantLocationRequirements?: unknown;
+  hiringOrganization?: { name?: unknown } | null;
+  validThrough?: unknown;
+}
+
+function findJobPostingNode(html: string): JobPostingNode | null {
   const scripts = html.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi) || [];
   for (const raw of scripts) {
     const content = raw.replace(/<script[^>]*>/i, "").replace(/<\/script>/i, "").trim();
-    let parsed: any;
+    let parsed: unknown;
     try {
       parsed = JSON.parse(content);
     } catch {
       continue;
     }
-    const nodes: any[] = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.["@graph"]) ? parsed["@graph"] : [parsed];
+    const nodes: (JobPostingNode | null | undefined)[] = Array.isArray(parsed) ? parsed : Array.isArray((parsed as { "@graph"?: unknown } | null)?.["@graph"]) ? (parsed as { "@graph": JobPostingNode[] })["@graph"] : [parsed as JobPostingNode | null];
     for (const node of nodes) {
       if (node && node["@type"] === "JobPosting") return node;
     }
@@ -46,7 +68,7 @@ function findJobPostingNode(html: string): any | null {
  * a source that omits baseSalary/skills simply doesn't get those fields,
  * never a guessed fallback.
  */
-function buildJobDetail(node: any): Partial<JobDetail> {
+function buildJobDetail(node: JobPostingNode): Partial<JobDetail> {
   const detail: Partial<JobDetail> = {};
 
   if (typeof node.description === "string" && node.description.trim()) {
@@ -157,7 +179,7 @@ export function extractJobPostingDetail(html: string): Partial<JobDetail> | null
   return Object.keys(detail).length > 0 ? detail : null;
 }
 
-function extractLocationLabel(node: any): string | undefined {
+function extractLocationLabel(node: JobPostingNode): string | undefined {
   // schema.org's own documented pattern for a fully-remote posting: no
   // `jobLocation` at all, `jobLocationType: "TELECOMMUTE"` instead —
   // confirmed live on WeRemoto. "Remoto" matches the pseudo-city convention
@@ -172,7 +194,7 @@ function extractLocationLabel(node: any): string | undefined {
     if (parts.length > 0) return parts.join(", ");
   }
 
-  const applicantCountry = node.applicantLocationRequirements?.name;
+  const applicantCountry = (node.applicantLocationRequirements as { name?: unknown } | null | undefined)?.name;
   if (typeof applicantCountry === "string" && applicantCountry.trim()) return applicantCountry.trim();
 
   return undefined;

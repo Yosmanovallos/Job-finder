@@ -202,11 +202,11 @@ async function handleMcp(
     return;
   }
   const body = await readJsonBodyCapped(req, 64 * 1024);
-  if (!body.ok || !body.value || body.value.jsonrpc !== "2.0" || typeof body.value.method !== "string") {
-    await context.sendBody(req, res, 400, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }, JSON.stringify({ jsonrpc: "2.0", id: body.ok ? body.value?.id ?? null : null, error: { code: -32700, message: "Invalid JSON-RPC request." } }));
+  if (!body.ok || !body.value || (body.value as JsonRpcEnvelope).jsonrpc !== "2.0" || typeof (body.value as JsonRpcEnvelope).method !== "string") {
+    await context.sendBody(req, res, 400, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }, JSON.stringify({ jsonrpc: "2.0", id: body.ok ? (body.value as JsonRpcEnvelope | null | undefined)?.id ?? null : null, error: { code: -32700, message: "Invalid JSON-RPC request." } }));
     return;
   }
-  const request = body.value as { id?: string | number | null; method: string; params?: any };
+  const request = body.value as { id?: string | number | null; method: string; params?: { name?: unknown; arguments?: unknown } | null };
   if (request.id === undefined) {
     await context.sendBody(req, res, 202, { "Cache-Control": "no-store" }, "");
     return;
@@ -225,7 +225,7 @@ async function handleMcp(
       response = { jsonrpc: "2.0", id: request.id, error: { code: -32602, message: "Tool arguments must be an object." } };
     } else {
       try {
-        const action = await executeAgentAction(name, args);
+        const action = await executeAgentAction(name, args as Record<string, unknown>);
         response = action.ok
           ? { jsonrpc: "2.0", id: request.id, result: { content: [{ type: "text", text: JSON.stringify(action.value) }], structuredContent: action.value, isError: false } }
           : { jsonrpc: "2.0", id: request.id, result: { content: [{ type: "text", text: `${action.code}: ${action.message} ${action.resolution}` }], structuredContent: { error: { code: action.code, message: action.message, resolution: action.resolution } }, isError: true } };
@@ -237,6 +237,18 @@ async function handleMcp(
     response = { jsonrpc: "2.0", id: request.id, error: { code: -32601, message: "Method not found." } };
   }
   await context.sendBody(req, res, 200, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }, JSON.stringify(response));
+}
+
+/** Envelope fields read before a JSON-RPC body is trusted. */
+interface JsonRpcEnvelope {
+  jsonrpc?: unknown;
+  id?: string | number | null;
+  method?: unknown;
+}
+
+/** Fields of an A2A message/send request that handleA2a reads. */
+interface A2aRequest extends JsonRpcEnvelope {
+  params?: { message?: { parts?: unknown; contextId?: unknown } | null } | null;
 }
 
 async function handleA2a(
@@ -259,13 +271,13 @@ async function handleA2a(
     return;
   }
   const body = await readJsonBodyCapped(req, 64 * 1024);
-  const request = body.ok ? body.value : null;
+  const request = body.ok ? (body.value as A2aRequest | null | undefined) : null;
   if (!request || request.jsonrpc !== "2.0" || request.method !== "message/send" || request.id === undefined) {
     await context.sendBody(req, res, 400, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }, JSON.stringify({ jsonrpc: "2.0", id: request?.id ?? null, error: { code: -32600, message: "Only message/send JSON-RPC requests are supported." } }));
     return;
   }
   const parts = request.params?.message?.parts;
-  const dataPart = Array.isArray(parts) ? parts.find((part: any) => part?.kind === "data" && part.data && typeof part.data === "object") : null;
+  const dataPart = Array.isArray(parts) ? (parts as ({ kind?: unknown; data?: unknown } | null | undefined)[]).find((part) => part?.kind === "data" && part.data && typeof part.data === "object") : null;
   if (!dataPart) {
     await context.sendBody(req, res, 200, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }, JSON.stringify({ jsonrpc: "2.0", id: request.id, error: { code: -32602, message: "A structured DataPart is required; free text is not interpreted." } }));
     return;

@@ -860,7 +860,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     // implícito en todo este archivo) — solo estos dos strings exactos
     // resuelven a un monto real; cualquier otra cosa cae a "pro", nunca
     // a un monto inventado por el cliente.
-    const requestedPlan = body.value?.plan;
+    const requestedPlan = (body.value as { plan?: unknown } | null | undefined)?.plan;
     const plan: "pro" | "pro_max" = requestedPlan === "pro_max" ? "pro_max" : "pro";
 
     try {
