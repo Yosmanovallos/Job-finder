@@ -26,9 +26,29 @@ Base: origin/main `516c8b8`; branch `codex/signup-analytics` in isolated worktre
 
 The user authorized implementation and subsequently authorized push, merge
 and deployment with post-deploy production checks and rollback on regression.
-Publication is in progress; this change is not yet deployed or archived.
-After authorized deployment verify the auth bundle, monitor normal organic
-usage over complete days, compare event count with event users and reconcile
+PR #14 merged as `bb8a01d6244836c4c00e99bbfa3caa37a87cf5b8` on
+2026-10-24 (Bogota). The deployed public bundle `index-Dv9h-688.js`
+contains the dedupe ledger and confirmation check, excludes synthetic
+settings and no longer contains the previous timestamp-only signup trigger.
+
+Post-deploy checks: homepage, dashboard, login, auth callback, Armenia,
+Neiva, Santa Marta, Ibague and Caracas returned 200; local page titles and
+canonicals remained correct. AuthCallback, Dashboard and Login chunks
+returned 200 JavaScript. Health stayed `ok` with uptime increasing from
+37 to 99 seconds. Anonymous /api/me remained 401. Sitemap returned 200
+with 7,772 URLs (live inventory, not a fixed test fixture).
+
+During rollout some cached HTML briefly referenced the previous bundle,
+which returned 404 when checked after the rollout. Rechecking the exact
+dashboard/login/Armenia URLs showed the new bundle, as did unique URLs
+with an edge MISS. No cache or server behavior was changed in this patch.
+This transient deploy/cache risk should be addressed in a separate phase;
+no persistent failure remained in the checked routes. No real login,
+registration, payment or GA event was submitted during public verification.
+
+The implementation is deployed; subsequent natural conversion observation
+is still pending. Future monitoring should follow these steps:
+Monitor normal organic usage over complete days, compare event count with event users and reconcile
 real verified account counts excluding tests using an authorized aggregate
 data source. Do not generate synthetic signups in production. Start a new
 measurement baseline at deployment; do not reinterpret historical inflated

@@ -259,6 +259,15 @@ rollback.
 
 ## Historial de sesiones
 
+Publicación de conversión SEO (2026-10-24): PR #14 integrada en `main`
+como `bb8a01d6`; bundle público `index-Dv9h-688.js` verificado con el fix.
+Salud, rutas públicas, chunks de autenticación y protección de `/api/me`
+comprobados; sin prueba de alta/pago real. Evidencia archivada en
+`openspec/changes/archive/signup-analytics/validation.md`. Durante el
+rollout hubo referencias HTML al bundle previo; las rutas comprobadas
+normalizaron al nuevo bundle. La observación de conversiones naturales
+posteriores al despliegue continúa pendiente.
+
 | Fecha | Fase | Resultado |
 |---|---|---|
 | 2026-10-24 | Conversión SEO — fase 1: medición de altas confirmadas | Implementación local en `codex/signup-analytics`, base `516c8b8`. `sign_up` pasa de solicitudes de correo/notificaciones `SIGNED_IN` repetidas a sesiones confirmadas en callback, con deduplicación acotada por navegador. 11/11 pruebas Analytics, suite unitaria aislada completa y build sintético pasan; typecheck 24 y lint 263 heredados, sin errores nuevos. Límites: medición de navegador, no ledger de registros; almacenamiento borrado/bloqueado y múltiples dispositivos no garantizan exactamente una entrega. Pendientes publicación y contraste con agregados reales sin pruebas. OpenSpec: `openspec/changes/signup-analytics/validation.md`. No se inicia otra fase en esta sesión. |

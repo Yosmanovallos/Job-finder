@@ -5,4 +5,5 @@
 - [x] Run regression cases and isolated unit suite.
 - [x] Compare lint/typecheck against unchanged origin/main baseline; build with synthetic env.
 - [x] Record evidence, limitations and rollout steps.
-- [ ] Review and authorize publication; verify post-deploy metrics without synthetic signups.
+- [x] User authorized publication; PR #14 merged and public deployment verified.
+- [ ] Observe normal conversion metrics over complete post-deploy days; no synthetic signups.
