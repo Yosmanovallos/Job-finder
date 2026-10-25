@@ -10,6 +10,7 @@ import { FetchBlockedError } from "./engine/resilient-fetch.js";
 import { reportSourceSignal } from "./observability/run-telemetry.js";
 import type { JobDetail } from "./sources/types.js";
 import { resolveOutboundUrl } from "./sources/types.js";
+import { detailFaultFor } from "./sources/detail-http.js";
 import { extractJobPostingDetail, extractFullJobPosting } from "./lib/job-posting-jsonld.js";
 import { jitterDelay } from "./engine/jitter-delay.js";
 import { filterKnownTechnologyTags } from "./lib/extract-technologies.js";
@@ -282,6 +283,9 @@ export async function scrapeLinkedIn(
 // conservative on request pacing matters more here than anywhere else.
 export async function fetchLinkedInDetail(url: string): Promise<Partial<JobDetail> | null> {
   const response = await fetch(url, { headers: { "User-Agent": pickUserAgent() } });
+  // 403/429/999 or a sign-in redirect are refusals, not "no detail" (see detail-http.ts).
+  const fault = detailFaultFor("LinkedIn-detail", response);
+  if (fault) throw fault;
   if (!response.ok) return null;
   return extractJobPostingDetail(await response.text());
 }
@@ -435,6 +439,9 @@ export async function fetchComputrabajoDetail(url: string): Promise<Partial<JobD
   const response = await fetch(proxyUrl, {
     headers: { "User-Agent": pickUserAgent(), "Accept-Language": "es-CO,es;q=0.9" }
   });
+  // A refusal is reported as one, never answered by trying another route.
+  const fault = detailFaultFor("Computrabajo-detail", response);
+  if (fault) throw fault;
   if (!response.ok) return null;
   return extractJobPostingDetail(await response.text());
 }
