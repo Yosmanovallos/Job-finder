@@ -50,10 +50,12 @@ Cambio acotado `job-render-seo`, base de producción `bb8a01d`, PR #15.
 Google renderizaba una vacante vigente como Soft 404 al bloquear `/api/jobs`
 y reemplazar el HTML público por un mensaje de ausencia. Se incorpora un
 snapshot público con campos permitidos y errores recuperables del cliente.
-Estado: en verificación; no iniciar otra fase. Unitarias y 10 pruebas de
-renderizado pasan; integración/baseline aislados en GitHub y verificación
-posterior con Google pendientes. Los fallos históricos de lint/typecheck
-siguen abiertos. Evidencia y rollback:
+Desplegado en `main@badb497`: unitarias, 10 pruebas de renderizado,
+integración y baseline aislados pasan (GitHub `40155054874`). Google repitió
+la prueba de la misma URL a las 21:42: disponible, indexable, una oferta válida;
+antes: Soft 404. Estado: verificado en producción, cierre de gates pendiente;
+no iniciar otra fase. Los fallos históricos de lint/typecheck siguen abiertos.
+Evidencia y rollback:
 `docs/JOB-RENDER-SEO-VERIFICATION.md` y `openspec/changes/job-render-seo/`.
 
 - Paginación SQL y caché acotado de páginas ya existían — no rehacer.
