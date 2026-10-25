@@ -44,6 +44,7 @@ const suites: Record<string, string[]> = {
     "validate-official-careers-links.test.ts",
     "validate-detail-fault-classes.test.ts",
     "validate-detail-http.test.ts",
+    "validate-detail-drain.test.ts",
     "validate-placeholder-employer.test.ts"
   ],
   integration: [

@@ -534,6 +534,8 @@ export async function scrapeElempleo(keyword: string): Promise<Job[]> {
 // Computrabajo/Magneto — reuses the same extractJobPostingDetail() parser.
 export async function fetchElempleoDetail(url: string): Promise<Partial<JobDetail> | null> {
   const response = await fetch(url, { headers: { "User-Agent": pickUserAgent() } });
+  const fault = detailFaultFor("Elempleo-detail", response);
+  if (fault) throw fault;
   if (!response.ok) return null;
   return extractJobPostingDetail(await response.text());
 }
@@ -806,6 +808,9 @@ export async function fetchMagnetoDetail(url: string): Promise<Partial<JobDetail
   // never a URL with a query (Disallow: /*?). Identifies itself.
   if (new URL(url).search) return null;
   const response = await fetch(url, { headers: { "User-Agent": "BuscoTrabajoBot/1.0 (+https://buscotrabajo.co)" } });
+  // A refusal stops the source instead of burning the drain cap as NO_DETAIL.
+  const fault = detailFaultFor("Magneto-detail", response);
+  if (fault) throw fault;
   if (!response.ok) return null;
   return extractJobPostingDetail(await response.text());
 }

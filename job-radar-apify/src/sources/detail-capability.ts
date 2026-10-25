@@ -9,11 +9,16 @@
  * other adapter does. Glassdoor's detail fetcher exists but is deliberately
  * unwired (403 risk, see src/sources/glassdoor.ts), so it is NOT listed.
  */
+// Order is the drain order (drainDetailQueue): sources whose robots.txt allows
+// the detail page and whose detail answers reliably go first, so a backlog on
+// LinkedIn/Computrabajo can no longer starve them. Measured 2026-10-25: Magneto
+// had 0 detail attempts in 48 h (1,309 pending) because the drain always ran
+// out of time on LinkedIn first.
 const DETAIL_ADAPTERS: Record<string, { CO: string; VE?: string }> = {
-  LinkedIn: { CO: "LinkedIn", VE: "LinkedIn-VE" },
-  Computrabajo: { CO: "Computrabajo", VE: "Computrabajo-VE" },
+  Magneto: { CO: "Magneto" },
   Elempleo: { CO: "Elempleo" },
-  Magneto: { CO: "Magneto" }
+  LinkedIn: { CO: "LinkedIn", VE: "LinkedIn-VE" },
+  Computrabajo: { CO: "Computrabajo", VE: "Computrabajo-VE" }
 };
 
 export function sourceSupportsDetail(source: string | null | undefined): boolean {

@@ -24,7 +24,7 @@ import {
 } from "../src/db/scheduler-repository.js";
 import { pool } from "../src/db/client.js";
 import { BUDGET_ESTIMATES, createFetchContext, hasBudget, isCancelled, whenAborted, type FetchContext } from "../src/engine/fetch-context.js";
-import { drainDetailQueue, formatFaultClasses } from "../src/queue/detail-enrichment.js";
+import { drainDetailQueue, formatDrainLine } from "../src/queue/detail-enrichment.js";
 import { planTickBudget, type TickBudgetPlan } from "../src/queue/tick-budget.js";
 import { claimLease, refreshLeases, releaseLease, releaseRunLeases } from "../src/db/scrape-leases.js";
 import { formatClosureReport, verifyTorreClosures } from "../src/queue/source-closure.js";
@@ -536,11 +536,8 @@ async function main() {
     try {
       const drained = await drainDetailQueue(marketAdapters, rootCtx);
       for (const [name, counters] of Object.entries(drained)) {
-        if (counters.claimed > 0) {
-          console.log(
-            `🧾 [Tick] Detalle ${name}: ${counters.claimed} reclamadas → ${counters.complete} completas, ${counters.rejected} rechazadas, ${counters.retry} reintento, ${counters.noDetail} sin detalle, ${counters.failed} agotadas${counters.stoppedEarly ? " (fuente detenida por política/plazo)" : ""}.${Object.keys(counters.faultClasses).length > 0 ? ` Fallos: ${formatFaultClasses(counters.faultClasses)}.` : ""}`
-          );
-        }
+        const line = formatDrainLine(name, counters);
+        if (line) console.log(line);
       }
     } catch (error) {
       console.warn("⚠️ [Tick] Drenaje de detalle omitido:", (error as Error)?.name);
