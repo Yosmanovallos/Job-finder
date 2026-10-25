@@ -7,6 +7,21 @@ const NOTION_TOKEN = process.env.NOTION_TOKEN;
 
 const notion = new Client({ auth: NOTION_TOKEN });
 
+// Loose view of the Notion objects this maintenance script reads. The SDK's
+// response unions are wider than what is accessed here.
+interface NotionPropertyLike {
+  url?: string | null;
+  title?: { plain_text?: string }[];
+  select?: { name?: string } | null;
+}
+interface NotionObjectLike {
+  id: string;
+  type?: string;
+  name?: string;
+  title?: { plain_text?: string }[];
+  properties?: Record<string, NotionPropertyLike | undefined>;
+}
+
 async function wipeAllDatabasesAndPages() {
   console.log('=== WIPING ALL NOTION DATABASES & PAGES TO START FROM CLEAN SLATE ===');
 
@@ -18,7 +33,7 @@ async function wipeAllDatabasesAndPages() {
     });
 
     console.log(`Found ${searchRes.results.length} data sources in Notion.`);
-    for (const ds of searchRes.results as any[]) {
+    for (const ds of searchRes.results as unknown as NotionObjectLike[]) {
       try {
         console.log(`Archiving data source "${ds.title?.[0]?.plain_text || ds.name || ds.id}"...`);
         // Use blocks.delete to archive/delete the database block
@@ -38,7 +53,7 @@ async function wipeAllDatabasesAndPages() {
     });
 
     console.log(`Found ${pageSearch.results.length} pages in Notion.`);
-    for (const page of pageSearch.results as any[]) {
+    for (const page of pageSearch.results as unknown as NotionObjectLike[]) {
       try {
         await notion.pages.update({
           page_id: page.id,

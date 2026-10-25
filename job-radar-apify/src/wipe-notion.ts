@@ -13,6 +13,21 @@ if (!NOTION_TOKEN || !NOTION_DATABASE_ID) {
 
 const notion = new Client({ auth: NOTION_TOKEN });
 
+// Loose view of the Notion objects this maintenance script reads. The SDK's
+// response unions are wider than what is accessed here.
+interface NotionPropertyLike {
+  url?: string | null;
+  title?: { plain_text?: string }[];
+  select?: { name?: string } | null;
+}
+interface NotionObjectLike {
+  id: string;
+  type?: string;
+  name?: string;
+  title?: { plain_text?: string }[];
+  properties?: Record<string, NotionPropertyLike | undefined>;
+}
+
 async function wipeDatabase() {
   console.log('=== WIPING NOTION DATABASE TO START FROM 0 ===');
   let hasMore = true;
@@ -20,7 +35,7 @@ async function wipeDatabase() {
 
   while (hasMore) {
     try {
-      const response = await (notion as any).dataSources.query({
+      const response = await notion.dataSources.query({
         data_source_id: NOTION_DATABASE_ID!,
         page_size: 100
       });
@@ -32,7 +47,7 @@ async function wipeDatabase() {
       }
 
       console.log(`Found ${pages.length} pages to archive...`);
-      for (const page of pages as any[]) {
+      for (const page of pages as unknown as NotionObjectLike[]) {
         const title = page.properties?.Nombre?.title?.[0]?.plain_text || page.id;
         console.log(`[Notion] Archiving page: "${title}"...`);
         await notion.pages.update({

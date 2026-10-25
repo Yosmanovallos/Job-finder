@@ -6,20 +6,35 @@ dotenv.config();
 const notion = new Client({ auth: process.env.NOTION_TOKEN });
 const NOTION_DATABASE_ID = process.env.NOTION_DATABASE_ID;
 
+// Loose view of the Notion objects this maintenance script reads. The SDK's
+// response unions are wider than what is accessed here.
+interface NotionPropertyLike {
+  url?: string | null;
+  title?: { plain_text?: string }[];
+  select?: { name?: string } | null;
+}
+interface NotionObjectLike {
+  id: string;
+  type?: string;
+  name?: string;
+  title?: { plain_text?: string }[];
+  properties?: Record<string, NotionPropertyLike | undefined>;
+}
+
 async function inspectNotionDb() {
   console.log('=== INSPECTING NOTION DATABASE JOBS & URLS ===\n');
 
   try {
-    const res = await (notion as any).dataSources.query({
-      data_source_id: NOTION_DATABASE_ID,
+    const res = await notion.dataSources.query({
+      data_source_id: NOTION_DATABASE_ID as string,
       page_size: 50
     });
 
     console.log(`Total Pages in Notion DB: ${res.results.length}\n`);
 
     for (let i = 0; i < res.results.length; i++) {
-      const page = res.results[i];
-      const props = page.properties;
+      const page = res.results[i] as unknown as NotionObjectLike;
+      const props = page.properties as Record<string, NotionPropertyLike | undefined>;
 
       const titleProp = props.Nombre || props.Title || props.Name;
       const title = titleProp?.title?.[0]?.plain_text || 'Untitled';

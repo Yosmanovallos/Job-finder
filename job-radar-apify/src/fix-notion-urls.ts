@@ -6,6 +6,21 @@ dotenv.config();
 const NOTION_TOKEN = process.env.NOTION_TOKEN;
 const notion = new Client({ auth: NOTION_TOKEN });
 
+// Loose view of the Notion objects this maintenance script reads. The SDK's
+// response unions are wider than what is accessed here.
+interface NotionPropertyLike {
+  url?: string | null;
+  title?: { plain_text?: string }[];
+  select?: { name?: string } | null;
+}
+interface NotionObjectLike {
+  id: string;
+  type?: string;
+  name?: string;
+  title?: { plain_text?: string }[];
+  properties?: Record<string, NotionPropertyLike | undefined>;
+}
+
 async function fixAllNotionUrls() {
   console.log('=== FIXING ALL OLD COMPUTRABAJO URLS IN NOTION ===');
 
@@ -19,14 +34,14 @@ async function fixAllNotionUrls() {
 
     let fixedCount = 0;
 
-    for (const ds of (searchRes.results as any[])) {
+    for (const ds of (searchRes.results as unknown as NotionObjectLike[])) {
       try {
-        const queryRes = await (notion as any).dataSources.query({
+        const queryRes = await notion.dataSources.query({
           data_source_id: ds.id,
           page_size: 100
         });
 
-        for (const page of (queryRes.results || [])) {
+        for (const page of ((queryRes.results || []) as unknown as NotionObjectLike[])) {
           const props = page.properties || {};
           const currentUrl = props.URL?.url || props.Aplicar?.url || '';
 

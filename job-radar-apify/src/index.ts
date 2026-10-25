@@ -5,6 +5,7 @@ import { fileURLToPath } from "url";
 import { htmlEntities, extractStructuredFromHtml, mapEmploymentTypeTag } from "./utils.js";
 import { toCountryCodes } from "./lib/country-codes.js";
 import { saveRunToCache } from "./cache-manager.js";
+import type { CreatePageParameters } from "@notionhq/client";
 import { FetchBlockedError } from "./engine/resilient-fetch.js";
 import { reportSourceSignal } from "./observability/run-telemetry.js";
 import type { JobDetail } from "./sources/types.js";
@@ -542,6 +543,24 @@ const TORRE_COMMITMENT_LABELS: Record<string, string> = {
   volunteer: "Voluntariado"
 };
 
+// Fields of Torre's search response that scrapeTorre reads. All external,
+// so everything but the id is treated as possibly missing.
+interface TorreSearchItem {
+  id: string;
+  created?: string;
+  locations?: string[];
+  remote?: boolean;
+  skills?: unknown;
+  objective?: string;
+  organizations?: { name?: string }[];
+  tagline?: string;
+  deadline?: unknown;
+  commitment?: unknown;
+}
+interface TorreSearchResponse {
+  results?: TorreSearchItem[];
+}
+
 export async function scrapeTorre(keyword: string): Promise<Job[]> {
   console.log(`[Torre] Searching for keyword "${keyword}"...`);
   // Torre migrated /opportunities/_search to torre.ai behind X-Torre-Gateway: paladin
@@ -559,7 +578,7 @@ export async function scrapeTorre(keyword: string): Promise<Job[]> {
   );
 
   for (const username of usernames) {
-    const andFilters: any[] = [
+    const andFilters: Record<string, unknown>[] = [
       {
         bestfor: {
           username,
@@ -600,7 +619,7 @@ export async function scrapeTorre(keyword: string): Promise<Job[]> {
         continue;
       }
 
-      const data: any = await response.json();
+      const data = (await response.json()) as TorreSearchResponse;
       const jobs: Job[] = [];
       const now = new Date();
 
@@ -620,7 +639,7 @@ export async function scrapeTorre(keyword: string): Promise<Job[]> {
 
           if (isColombia || isRemote) {
             const skills: string[] = Array.isArray(item.skills)
-              ? item.skills.map((s: any) => s?.name).filter((n: unknown): n is string => typeof n === "string")
+              ? (item.skills as ({ name?: unknown } | null)[]).map((s) => s?.name).filter((n: unknown): n is string => typeof n === "string")
               : [];
 
             jobs.push({
@@ -1191,6 +1210,23 @@ export async function scrapeRemotive(): Promise<Job[]> {
 // passing "Venezuela" — changing the string doesn't fix a coverage gap,
 // and future evidence otherwise is easy to test against the live API
 // again if Jooble ever adds Venezuela.
+// Fields of Jooble's search response that scrapeJooble reads.
+interface JoobleJobItem {
+  id?: string | number;
+  title?: string;
+  updated?: string;
+  location?: string;
+  company?: string;
+  link: string;
+  snippet?: string;
+  salary?: unknown;
+  type?: string;
+}
+interface JoobleSearchResponse {
+  jobs?: JoobleJobItem[];
+  totalCount?: number;
+}
+
 export async function scrapeJooble(locationQuery: string = "Colombia"): Promise<Job[]> {
   const apiKey = process.env.JOOBLE_API_KEY_CO || process.env.JOOBLE_API_KEY;
   if (!apiKey) {
@@ -1231,7 +1267,7 @@ export async function scrapeJooble(locationQuery: string = "Colombia"): Promise<
       }
 
       const text = await response.text();
-      let data: any;
+      let data: JoobleSearchResponse;
       try {
         data = JSON.parse(text);
       } catch {
@@ -1600,7 +1636,7 @@ async function syncToNotion(job: Job, targetDataSourceId: string) {
         "Fuente principal": { select: { name: job.source } },
         Aplicar: { url: job.url },
         "Fecha publicada": { date: { start: job.publishedAt } }
-      } as any
+      } as CreatePageParameters["properties"]
     });
     console.log(`[Notion] Synced page: "${job.title}" into dedicated DB`);
   } catch (error) {
@@ -1819,7 +1855,7 @@ async function main() {
   if (notion && relevantJobs.length > 0) {
     try {
       console.log(`\n=== CREATING DEDICATED NOTION DATABASE: "${runDbTitle}" ===`);
-      const newDb = await (notion as any).databases.create({
+      const newDb = await notion.databases.create({
         parent: { type: "page_id", page_id: NOTION_PARENT_PAGE_ID },
         title: [{ type: "text", text: { content: runDbTitle } }],
         initial_data_source: {
@@ -1835,7 +1871,7 @@ async function main() {
         }
       });
 
-      targetDataSourceId = newDb.data_sources?.[0]?.id || newDb.id;
+      targetDataSourceId = (newDb as { data_sources?: { id?: string }[] }).data_sources?.[0]?.id || newDb.id;
       console.log(
         `[Notion] Successfully created dedicated database with ID: ${targetDataSourceId}`
       );

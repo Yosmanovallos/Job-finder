@@ -8,6 +8,21 @@ const PARENT_PAGE_ID = '3a1ffe7c-41af-800b-a8f6-d897759c21df';
 
 const notion = new Client({ auth: NOTION_TOKEN });
 
+// Loose view of the Notion objects this maintenance script reads. The SDK's
+// response unions are wider than what is accessed here.
+interface NotionPropertyLike {
+  url?: string | null;
+  title?: { plain_text?: string }[];
+  select?: { name?: string } | null;
+}
+interface NotionObjectLike {
+  id: string;
+  type?: string;
+  name?: string;
+  title?: { plain_text?: string }[];
+  properties?: Record<string, NotionPropertyLike | undefined>;
+}
+
 async function wipeAllCreatedPagesAndDatabases() {
   console.log('=== CLEANING NOTION WORKSPACE PAGE "radar de empleo" ===');
 
@@ -17,7 +32,7 @@ async function wipeAllCreatedPagesAndDatabases() {
     });
 
     console.log(`Found ${children.results.length} child blocks inside "radar de empleo".`);
-    for (const child of children.results as any[]) {
+    for (const child of children.results as unknown as NotionObjectLike[]) {
       try {
         console.log(`Deleting child block: ${child.id} (${child.type})...`);
         await notion.blocks.delete({
