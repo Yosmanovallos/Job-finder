@@ -102,3 +102,19 @@ atascadas y no solo las aptas, para que las 15.000 aporten valor SEO desde hoy.
 4. **Medición:** checkpoints del 31-oct y del 7-nov, con
    `seo_ready_active` por fuente, el conteo de `sitemap-jobs.xml` (hoy 7.727)
    y las copias reemplazadas por vacantes oficiales.
+
+## 5. Palanca A — primera tanda (2026-10-25)
+
+| Empresa | Atascadas en bolsas | Portal oficial | Estado |
+|---|---|---|---|
+| MetLife | 65 (LinkedIn) | Lever `metlife` (39 vacantes, todas en Colombia) | Añadida al seed |
+| Softtek | 66 (LinkedIn) + 5 (Elempleo) | Eightfold `softtek.eightfold.ai` (64 en Colombia; robots permite `/api/pcsx`) | Añadida al seed |
+| Bancolombia, Concentrix | — | SuccessFactors / Workday | Ya cubiertas |
+| Keralty | 46 | Publica en Magneto (página de empresa) | La recoge el drenaje de Magneto (PR #24) |
+| EPAM | 139 | `careers.epam.com`, sitio propio; robots prohíbe `/api` | Necesita un conector de sitio (sitemap + JSON-LD); pendiente |
+| BairesDev, AgileEngine, Bold, WSP, Salesland, Bruntwork | 38–215 c/u | No hay un ATS público detectable en el HTML (sitios con JS) | Investigar uno por uno |
+| Agencias (Adecco, Manpower, Gi Group, Comfama…) | ~600 | Sitios propios | Vía palanca B (feed con permiso) |
+
+Para que las empresas nuevas aparezcan en producción hay que aplicar el seed
+(workflow `direct-employers-tick`, modo `seed`). Eso escribe en la base de
+producción, así que requiere aprobación explícita.
