@@ -19,3 +19,11 @@ Una corrida manual de solo lectura tras el despliegue (`40214084494`) encontró 
 ## Salida de la fase
 
 CI aislada y pruebas locales verdes; una corrida programada o manual de descubrimiento exitosa; reporte de cobertura posterior que muestre progreso del grupo pendiente y la capacidad del tick. No afirmar 100 % hasta que el denominador vivo se haya procesado y los casos de error/revisión estén resueltos.
+
+## Resultado de la primera corrida
+
+El PR #30 pasó TypeScript, build, unitarias e integración aislada y se integró en `main`. La [corrida acotada de descubrimiento 40214865658](https://github.com/Yosmanovallos/Job-finder/actions/runs/40214865658) terminó correctamente: encontró 8.590 empresas en el directorio vivo, sincronizó 53 candidatas nuevas y retiró del denominador activo 1.168 registros históricos sin vacantes visibles, conservando su evidencia. Revisó 1.000 candidatas: 7 tableros verificados y habilitados, 5 casos para revisión humana, 2 pendientes y 986 sin coincidencia en los ATS buscados.
+
+El [reporte posterior 40232993206](https://github.com/Yosmanovallos/Job-finder/actions/runs/40232993206) cuenta 8.590 empresas activas y 27.103 vacantes de bolsas: 3.119 empresas revisadas (36,3 %) y 100 con tablero oficial (1,2 % de las activas; 3,2 % de las revisadas). Hay 5.471 sin revisar o con error transitorio, 2.920 sin coincidencia por nombre y sin dominio verificado para leer su sitio, 25 sin portal visible en nombre ni sitio, y 13 cuyo sitio bloquea o no se pudo leer. El tick dispone de 104 tableros habilitados, todos leídos al menos una vez; uno supera seis horas desde su última lectura correcta.
+
+**Siguiente bloque según la evidencia:** obtener y verificar dominios oficiales para las empresas que hoy solo se buscan por nombre, priorizando las que concentran más vacantes; después revisar los 10 casos detectados con posible tablero y ampliar conectores solo para ATS con evidencia de volumen. Una ausencia de coincidencia por nombre no demuestra que la empresa carezca de portal. La automatización seguirá sondeando el grupo pendiente, pero el 100 % de empresas revisadas y clasificadas aún no se ha alcanzado.
