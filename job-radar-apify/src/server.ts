@@ -37,6 +37,7 @@ import {
   buildJobMeta,
   buildJobPosting,
   buildJobPageBody,
+  buildJobPagePayload,
   isGoogleEligiblePage,
   buildJobPath,
   buildJobSitemapEntry,
@@ -1240,6 +1241,19 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       '<div id="app"></div>',
       `<div id="app">${buildJobPageBody(visible)}</div>`
     );
+    // Google blocks /api/jobs under robots.txt. Without this snapshot React
+    // discarded a real SSR job and rendered a false "no longer available".
+    // Only embed anonymous, already-public fields; authenticated clients refetch.
+    if (!session) {
+      // Preserve the public badges previously obtained by the detail API.
+      // One company lookup, never a corpus scan; optional enrichment may fail
+      // without making an otherwise healthy vacancy unavailable.
+      const [publicJob] = await attachReputation([visible]).catch(() => [visible]);
+      indexHtml = indexHtml.replace(
+        "</head>",
+        `  <script>window.__SSR_JOB__=${escapeJsonForScriptTag(buildJobPagePayload(publicJob))};</script>\n</head>`
+      );
+    }
     indexHtml = indexHtml.replace(/<meta[^>]*name=["']robots["'][^>]*>/i, "");
     if (!googleReady || !jobPosting) {
       indexHtml = indexHtml.replace(

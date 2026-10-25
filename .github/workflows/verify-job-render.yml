@@ -1,0 +1,52 @@
+name: Verify job rendering
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "job-radar-apify/src/sections/JobLanding.tsx"
+      - "job-radar-apify/src/lib/job-page-state.ts"
+      - "job-radar-apify/src/lib/job-seo.ts"
+      - "job-radar-apify/src/server.ts"
+      - "job-radar-apify/tests/validate-job-render.test.ts"
+      - "job-radar-apify/tests/validate-job-seo-v2.ts"
+      - "job-radar-apify/scripts/run-isolated-tests.ts"
+      - ".github/workflows/verify-job-render.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-job-render-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: job-radar-apify
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24.18.0"
+          package-manager-cache: false
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:job-render
+      - run: npm run test:unit
+      - run: npm run test:job-seo
+      - run: npm run test:baseline
+      - run: npm run test:integration
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: job-render-verification
+          retention-days: 7
+          path: |
+            /tmp/job-radar-test-*/results.json
+            /tmp/job-radar-test-*/public-baseline.json
+            /tmp/job-radar-test-*/baseline-*.png
+            /tmp/job-radar-test-*/job-render-*.png

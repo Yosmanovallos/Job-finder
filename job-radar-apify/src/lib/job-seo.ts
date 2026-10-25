@@ -14,6 +14,7 @@ export const SITE_URL = "https://buscotrabajo.co";
 // expiration is emitted now; expiry is otherwise signaled by 410 + URL_DELETED.
 
 export type SeoJob = Job & {
+  reputation?: { source: string; score: number | null; scoreScale: string; reviewCount: number | null; sourceUrl: string }[];
   isLocked?: boolean;
   alsoIn?: string[];
   sources?: string[];
@@ -229,6 +230,25 @@ export function buildJobPageBody(job: SeoJob): string {
     : "";
 
   return `<article><h1>${escapeHtml(job.title)}</h1>\n<ul>${facts.join("")}</ul>\n${apply}\n${descriptionBlock}\n${apply}</article>`;
+}
+
+/** Public fields only. Never serialize an entire repository/session object. */
+export function buildJobPagePayload(job: SeoJob): { job: SeoJob } {
+  return { job: {
+    jobId: job.jobId, title: job.title, company: job.company,
+    location: job.location, url: job.url, dateText: job.dateText, source: job.source,
+    publishedAt: job.publishedAt, country: job.country,
+    description: job.description, requirements: job.requirements,
+    technologies: job.technologies, employmentType: job.employmentType,
+    salary: job.salary, salaryMin: job.salaryMin, salaryMax: job.salaryMax,
+    salaryCurrency: job.salaryCurrency, salaryRaw: job.salaryRaw,
+    applicantCount: job.applicantCount, remoteType: job.remoteType,
+    applicantCountries: job.applicantCountries, validThrough: job.validThrough,
+    isLocked: job.isLocked, sources: job.sources, alsoIn: job.alsoIn,
+    reputation: job.reputation?.map(({ source, score, scoreScale, reviewCount, sourceUrl }) => ({
+      source, score, scoreScale, reviewCount, sourceUrl
+    }))
+  } };
 }
 
 export interface JobMeta {

@@ -252,6 +252,12 @@ try {
   assert.equal(fullPosting.validThrough, undefined, "no synthetic validThrough");
   assert.equal(fullPosting.jobLocation?.address.addressCountry, "CO");
   assert.ok((await page(fullId)).html.includes(fullPosting.description), "JSON-LD description is the visible description");
+  const ssrPayload = /window\.__SSR_JOB__=([\s\S]*?);<\/script>/.exec((await page(fullId)).html);
+  assert.ok(ssrPayload, "JRD-002: real anonymous SSR embeds public job data");
+  const ssrJob = JSON.parse(ssrPayload[1]).job as Job;
+  assert.equal(ssrJob.jobId, fullId);
+  assert.equal(ssrJob.description, RICH);
+  assert.equal(ssrJob.title, fullPosting.title);
 
   // --- 3b. Every readiness-relevant administrative mutation is atomic -------
   const mutationId = await saveOne(job({ title: "Especialista de Operaciones", description: RICH, requirements: RICH_REQ }));
