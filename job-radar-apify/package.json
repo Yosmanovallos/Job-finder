@@ -15,6 +15,7 @@
     "dev": "vite",
     "cli": "tsx src/index.ts",
     "test:unit": "tsx scripts/run-isolated-tests.ts unit",
+    "audit:job-trust": "tsx scripts/audit-job-trust.ts",
     "test:job-render": "tsx scripts/run-isolated-tests.ts job-render",
     "test:integration": "tsx scripts/run-isolated-tests.ts integration",
     "test:sitemap": "tsx scripts/run-isolated-tests.ts sitemap",

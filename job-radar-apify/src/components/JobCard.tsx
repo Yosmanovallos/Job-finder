@@ -4,16 +4,15 @@ import { Star, Check, ArrowRight } from "lucide-react";
 import { Job } from "../sources/types.js";
 import { getSourceColor } from "../lib/source-colors.js";
 import { getModalityLabel } from "../lib/job-filters.js";
-import { buildCompanyPath } from "../lib/job-seo.js";
+import { buildCompanyPath, buildJobPath } from "../lib/job-seo.js";
 import { isPlaceholderEmployer } from "../lib/company-key.js";
 import { buildLocationLabel } from "../countries/index.js";
-import { useAuth } from "../auth/auth-provider.js";
-import { jobAnalyticsParams, trackEvent } from "../lib/analytics.js";
 import { Button } from "./ui/button.js";
 import { Badge } from "./ui/badge.js";
 import { cn } from "../lib/utils.js";
 import { ReputationEntryProps } from "./ReputationBadges.js";
 import { jobDateLabel } from "../lib/job-date-label.js";
+import { isAvailabilityUnverified } from "../lib/job-availability.js";
 
 export interface JobCardProps {
   job: Job & {
@@ -25,10 +24,6 @@ export interface JobCardProps {
   };
   onSaveToggle?: (jobId: string) => void;
   onAppliedToggle?: (jobId: string) => void;
-  // Anonymous visitors get intercepted here instead of navigating straight
-  // to the external posting — the caller (Dashboard) owns the gate modal's
-  // open/closed state so it can be shared with the split-pane detail panel.
-  onApplyClick?: (job: JobCardProps["job"]) => void;
   // Which dashboard context this card is rendered in ("CO" default, "VE" on
   // /ve/dashboard) — NOT the same as job.country (which can be null for a
   // shared remote posting). The company link below must stay inside
@@ -44,6 +39,7 @@ function initialFor(job: JobCardProps["job"]): string {
 }
 
 function isFresh(job: JobCardProps["job"]): boolean {
+  if (isAvailabilityUnverified(job.source)) return false;
   if (!job.publishedAt) return false;
   const ageHours = (Date.now() - new Date(job.publishedAt).getTime()) / (1000 * 60 * 60);
   return ageHours <= 48;
@@ -59,10 +55,8 @@ export const JobCard: React.FC<JobCardProps> = ({
   job,
   onSaveToggle,
   onAppliedToggle,
-  onApplyClick,
   country
 }) => {
-  const { isAuthenticated } = useAuth();
   const [saved, setSaved] = useState(job.isSaved || false);
   const [applied, setApplied] = useState(job.isApplied || false);
 
@@ -74,15 +68,6 @@ export const JobCard: React.FC<JobCardProps> = ({
   const handleApplied = () => {
     setApplied(!applied);
     if (onAppliedToggle) onAppliedToggle(job.jobId);
-  };
-
-  const handleApplyLinkClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    if (!isAuthenticated && onApplyClick) {
-      e.preventDefault();
-      onApplyClick(job);
-      return;
-    }
-    trackEvent("outbound_apply", jobAnalyticsParams(job, "dashboard_card"));
   };
 
   const otherSources =
@@ -158,6 +143,7 @@ export const JobCard: React.FC<JobCardProps> = ({
               <Badge style={{ background: sourceColor.bg, color: sourceColor.text }}>
                 {job.source}
               </Badge>
+              {isAvailabilityUnverified(job.source) && <Badge variant="hybrid">Vigencia no verificada</Badge>}
             </div>
 
             <p className="text-[11px] font-mono text-ink-faint">
@@ -170,14 +156,9 @@ export const JobCard: React.FC<JobCardProps> = ({
         {/* Actions */}
         <div className="shrink-0 flex flex-row sm:flex-col items-center sm:items-end justify-between sm:justify-start gap-2 w-full sm:w-auto">
           <Button asChild size="sm" className="order-2 sm:order-1 font-mono">
-            <a
-              href={job.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={handleApplyLinkClick}
-            >
+            <Link to={buildJobPath(job)}>
               Ver vacante <ArrowRight className="h-3.5 w-3.5" />
-            </a>
+            </Link>
           </Button>
           <div className="flex items-center gap-1 order-1 sm:order-2">
             <Button
