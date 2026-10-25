@@ -37,8 +37,8 @@ export function ApplyGateModal({ job, onClose }: ApplyGateModalProps) {
     setBusy(true);
     try {
       await loginWithGoogle(returnTo);
-    } catch (e: any) {
-      setError(translateAuthError(e?.message));
+    } catch (e) {
+      setError(translateAuthError((e as Error)?.message));
       setBusy(false);
     }
   };

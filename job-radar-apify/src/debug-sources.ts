@@ -1,13 +1,10 @@
 import {
-  scrapeLinkedIn,
-  scrapeComputrabajo,
   scrapeElempleo,
   scrapeTorre,
   scrapeWorkana,
   scrapeMagneto,
   scrapeWeRemoto,
-  scrapeGetOnBoard,
-  scrapeRemoteOK
+  scrapeGetOnBoard
 } from './index.js';
 
 async function debugAllSources() {

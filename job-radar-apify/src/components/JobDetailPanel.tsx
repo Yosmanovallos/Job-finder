@@ -37,7 +37,7 @@ export interface JobDetailPanelProps {
     | null;
   onSaveToggle?: (jobId: string) => void;
   onAppliedToggle?: (jobId: string) => void;
-  onApplyClick?: (job: any) => void;
+  onApplyClick?: (job: NonNullable<JobDetailPanelProps["job"]>) => void;
   // Dashboard context ("CO"/"VE") — see JobCard.tsx's identical prop for why
   // this, not job.country, decides the company link's prefix.
   country?: string;
@@ -92,8 +92,8 @@ export const JobDetailPanel: React.FC<JobDetailPanelProps> = ({
 
   const otherSources =
     job.alsoIn ||
-    (Array.isArray((job as any).sources)
-      ? (job as any).sources.filter((s: string) => s !== job.source)
+    (Array.isArray(job.sources)
+      ? job.sources.filter((s: string) => s !== job.source)
       : []);
   const modality = getModalityLabel(job.location);
   const sourceColor = getSourceColor(job.source);

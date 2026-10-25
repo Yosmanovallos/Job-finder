@@ -1,4 +1,4 @@
-import { generateRoleKeywordsWithAI } from './src/ai-role-agent.js';
+import { generateRoleKeywordsWithAI } from './ai-role-agent.js';
 
 // Test search for Business Analyst and inspect raw titles from all scrapers before filtering
 async function debugTitles() {

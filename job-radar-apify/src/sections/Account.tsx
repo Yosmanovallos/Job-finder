@@ -48,7 +48,7 @@ export default function Account() {
           const data = await res.json();
           setTransactions(Array.isArray(data.transactions) ? data.transactions : []);
         }
-      } catch (e) {
+      } catch {
         // no-op — the history section just stays empty, nothing critical breaks
       } finally {
         setLoadingTransactions(false);

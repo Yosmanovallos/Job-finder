@@ -55,8 +55,8 @@ async function diagnoseComputrabajo() {
       } else {
         console.log('  ✅ SUCCESS: Valid active offer page loaded!');
       }
-    } catch (e: any) {
-      console.error(`  Fetch error:`, e.message);
+    } catch (e) {
+      console.error(`  Fetch error:`, (e as Error).message);
     }
     console.log('--------------------------------------------------');
   }

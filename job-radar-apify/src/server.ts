@@ -716,7 +716,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
             subscriptionEnd: updated.subscriptionEnd
           })
         );
-      } catch (e: any) {
+      } catch (e) {
         respondToUnexpectedError(res, e, "PATCH /api/me", "No se pudo actualizar el nombre.");
       }
     });
@@ -747,7 +747,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
           return;
         }
         const roles = Array.from(
-          new Set(
+          new Set<string>(
             parsed.roles
               .filter((r: unknown) => typeof r === "string")
               .map((r: string) => r.trim())
@@ -767,7 +767,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
             preferredRoles: updated.preferredRoles
           })
         );
-      } catch (e: any) {
+      } catch (e) {
         respondToUnexpectedError(
           res,
           e,
@@ -820,7 +820,9 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
             keywords = parsed.keywords;
           }
         }
-      } catch (e) {}
+      } catch {
+        // Malformed body: keep the default keywords below.
+      }
 
       if (keywords.length === 0) {
         res.writeHead(400, { "Content-Type": "application/json" });
@@ -865,7 +867,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     // implícito en todo este archivo) — solo estos dos strings exactos
     // resuelven a un monto real; cualquier otra cosa cae a "pro", nunca
     // a un monto inventado por el cliente.
-    const requestedPlan = body.value?.plan;
+    const requestedPlan = (body.value as { plan?: unknown } | null | undefined)?.plan;
     const plan: "pro" | "pro_max" = requestedPlan === "pro_max" ? "pro_max" : "pro";
 
     try {
@@ -876,7 +878,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       });
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify(checkout));
-    } catch (e: any) {
+    } catch (e) {
       respondToUnexpectedError(
         res,
         e,
@@ -905,7 +907,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
         }
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ status: "ok" }));
-      } catch (e: any) {
+      } catch (e) {
         respondToUnexpectedError(res, e, "POST /api/webhooks/wompi", "Payload inválido.");
       }
     });
@@ -1030,7 +1032,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       // hub linking into the individual job pages, unlike the job-detail
       // branch below (which only needs JSON-LD in <head>, no visible list).
       const items = page
-        .map((job: any) => {
+        .map((job) => {
           const href = buildJobPath(job);
           const title = escapeHtml(job.title);
           const company = escapeHtml(job.company || "Confidencial");
@@ -1592,7 +1594,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       })
       .join("\n");
     const jobItems = page
-      .map((job: any) => {
+      .map((job) => {
         const href = buildJobPath(job);
         return `<li><a href="${href}">${escapeHtml(job.title)}</a> — ${escapeHtml(job.location || countryConfig.name)}</li>`;
       })
@@ -1735,8 +1737,8 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     // fields, same as /api/jobs) since the client already knows how to
     // render PaywallCard for those.
     const items = firstPage
-      .filter((job: any) => isPubliclyDescribable(job))
-      .map((job: any) => {
+      .filter((job) => isPubliclyDescribable(job))
+      .map((job) => {
         const href = buildJobPath(job);
         const title = escapeHtml(job.title);
         const company = escapeHtml(job.company || "Confidencial");
@@ -2095,7 +2097,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     );
     return;
   }
-  let filePath = path.join(PUBLIC_DIR, hasFileExtension ? pathname : "index.html");
+  const filePath = path.join(PUBLIC_DIR, hasFileExtension ? pathname : "index.html");
 
   const ext = path.extname(filePath);
   const mimeTypes: Record<string, string> = {

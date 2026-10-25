@@ -17,7 +17,7 @@ import { pool } from "../src/db/client.js";
 import { executeWithResilience } from "../src/engine/resilient-fetch.js";
 import { upsertReputationScores } from "../src/db/company-reputation-repository.js";
 import { REPUTATION_SOURCES } from "../src/sources/reputation/index.js";
-import { ReputationScoreInput } from "../src/sources/reputation/types.js";
+import type { ReputationScoreInput } from "../src/sources/reputation/types.js";
 
 dotenv.config();
 

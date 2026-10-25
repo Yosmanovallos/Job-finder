@@ -98,6 +98,20 @@ function extractBalancedObject(html: string, fromIdx: number): string | null {
   return null;
 }
 
+// Fields of an Indeed mosaic job card that parseJobcards reads.
+interface IndeedJobCard {
+  jobkey?: string;
+  title?: string;
+  pubDate?: number;
+  remoteLocation?: boolean;
+  formattedLocation?: string;
+  company?: string;
+  formattedRelativeTime?: string;
+}
+interface IndeedMosaicData {
+  metaData?: { mosaicProviderJobCardsModel?: { results?: IndeedJobCard[] } };
+}
+
 function parseJobcards(html: string, now: number, subdomain: string, fallbackLocation: string): IndeedJob[] {
   const jobs: IndeedJob[] = [];
   const marker = 'window.mosaic.providerData["mosaic-provider-jobcards"]=';
@@ -107,7 +121,7 @@ function parseJobcards(html: string, now: number, subdomain: string, fallbackLoc
   const jsonStr = extractBalancedObject(html, markerIdx + marker.length);
   if (!jsonStr) return jobs;
 
-  let data: any;
+  let data: IndeedMosaicData | null;
   try {
     data = JSON.parse(jsonStr);
   } catch {
@@ -150,8 +164,8 @@ export async function scrapeIndeedBrowser(country: Country = "CO"): Promise<Inde
     const countryJobs = parseJobcards(html, now, config.subdomain, config.countryName);
     jobs.push(...countryJobs);
     console.log(`[IndeedBrowser:${country}] ${config.countryName} (country-wide): ${countryJobs.length} jobs within 1 day.`);
-  } catch (error: any) {
-    console.error(`[IndeedBrowser:${country}] Country-wide query failed: ${error.message}`);
+  } catch (error) {
+    console.error(`[IndeedBrowser:${country}] Country-wide query failed: ${(error as Error).message}`);
     // P2: a swallowed failure must not read as an empty source in run telemetry.
     reportSourceSignal("swallowed_error");
   }
@@ -164,8 +178,8 @@ export async function scrapeIndeedBrowser(country: Country = "CO"): Promise<Inde
       const cityJobs = parseJobcards(html, now, config.subdomain, config.countryName);
       jobs.push(...cityJobs);
       console.log(`[IndeedBrowser:${country}] ${city}: ${cityJobs.length} jobs within 1 day (${jobs.length} total so far).`);
-    } catch (error: any) {
-      console.warn(`[IndeedBrowser:${country}] ${city} failed, skipping: ${error.message}`);
+    } catch (error) {
+      console.warn(`[IndeedBrowser:${country}] ${city} failed, skipping: ${(error as Error).message}`);
       reportSourceSignal("swallowed_error");
     }
   }

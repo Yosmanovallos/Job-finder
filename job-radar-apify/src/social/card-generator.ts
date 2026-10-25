@@ -1,4 +1,4 @@
-import { SocialDigest } from "./digest-generator.js";
+import type { SocialDigest } from "./digest-generator.js";
 import { SITE_DOMAIN } from "../config.js";
 
 /**
@@ -13,7 +13,7 @@ import { SITE_DOMAIN } from "../config.js";
 export function generateCardSvg(digest: SocialDigest): string {
   const { category, jobCount, companies, sources } = digest;
   const companyListStr = companies.length > 0 ? companies.join(" · ") : "Empresas destacadas";
-  const sourcesBadges = sources
+  const _sourcesBadges = sources
     .slice(0, 4)
     .map((s) => `<tspan fill="#34D399" font-weight="bold">[${s}]</tspan>`)
     .join("  ");

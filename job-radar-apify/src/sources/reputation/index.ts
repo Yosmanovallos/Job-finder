@@ -1,4 +1,4 @@
-import { ReputationSourceAdapter } from "./types.js";
+import type { ReputationSourceAdapter } from "./types.js";
 import { mercoTalentoAdapter } from "./merco.js";
 import { gptwAdapter } from "./gptw.js";
 import { computrabajoAdapter } from "./computrabajo.js";

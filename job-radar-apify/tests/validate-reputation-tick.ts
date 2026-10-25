@@ -29,7 +29,8 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { spawn, ChildProcess } from "child_process";
+import type { ChildProcess } from "child_process";
+import { spawn } from "child_process";
 import dotenv from "dotenv";
 import { pool } from "../src/db/client.js";
 import { executeWithResilience, isSourceDegraded } from "../src/engine/resilient-fetch.js";
@@ -40,7 +41,7 @@ import {
   resolveCompanyBySlug
 } from "../src/db/company-reputation-repository.js";
 import { REPUTATION_SOURCES } from "../src/sources/reputation/index.js";
-import { ReputationScoreInput } from "../src/sources/reputation/types.js";
+import type { ReputationScoreInput } from "../src/sources/reputation/types.js";
 import { parseMercoTalentoHtml } from "../src/sources/reputation/merco.js";
 import { filterCurrentCertifications } from "../src/sources/reputation/gptw.js";
 import {
@@ -472,7 +473,7 @@ async function runCompanyEndpointTests() {
       `GET respondió ${res.status} o con forma inesperada: ${JSON.stringify(body).slice(0, 300)}`
     );
     check(
-      body.reputation.some((r: any) => r.source === "merco" && typeof r.score === "number"),
+      body.reputation.some((r: { source?: string; score?: unknown }) => r.source === "merco" && typeof r.score === "number"),
       "La reputación de Bancolombia incluye el score real de Merco Talento.",
       `No se encontró la entrada de Merco esperada: ${JSON.stringify(body.reputation)}`
     );
@@ -493,7 +494,7 @@ async function runCompanyEndpointTests() {
     const jobsRes = await fetch(`${BASE_URL}/api/jobs?limit=50`);
     const jobsBody = await jobsRes.json();
     const noReputationJob = jobsBody.jobs.find(
-      (j: any) => j.company && (j.reputation || []).length === 0
+      (j: { company?: string | null; reputation?: unknown[] }) => j.company && (j.reputation || []).length === 0
     );
     if (noReputationJob) {
       const fallbackSlug = buildCompanyPath(noReputationJob.company).replace("/empresas/", "");

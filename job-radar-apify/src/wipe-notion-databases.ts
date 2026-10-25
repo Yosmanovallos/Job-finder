@@ -4,9 +4,23 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const NOTION_TOKEN = process.env.NOTION_TOKEN;
-const NOTION_DATABASE_ID = process.env.NOTION_DATABASE_ID;
 
 const notion = new Client({ auth: NOTION_TOKEN });
+
+// Loose view of the Notion objects this maintenance script reads. The SDK's
+// response unions are wider than what is accessed here.
+interface NotionPropertyLike {
+  url?: string | null;
+  title?: { plain_text?: string }[];
+  select?: { name?: string } | null;
+}
+interface NotionObjectLike {
+  id: string;
+  type?: string;
+  name?: string;
+  title?: { plain_text?: string }[];
+  properties?: Record<string, NotionPropertyLike | undefined>;
+}
 
 async function wipeAllDatabasesAndPages() {
   console.log('=== WIPING ALL NOTION DATABASES & PAGES TO START FROM CLEAN SLATE ===');
@@ -19,7 +33,7 @@ async function wipeAllDatabasesAndPages() {
     });
 
     console.log(`Found ${searchRes.results.length} data sources in Notion.`);
-    for (const ds of searchRes.results as any[]) {
+    for (const ds of searchRes.results as unknown as NotionObjectLike[]) {
       try {
         console.log(`Archiving data source "${ds.title?.[0]?.plain_text || ds.name || ds.id}"...`);
         // Use blocks.delete to archive/delete the database block
@@ -27,8 +41,8 @@ async function wipeAllDatabasesAndPages() {
           block_id: ds.id
         });
         console.log(`Deleted DB block: ${ds.id}`);
-      } catch (e: any) {
-        console.warn(`Could not delete DB block ${ds.id}:`, e.message);
+      } catch (e) {
+        console.warn(`Could not delete DB block ${ds.id}:`, (e as Error).message);
       }
     }
 
@@ -39,18 +53,20 @@ async function wipeAllDatabasesAndPages() {
     });
 
     console.log(`Found ${pageSearch.results.length} pages in Notion.`);
-    for (const page of pageSearch.results as any[]) {
+    for (const page of pageSearch.results as unknown as NotionObjectLike[]) {
       try {
         await notion.pages.update({
           page_id: page.id,
           archived: true
         });
-      } catch (e) {}
+      } catch {
+        // skip pages that cannot be archived and keep going
+      }
     }
 
     console.log('=== CLEAN SLATE COMPLETE! Notion is 100% clean and ready for fresh runs. ===');
-  } catch (error: any) {
-    console.error('Wipe error:', error.message);
+  } catch (error) {
+    console.error('Wipe error:', (error as Error).message);
   }
 }
 

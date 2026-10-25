@@ -1,4 +1,4 @@
-import { Job } from '../sources/types.js';
+import type { Job } from '../sources/types.js';
 import { jobStaleReason } from '../lib/job-freshness.js';
 
 const KNOWN_SOURCES = new Set([

@@ -32,11 +32,14 @@ export interface WompiEventPayload {
   environment: string;
 }
 
-function getNestedValue(obj: any, path: string): string {
+function getNestedValue(obj: unknown, path: string): string {
   return (
-    path
+    (path
       .split(".")
-      .reduce((acc, key) => (acc == null ? acc : acc[key]), obj)
+      .reduce<unknown>((acc, key) => (acc == null ? acc : (acc as Record<string, unknown>)[key]), obj) as
+      | { toString(): string }
+      | null
+      | undefined)
       ?.toString() ?? ""
   );
 }

@@ -185,16 +185,16 @@ async function browserFetchOnce(url: string, timeoutMs: number): Promise<string>
 }
 
 export async function browserFetch(url: string, timeoutMs = 30_000, maxRetries = 2): Promise<string> {
-  let lastError: any;
+  let lastError: unknown;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       return await browserFetchOnce(url, timeoutMs);
-    } catch (err: any) {
+    } catch (err) {
       lastError = err;
       if (attempt < maxRetries) {
         const backoffMs = (attempt + 1) * 2000;
         console.warn(
-          `[browser-fetch] Attempt ${attempt + 1} failed for ${url}: ${err.message} — retrying in ${backoffMs}ms (fresh proxy IP)...`
+          `[browser-fetch] Attempt ${attempt + 1} failed for ${url}: ${(err as Error).message} — retrying in ${backoffMs}ms (fresh proxy IP)...`
         );
         await new Promise((resolve) => setTimeout(resolve, backoffMs));
       }

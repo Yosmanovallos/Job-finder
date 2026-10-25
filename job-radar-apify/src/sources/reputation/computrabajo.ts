@@ -1,4 +1,4 @@
-import { ReputationScoreInput, ReputationSourceAdapter } from "./types.js";
+import type { ReputationScoreInput, ReputationSourceAdapter } from "./types.js";
 import { getComputrabajoDiscoveryCandidates, upsertReputationAliases } from "../../db/company-reputation-repository.js";
 import { jitterDelay } from "../../engine/jitter-delay.js";
 

@@ -15,7 +15,8 @@
  * shows a single clean label regardless of which adapter fetched them.
  */
 
-import { SourceAdapter, Job, deduplicateJobs } from "./types.js";
+import type { SourceAdapter, Job } from "./types.js";
+import { deduplicateJobs } from "./types.js";
 import { scrapeWorkanaV2 } from "../scrapers/workana-v2-scraper.js";
 import { executeWithResilience } from "../engine/resilient-fetch.js";
 

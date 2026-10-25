@@ -1,4 +1,5 @@
-import { allAdapters, SourceAdapter } from "../sources/index.js";
+import type { SourceAdapter } from "../sources/index.js";
+import { allAdapters } from "../sources/index.js";
 import { markRoleSourceRun } from "../db/scheduler-repository.js";
 import { generateRoleKeywordsWithAI } from "../ai-role-agent.js";
 import { DEFAULT_COUNTRY, resolveJobCountry } from "../countries/index.js";
@@ -67,7 +68,9 @@ export class ScrapeWorker {
       if (global.gc) {
         try {
           global.gc();
-        } catch (e) {}
+        } catch {
+          // gc is best-effort; nothing to recover if it throws
+        }
       }
     }
   }
@@ -179,12 +182,12 @@ export class ScrapeWorker {
         }
 
         await markRoleSourceRun(roleName, adapter.name);
-      } catch (err: any) {
+      } catch (err) {
         console.error(
           `❌ [ScrapeWorker] Error en adaptador ${adapter.name} procesando "${roleName}":`,
-          err?.message || err
+          (err as Error)?.message || err
         );
-        perSource[adapter.name] = { fetched: 0, error: err?.message || String(err), status: listingStatus() };
+        perSource[adapter.name] = { fetched: 0, error: (err as Error)?.message || String(err), status: listingStatus() };
       }
     }
 

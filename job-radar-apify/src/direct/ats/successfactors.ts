@@ -15,7 +15,6 @@ import { allowedUrl, innerHtmlAt, readRobots, splitSiteRef } from "./site.js";
  * (`empleo.grupobancolombia.com/bancolombia`, `jobs.avianca.com`).
  */
 
-const PAGE_SIZE = 25;
 const MAX_PAGES = 40;
 // Above this many postings the board is global (EY: 8,944): read only the
 // site's own Colombia search instead of paging the world.

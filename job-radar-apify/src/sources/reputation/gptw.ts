@@ -1,4 +1,4 @@
-import { ReputationScoreInput, ReputationSourceAdapter } from "./types.js";
+import type { ReputationScoreInput, ReputationSourceAdapter } from "./types.js";
 import { decodeNumericHtmlEntities } from "./html-entities.js";
 
 const CERTIFICATIONS_ENDPOINT = "https://greatplacetowork.com.co/wp-json/wp/v2/certificaciones";

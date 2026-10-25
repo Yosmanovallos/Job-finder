@@ -1,4 +1,4 @@
-import { SourceAdapter, Job, JobDetail } from './types.js';
+import type { SourceAdapter, Job, JobDetail } from './types.js';
 import { fetchMagnetoDetail } from '../index.js';
 import { executeWithResilience } from '../engine/resilient-fetch.js';
 import { scrapeMagnetoCatalog } from './magneto-catalog.js';

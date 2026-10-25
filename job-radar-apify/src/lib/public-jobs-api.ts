@@ -1,6 +1,7 @@
 import { COUNTRIES, SOURCES_BY_COUNTRY } from "../countries/index.js";
 import type { JobFilterParams } from "./job-filters.js";
 import { buildJobUrl, isPubliclyDescribable, isUuid } from "./job-seo.js";
+import type { SitemapJobInput } from "./job-seo.js";
 
 export interface PublicJobsQuery {
   filters: JobFilterParams;
@@ -131,14 +132,34 @@ function publicHttpUrl(value: unknown): string | null {
   }
 }
 
-export function toPublicJob(job: any): PublicJob | null {
+/**
+ * A repository job row as handed to the public API. Identity fields are what
+ * the SEO helpers need; everything else is re-validated field by field below.
+ */
+type PublicJobInput = Pick<SitemapJobInput, "jobId" | "title" | "company" | "location" | "url"> & {
+  source?: unknown;
+  sources?: unknown;
+  publishedAt?: string | Date;
+  country?: unknown;
+  description?: unknown;
+  requirements?: unknown;
+  technologies?: unknown;
+  employmentType?: unknown;
+  salaryMin?: unknown;
+  salaryMax?: unknown;
+  salaryCurrency?: unknown;
+  salaryRaw?: unknown;
+  applicantCount?: unknown;
+};
+
+export function toPublicJob(job: PublicJobInput): PublicJob | null {
   if (!isPubliclyDescribable(job)) return null;
   const id = boundedText(job.jobId, 36);
   const title = boundedText(job.title, 300);
   const company = boundedText(job.company, 300);
   const location = boundedText(job.location, 300);
   const source = boundedText(job.source, 100);
-  const publishedAt = new Date(job.publishedAt);
+  const publishedAt = new Date(job.publishedAt as string | Date);
   if (!id || !title || !company || !location || !source || !Number.isFinite(publishedAt.getTime())) return null;
   return {
     id,

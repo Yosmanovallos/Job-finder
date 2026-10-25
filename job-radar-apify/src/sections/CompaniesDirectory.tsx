@@ -8,6 +8,11 @@ import { usePageMeta } from "../lib/use-page-meta.js";
 import { buildCompanyPath } from "../lib/job-seo.js";
 import { getCountryConfig } from "../countries/index.js";
 
+// Shape of the first-page payload the server inlines for anonymous SSR.
+type SsrCompaniesWindow = Window & {
+  __SSR_COMPANIES__?: { country?: string; companies?: CompanyResult[]; total?: number; hasMore?: boolean };
+};
+
 interface CompanyResult {
   company: string;
   count: number;
@@ -83,8 +88,8 @@ export default function CompaniesDirectory() {
     // search typed yet, country matches this mount) — any real search
     // query or country mismatch falls through to the normal fetch below.
     // Deleted immediately after one read.
-    const ssrCompanies = (window as any).__SSR_COMPANIES__;
-    delete (window as any).__SSR_COMPANIES__;
+    const ssrCompanies = (window as SsrCompaniesWindow).__SSR_COMPANIES__;
+    delete (window as SsrCompaniesWindow).__SSR_COMPANIES__;
     if (ssrCompanies && ssrCompanies.country === country && debouncedSearch.trim() === "") {
       const ssrList = Array.isArray(ssrCompanies.companies) ? ssrCompanies.companies : [];
       nextOffsetRef.current = ssrList.length;

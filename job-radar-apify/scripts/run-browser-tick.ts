@@ -34,6 +34,7 @@ import { scrapeGlassdoorBrowser, type Country } from "../src/scrapers/glassdoor-
 import { scrapeIndeedBrowser } from "../src/scrapers/indeed-browser-scraper.js";
 import { closeBrowser } from "../src/engine/browser-fetch.js";
 import { deduplicateJobs } from "../src/sources/types.js";
+import type { Job } from "../src/sources/types.js";
 import { runListingAttempt } from "../src/queue/listing-attempt.js";
 import { RunRecorder, runTelemetrySafely, type AttemptStatus } from "../src/observability/run-telemetry.js";
 import { createPgRunStore, reconcileStaleRuns } from "../src/db/run-repository.js";
@@ -53,7 +54,7 @@ interface SourceResult {
 async function runSource(
   label: string,
   country: Country,
-  fetcher: () => Promise<any[]>,
+  fetcher: () => Promise<Job[]>,
   recorder: RunRecorder
 ): Promise<SourceResult> {
   const attemptRef: { id?: string } = {};
@@ -80,9 +81,9 @@ async function runSource(
       async () => deduplicateJobs(await fetcher())
     );
     return { label, fetched, savedCount, duplicateCount, status: listingStatus() };
-  } catch (err: any) {
-    console.error(`❌ [BrowserTick] ${label} failed:`, err?.message || err);
-    return { label, fetched: 0, savedCount: 0, duplicateCount: 0, error: err?.message || String(err), status: listingStatus() };
+  } catch (err) {
+    console.error(`❌ [BrowserTick] ${label} failed:`, (err as Error)?.message || err);
+    return { label, fetched: 0, savedCount: 0, duplicateCount: 0, error: (err as Error)?.message || String(err), status: listingStatus() };
   }
 }
 

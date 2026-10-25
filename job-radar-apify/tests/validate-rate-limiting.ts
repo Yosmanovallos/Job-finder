@@ -1,4 +1,5 @@
-import { spawn, ChildProcess } from "child_process";
+import type { ChildProcess } from "child_process";
+import { spawn } from "child_process";
 import path from "path";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
@@ -17,7 +18,7 @@ async function waitForServer(maxAttempts = 80, delayMs = 250): Promise<void> {
     try {
       const res = await fetch(`${BASE_URL}/api/health`);
       if (res.ok) return;
-    } catch (e) {
+    } catch {
       // not up yet
     }
     await new Promise((r) => setTimeout(r, delayMs));
@@ -39,7 +40,7 @@ function killServerTree(server: ChildProcess): void {
   if (server.pid) {
     try {
       process.kill(-server.pid, "SIGKILL");
-    } catch (e) {
+    } catch {
       // Group may already be gone.
     }
   }

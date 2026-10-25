@@ -1,4 +1,4 @@
-import { Job } from "../sources/types.js";
+import type { Job } from "../sources/types.js";
 import { DEFAULT_ROLES_200 } from "../queue/scheduler.js";
 import { TRANSLATION_MAP } from "../ai-role-agent.js";
 import { getCountryConfig } from "../countries/index.js";
@@ -88,7 +88,7 @@ function titleContainsWord(title: string, word: string): boolean {
   return re.test(title);
 }
 
-export function jobMatchesRole(role: string, job: any): boolean {
+export function jobMatchesRole(role: string, job: { title?: string | null }): boolean {
   const title = (job.title || "").toLowerCase();
   const match = getRoleMatchWords(role);
   if (match.mode === "any") return match.words.some((word) => titleContainsWord(title, word));
@@ -221,7 +221,7 @@ export function applyJobFilters(jobs: Job[], filters: JobFilterParams): Job[] {
       // posting. That guard only makes sense with nothing else narrowing
       // the query, which is exactly the single-word case.
       result = result.filter(
-        (j: any) =>
+        (j) =>
           (j.title && j.title.toLowerCase().includes(search)) ||
           (j.company && j.company.toLowerCase().includes(search)) ||
           (j.location && j.location.toLowerCase().includes(search)) ||
@@ -242,7 +242,7 @@ export function applyJobFilters(jobs: Job[], filters: JobFilterParams): Job[] {
       // tracked role name, those are English, e.g. "QA Engineer") and got
       // OR'd, so any "ingeniería" job matched regardless of "civil": the
       // second word never actually narrowed anything.
-      result = result.filter((j: any) => {
+      result = result.filter((j) => {
         const title = (j.title || "").toLowerCase();
         const company = (j.company || "").toLowerCase();
         const location = (j.location || "").toLowerCase();
@@ -267,7 +267,7 @@ export function applyJobFilters(jobs: Job[], filters: JobFilterParams): Job[] {
   if (filters.sources && filters.sources.length > 0) {
     const wanted = new Set(filters.sources);
     result = result.filter(
-      (j: any) =>
+      (j) =>
         wanted.has(j.source) ||
         (Array.isArray(j.sources) && j.sources.some((s: string) => wanted.has(s))) ||
         (Array.isArray(j.alsoIn) && j.alsoIn.some((s: string) => wanted.has(s)))
@@ -276,7 +276,7 @@ export function applyJobFilters(jobs: Job[], filters: JobFilterParams): Job[] {
 
   if (filters.cities && filters.cities.length > 0) {
     const wanted = filters.cities.map(normalizeText);
-    result = result.filter((j: any) => {
+    result = result.filter((j) => {
       if (!j.location) return false;
       const loc = normalizeText(j.location);
       return wanted.some((c) => loc.includes(c));
@@ -285,7 +285,7 @@ export function applyJobFilters(jobs: Job[], filters: JobFilterParams): Job[] {
 
   if (filters.modality && filters.modality !== "all") {
     const m = filters.modality.toLowerCase();
-    result = result.filter((j: any) => {
+    result = result.filter((j) => {
       const loc = (j.location || "").toLowerCase();
       if (m === "remoto") return loc.includes("remoto") || loc.includes("remote");
       if (m === "hibrido") return loc.includes("híbrido") || loc.includes("hibrido");
@@ -298,7 +298,7 @@ export function applyJobFilters(jobs: Job[], filters: JobFilterParams): Job[] {
   if (filters.freshness && filters.freshness !== "all") {
     const maxAgeHours =
       filters.freshness === "24h" ? 24 : filters.freshness === "48h" ? 48 : 24 * 7;
-    result = result.filter((j: any) => {
+    result = result.filter((j) => {
       if (!j.publishedAt) return false;
       const ageHours = (Date.now() - new Date(j.publishedAt).getTime()) / (1000 * 60 * 60);
       return ageHours <= maxAgeHours;
@@ -312,12 +312,12 @@ export function applyJobFilters(jobs: Job[], filters: JobFilterParams): Job[] {
 
   if (filters.company) {
     const company = filters.company;
-    result = result.filter((j: any) => j.company === company);
+    result = result.filter((j) => j.company === company);
   }
 
   if (filters.country) {
     const wanted = filters.country.toUpperCase();
-    result = result.filter((j: any) => j.country == null || j.country === wanted);
+    result = result.filter((j) => j.country == null || j.country === wanted);
   }
 
   return result;

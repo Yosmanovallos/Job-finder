@@ -17,7 +17,8 @@
  */
 import dotenv from "dotenv";
 import { pool } from "../src/db/client.js";
-import { upsertReputationAliases, ReputationAliasInput } from "../src/db/company-reputation-repository.js";
+import type { ReputationAliasInput } from "../src/db/company-reputation-repository.js";
+import { upsertReputationAliases } from "../src/db/company-reputation-repository.js";
 
 dotenv.config();
 

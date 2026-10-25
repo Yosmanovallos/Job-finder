@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import type { Job } from './sources/types.js';
 
 const CACHE_DIR = path.join(process.cwd(), 'data');
 const CACHE_FILE = path.join(CACHE_DIR, 'jobs-cache.json');
@@ -9,7 +10,7 @@ export interface CachedRun {
   name: string;
   role: string;
   timestamp: string;
-  jobs: any[];
+  jobs: Job[];
 }
 
 export interface CacheSchema {
@@ -30,7 +31,7 @@ export function loadCache(): CacheSchema {
   try {
     const raw = fs.readFileSync(CACHE_FILE, 'utf-8');
     return JSON.parse(raw);
-  } catch (e) {
+  } catch {
     return { runs: [] };
   }
 }
@@ -52,7 +53,7 @@ export function saveRunToCache(run: CachedRun) {
   console.log(`[Local Cache] Successfully saved run "${run.name}" with ${run.jobs.length} jobs.`);
 }
 
-export function getAllCachedJobs(runId?: string): any[] {
+export function getAllCachedJobs(runId?: string): Job[] {
   const cache = loadCache();
   if (cache.runs.length === 0) return [];
 
@@ -62,7 +63,7 @@ export function getAllCachedJobs(runId?: string): any[] {
   }
 
   // Return jobs from all runs combined, deduplicated by URL
-  const all: any[] = [];
+  const all: Job[] = [];
   const urlsSeen = new Set<string>();
 
   for (const r of cache.runs) {

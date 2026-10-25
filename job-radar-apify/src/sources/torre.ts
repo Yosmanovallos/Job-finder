@@ -1,4 +1,5 @@
-import { SourceAdapter, Job, deduplicateJobs } from './types.js';
+import type { SourceAdapter, Job } from './types.js';
+import { deduplicateJobs } from './types.js';
 import { scrapeTorre } from '../index.js';
 import { executeWithResilienceResult } from '../engine/resilient-fetch.js';
 import { liftJobArray, successResult, emptyResult, type SourceFetchResult } from './fetch-result.js';

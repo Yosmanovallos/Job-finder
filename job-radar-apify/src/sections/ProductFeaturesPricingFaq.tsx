@@ -1,5 +1,4 @@
 import { Link } from "react-router-dom";
-import { hoverStyle } from "../lib/hover-style.js";
 import { pricingPlans } from "../lib/pricing-plans.js";
 import { MonoLabel } from "../components/MonoLabel.js";
 import { PAYWALL_ENABLED } from "../config.js";

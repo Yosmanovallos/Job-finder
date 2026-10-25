@@ -8,7 +8,7 @@ import { checkRateLimit, recordSuspiciousEvent } from "../lib/security-monitor.j
 
 export function respondToUnexpectedError(
   res: http.ServerResponse,
-  err: any,
+  err: unknown,
   routeLabel: string,
   fallbackMessage: string
 ): void {
@@ -48,7 +48,7 @@ export function checkSensitiveRateLimit(
 export function readJsonBodyCapped(
   req: http.IncomingMessage,
   maxBytes: number
-): Promise<{ ok: true; value: any } | { ok: false }> {
+): Promise<{ ok: true; value: unknown } | { ok: false }> {
   return new Promise((resolve) => {
     let bytes = 0;
     let bodyText = "";

@@ -46,8 +46,8 @@ export default function Login() {
     setError(null);
     try {
       await loginWithGoogle(returnTo);
-    } catch (e: any) {
-      setError(translateAuthError(e?.message));
+    } catch (e) {
+      setError(translateAuthError((e as Error)?.message));
     }
   };
 
@@ -82,11 +82,11 @@ export default function Login() {
       } else {
         navigate(returnTo);
       }
-    } catch (e: any) {
+    } catch (e) {
       // signInWithPassword/signUp normally resolve with { error } rather than
       // rejecting, but a network failure (offline, CORS, DNS) does reject —
       // without this catch the button was stuck on "Procesando..." forever.
-      setError(translateAuthError(e?.message));
+      setError(translateAuthError((e as Error)?.message));
     } finally {
       setBusy(false);
     }

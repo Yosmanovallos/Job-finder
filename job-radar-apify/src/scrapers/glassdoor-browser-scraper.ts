@@ -148,8 +148,8 @@ export async function scrapeGlassdoorBrowser(country: Country = "CO"): Promise<G
     const countryJobs = parseJobviews(html, now, config.fallbackLocationName);
     jobs.push(...countryJobs);
     console.log(`[GlassdoorBrowser:${country}] ${config.fallbackLocationName} (country-wide): ${countryJobs.length} jobs within 1 day.`);
-  } catch (error: any) {
-    console.error(`[GlassdoorBrowser:${country}] Country-wide query failed: ${error.message}`);
+  } catch (error) {
+    console.error(`[GlassdoorBrowser:${country}] Country-wide query failed: ${(error as Error).message}`);
     // P2: a swallowed failure must not read as an empty source in run telemetry.
     reportSourceSignal("swallowed_error");
   }
@@ -162,8 +162,8 @@ export async function scrapeGlassdoorBrowser(country: Country = "CO"): Promise<G
       const cityJobs = parseJobviews(html, now, config.fallbackLocationName);
       jobs.push(...cityJobs);
       console.log(`[GlassdoorBrowser:${country}] ${slug}: ${cityJobs.length} jobs within 1 day (${jobs.length} total so far).`);
-    } catch (error: any) {
-      console.warn(`[GlassdoorBrowser:${country}] ${slug} failed, skipping: ${error.message}`);
+    } catch (error) {
+      console.warn(`[GlassdoorBrowser:${country}] ${slug} failed, skipping: ${(error as Error).message}`);
       reportSourceSignal("swallowed_error");
     }
   }

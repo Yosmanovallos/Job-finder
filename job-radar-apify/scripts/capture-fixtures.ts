@@ -1,6 +1,9 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import type {
+  Job
+} from '../src/index.js';
 import {
   scrapeLinkedIn,
   scrapeComputrabajo,
@@ -13,8 +16,7 @@ import {
   scrapeRemoteOK,
   scrapeRemotive,
   scrapeIndeedLocal,
-  scrapeGlassdoor,
-  Job
+  scrapeGlassdoor
 } from '../src/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -42,7 +44,7 @@ async function runFixtureCapture() {
     { name: 'weremoto', runner: () => scrapeWeRemoto() },
     { name: 'getonboard', runner: () => scrapeGetOnBoard() },
     { name: 'remoteok', runner: () => scrapeRemoteOK() },
-    { name: 'remotive', runner: () => scrapeRemotive([TEST_KEYWORD]) },
+    { name: 'remotive', runner: () => scrapeRemotive() },
     { name: 'indeed', runner: () => scrapeIndeedLocal(TEST_KEYWORD) },
     { name: 'glassdoor', runner: () => scrapeGlassdoor(TEST_KEYWORD) }
   ];
@@ -57,8 +59,8 @@ async function runFixtureCapture() {
       fs.writeFileSync(fixturePath, JSON.stringify(jobs, null, 2), 'utf-8');
       summary[name] = jobs.length;
       console.log(`✅ [Fixture] ${name}: ${jobs.length} vacantes guardadas en ${fixturePath}`);
-    } catch (err: any) {
-      console.error(`❌ [Fixture] ${name} falló:`, err?.message || err);
+    } catch (err) {
+      console.error(`❌ [Fixture] ${name} falló:`, (err as Error)?.message || err);
       summary[name] = 0;
       const fixturePath = path.join(FIXTURES_DIR, `${name}.json`);
       fs.writeFileSync(fixturePath, JSON.stringify([], null, 2), 'utf-8');

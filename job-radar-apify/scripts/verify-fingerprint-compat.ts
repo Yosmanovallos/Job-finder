@@ -16,6 +16,7 @@
 import dotenv from "dotenv";
 import { pool } from "../src/db/client.js";
 import { computeContentFingerprint } from "../src/db/job-repository.js";
+import type { Job } from "../src/sources/types.js";
 
 dotenv.config();
 
@@ -29,7 +30,7 @@ async function main() {
   console.log(`📊 Rows with a stored content_fingerprint: ${result.rows.length}`);
 
   let mismatches = 0;
-  const sample: any[] = [];
+  const sample: Record<string, unknown>[] = [];
 
   for (const row of result.rows) {
     const recomputed = computeContentFingerprint({
@@ -42,7 +43,7 @@ async function main() {
       url: "",
       dateText: "",
       source: ""
-    } as any);
+    } as Job);
 
     if (recomputed !== row.content_fingerprint) {
       mismatches++;

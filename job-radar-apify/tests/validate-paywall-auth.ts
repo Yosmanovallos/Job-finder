@@ -1,10 +1,11 @@
-import { spawn, ChildProcess } from "child_process";
+import type { ChildProcess } from "child_process";
+import { spawn } from "child_process";
 import path from "path";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 import { createClient } from "@supabase/supabase-js";
 import { saveJobs, clearRepository, getJobs, maskLockedFields } from "../src/db/job-repository.js";
-import { Job } from "../src/sources/types.js";
+import type { Job } from "../src/sources/types.js";
 
 dotenv.config();
 
@@ -19,7 +20,7 @@ async function waitForServer(maxAttempts = 80, delayMs = 250): Promise<void> {
     try {
       const res = await fetch(`${BASE_URL}/api/health`);
       if (res.ok) return;
-    } catch (e) {
+    } catch {
       // not up yet
     }
     await new Promise((r) => setTimeout(r, delayMs));
@@ -44,7 +45,7 @@ function killServerTree(server: ChildProcess): void {
   if (server.pid) {
     try {
       process.kill(-server.pid, "SIGKILL");
-    } catch (e) {
+    } catch {
       // Group may already be gone.
     }
   }
@@ -120,8 +121,8 @@ async function runPaywallAuthValidation() {
     console.log(`\n🔍 [Test 1] GET /api/jobs sin autenticación...`);
     const anonRes = await fetch(`${BASE_URL}/api/jobs`);
     const anonBody = await anonRes.json();
-    const anonRecent = anonBody.jobs.find((j: any) => j.title === recentJob.title);
-    const anonOlder = anonBody.jobs.find((j: any) => j.title === olderJob.title);
+    const anonRecent = anonBody.jobs.find((j: { title?: string }) => j.title === recentJob.title);
+    const anonOlder = anonBody.jobs.find((j: { title?: string }) => j.title === olderJob.title);
 
     if (
       !anonRecent ||
@@ -149,16 +150,16 @@ async function runPaywallAuthValidation() {
     // for Pro users on a <48h job even though the real data came through.
     console.log(`\n🔍 [Test 1b] maskLockedFields(jobs, 'pro') debe apagar isLocked...`);
     const rawJobs = await getJobs();
-    const rawRecent = rawJobs.find((j: any) => j.title === recentJob.title);
+    const rawRecent = rawJobs.find((j) => j.title === recentJob.title);
     if (!rawRecent?.isLocked) {
       console.error(`❌ [FAILED] La vacante <48h debería llegar de getJobs() con isLocked=true.`);
       process.exit(1);
     }
     const proJobs = maskLockedFields(rawJobs, "pro");
-    const proRecent = proJobs.find((j: any) => j.title === recentJob.title);
-    if (proRecent.isLocked !== false) {
+    const proRecent = proJobs.find((j) => j.title === recentJob.title);
+    if (proRecent!.isLocked !== false) {
       console.error(
-        `❌ [FAILED] Para tier 'pro', isLocked debe quedar en false — llegó ${proRecent.isLocked}.`
+        `❌ [FAILED] Para tier 'pro', isLocked debe quedar en false — llegó ${proRecent!.isLocked}.`
       );
       process.exit(1);
     }
@@ -192,7 +193,7 @@ async function runPaywallAuthValidation() {
         headers: { Authorization: `Bearer ${accessToken}` }
       });
       const authedBody = await authedRes.json();
-      const authedRecent = authedBody.jobs.find((j: any) => j.title === recentJob.title);
+      const authedRecent = authedBody.jobs.find((j: { title?: string }) => j.title === recentJob.title);
       // A freshly created user is 'free' tier — should still be masked.
       if (!authedRecent || authedRecent.company !== null) {
         console.error(

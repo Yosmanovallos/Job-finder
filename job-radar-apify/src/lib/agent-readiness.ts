@@ -299,7 +299,7 @@ const queryParameters = [
   { name: "offset", in: "query", description: "Desplazamiento entre 0 y 5000.", schema: { type: "integer", minimum: 0, maximum: 5000, default: 0 } }
 ];
 
-export const OPENAPI_DOCUMENT: any = {
+export const OPENAPI_DOCUMENT = {
   openapi: "3.1.2",
   info: {
     title: "BuscoTrabajo Public Jobs API",

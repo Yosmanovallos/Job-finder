@@ -52,11 +52,19 @@ test("Accept negotiation only selects Markdown with positive preference", () => 
   assert.equal(wantsMarkdown(undefined), false);
 });
 
+/** The parts of an OpenAPI operation this test inspects. */
+interface OpenApiOperation {
+  operationId: string;
+  description: string;
+  responses: Record<string, unknown>;
+  parameters?: { name: string; schema?: { type?: string; $ref?: string } }[];
+}
+
 test("OpenAPI operations are typed, unique and read-only", () => {
   assert.equal(OPENAPI_DOCUMENT.openapi, "3.1.2");
   assert.deepEqual(OPENAPI_DOCUMENT.servers, [{ url: "https://buscotrabajo.co" }]);
   const ids: string[] = [];
-  for (const [pathname, pathItem] of Object.entries(OPENAPI_DOCUMENT.paths as Record<string, { get: any }>)) {
+  for (const [pathname, pathItem] of Object.entries(OPENAPI_DOCUMENT.paths as Record<string, { get: OpenApiOperation }>)) {
     assert.deepEqual(Object.keys(pathItem), ["get"], pathname);
     const operation = pathItem.get;
     ids.push(operation.operationId);
@@ -140,8 +148,10 @@ test("public job query validation is bounded", () => {
 });
 
 test("WebMCP feature detection registers only bounded read-only tools", () => {
-  const tools: Array<Record<string, unknown>> = [];
-  const modelContext = { registerTool(tool: any) { tools.push(tool); } };
+  type WebModelContext = NonNullable<Parameters<typeof registerBuscoTrabajoWebMcp>[0]>;
+  type RegisteredTool = Parameters<WebModelContext["registerTool"]>[0];
+  const tools: RegisteredTool[] = [];
+  const modelContext = { registerTool(tool: RegisteredTool) { tools.push(tool); } };
   const controller = registerBuscoTrabajoWebMcp(modelContext);
   assert.ok(controller instanceof AbortController);
   assert.deepEqual(tools.map((tool) => tool.name), ["search_jobs", "get_job", "list_supported_countries"]);

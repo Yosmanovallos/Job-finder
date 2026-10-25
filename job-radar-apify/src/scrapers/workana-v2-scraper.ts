@@ -113,12 +113,12 @@ async function gsFetchV2(url: string, attempts = 3): Promise<string> {
         `[WorkanaV2] HTTP ${response.statusCode}, retrying in ${backoffMs / 1000}s (attempt ${attempt}/${attempts})...`
       );
       await sleep(backoffMs);
-    } catch (error: any) {
-      if (error.message?.includes("Blocked")) throw error;
+    } catch (error) {
+      if ((error as Error).message?.includes("Blocked")) throw error;
       if (attempt === attempts) {
         console.error(
           `[WorkanaV2] Fetch error after ${attempts} attempts:`,
-          error?.message || error
+          (error as Error)?.message || error
         );
         throw error;
       }
@@ -202,6 +202,23 @@ function parseRelativeDate(dateText: string): string | null {
  * @param maxPages  Maximum pages to fetch (default: 10, ~20 results/page).
  * @returns Array of WorkanaJob objects from the last 24 hours.
  */
+// Fields of a Workana catalog page item that scrapeWorkanaV2 reads.
+interface WorkanaCatalogItem {
+  title?: string;
+  slug?: string;
+  authorName?: string;
+  country?: string;
+  publishedDate?: string;
+  description?: string;
+  skills?: unknown;
+  isHourly?: unknown;
+  budget?: unknown;
+}
+interface WorkanaCatalogPage {
+  results?: WorkanaCatalogItem[];
+  pagination?: { pages?: number };
+}
+
 export async function scrapeWorkanaV2(
   maxPages: number = 10
 ): Promise<WorkanaJob[]> {
@@ -217,15 +234,15 @@ export async function scrapeWorkanaV2(
     let html: string;
     try {
       html = await gsFetchV2(url);
-    } catch (error: any) {
+    } catch (error) {
       if (page === 1) {
         // If page 1 fails, nothing to return — propagate
-        console.error(`[WorkanaV2] Page 1 failed — aborting: ${error.message}`);
+        console.error(`[WorkanaV2] Page 1 failed — aborting: ${(error as Error).message}`);
         throw error;
       }
       // Pages 2+ failing just means no more results
       console.warn(
-        `[WorkanaV2] Page ${page} failed, stopping pagination: ${error.message}`
+        `[WorkanaV2] Page ${page} failed, stopping pagination: ${(error as Error).message}`
       );
       break;
     }
@@ -255,10 +272,10 @@ export async function scrapeWorkanaV2(
       .replaceAll("&quot;", '"')
       .replaceAll("&#39;", "'");
 
-    let parsed: any;
+    let parsed: WorkanaCatalogPage;
     try {
       parsed = JSON.parse(decodedValue);
-    } catch (parseError) {
+    } catch {
       console.warn(
         `[WorkanaV2] JSON parse failed on page ${page} — stopping pagination.`
       );
@@ -312,7 +329,7 @@ export async function scrapeWorkanaV2(
 
       const { description, requirements } = extractStructuredFromHtml(item.description || "");
       const skills: string[] = Array.isArray(item.skills)
-        ? item.skills.map((s: any) => s?.anchorText).filter((n: unknown): n is string => typeof n === "string")
+        ? item.skills.map((s: { anchorText?: unknown } | null) => s?.anchorText).filter((n: unknown): n is string => typeof n === "string")
         : [];
 
       jobs.push({
@@ -409,9 +426,9 @@ async function main() {
     console.log(`  Unique companies: ${companies.size}`);
     console.log(`  Unique locations: ${locations.size}`);
     console.log("─".repeat(40));
-  } catch (error: any) {
-    console.error(`\n❌ FAILED: ${error.message}`);
-    if (error.message.includes("Blocked")) {
+  } catch (error) {
+    console.error(`\n❌ FAILED: ${(error as Error).message}`);
+    if ((error as Error).message.includes("Blocked")) {
       console.error(
         "\n   got-scraping was also blocked by Cloudflare.\n" +
           "   Next step: try session cookie authentication.\n"
