@@ -38,6 +38,14 @@ async function main(): Promise<void> {
     for (const row of uncovered.slice(0, 30)) {
       console.log(`  ${String(row.directoryCount).padStart(5)}  ${row.companyName.slice(0, 45).padEnd(45)}  ${row.decision ?? "sin sondeo"}  ${row.websiteDomain ?? "sin dominio"}`);
     }
+    console.log("\nEmpresas de Computrabajo con dominio curado y sin tablero:");
+    for (const row of withDomain) {
+      console.log(`  ${String(row.directoryCount).padStart(5)}  ${row.companyName.slice(0, 45).padEnd(45)}  ${row.websiteDomain}  ${row.decision ?? "sin sondeo"}`);
+    }
+    console.log("\nEmpresas de Computrabajo con tablero oficial habilitado:");
+    for (const row of covered) {
+      console.log(`  ${String(row.directoryCount).padStart(5)}  ${row.companyName.slice(0, 45).padEnd(45)}  ${row.liveOfficialJobs} vacantes oficiales vigentes`);
+    }
     console.log("Un tablero verificado no demuestra que cada vacante de Computrabajo tenga equivalente oficial; las cifras se muestran por separado.");
   } finally {
     await pool.end();
