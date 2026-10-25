@@ -26,6 +26,8 @@ import {
   buildCategoryMeta,
   buildCategoryInsights,
   buildCategoryInternalLinks,
+  buildRelatedCityLinks,
+  buildCategorySectionHeadings,
   buildCategoryPath,
   buildCategoriesSitemapXml,
   buildJobUrlPrefix,
@@ -369,11 +371,12 @@ function runPureFunctionTests() {
   const cityMeta = buildCategoryMeta(cityMatch!, 42);
   check(
     cityMeta.title.includes(realCity) &&
-      cityMeta.title.includes("Trabajo en") &&
-      cityMeta.title.includes("vacantes de empleo") &&
+      cityMeta.title.includes(`Empleos en ${realCity}`) &&
+      cityMeta.title.includes("trabajo") &&
+      cityMeta.title.includes("ofertas de empleo") &&
       cityMeta.description.includes("42 vacantes") &&
       cityMeta.canonicalUrl.endsWith(buildCategoryPath(cityMatch!)),
-    "buildCategoryMeta() orienta el título de ciudad a 'trabajo en' + 'vacantes de empleo', conserva el conteo real en la descripción y usa un canonical consistente.",
+    "buildCategoryMeta() orienta el título de ciudad a 'empleos en' + 'trabajo' + 'ofertas de empleo', conserva el conteo real en la descripción y usa un canonical consistente.",
     `buildCategoryMeta(cityMatch, 42) produjo metadata inconsistente: ${JSON.stringify(cityMeta)}`
   );
 
@@ -443,6 +446,29 @@ function runPureFunctionTests() {
       ),
     "buildCategoryInternalLinks() enlaza desde una ciudad de Colombia a los hubs reales de vacantes, empresas e inicio.",
     `buildCategoryInternalLinks() produjo enlaces inesperados: ${JSON.stringify(categoryLinks)}`
+  );
+
+  const relatedCityLinks = buildRelatedCityLinks(cityMatch!);
+  check(
+    relatedCityLinks.length > 0 &&
+      relatedCityLinks.every((link) => {
+        const resolved = resolveCategorySlug(link.href.replace(/^\/empleos\//, ""));
+        return resolved?.kind === "ciudad" && resolved.country === "CO" && link.href.startsWith("/empleos/");
+      }) &&
+      !relatedCityLinks.some((link) => link.href === buildCategoryPath(cityMatch!)) &&
+      !relatedCityLinks.some((link) => link.href === "/empleos/remoto"),
+    "buildRelatedCityLinks() enlaza una ciudad de Colombia solo a otras páginas de ciudad reales del mismo país, sin sí misma ni 'Remoto'.",
+    `buildRelatedCityLinks() produjo enlaces inesperados: ${JSON.stringify(relatedCityLinks)}`
+  );
+  const caracasMatch = resolveCategorySlug("caracas");
+  const veRelated = buildRelatedCityLinks(caracasMatch!);
+  check(
+    veRelated.length > 0 &&
+      veRelated.every((link) => resolveCategorySlug(link.href.replace(/^\/empleos\//, ""))?.country === "VE") &&
+      buildRelatedCityLinks(roleMatchCO!).length === 0 &&
+      buildCategorySectionHeadings(caracasMatch!).relatedCities.includes("Venezuela"),
+    "buildRelatedCityLinks() mantiene Venezuela separada de Colombia y no agrega enlaces de ciudad a páginas de rol.",
+    `Enlaces de ciudad VE/rol inesperados: ${JSON.stringify({ veRelated, heading: buildCategorySectionHeadings(caracasMatch!) })}`
   );
 
   const categoriesSitemapXml = buildCategoriesSitemapXml();
@@ -634,6 +660,24 @@ async function runHttpTests() {
         sourcesHtml.includes('name="twitter:title" content="Fuentes de vacantes: Elempleo y más | BuscoTrabajo"'),
       "/fuentes publica Open Graph y Twitter metadata específicos.",
       "/fuentes conserva metadata social genérica de la portada."
+    );
+
+    for (const placeholderPath of ["/empresas/confidential-careers", "/empresas/confidencial", "/ve/empresas/confidencial"]) {
+      const placeholderRes = await fetch(`${BASE_URL}${placeholderPath}`, { redirect: "manual" });
+      const placeholderHtml = await placeholderRes.text();
+      check(
+        placeholderRes.status === 410 &&
+          placeholderHtml.includes('content="noindex"') &&
+          !placeholderHtml.includes('"@type":"Organization"'),
+        `${placeholderPath} (empleador no revelado) responde 410 noindex, sin perfil de empresa.`,
+        `${placeholderPath} no respondió 410 noindex (status=${placeholderRes.status}).`
+      );
+    }
+    const placeholderApiRes = await fetch(`${BASE_URL}/api/companies/confidential-careers`);
+    check(
+      placeholderApiRes.status === 404,
+      "/api/companies/confidential-careers responde 404: un placeholder no es una empresa.",
+      `/api/companies/confidential-careers respondió ${placeholderApiRes.status}.`
     );
 
     const elempleoRes = await fetch(`${BASE_URL}/empresas/elempleo`, { redirect: "manual" });
@@ -953,8 +997,11 @@ async function runHttpTests() {
       `La página de categoría ${cityPath} no incluyó el resumen SEO enriquecido completo en el HTML crudo.`
     );
     check(
-      cityHtml.includes("Trabajo en") && cityHtml.includes("vacantes de empleo"),
-      `El título/H1 de ${cityPath} responde a la intención 'trabajo en <ciudad>' y 'vacantes de empleo'.`,
+      cityHtml.includes("Empleos en") &&
+        cityHtml.includes("ofertas de empleo") &&
+        cityHtml.includes("data-related-cities") &&
+        /<h2>Empleos en otras ciudades de (Colombia|Venezuela)<\/h2>/.test(cityHtml),
+      `El título/H1 de ${cityPath} responde a 'empleos en <ciudad>' y 'ofertas de empleo', y el HTML crudo enlaza otras ciudades bajo un H2.`,
       `La página ${cityPath} no contiene la orientación de búsqueda local esperada.`
     );
 

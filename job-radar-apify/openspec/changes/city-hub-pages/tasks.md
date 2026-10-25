@@ -1,0 +1,7 @@
+- [x] buildRelatedCityLinks / buildCategorySectionHeadings in job-seo.ts
+- [x] SSR (server.ts) and CategoryLanding.tsx render the same sections
+- [x] validate-seo-job-pages.ts: title, related links, VE separation, raw HTML
+- [x] tsc (24 pre-existing, none new), build
+- [ ] integration suite in CI (local Docker unavailable)
+- [ ] /seo drift compare and cold MISS latency after deploy (needs approval)
+- [ ] GSC follow-up: positions/CTR for candidate cities at +14 and +28 days

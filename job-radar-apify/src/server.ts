@@ -27,6 +27,7 @@ import {
 } from "./db/company-reputation-repository.js";
 import type { ReputationEntry } from "./db/company-reputation-repository.js";
 import type { JobFilterParams } from "./lib/job-filters.js";
+import { isPlaceholderEmployer } from "./lib/company-key.js";
 import { COMPANY_LOGO_DOMAINS, getCompanyLogoUrl } from "./data/company-logo-domains.js";
 import { getOfficialCareersUrl } from "./data/official-careers-links.js";
 import { getCountryConfig } from "./countries/index.js";
@@ -50,6 +51,8 @@ import {
   buildCategoryMeta,
   buildCategoryInsights,
   buildCategoryInternalLinks,
+  buildRelatedCityLinks,
+  buildCategorySectionHeadings,
   buildCategoryPath,
   buildCategoryBreadcrumbList,
   buildCategoryItemList,
@@ -611,7 +614,9 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
         slug,
         companyNames.map((company) => ({ company }))
       );
-    if (!resolvedName) {
+    // An undisclosed employer ("Confidencial", "Confidential Careers") is
+    // not a company: no profile, same as an unknown slug.
+    if (!resolvedName || isPlaceholderEmployer(resolvedName) || isPlaceholderEmployer(slug.replace(/-/g, " "))) {
       res.writeHead(404, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: "Empresa no encontrada" }));
       return;
@@ -1019,6 +1024,8 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       const meta = buildCategoryMeta(category, total);
       const insights = buildCategoryInsights(category, total, page);
       const internalLinks = buildCategoryInternalLinks(category);
+      const relatedCityLinks = buildRelatedCityLinks(category);
+      const sectionHeadings = buildCategorySectionHeadings(category);
 
       // Same "real links in the raw HTML" pattern /dashboard already uses
       // (see 7c below) — this page's whole SEO value is being a crawlable
@@ -1050,7 +1057,12 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
   ${insights.latestPublishedLabel ? `<p><strong>Última publicación visible:</strong> ${escapeHtml(insights.latestPublishedLabel)}.</p>` : ""}
   <nav aria-label="Explorar más empleos">${internalLinks.map((link) => `<a href="${escapeHtml(link.href)}">${escapeHtml(link.label)}</a>`).join(" · ")}</nav>
 </section>`;
-      const ssrSnippet = `<h1>${escapeHtml(meta.heading)}</h1>\n${emptyNotice}${overviewHtml}<nav aria-label="Vacantes"><ul>\n${items}\n</ul></nav>`;
+      const jobsHeading = page.length > 0 ? `<h2>${escapeHtml(sectionHeadings.jobs)}</h2>\n` : "";
+      const relatedCitiesHtml =
+        relatedCityLinks.length > 0
+          ? `\n<section data-related-cities aria-label="${escapeHtml(sectionHeadings.relatedCities)}"><h2>${escapeHtml(sectionHeadings.relatedCities)}</h2><ul>${relatedCityLinks.map((link) => `<li><a href="${escapeHtml(link.href)}">${escapeHtml(link.label)}</a></li>`).join("")}</ul></section>`
+          : "";
+      const ssrSnippet = `<h1>${escapeHtml(meta.heading)}</h1>\n${emptyNotice}${overviewHtml}${jobsHeading}<nav aria-label="Vacantes"><ul>\n${items}\n</ul></nav>${relatedCitiesHtml}`;
       indexHtml = indexHtml.replace('<div id="app"></div>', `<div id="app">${ssrSnippet}</div>`);
 
       // Same fix /dashboard already had (Fase 1, §5.4) applied here too —
@@ -1505,6 +1517,16 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       return;
     }
 
+    // Placeholder employers ("Confidencial", "Confidential Careers",
+    // "Empresa Reservada") had indexable 200 pages because job cards linked
+    // them. They name no company, so the URL is gone for good: 410 +
+    // noindex, decided before any query (same contract as RETIRED_ROLE_SLUGS).
+    if (isPlaceholderEmployer(slug.replace(/-/g, " "))) {
+      res.writeHead(410, { "Content-Type": "text/html; charset=utf-8" });
+      res.end('<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Empresa no disponible | BuscoTrabajo</title><meta name="robots" content="noindex"></head><body><h1>Esta empresa no está disponible</h1><p>La fuente no publicó el nombre del empleador, así que no existe una página de empresa para estas vacantes.</p><p><a href="/dashboard">Ver todas las vacantes</a></p></body></html>');
+      return;
+    }
+
     // Individual company page — exact same two-step resolution and
     // country-scoping rules as GET /api/companies/:slug (server.ts's own
     // API handler below), so SSR never disagrees with what the client
@@ -1521,6 +1543,11 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       res.end(
         '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Empresa no encontrada | BuscoTrabajo</title><meta name="robots" content="noindex"></head><body><h1>Empresa no encontrada</h1><p><a href="/dashboard">Ver todas las vacantes</a></p></body></html>'
       );
+      return;
+    }
+    if (isPlaceholderEmployer(resolvedName)) {
+      res.writeHead(410, { "Content-Type": "text/html; charset=utf-8" });
+      res.end('<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Empresa no disponible | BuscoTrabajo</title><meta name="robots" content="noindex"></head><body><h1>Esta empresa no está disponible</h1><p>La fuente no publicó el nombre del empleador, así que no existe una página de empresa para estas vacantes.</p><p><a href="/dashboard">Ver todas las vacantes</a></p></body></html>');
       return;
     }
     // Every spelling of the employer ("accenture" and "accenture-colombia")

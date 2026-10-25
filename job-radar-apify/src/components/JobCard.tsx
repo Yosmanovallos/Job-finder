@@ -5,6 +5,7 @@ import { Job } from "../sources/types.js";
 import { getSourceColor } from "../lib/source-colors.js";
 import { getModalityLabel } from "../lib/job-filters.js";
 import { buildCompanyPath } from "../lib/job-seo.js";
+import { isPlaceholderEmployer } from "../lib/company-key.js";
 import { buildLocationLabel } from "../countries/index.js";
 import { useAuth } from "../auth/auth-provider.js";
 import { jobAnalyticsParams, trackEvent } from "../lib/analytics.js";
@@ -131,7 +132,7 @@ export const JobCard: React.FC<JobCardProps> = ({
             </h3>
 
             <p className="text-sm text-foreground/80 mb-2">
-              {job.company ? (
+              {job.company && !isPlaceholderEmployer(job.company) ? (
                 // Every real company gets a working /empresas/:slug page —
                 // resolveCompanyNameFromJobs() in server.ts falls back to
                 // matching any company from the live job corpus when it's
@@ -145,7 +146,7 @@ export const JobCard: React.FC<JobCardProps> = ({
                   {job.company}
                 </Link>
               ) : (
-                "Confidencial"
+                job.company || "Confidencial"
               )}
               <span className="text-muted-foreground"> · {buildLocationLabel(job, country)}</span>
             </p>

@@ -4,6 +4,7 @@ import { DEFAULT_ROLES_200 } from "../queue/scheduler.js";
 import { getCountryConfig, DEFAULT_COUNTRY } from "../countries/index.js";
 import { isGoogleReadyNow, resolveGoogleLocation } from "./google-job-readiness.js";
 import { countryNameFor } from "./country-codes.js";
+import { isPlaceholderEmployer } from "./company-key.js";
 
 export const SITE_URL = "https://buscotrabajo.co";
 // Job SEO V2 (docs/JOBPOSTING-GOOGLE-CONTRACT.md): there is deliberately no
@@ -597,11 +598,21 @@ export function buildCategoryMeta(category: ResolvedCategory, totalCount: number
   // Venezuela role page claiming "en Colombia" while actually listing
   // Venezuela jobs, a real mismatch that existed before this country field.
   const countryName = getCountryConfig(country).name;
-  const heading =
-    kind === "ciudad"
-      ? `Trabajo en ${label}: vacantes de empleo`
+  // City wording mirrors the query variants Search Console actually shows
+  // for these pages ("empleos <ciudad>", "trabajo en <ciudad>", "ofertas de
+  // empleo en <ciudad>" — docs/seo-baseline/2026-10-24-measurement-baseline.md).
+  // "Remoto" lives in CITY_OPTIONS as a modality bucket, not a place
+  // ("trabajos remotos" is its own query in Search Console).
+  const heading = isRemoteBucket(category)
+    ? `Trabajos remotos en ${countryName}: empleos y ofertas de empleo`
+    : kind === "ciudad"
+      ? `Empleos en ${label}: trabajo y ofertas de empleo`
       : `Trabajo de ${label} en ${countryName}`;
-  const target = kind === "ciudad" ? `trabajo en ${label}` : `${label} en ${countryName}`;
+  const target = isRemoteBucket(category)
+    ? `trabajo remoto en ${countryName}`
+    : kind === "ciudad"
+      ? `trabajo en ${label}`
+      : `${label} en ${countryName}`;
   return {
     // Keep the query wording stable even when the live count changes. The
     // exact count remains in the description and visible body, where it is
@@ -653,7 +664,8 @@ export function buildCategoryInsights(
   let latestPublishedMs: number | null = null;
 
   for (const job of jobs) {
-    if (job.company) incrementCount(companies, job.company);
+    // An undisclosed employer is not one more company in the sample.
+    if (job.company && !isPlaceholderEmployer(job.company)) incrementCount(companies, job.company);
     const jobSources =
       Array.isArray(job.sources) && job.sources.length > 0 ? job.sources : [job.source];
     for (const source of jobSources) if (source) incrementCount(sources, source);
@@ -680,8 +692,9 @@ export function buildCategoryInsights(
 
   const visibleCount = jobs.length;
   const countLabel = totalCount === 1 ? "1 vacante activa" : `${totalCount} vacantes activas`;
-  const target =
-    category.kind === "ciudad"
+  const target = isRemoteBucket(category)
+    ? `trabajo remoto en ${getCountryConfig(category.country).name}`
+    : category.kind === "ciudad"
       ? `trabajo en ${category.label}`
       : `${category.label} en ${getCountryConfig(category.country).name}`;
   const sampleLabel =
@@ -730,6 +743,53 @@ export function buildCategoryInternalLinks(category: ResolvedCategory): Category
     { href: `${prefix}/empresas`, label: `Empresas con vacantes en ${countryName}` },
     { href: prefix || "/", label: `Inicio de BuscoTrabajo ${countryName}` }
   ];
+}
+
+function isRemoteBucket(category: ResolvedCategory): boolean {
+  return category.kind === "ciudad" && category.label === "Remoto";
+}
+
+/**
+ * City hub cross-links: every other city page of the same country, from the
+ * same static taxonomy resolveCategorySlug()/sitemap-categories.xml use, so
+ * each link resolves to a real category page. Role pages get none.
+ */
+export function buildRelatedCityLinks(category: ResolvedCategory): CategoryInternalLink[] {
+  if (category.kind !== "ciudad") return [];
+  const self = slugify(category.label);
+  // Same lists resolveCategorySlug() matches against, so every href is a
+  // real city page. "Remoto" is a modality bucket, not another city.
+  const cities =
+    category.country === "VE"
+      ? getCountryConfig("VE").cities
+      : CITY_OPTIONS.filter((city) => city !== "Remoto");
+  return cities
+    .filter((city) => slugify(city) !== self)
+    .map((city) => ({
+      href: buildCategoryPath({ kind: "ciudad", label: city, country: category.country }),
+      label: `Empleos en ${city}`
+    }));
+}
+
+/** Section headings shared by SSR and the hydrated category page. */
+export function buildCategorySectionHeadings(category: ResolvedCategory): {
+  jobs: string;
+  relatedCities: string;
+} {
+  const countryName = getCountryConfig(category.country).name;
+  if (isRemoteBucket(category)) {
+    return {
+      jobs: `Vacantes remotas recientes en ${countryName}`,
+      relatedCities: `Empleos por ciudad en ${countryName}`
+    };
+  }
+  return {
+    jobs:
+      category.kind === "ciudad"
+        ? `Vacantes recientes en ${category.label}`
+        : `Vacantes recientes de ${category.label}`,
+    relatedCities: `Empleos en otras ciudades de ${countryName}`
+  };
 }
 
 // BreadcrumbList for a category page (SEO Fase 6 — seo-technical/§1.7 flagged
