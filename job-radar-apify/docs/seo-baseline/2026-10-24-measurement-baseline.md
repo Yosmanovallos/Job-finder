@@ -92,7 +92,8 @@ hasta tener un fallo concreto.
 
 - Consulta "trabajos en confidential" (13 impresiones) y página
   `/empresas/confidential-careers` (21 impresiones, indexable): un nombre
-  de empresa placeholder se publica como empresa y ciudad.
+  de empresa placeholder se publica como empresa (la consulta "trabajos en
+  X" es intención de empresa; ninguna ruta escribe la empresa como ciudad).
 - `/empresas/elempleo` (124 impresiones en 90 días; hoy responde 301) y
   consultas "elempleo", "elempleo colombia": un portal de empleo que se
   trató como empleador.
