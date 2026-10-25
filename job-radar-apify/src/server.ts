@@ -78,9 +78,11 @@ import {
   NOT_FOUND_MARKDOWN,
   getHomeContent,
   injectPublicContent,
+  injectRouteMeta,
   renderContentMarkdown,
   wantsMarkdown
 } from "./lib/agent-readiness.js";
+import { ROUTE_META, companiesDirectoryMeta, dashboardDescription } from "./lib/page-meta.js";
 import {
   SOURCE_DIRECTORY_SLUGS,
   SOURCES_PAGE_DESCRIPTION,
@@ -1437,10 +1439,11 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
         logoUrl: getCompanyLogoUrl(item.company)
       }));
       const total = companyPage.total;
-      const heading = `Empresas en ${countryConfig.name}`;
+      const directoryMeta = companiesDirectoryMeta(countryConfig.name);
+      const heading = directoryMeta.heading;
       const meta = {
-        title: `${heading} | BuscoTrabajo`,
-        description: `Explora empresas con vacantes activas en ${countryConfig.name} en BuscoTrabajo — su reputación y ofertas.`,
+        title: directoryMeta.title,
+        description: directoryMeta.description,
         canonicalUrl: `${SITE_URL}${isVeEmpresas ? "/ve" : ""}/empresas`
       };
 
@@ -1762,13 +1765,13 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     // meta.ts) — this just makes them true in the raw HTML too, instead of
     // only after JS runs.
     const dashboardTitle = `Vacantes de Empleo en ${countryConfig.name} | BuscoTrabajo`;
-    const dashboardDescription = `Explora vacantes actualizadas de LinkedIn, Computrabajo${country === "CO" ? ", Elempleo" : ""} y más en ${countryConfig.name}, filtradas y sin duplicados. Gratis para vacantes con más de 48h publicadas.`;
+    const dashboardDescriptionText = dashboardDescription(country, countryConfig.name);
     const dashboardCanonical = `${SITE_URL}${pathname}`;
     indexHtml = indexHtml
       .replace(/<title>[\s\S]*?<\/title>/, `<title>${escapeHtml(dashboardTitle)}</title>`)
       .replace(
         /<meta[^>]*name=["']description["'][^>]*>/,
-        `<meta name="description" content="${escapeHtml(dashboardDescription)}" />`
+        `<meta name="description" content="${escapeHtml(dashboardDescriptionText)}" />`
       )
       .replace(
         /<link[^>]*rel=["']canonical["'][^>]*>/,
@@ -1803,7 +1806,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       )
       .replace(
         /<meta[^>]*property=["']og:description["'][^>]*>/,
-        `<meta property="og:description" content="${escapeHtml(dashboardDescription)}" />`
+        `<meta property="og:description" content="${escapeHtml(dashboardDescriptionText)}" />`
       )
       .replace(
         /<meta[^>]*name=["']twitter:title["'][^>]*>/,
@@ -1811,7 +1814,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       )
       .replace(
         /<meta[^>]*name=["']twitter:description["'][^>]*>/,
-        `<meta name="twitter:description" content="${escapeHtml(dashboardDescription)}" />`
+        `<meta name="twitter:description" content="${escapeHtml(dashboardDescriptionText)}" />`
       );
 
     // Lets the client skip its own redundant first fetch to /api/jobs when
@@ -2106,6 +2109,30 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     );
     return;
   }
+
+  // Client-rendered routes with no SSR body of their own (/como-funciona,
+  // /preguntas, /legal/*, sign-in/account pages): they used to ship the
+  // homepage's <title>, description and canonical="/" — every one of them
+  // declared itself a duplicate of the home. Inject their own head (and H1
+  // where they have one) from the same registry the React pages read.
+  const routeMeta = !hasFileExtension ? ROUTE_META[pathname] : undefined;
+  if (routeMeta && (method === "GET" || method === "HEAD")) {
+    try {
+      const indexHtml = (await readStaticFile(path.join(PUBLIC_DIR, "index.html"))).toString("utf-8");
+      await sendBody(
+        req,
+        res,
+        200,
+        { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "private, no-store", Vary: "Accept" },
+        injectRouteMeta(indexHtml, pathname, routeMeta)
+      );
+    } catch {
+      res.writeHead(500, { "Content-Type": "text/plain" });
+      res.end("Server Error: build not found");
+    }
+    return;
+  }
+
   const filePath = path.join(PUBLIC_DIR, hasFileExtension ? pathname : "index.html");
 
   const ext = path.extname(filePath);

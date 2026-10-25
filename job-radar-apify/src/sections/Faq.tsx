@@ -3,6 +3,7 @@ import { useLocation } from "react-router-dom";
 import { MonoLabel } from "../components/MonoLabel.js";
 import { SOURCES_BY_COUNTRY } from "../countries/index.js";
 import { getEffectiveCountry } from "../lib/country-context.js";
+import { ROUTE_META } from "../lib/page-meta.js";
 
 // Every item except faq-1 is country-neutral (how the product works, not
 // what it's connected to).
@@ -139,15 +140,15 @@ export default function Faq({ country }: FaqProps) {
       <div className="max-w-[1200px] mx-auto px-4 md:px-8">
         <div className="mb-8 md:mb-12">
           <MonoLabel>11 / PREGUNTAS</MonoLabel>
-          <h2
+          <h1
             className="mt-3 font-semibold tracking-tight leading-tight"
             style={{
               fontSize: "clamp(1.5rem, 3vw, 2.25rem)",
               color: "#0e0f10"
             }}
           >
-            Preguntas frecuentes
-          </h2>
+            {ROUTE_META["/preguntas"]!.heading}
+          </h1>
         </div>
 
         <div className="max-w-3xl space-y-3">

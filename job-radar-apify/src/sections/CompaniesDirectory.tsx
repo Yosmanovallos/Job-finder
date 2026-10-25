@@ -5,6 +5,7 @@ import { MonoLabel } from "../components/MonoLabel.js";
 import { Input } from "../components/ui/input.js";
 import { CompanyAvatar } from "../components/CompanyAvatar.js";
 import { usePageMeta } from "../lib/use-page-meta.js";
+import { companiesDirectoryMeta } from "../lib/page-meta.js";
 import { buildCompanyPath } from "../lib/job-seo.js";
 import { getCountryConfig } from "../countries/index.js";
 
@@ -37,10 +38,8 @@ export default function CompaniesDirectory() {
   const country = location.pathname.startsWith("/ve") ? "VE" : "CO";
   const countryName = getCountryConfig(country).name;
 
-  usePageMeta({
-    title: `Empresas en ${countryName} | BuscoTrabajo`,
-    description: `Explora empresas con vacantes activas en ${countryName} en BuscoTrabajo — su reputación y ofertas.`
-  });
+  const directoryMeta = companiesDirectoryMeta(countryName);
+  usePageMeta({ title: directoryMeta.title, description: directoryMeta.description });
 
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -178,7 +177,7 @@ export default function CompaniesDirectory() {
       <div className="relative max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-20">
         <MonoLabel>EMPRESAS</MonoLabel>
         <h1 className="mt-2 font-heading font-semibold text-2xl sm:text-3xl text-foreground">
-          Explora empresas con vacantes activas
+          {directoryMeta.heading}
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
           {total > 0

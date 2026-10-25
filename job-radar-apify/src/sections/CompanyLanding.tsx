@@ -5,6 +5,7 @@ import { CompanyAvatar } from "../components/CompanyAvatar.js";
 import { CategoryJobRow } from "../components/CategoryJobRow.js";
 import { useAuth } from "../auth/auth-provider.js";
 import { usePageMeta } from "../lib/use-page-meta.js";
+import { buildCompanyMeta } from "../lib/job-seo.js";
 import { Button } from "../components/ui/button.js";
 import { Job } from "../sources/types.js";
 import { ArrowLeft, ExternalLink } from "lucide-react";
@@ -103,11 +104,12 @@ export default function CompanyLanding() {
       .catch(() => setState("not-found"));
   }, [slug, accessToken, authLoading, country]);
 
+  // Same builder as server.ts's SSR head, so title/description don't change
+  // when React mounts.
+  const companyMeta = companyName ? buildCompanyMeta(companyName, total, country) : null;
   usePageMeta({
-    title: companyName ? `${companyName} | BuscoTrabajo` : "Cargando empresa... | BuscoTrabajo",
-    description: companyName
-      ? `Reputación y vacantes activas de ${companyName} en BuscoTrabajo.`
-      : "Cargando información de la empresa."
+    title: companyMeta ? companyMeta.title : "Cargando empresa... | BuscoTrabajo",
+    description: companyMeta ? companyMeta.description : "Cargando información de la empresa."
   });
 
   return (

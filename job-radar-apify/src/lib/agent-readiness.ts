@@ -38,11 +38,14 @@ export function getHomeContent(country: "CO" | "VE"): PublicContent {
   const sources = country === "VE"
     ? "LinkedIn, Computrabajo, Torre, GetOnBoard y otros portales con cobertura real en Venezuela"
     : "LinkedIn, Computrabajo, Elempleo, Magneto, Torre y otros portales con cobertura real en Colombia";
+  // Description names the best-known portals for each country (only ones
+  // in SOURCES_BY_COUNTRY) — the angle no single portal can claim.
+  const descriptionSources = country === "VE" ? "LinkedIn, Computrabajo, Torre" : "Computrabajo, LinkedIn, Elempleo";
   return {
     pathname: country === "VE" ? "/ve" : "/",
-    title: `Busco trabajo en ${countryName} | Vacantes de empleo | BuscoTrabajo`,
-    description: `Busca trabajo en ${countryName} entre vacantes de empleo públicas, deduplicadas y verificadas. Filtra oportunidades y aplica en el portal original.`,
-    heading: `Busco trabajo en ${countryName}: vacantes de empleo en un solo lugar`,
+    title: `Busco trabajo en ${countryName}: ofertas de empleo | BuscoTrabajo`,
+    description: `Busca trabajo en ${countryName} en un solo lugar: vacantes de ${descriptionSources} y más, sin duplicados. Gratis y con enlace a la oferta original.`,
+    heading: `Busco trabajo en ${countryName}: todas las ofertas de empleo en un solo lugar`,
     introduction: [
       `Si buscas trabajo en ${countryName}, BuscoTrabajo reúne resultados de ${sources}. Presenta información pública de ofertas laborales en un solo dashboard para reducir pestañas repetidas, duplicados y enlaces vencidos.`,
       "El servicio ayuda a descubrir y comparar oportunidades; la postulación siempre se realiza manualmente en el portal que publicó la vacante."
@@ -218,6 +221,34 @@ export function injectPublicContent(indexHtml: string, content: PublicContent): 
   return result.includes('property="og:url"')
     ? result.replace(/<meta[^>]*property=["']og:url["'][^>]*>/, `<meta property="og:url" content="${escapeHtml(canonicalUrl)}" />`)
     : result.replace("</head>", `  <meta property="og:url" content="${escapeHtml(canonicalUrl)}" />\n</head>`);
+}
+
+// Head (+ an H1/intro body when the route has one) for the client-rendered
+// routes in page-meta.ts's ROUTE_META — same injector as the public pages,
+// so they get the same og/twitter/canonical treatment.
+export function injectRouteMeta(
+  indexHtml: string,
+  pathname: string,
+  meta: { title: string; description: string; heading?: string; introduction?: string; noindex?: boolean }
+): string {
+  const content: PublicContent = {
+    pathname,
+    title: meta.title,
+    description: meta.description,
+    heading: meta.heading ?? "",
+    introduction: meta.introduction ? [meta.introduction] : [],
+    sections: []
+  };
+  let html = injectPublicContent(indexHtml, content);
+  if (!meta.heading) {
+    // Utility pages (sign-in, account) render their own state-dependent
+    // heading; leave the mount point empty instead of an empty <h1>.
+    html = html.replace(`<div id="app">${renderContentHtml(content)}</div>`, '<div id="app"></div>');
+  }
+  if (meta.noindex) {
+    html = html.replace("</head>", `  <meta name="robots" content="noindex,follow" />\n</head>`);
+  }
+  return html;
 }
 
 function qualityFor(mediaType: string, accept: string): number {

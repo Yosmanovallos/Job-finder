@@ -10,6 +10,7 @@ import { FilterBar, FilterState, EMPTY_FILTERS } from "../components/FilterBar.j
 import { StatsBar } from "../components/StatsBar.js";
 import { useAuth } from "../auth/auth-provider.js";
 import { usePageMeta } from "../lib/use-page-meta.js";
+import { dashboardDescription } from "../lib/page-meta.js";
 import { jobAnalyticsParams, trackEvent } from "../lib/analytics.js";
 import { getCityOptionsForCountry } from "../lib/job-filters.js";
 import { getCountryConfig } from "../countries/index.js";
@@ -45,7 +46,7 @@ export default function Dashboard() {
 
   usePageMeta({
     title: `Vacantes de Empleo en ${countryConfig.name} | BuscoTrabajo`,
-    description: `Explora vacantes actualizadas de LinkedIn, Computrabajo${country === "CO" ? ", Elempleo" : ""} y más en ${countryConfig.name}, filtradas y sin duplicados. Gratis para vacantes con más de 48h publicadas.`
+    description: dashboardDescription(country, countryConfig.name)
   });
 
   const { tier, isAuthenticated, accessToken, user, refreshTier } = useAuth();

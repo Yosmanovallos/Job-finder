@@ -48,7 +48,7 @@ async function main(): Promise<void> {
     assert.ok(textLength(homeHtml) >= 500);
     assert.equal((homeHtml.match(/<h1\b/g) || []).length, 1);
     assert.match(homeHtml, /<title>Busco trabajo en Colombia \| Vacantes de empleo \| BuscoTrabajo<\/title>/);
-    assert.match(homeHtml, /<h1>Busco trabajo en Colombia: vacantes de empleo en un solo lugar<\/h1>/);
+    assert.match(homeHtml, /<h1>Busco trabajo en Colombia: todas las ofertas de empleo en un solo lugar<\/h1>/);
     assert.match(homeHtml, /"alternateName": \["Busco Trabajo", "BuscoTrabajo\.co"\]/);
     assert.match(homeHtml, /https:\/\/x\.com\/Buscotrabajoco/);
     assert.match(homeHtml, /href="\/docs"/);
@@ -62,7 +62,7 @@ async function main(): Promise<void> {
     const veHomeHtml = await veHome.text();
     assert.equal(veHome.status, 200);
     assert.match(veHomeHtml, /<title>Busco trabajo en Venezuela \| Vacantes de empleo \| BuscoTrabajo<\/title>/);
-    assert.match(veHomeHtml, /<h1>Busco trabajo en Venezuela: vacantes de empleo en un solo lugar<\/h1>/);
+    assert.match(veHomeHtml, /<h1>Busco trabajo en Venezuela: todas las ofertas de empleo en un solo lugar<\/h1>/);
     assert.match(veHomeHtml, /<meta property="og:locale" content="es_VE" \/>/);
 
     const sourcesPage = await fetch(`${base}/fuentes`, { headers: { Accept: "text/html" } });

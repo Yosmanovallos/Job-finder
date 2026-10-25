@@ -618,10 +618,10 @@ async function runHttpTests() {
       );
     }
     check(
-      homeHtml.includes("<title>Busco trabajo en Colombia | Vacantes de empleo | BuscoTrabajo</title>") &&
-        homeHtml.includes("<h1>Busco trabajo en Colombia: vacantes de empleo en un solo lugar</h1>") &&
-        veHtml.includes("<title>Busco trabajo en Venezuela | Vacantes de empleo | BuscoTrabajo</title>") &&
-        veHtml.includes("<h1>Busco trabajo en Venezuela: vacantes de empleo en un solo lugar</h1>") &&
+      homeHtml.includes("<title>Busco trabajo en Colombia: ofertas de empleo | BuscoTrabajo</title>") &&
+        homeHtml.includes("<h1>Busco trabajo en Colombia: todas las ofertas de empleo en un solo lugar</h1>") &&
+        veHtml.includes("<title>Busco trabajo en Venezuela: ofertas de empleo | BuscoTrabajo</title>") &&
+        veHtml.includes("<h1>Busco trabajo en Venezuela: todas las ofertas de empleo en un solo lugar</h1>") &&
         veHtml.includes('"alternateName": ["Busco Trabajo", "BuscoTrabajo.co"]'),
       "/ y /ve orientan title/H1 a la intención exacta 'busco trabajo', conservan el país correcto y declaran el nombre alternativo de marca.",
       "La portada de Colombia o Venezuela no sirve el nuevo title/H1 de intención, o falta alternateName en el HTML crudo."

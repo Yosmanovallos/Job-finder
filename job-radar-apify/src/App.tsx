@@ -8,6 +8,7 @@ import Faq from "./sections/Faq.js";
 import Footer from "./sections/Footer.js";
 import ScrollToTop from "./components/ScrollToTop.js";
 import { usePageMeta, PageMeta } from "./lib/use-page-meta.js";
+import { ROUTE_META } from "./lib/page-meta.js";
 import { getHomeContent } from "./lib/agent-readiness.js";
 import {
   getEffectiveCountry,
@@ -122,9 +123,9 @@ function AppRoutes() {
       <Route path="/empresas/:slug" element={<CompanyLanding />} />
       <Route path="/ve/empresas" element={<CompaniesDirectory />} />
       <Route path="/ve/empresas/:slug" element={<CompanyLanding />} />
-      <Route path="/login" element={<Login />} />
-      <Route path="/reset-password" element={<ResetPassword />} />
-      <Route path="/auth/callback" element={<AuthCallback />} />
+      <Route path="/login" element={<><PageMeta {...ROUTE_META["/login"]!} /><Login /></>} />
+      <Route path="/reset-password" element={<><PageMeta {...ROUTE_META["/reset-password"]!} /><ResetPassword /></>} />
+      <Route path="/auth/callback" element={<><PageMeta {...ROUTE_META["/auth/callback"]!} /><AuthCallback /></>} />
       <Route path="/pricing" element={<Pricing />} />
       <Route path="/legal/terminos" element={<Legal type="terminos" />} />
       <Route path="/legal/privacidad" element={<Legal type="privacidad" />} />
@@ -138,7 +139,10 @@ function AppRoutes() {
         path="/cuenta"
         element={
           <RequireAuth>
-            <Account />
+            <>
+              <PageMeta {...ROUTE_META["/cuenta"]!} />
+              <Account />
+            </>
           </RequireAuth>
         }
       />
@@ -146,10 +150,7 @@ function AppRoutes() {
         path="/como-funciona"
         element={
           <>
-            <PageMeta
-              title="Cómo funciona BuscoTrabajo — Deduplicación y verificación de vacantes"
-              description="BuscoTrabajo escanea varios portales de empleo en paralelo, elimina duplicados y verifica que cada vacante siga vigente antes de mostrarla."
-            />
+            <PageMeta {...ROUTE_META["/como-funciona"]!} />
             <ComparisonAndProcess />
           </>
         }
@@ -167,10 +168,7 @@ function AppRoutes() {
         path="/preguntas"
         element={
           <>
-            <PageMeta
-              title="Preguntas frecuentes — BuscoTrabajo"
-              description="Resolvemos las dudas más comunes sobre fuentes, actualidad de las vacantes, el plan Pro y cómo funciona la deduplicación."
-            />
+            <PageMeta {...ROUTE_META["/preguntas"]!} />
             <Faq />
           </>
         }

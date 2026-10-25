@@ -26,6 +26,7 @@ const suites: Record<string, string[]> = {
     "validate-fetch-context.test.ts",
     "validate-source-contract.test.ts",
     "validate-agent-readiness.test.ts",
+    "validate-page-meta.test.ts",
     "validate-source-closure.test.ts",
     "validate-job-freshness.test.ts",
     "validate-company-identity.test.ts",

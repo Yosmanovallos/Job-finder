@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ROUTE_META } from "../lib/page-meta.js";
 
 // Process steps data — kept deliberately close to what the product actually
 // does today: no "AI" claim for what is really a synonym dictionary
@@ -124,7 +125,7 @@ export default function ComparisonAndProcess() {
             />
           </div>
 
-          <h2
+          <h1
             className="font-semibold mb-10 leading-tight"
             style={{
               fontSize: "clamp(1.5rem, 3vw, 2.25rem)",
@@ -134,8 +135,8 @@ export default function ComparisonAndProcess() {
                 "ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
             }}
           >
-            Cómo funciona
-          </h2>
+            {ROUTE_META["/como-funciona"]!.heading}
+          </h1>
 
           {/* Steps grid with connector line on desktop */}
           <div className="relative">
