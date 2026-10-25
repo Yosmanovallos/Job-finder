@@ -7,6 +7,8 @@ import dotenv from "dotenv";
 import {
   getJobsPage,
   getJobById,
+  getHomeJobCounts,
+  getHomeCompanies,
   getSupersedingTarget,
   isJobExpiredInPlace,
   getActiveCompanyNames,
@@ -32,6 +34,7 @@ import { COMPANY_LOGO_DOMAINS, getCompanyLogoUrl } from "./data/company-logo-dom
 import { getOfficialCareersUrl } from "./data/official-careers-links.js";
 import { getCountryConfig } from "./countries/index.js";
 import { PAYWALL_ENABLED } from "./config.js";
+import { getHomeCities, isHomeCountry, type HomeData } from "./lib/home-stats.js";
 import {
   escapeHtml,
   escapeJsonForScriptTag,
@@ -471,6 +474,76 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
   // 3. GET /api/runs (public-safe) + GET /api/admin/runs[/:id] (operator
   //    token) — persisted run observability, see server/routes/runs.ts (P2).
   if (isRunsRoute(pathname) && (await handleRunsRoute(req, res, { pathname, method, parsedUrl }))) {
+    return;
+  }
+
+  // 3z. GET /api/home-stats?country=CO|VE — every figure the homepage shows,
+  //     in one response (it used to be ~13 /api/jobs + /api/companies/search
+  //     calls per visit). Same payload for every visitor: no session lookup,
+  //     only known countries and the homepage's own city list, so it can't be
+  //     turned into an arbitrary-filter query. A part whose query fails comes
+  //     back null/empty (the page hides it) and the response is then never
+  //     shared by the edge.
+  if (pathname === "/api/home-stats" && method === "GET") {
+    const country = (parsedUrl.searchParams.get("country") || "").toUpperCase();
+    if (!isHomeCountry(country)) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "País no soportado" }));
+      return;
+    }
+    const cities = getHomeCities(country);
+    const [counts, companies] = await Promise.allSettled([
+      getHomeJobCounts(country, cities),
+      getHomeCompanies(country, 12, Object.keys(COMPANY_LOGO_DOMAINS))
+    ]);
+    const jobs = counts.status === "fulfilled" ? counts.value : null;
+    const companyPage = companies.status === "fulfilled" ? companies.value : null;
+    const latest = jobs ? maskLockedFields(jobs.latestJobs, "free") : [];
+    const body: HomeData = {
+      totalJobs: jobs?.totalJobs ?? null,
+      last7Days: jobs?.last7Days ?? null,
+      last24Hours: jobs?.last24Hours ?? null,
+      onSite: jobs?.onSite ?? null,
+      remote: jobs?.remote ?? null,
+      totalCompanies: companyPage?.total ?? null,
+      cityCounts: Object.fromEntries(cities.map((city) => [city, jobs?.cityCounts[city] ?? null])),
+      latestJobs: latest.map((job) => ({
+        jobId: job.jobId,
+        title: job.title,
+        company: job.company,
+        location: job.location,
+        source: job.source,
+        dateText: job.dateText,
+        publishedAt: job.publishedAt
+      })),
+      companies: (companyPage?.companies ?? []).map((item) => ({
+        company: item.company,
+        count: item.count,
+        logoUrl: getCompanyLogoUrl(item.company)
+      }))
+    };
+    if (!jobs || !companyPage) {
+      console.warn(
+        JSON.stringify({
+          ts: new Date().toISOString(),
+          event: "home_stats_partial",
+          country,
+          countsFailed: !jobs,
+          companiesFailed: !companyPage
+        })
+      );
+    }
+    await sendBody(
+      req,
+      res,
+      200,
+      {
+        "Content-Type": "application/json",
+        "Cache-Control":
+          jobs && companyPage ? "public, max-age=60, s-maxage=300, stale-while-revalidate=600" : "private, no-store"
+      },
+      JSON.stringify(body)
+    );
     return;
   }
 

@@ -40,6 +40,7 @@
     "test:extract-technologies": "tsx tests/validate-extract-technologies.ts",
     "test:utils": "tsx tests/validate-utils.ts",
     "test:seo": "tsx scripts/run-isolated-tests.ts seo",
+    "test:home-stats": "tsx scripts/run-isolated-tests.ts home",
     "test:social-publisher": "tsx tests/validate-social-publisher.ts",
     "test:reputation": "tsx tests/validate-reputation-tick.ts",
     "test:companies-search": "tsx scripts/run-isolated-tests.ts companies",

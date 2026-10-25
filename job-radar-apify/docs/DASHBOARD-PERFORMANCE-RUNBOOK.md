@@ -47,6 +47,35 @@ The implementation currently lives in:
 - `src/server.ts`
 - `tests/validate-stale-cache.test.ts`
 
+### Homepage figures stay out of the dashboard cache
+
+Since 2026-10-25 the homepage reads all its figures from one endpoint,
+`GET /api/home-stats?country=CO|VE`, instead of about 13 `/api/jobs` and
+`/api/companies/search` calls per visit. Those calls used to be keys in the
+64-entry job-page LRU above (about 26 for CO and VE), where homepage traffic
+competed with, and could evict, the warmed dashboard pages.
+
+- The endpoint has its own two stale-while-revalidate caches
+  (`getHomeJobCounts` and `getHomeCompanies` in `src/db/job-repository.ts`):
+  8 entries each, the same 5-minute fresh and 6-hour stale policy, with
+  single-flight refresh. They never touch the dashboard LRU or
+  `companySearchCache`.
+- The job figures come from one statement: the dashboard's canonical
+  projection read once, with every count a `COUNT(*) FILTER` built from
+  `buildJobWhere()`, and the latest six jobs as `LATERAL` rows.
+  `tests/validate-home-stats.ts` (`npm run test:home-stats`, also part of
+  `test:integration`) checks that each figure equals the `/api/jobs` or
+  `/api/companies/search` total for the same filter.
+- Only known countries are accepted (400 otherwise), and the city list is
+  fixed (`getHomeCities`), so the endpoint can't run arbitrary filters.
+- A complete response is `public, max-age=60, s-maxage=300,
+  stale-while-revalidate=600`. A partial one (one query failed; its figures
+  are `null` and the page hides them) is `private, no-store`, so the edge
+  never pins a degraded payload.
+- No startup warmup: the startup gate above stays dashboard-only. The first
+  homepage visit after a deploy pays for one cold statement, instead of 13
+  as before.
+
 These files may evolve, but the user-visible latency, bounded memory behavior,
 single-flight refresh, startup safety and cost constraints must be preserved or
 improved with measurements.

@@ -7,6 +7,7 @@ import { jobDateLabel } from "../lib/job-date-label.js";
 import { getSourceColor } from "../lib/source-colors.js";
 import { getSourceLogoUrl } from "../lib/source-logos.js";
 import { formatCount, useHomeData, type HomeCompany, type HomeData } from "../lib/use-home-data.js";
+import { getHomeCities } from "../lib/home-stats.js";
 import { CompanyAvatar } from "../components/CompanyAvatar.js";
 
 // Homepage approved on the design canvas (R3, 2026-10-25): one DOM for both
@@ -497,7 +498,7 @@ function Video() {
 function Explore({ country, data }: { country: string; data: HomeData }) {
   const [tab, setTab] = useState<"ciudad" | "cargo">("ciudad");
   const countryConfig = getCountryConfig(country);
-  const cities = countryConfig.cities.slice(0, 6);
+  const cities = getHomeCities(country);
   const remoteCount = formatCount(data.remote);
   const roles = POPULAR_ROLES;
   const chipTints = ["#e6f4ec", "#fdf1d3", "#e8f1fb"];
@@ -681,8 +682,7 @@ function BottomNav({ country }: { country: string }) {
 }
 
 export default function HomeLanding({ country }: { country: string }) {
-  const cities = getCountryConfig(country).cities.slice(0, 6);
-  const data = useHomeData(country, cities);
+  const data = useHomeData(country);
   return (
     // overflow-x-clip, not -hidden: "hidden" makes this div a scroll
     // container, which steals the sections' scroll-driven reveal timeline
