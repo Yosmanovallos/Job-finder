@@ -3,6 +3,7 @@ import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase-client.js";
 import { isSupabaseConfigError } from "../lib/auth-error-messages.js";
 import { trackEvent } from "../lib/analytics.js";
+import { trackAuthCallback, trackConfirmedAuth } from "../lib/auth-analytics.js";
 
 export interface UserProfile {
   id: string;
@@ -102,15 +103,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const { data: listener } = supabase.auth.onAuthStateChange((event, newSession) => {
       if (event === "PASSWORD_RECOVERY") setPasswordRecovery(true);
-      if (event === "SIGNED_IN" && newSession?.user.app_metadata?.provider === "google") {
-        const createdAt = Date.parse(newSession.user.created_at);
-        const lastSignInAt = Date.parse(newSession.user.last_sign_in_at || "");
-        const isNewUser =
-          Number.isFinite(createdAt) &&
-          Number.isFinite(lastSignInAt) &&
-          Math.abs(lastSignInAt - createdAt) <= 5 * 60 * 1000;
-        trackEvent(isNewUser ? "sign_up" : "login", { method: "google" });
-      }
+      trackAuthCallback(event, newSession?.user, window.location.pathname);
       setSession(newSession);
       // "INITIAL_SESSION" fires immediately on subscribe, duplicating the
       // getSession().then() call above (2x /api/me on every page load,
@@ -170,7 +163,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // user wanted after they click the confirmation link in their email.
     const callbackUrl = new URL("/auth/callback", window.location.origin);
     if (returnTo) callbackUrl.searchParams.set("return_to", returnTo);
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: { emailRedirectTo: callbackUrl.toString() }
@@ -179,7 +172,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setConfigError(true);
       console.error("[Auth] Supabase rechazó la API key configurada (signup).", error.message);
     }
-    if (!error) trackEvent("sign_up", { method: "email" });
+    // Without a session the confirmation link, not this request, completes signup.
+    if (!error && data.session) trackConfirmedAuth(data.session.user);
     return { error: error?.message };
   };
 
