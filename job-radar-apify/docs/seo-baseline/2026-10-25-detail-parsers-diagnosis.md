@@ -88,3 +88,17 @@ Busca en el log del scrape la línea de enriquecimiento de detalle. Para
 Computrabajo-CO se espera `FetchBlockedError×1` y el circuito abierto, en vez
 de `NO_DETAIL`. No se espera un aumento de descripciones completas ni del
 sitemap por este cambio: es telemetría y cumplimiento, no recuperación.
+
+## Verificación con el primer tick (run 2026-10-25 15:09 UTC, código del PR #23)
+
+- **Computrabajo:** los fallos de detalle son `FetchRateLimitedError` (HTTP 429)
+  por la ruta del proxy, no 403. La hipótesis "rechazo oculto como NO_DETAIL"
+  se confirma; la hipótesis "403 por la mudanza de dominio" queda **refutada**
+  como causa directa: es límite de peticiones. 8 reclamadas → 1 completa y 7
+  en reintento con clase de fallo.
+- **LinkedIn:** 8 reclamadas → 3 completas, 5 en reintento (NO_DETAIL a la
+  primera respuesta vacía, sin rechazo HTTP).
+- **Elempleo y Magneto:** 8/8 completas cada una. En este tick el drenaje
+  llegó hasta ellas, y confirma que el detalle de Magneto funciona (llevaba
+  0 intentos en 48 h). El PR #24 les da un paso propio para que no dependan
+  del tiempo sobrante.
