@@ -24,8 +24,9 @@ Base: origin/main `516c8b8`; branch `codex/signup-analytics` in isolated worktre
 
 ## Publication and acceptance
 
-The user authorized implementation. Push/merge/deploy is a separate pending
-step under the production roadmap; this change is not deployed or archived.
+The user authorized implementation and subsequently authorized push, merge
+and deployment with post-deploy production checks and rollback on regression.
+Publication is in progress; this change is not yet deployed or archived.
 After authorized deployment verify the auth bundle, monitor normal organic
 usage over complete days, compare event count with event users and reconcile
 real verified account counts excluding tests using an authorized aggregate
