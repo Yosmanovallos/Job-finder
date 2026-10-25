@@ -181,3 +181,41 @@ Base capturada; **fase abierta**.
 - Fase 5: `confidential` y portales como empleador.
 - Fase 7/GEO: si el canal chatgpt.com se confirma, medirlo por separado.
 - Medición: definir tráfico interno en GA4 y regla de cuentas de prueba.
+
+## Anexo — Fase 2 (muestra de indexación) y diagnóstico de fase 5, 24–25 oct
+
+Inspección de URL en GSC (datos almacenados, sin "Solicitar indexación"):
+
+| URL | Fuente | Estado GSC | robots / sitemap |
+|---|---|---|---|
+| /empleos/caracas, /santa-marta, /neiva, /valledupar, /armenia | ciudad | Indexada; ruta de exploración válida | index / sí |
+| /ve/empleos/caracas | ciudad (alias) | Desconocida para Google | canonical → /empleos/caracas |
+| /empleos/d5d2c19f…, /6c19fbb1… | Computrabajo | Desconocida | noindex / no |
+| /empleos/e46bf483…, /1bc0aa3b… | LinkedIn | Desconocida | noindex / no |
+| /empleos/5354ee04… | Magneto | (no inspeccionada) | noindex / no |
+| /empleos/b3b22219… | Glassdoor | (no inspeccionada) | noindex / no |
+| /empleos/91b74eb5… | Elempleo | Soft 404, rastreo 21 oct (antes de PR #15) | index / sí |
+| /empleos/426e7100… | Portal oficial | Desconocida | index / sí |
+| /empleos/aafabedd… (control retirado) | LinkedIn | 404, rastreo 16 oct | 410 hoy |
+
+Lectura: las vacantes sin descripción de la fuente se sirven `noindex,follow`
+y quedan fuera del sitemap por contrato (JOBPOSTING-GOOGLE-CONTRACT §1); su
+página dice "La fuente original no publicó una descripción". Las aptas sí
+están en el sitemap (leído por Google el 23 oct, 7.843 descubiertas), pero
+Google aún no las conoce: ≈520 solicitudes de rastreo/día, 18 % a 404.
+El Soft 404 de Elempleo es anterior a PR #15; revisar tras el recrawl.
+
+**Cuello de botella de descripciones** (logs de 12 ticks CO de GitHub
+Actions, 23–25 oct; 8 reclamadas por fuente y tick):
+
+| Fuente | Reclamadas | Completas | Reintento | Sin detalle |
+|---|---:|---:|---:|---:|
+| LinkedIn | 96 | 17 (18 %) | 58 | 20 |
+| Computrabajo | 96 | 22 (23 %) | 58 | 10 |
+| Elempleo | 80 | 63 (79 %) | 2 | 0 |
+| Magneto | 64 | 55 (86 %) | 0 | 0 |
+
+La causa de los reintentos no aparece en los logs (no se imprime el código
+de fallo). Diagnóstico pendiente: requiere canario en vivo autorizado
+(`--allow-live-sources`) o lectura de `detail_last_error` agregada en BD.
+No se cambió el tope ni la política de fuentes.
