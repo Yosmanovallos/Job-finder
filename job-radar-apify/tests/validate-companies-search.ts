@@ -42,7 +42,14 @@ const MERGE_COUNTRY = "ZzMerge Holdings Colombia";
 const DUP_COMPANY_A = "ZzDup Corp";
 const DUP_COMPANY_B = "ZzDup Corp S.A.S.";
 const COUNTRY_COMPANY = "ZzCountry Corp";
-const PLACEHOLDER_VARIANTS = ["Empresa Confidencial", "CONFIDENCIAL", "-Confidencial-", "Confidencial USQ"];
+const PLACEHOLDER_VARIANTS = [
+  "Empresa Confidencial",
+  "CONFIDENCIAL",
+  "-Confidencial-",
+  "Confidencial USQ",
+  "Confidential Careers",
+  "Empresa Reservada"
+];
 
 async function cleanupTestJobs(): Promise<void> {
   await pool.query(`DELETE FROM jobs WHERE url LIKE $1`, [`${TEST_URL_PREFIX}%`]);
