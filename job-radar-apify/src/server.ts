@@ -2120,10 +2120,61 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     // is exactly the kind of thing Search Console's sitemap validator
     // rejects as "invalid" — robots.txt is correctly text/plain already.
     ".xml": "application/xml",
-    ".txt": "text/plain"
+    ".txt": "text/plain",
+    // Homepage media (static/home/). Without these they fell through to
+    // text/plain, which browsers may refuse to render as an image/video.
+    ".webp": "image/webp",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".ico": "image/x-icon",
+    ".woff2": "font/woff2",
+    ".mp4": "video/mp4"
   };
 
   const contentType = mimeTypes[ext] || "text/plain";
+
+  // Video is streamed from disk with byte-range support instead of the
+  // in-memory static cache: iOS Safari will not play a <video> whose
+  // server can't answer Range requests with 206, and there's no reason to
+  // hold megabytes of video in this process's memory.
+  if (ext === ".mp4") {
+    try {
+      const { size } = await fs.promises.stat(filePath);
+      const range = /^bytes=(\d*)-(\d*)$/.exec(String(req.headers.range || ""));
+      let start = 0;
+      let end = size - 1;
+      if (range) {
+        if (range[1] === "" && range[2] !== "") {
+          start = Math.max(0, size - Number(range[2]));
+        } else {
+          start = Number(range[1] || 0);
+          if (range[2] !== "") end = Math.min(size - 1, Number(range[2]));
+        }
+        if (start > end || start >= size) {
+          res.writeHead(416, { "Content-Range": `bytes */${size}` });
+          res.end();
+          return;
+        }
+      }
+      const headers: Record<string, string | number> = {
+        "Content-Type": contentType,
+        "Accept-Ranges": "bytes",
+        "Content-Length": end - start + 1,
+        "Cache-Control": "public, max-age=86400"
+      };
+      if (range) headers["Content-Range"] = `bytes ${start}-${end}/${size}`;
+      res.writeHead(range ? 206 : 200, headers);
+      if (method === "HEAD") {
+        res.end();
+        return;
+      }
+      fs.createReadStream(filePath, { start, end }).on("error", () => res.destroy()).pipe(res);
+    } catch {
+      res.writeHead(404, { "Content-Type": "text/html" });
+      res.end("<h1>404 Not Found</h1>");
+    }
+    return;
+  }
 
   try {
     const content = await readStaticFile(filePath);
