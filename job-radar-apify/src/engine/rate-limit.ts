@@ -23,9 +23,11 @@ export class FetchRateLimitedError extends Error {
   constructor(
     readonly label: string,
     readonly statusCode: number,
-    readonly retryAfterMs: number
+    // Undefined when the 429 carried no usable Retry-After: the wrapper then
+    // falls back to its own backoff instead of reading "0" as "retry now".
+    readonly retryAfterMs?: number
   ) {
-    super(`[${label}] Rate limited: HTTP ${statusCode} (espera solicitada: ${retryAfterMs}ms)`);
+    super(`[${label}] Rate limited: HTTP ${statusCode} (espera solicitada: ${retryAfterMs ?? "sin Retry-After"}ms)`);
     this.name = "FetchRateLimitedError";
   }
 }

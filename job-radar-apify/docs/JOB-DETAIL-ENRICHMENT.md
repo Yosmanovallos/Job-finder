@@ -88,6 +88,8 @@ fixed in the server-rendered body and JSON-LD (lists sit inside a neutral "Descr
 | Glassdoor | detail implemented, unwired (403 risk) | — | `unsupported`. Wiring it requires evidence it won't degrade the listing |
 | Indeed | none | — | `unsupported` |
 
+**Update 2026-10-25 (Fase 5):** the LinkedIn/Computrabajo `NO_DETAIL` was not a parser fault: non-2xx answers were returned as `null`. 401/403/999, 429 and a LinkedIn sign-in redirect now raise the existing blocked / rate-limited errors (`src/sources/detail-http.ts`). Computrabajo-CO dropped to ~2 % on 2026-10-07 after its host moved to `co.computrabajo.com` (403 to direct requests); the translate.goog path is an anti-bot bypass and is not extended. LinkedIn's robots.txt disallows `*`. See [seo-baseline/2026-10-25-detail-parsers-diagnosis.md](seo-baseline/2026-10-25-detail-parsers-diagnosis.md).
+
 "received" includes the per-tick cap (`filtered`), so valid/received understates per-request success.
 
 ## 6. Historical backfill (Phase E — design only; do not run without authorization)
