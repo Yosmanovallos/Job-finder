@@ -220,3 +220,13 @@ La causa de los reintentos no aparece en los logs (no se imprime el código
 de fallo). Diagnóstico pendiente: requiere canario en vivo autorizado
 (`--allow-live-sources`) o lectura de `detail_last_error` agregada en BD.
 No se cambió el tope ni la política de fuentes.
+
+**Prueba en vivo (GSC, 24 oct 22:56, solo lectura):** /empleos/91b74eb5…
+(Elempleo), marcada Soft 404 en el rastreo del 21 oct, ahora "La URL está
+disponible para Google", indexable, 1 oferta de trabajo válida (avisos no
+críticos). Segunda fuente donde se confirma PR #15. "Validar corrección"
+del grupo Soft 404 sigue pendiente de aprobación.
+
+**Corrección:** la consulta "trabajos remotos" (16 impresiones, pos. 3,0)
+aterrizó en una vacante individual con UTM de Google Jobs, no en
+/empleos/remoto, y solo a inicios de septiembre.
