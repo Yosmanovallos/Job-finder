@@ -112,7 +112,7 @@ jobs:
             dry-run-one|tick-one)
               [[ "$SEED_SLUG" =~ ^[a-z0-9]+(-[a-z0-9]+)*$ ]] || { echo "seed_slug inválido"; exit 1; }
               if [ "$MODE" = "dry-run-one" ]; then
-                cmd="npx tsx scripts/run-direct-tick.ts --dry-run --employer $SEED_SLUG --allow-live-sources"
+                cmd="npx tsx scripts/run-direct-tick.ts --dry-run --employer $SEED_SLUG --include-disabled --allow-live-sources"
               else
                 cmd="npx tsx scripts/run-direct-tick.ts --employer $SEED_SLUG --force --allow-remote-db --allow-live-sources"
               fi ;;
