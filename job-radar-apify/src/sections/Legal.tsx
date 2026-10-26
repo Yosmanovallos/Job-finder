@@ -41,20 +41,19 @@ const content: Record<LegalPageType, { title: string; updated: string; sections:
   },
   privacidad: {
     title: "Política de privacidad",
-    updated: "julio de 2026",
+    updated: "octubre de 2026",
     sections: [
       {
         title: "Qué datos recolectamos",
         paragraphs: [
           "Tu correo electrónico y credenciales de sesión, gestionadas por Supabase Auth (incluye inicio de sesión con Google o con correo/contraseña).",
-          "El estado de tu suscripción (free/pro) y el historial de transacciones de pago, gestionado junto con Wompi.",
           "Vacantes que marques como guardadas o aplicadas — se guardan asociadas a tu sesión, no se comparten con nadie.",
         ],
       },
       {
         title: "Qué NO recolectamos",
         paragraphs: [
-          "No almacenamos datos de tarjetas de crédito ni información financiera directamente — eso lo procesa Wompi bajo sus propios estándares de seguridad.",
+          "Hoy no procesamos pagos: no recibimos ni almacenamos datos de tarjetas de crédito ni otra información financiera.",
           "No vendemos ni compartimos tu información con terceros con fines publicitarios.",
         ],
       },
