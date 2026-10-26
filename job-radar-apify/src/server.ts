@@ -925,6 +925,15 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
   // 6. POST /api/checkout/start (requiere sesión autenticada) — inicia un
   //    Wompi Web Checkout real (sandbox) para el plan Pro o Pro Max mensual.
   if (pathname === "/api/checkout/start" && method === "POST") {
+    // The service is free while the paywall is off (config.ts), so no
+    // payment can start; the same flag brings checkout back with the paid
+    // plans. The Wompi webhook below stays live on purpose: it only ever
+    // confirms a payment that some earlier checkout started.
+    if (!PAYWALL_ENABLED) {
+      res.writeHead(404, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Los pagos no están disponibles por ahora." }));
+      return;
+    }
     const session = await verifySession(req);
     if (!session) {
       res.writeHead(401, { "Content-Type": "application/json" });

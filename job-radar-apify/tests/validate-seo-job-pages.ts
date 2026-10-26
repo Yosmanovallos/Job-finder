@@ -954,6 +954,12 @@ async function runHttpTests() {
       "/sitemap-pages.xml ya no lista /pricing.",
       "/sitemap-pages.xml todavía lista /pricing."
     );
+    const checkoutRes = await fetch(`${BASE_URL}/api/checkout/start`, { method: "POST" });
+    check(
+      checkoutRes.status === 404,
+      "POST /api/checkout/start responde 404 con el paywall apagado (no se puede iniciar un pago).",
+      `POST /api/checkout/start respondió ${checkoutRes.status} con el paywall apagado.`
+    );
     const pricingRes = await fetch(`${BASE_URL}/pricing`, { redirect: "manual" });
     check(
       pricingRes.status === 301 && pricingRes.headers.get("location") === "/",
