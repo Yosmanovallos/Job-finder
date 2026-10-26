@@ -7,6 +7,7 @@ import dotenv from "dotenv";
 import { readFile } from "node:fs/promises";
 import { assertDirectDatabaseAllowed } from "../src/direct/db-guard.js";
 import { parseAgencyKeys } from "../src/direct/discovery/candidates.js";
+import { buildComputrabajoBacklog, parseOfficialReviews } from "../src/direct/discovery/computrabajo-backlog.js";
 
 dotenv.config();
 
@@ -16,7 +17,14 @@ async function main(): Promise<void> {
   const { loadComputrabajoCoverage } = await import("../src/db/direct-discovery-repository.js");
   try {
     const agencies = parseAgencyKeys(JSON.parse(await readFile(new URL("../data/direct-discovery-agencies.json", import.meta.url), "utf8")));
+    const reviews = parseOfficialReviews(JSON.parse(await readFile(new URL("../data/computrabajo-official-reviews.json", import.meta.url), "utf8")));
     const rows = await loadComputrabajoCoverage();
+    const backlog = buildComputrabajoBacklog(rows, agencies, reviews);
+    if (process.argv.includes("--all")) {
+      for (const row of backlog) console.log(JSON.stringify(row));
+      console.log(JSON.stringify({ kind: "summary", total: backlog.length, target: backlog.filter((row) => !row.isAgency).length, pending: backlog.filter((row) => !row.isAgency && row.status === "pending_review").length }));
+      return;
+    }
     const employers = rows.filter((row) => !agencies.has(row.companyKey));
     const sum = (selected: typeof rows) => selected.reduce((total, row) => total + row.directoryCount, 0);
     const covered = employers.filter((row) => row.enabledBoards > 0);
@@ -32,6 +40,7 @@ async function main(): Promise<void> {
     console.log(`  Con tablero oficial habilitado: ${covered.length}/${employers.length} (${pct(covered.length, employers.length)}) · ${sum(covered)} vacantes de Computrabajo.`);
     console.log(`  Con al menos una vacante oficial vigente: ${withJobs.length} empresas.`);
     console.log(`  Sin tablero oficial: ${uncovered.length} empresas · ${sum(uncovered)} vacantes de Computrabajo.`);
+    console.log(`    Revisión manual documentada: ${backlog.filter((row) => !row.isAgency && row.enabledBoards === 0 && row.status !== "pending_review").length} empresas; pendientes de revisión manual: ${backlog.filter((row) => !row.isAgency && row.enabledBoards === 0 && row.status === "pending_review").length}.`);
     console.log(`    De ellas, con dominio ya verificado: ${withDomain.length} empresas · ${sum(withDomain)} vacantes.`);
     console.log(`    Con posible tablero para revisión: ${review.length} empresas · ${sum(review)} vacantes.`);
     console.log("\nPrimeras 30 empresas sin tablero, por vacantes de Computrabajo:");

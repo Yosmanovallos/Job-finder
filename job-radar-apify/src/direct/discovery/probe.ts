@@ -119,7 +119,9 @@ async function checkBoard(atsType: DirectAtsType, atsRef: string, http: HttpGet,
   };
 }
 
-function isSupported(atsType: DetectableAtsType): atsType is DirectAtsType {
+type DiscoverableAtsType = Extract<DetectableAtsType, DirectAtsType>;
+
+function isSupported(atsType: DetectableAtsType): atsType is DiscoverableAtsType {
   return (DIRECT_ATS_TYPES as readonly string[]).includes(atsType);
 }
 
@@ -160,7 +162,7 @@ export async function probeByName(candidate: DiscoveryCandidate, http: HttpGet, 
   return evidence;
 }
 
-function nameEvidence(atsType: DirectAtsType, atsRef: string, check: BoardCheck, weakKey: boolean, nameDeclared: boolean): BoardEvidence {
+function nameEvidence(atsType: DiscoverableAtsType, atsRef: string, check: BoardCheck, weakKey: boolean, nameDeclared: boolean): BoardEvidence {
   const base = { method: "name" as const, atsType, atsRef, declaredName: check.declaredName ?? null, boardTotal: check.boardTotal, colombiaLive: check.colombiaLive, sampleIds: check.sampleIds };
   if (check.listing === "not_found") return { ...base, outcome: "not_found", reason: "tablero inexistente" };
   if (check.listing === "error") return { ...base, outcome: "error", reason: check.detail ?? "error" };

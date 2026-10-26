@@ -1,0 +1,34 @@
+{
+  "reviews": [
+    {
+      "company": "Smurfit Westrock",
+      "status": "official_incomplete",
+      "evidenceUrl": "https://www.smurfitkappa.com/co/people/careers",
+      "reviewedAt": "2026-10-25"
+    },
+    {
+      "company": "Grupo Éxito",
+      "status": "official_incomplete",
+      "evidenceUrl": "https://www.grupoexito.com.co/es/colaboradores/juntos-lo-logramos",
+      "reviewedAt": "2026-10-25"
+    },
+    {
+      "company": "Salesland Colombia",
+      "status": "official_no_colombia",
+      "evidenceUrl": "https://trabajo.salesland.net/jobs",
+      "reviewedAt": "2026-10-25"
+    },
+    {
+      "company": "D1 S A S",
+      "status": "form_only",
+      "evidenceUrl": "https://reclutamiento.d1.com.co/",
+      "reviewedAt": "2026-10-25"
+    },
+    {
+      "company": "Bancamia S.A.",
+      "status": "blocked",
+      "evidenceUrl": "https://www.bancamia.com.co/somos_bancamia-nosotros/",
+      "reviewedAt": "2026-10-25"
+    }
+  ]
+}

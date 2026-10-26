@@ -5,6 +5,8 @@ import { listMagneto, MAGNETO_REF } from "./ats/magneto.js";
 import { listPhenom, PHENOM_REF } from "./ats/phenom.js";
 import { listSuccessFactors } from "./ats/successfactors.js";
 import { listTeamtailor } from "./ats/teamtailor.js";
+import { listTp } from "./ats/tp.js";
+import { listWorkeando } from "./ats/workeando.js";
 import { listWorkday, WORKDAY_REF } from "./ats/workday.js";
 import { SITE_REF } from "./ats/site.js";
 import { htmlToText, isoDate, safeJson, text } from "./text.js";
@@ -372,6 +374,19 @@ const CONNECTORS: Record<DirectAtsType, Connector> = {
     refPattern: /^google$/,
     portalUrl: () => "https://www.google.com/about/careers/applications/jobs/results?location=Colombia",
     list: listGoogle
+  },
+  // TP's own Colombia career search has a bounded JSON listing with dates.
+  tp: {
+    refPattern: /^colombia$/,
+    portalUrl: () => "https://www.tp.com/es-co/ubicaciones/colombia/carreras/",
+    list: listTp
+  },
+  // NEXA links to Workeando from its corporate site; only its public WP
+  // collection is read. A detail-page 200 is not proof a posting is open.
+  workeando: {
+    refPattern: /^nexa-bpo$/,
+    portalUrl: () => "https://workeando.com/ofertas/",
+    list: listWorkeando
   }
 };
 
