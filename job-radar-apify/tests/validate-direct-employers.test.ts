@@ -342,7 +342,7 @@ test("seed: references only, unique boards, https portals", () => {
   assert.deepEqual(cemex?.sources.map((source) => `${source.atsType}:${source.atsRef}`), ["successfactors:jobs.cemex.com"]);
   const holcimAbs = seeds.find((seed) => seed.slug === "holcim-abs");
   assert.deepEqual(holcimAbs?.aliases, ["Holcim ABS"]);
-  assert.deepEqual(holcimAbs?.sources.map((source) => `${source.atsType}:${source.atsRef}:${source.enabled}`), ["successfactors:careers.holcimgroup.com/Holcim_abs:false"]);
+  assert.deepEqual(holcimAbs?.sources.map((source) => `${source.atsType}:${source.atsRef}:${source.enabled}`), ["successfactors:careers.holcimgroup.com/Holcim_abs:true"]);
   assert.throws(() => parseEmployerSeed({ employers: [{ slug: "a", displayName: "A", websiteDomain: null, aliases: [], sources: [], directJobs: [] }] }));
 });
 
