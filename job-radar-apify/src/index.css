@@ -38,9 +38,33 @@
     --green-deep: 163 82% 16%;
     --green-soft: 152 45% 92%;
 
-    --font-heading: 'Space Grotesk', sans-serif;
-    --font-body: 'Inter', system-ui, sans-serif;
+    --font-heading: 'Space Grotesk', 'Space Grotesk Fallback', sans-serif;
+    --font-body: 'Inter', 'Inter Fallback', system-ui, sans-serif;
   }
+}
+
+/* Metric-matched fallbacks. Google Fonts loads with display=swap, so text
+   first paints in a fallback and reflows when the web font arrives. The
+   server-rendered /dashboard body (H1 + job list, before React mounts)
+   moved 24px on that swap: CLS 0.42 on a throttled phone in production
+   (2026-10-25). Arial scaled to the web fonts' metrics keeps line boxes
+   the same size, so the swap no longer moves anything (CLS 0.000 measured
+   with the same throttling). */
+@font-face {
+  font-family: "Space Grotesk Fallback";
+  src: local("Arial");
+  size-adjust: 100.6%;
+  ascent-override: 90%;
+  descent-override: 26.7%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: "Inter Fallback";
+  src: local("Arial");
+  size-adjust: 107.1%;
+  ascent-override: 90.4%;
+  descent-override: 22.5%;
+  line-gap-override: 0%;
 }
 
 @layer base {
