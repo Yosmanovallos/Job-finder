@@ -2,6 +2,8 @@ import { Link } from "react-router-dom";
 import { PRO_MONTHLY_PRICE_COP, formatCOP } from "../config.js";
 import { usePageMeta } from "../lib/use-page-meta.js";
 import { ROUTE_META } from "../lib/page-meta.js";
+import { TINTS } from "../lib/brand-tints.js";
+import { ContentSection, InkPanel, PageHero } from "../components/ContentPage.js";
 
 export type LegalPageType = "terminos" | "privacidad" | "uso-aceptable" | "cookies";
 
@@ -108,46 +110,67 @@ const content: Record<LegalPageType, { title: string; sections: LegalSection[] }
   },
 };
 
+const LEGAL_LINKS: Array<{ type: LegalPageType; label: string }> = [
+  { type: "terminos", label: "Términos de uso" },
+  { type: "privacidad", label: "Privacidad" },
+  { type: "uso-aceptable", label: "Uso aceptable" },
+  { type: "cookies", label: "Cookies" }
+];
+
+// Presentation only: the legal text above is the user's to change.
 export default function Legal({ type }: { type: LegalPageType }) {
   const page = content[type];
 
   usePageMeta(ROUTE_META[`/legal/${type}`]!);
 
   return (
-    <section className="min-h-screen px-4 py-16" style={{ backgroundColor: "#fafafa" }}>
-      <div className="max-w-2xl mx-auto">
-        <Link
-          to="/"
-          className="inline-block mb-6 text-sm font-mono text-primary hover:text-primary"
-        >
-          ← Volver al inicio
-        </Link>
-
-        <h1 className="text-3xl font-bold mb-8 font-heading" style={{ color: "#0e0f10" }}>
-          {page.title}
-        </h1>
-
-        <div className="space-y-8">
-          {page.sections.map((section) => (
-            <div key={section.title}>
-              <h2 className="text-lg font-semibold mb-2" style={{ color: "#0e0f10" }}>
-                {section.title}
-              </h2>
-              <div className="space-y-3">
-                {section.paragraphs.map((p, i) => (
-                  <p key={i} className="text-sm leading-relaxed" style={{ color: "#5b5f5c" }}>
-                    {p}
+    <div className="bg-white">
+      <PageHero eyebrow="Legal" heading={page.title}>
+        <p>Última actualización: julio de 2026. Preguntas: buscotrabajocolombia123@gmail.com</p>
+      </PageHero>
+      <ContentSection>
+        <div className="flex flex-col md:flex-row gap-6 md:gap-10 items-start">
+          <nav aria-label="Documentos legales" className="md:sticky md:top-24 w-full md:w-[240px] shrink-0">
+            <ul className="flex md:flex-col flex-wrap gap-2">
+              {LEGAL_LINKS.map((link) => (
+                <li key={link.type}>
+                  <Link
+                    to={`/legal/${link.type}`}
+                    aria-current={link.type === type ? "page" : undefined}
+                    className={`ink-card-sm inline-flex md:flex w-full rounded-xl px-4 py-2.5 text-sm font-semibold no-underline ${
+                      link.type === type ? "bg-primary text-white" : "bg-white text-foreground ink-lift"
+                    }`}
+                  >
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
+          <div className="sr-stagger flex-1 min-w-0 flex flex-col gap-4 md:gap-6">
+            {page.sections.map((section, index) => {
+              const tint = TINTS[index % TINTS.length]!;
+              return (
+                <InkPanel key={section.title} tint={tint.bg}>
+                  <p className="font-mono text-xs font-bold" style={{ color: tint.sub }}>
+                    {String(index + 1).padStart(2, "0")}
                   </p>
-                ))}
-              </div>
-            </div>
-          ))}
+                  <h2 className="mt-1 font-heading font-bold text-xl md:text-[26px] leading-tight tracking-[-0.02em]" style={{ color: tint.fg }}>
+                    {section.title}
+                  </h2>
+                  <div className="mt-3 space-y-3">
+                    {section.paragraphs.map((p, i) => (
+                      <p key={i} className="text-[15px] md:text-base leading-relaxed text-[#3d413e]">
+                        {p}
+                      </p>
+                    ))}
+                  </div>
+                </InkPanel>
+              );
+            })}
+          </div>
         </div>
-
-        <p className="mt-10 text-xs font-mono" style={{ color: "#9a9d98" }}>
-          Última actualización: julio de 2026. Preguntas: buscotrabajocolombia123@gmail.com
-        </p>
-      </div>
-    </section>
+      </ContentSection>
+    </div>
   );
 }

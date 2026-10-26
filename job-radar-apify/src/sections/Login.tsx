@@ -110,21 +110,19 @@ export default function Login() {
     mode === "forgot" ? "Te enviamos un enlace para elegir una nueva contraseña." : null;
 
   return (
-    <section className="min-h-screen flex items-center justify-center px-4 bg-background">
-      <div className="hud-corners w-full max-w-sm rounded-2xl border border-border bg-card overflow-hidden">
-        {/* Same top rail treatment as JobCard/PaywallCard, adapted to a
-            horizontal strip — the auth screen is most people's first
-            interaction with the product, so it should carry the same
-            identity as the rest of the app, not fall back to a bare form. */}
-        <div className="h-1.5 bg-gradient-to-r from-green-soft via-primary to-gold-2" />
-        <div className="p-6">
-          <img src="/BT.png" alt="BuscoTrabajo.co" className="h-6 w-auto mb-4" />
+    <section className="min-h-screen flex items-center justify-center px-4 py-10 bg-gradient-to-b from-green-soft to-white">
+      {/* Homepage card style (ink outline + offset shadow) — the auth screen
+          is many people's first interaction with the product. */}
+      <div className="ink-card md:shadow-[8px_8px_0_hsl(var(--foreground))] w-full max-w-md rounded-3xl bg-white overflow-hidden">
+        <div className="h-2 bg-gradient-to-r from-green-soft via-primary to-gold-2 border-b-2 border-foreground" />
+        <div className="p-6 md:p-8">
+          <img src="/BT.png" alt="BuscoTrabajo.co" className="h-7 w-auto mb-5" />
           <h1
-            className={`text-xl font-bold text-foreground font-heading ${subtitle ? "mb-1" : "mb-6"}`}
+            className={`font-heading font-bold text-[26px] md:text-[30px] leading-tight tracking-[-0.03em] text-foreground ${subtitle ? "mb-1" : "mb-6"}`}
           >
             {title}
           </h1>
-          {subtitle && <p className="text-xs text-muted-foreground mb-6 font-mono">{subtitle}</p>}
+          {subtitle && <p className="text-sm text-[#3d413e] mb-6">{subtitle}</p>}
 
           {configError && (
             <div className="mb-4 px-3 py-2.5 rounded-lg border border-destructive/30 bg-destructive/10">

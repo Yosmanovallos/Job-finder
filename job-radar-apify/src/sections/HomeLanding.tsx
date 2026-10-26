@@ -4,11 +4,13 @@ import { getCountryConfig, SOURCES_BY_COUNTRY } from "../countries/index.js";
 import { getHomeContent } from "../lib/agent-readiness.js";
 import { buildCategoryPath, buildCompanyPath, buildJobPath } from "../lib/job-seo.js";
 import { jobDateLabel } from "../lib/job-date-label.js";
-import { getSourceColor } from "../lib/source-colors.js";
-import { getSourceLogoUrl } from "../lib/source-logos.js";
 import { formatCount, useHomeData, type HomeCompany, type HomeData } from "../lib/use-home-data.js";
 import { getHomeCities } from "../lib/home-stats.js";
 import { CompanyAvatar } from "../components/CompanyAvatar.js";
+import { getSourceColor } from "../lib/source-colors.js";
+import { SourceLogo } from "../components/SourceLogo.js";
+import { YouTubeLite } from "../components/YouTubeLite.js";
+import { TINTS } from "../lib/brand-tints.js";
 
 // Homepage approved on the design canvas (R3, 2026-10-25): one DOM for both
 // layouts — sections only change arrangement at `md`, and the phone order
@@ -16,16 +18,6 @@ import { CompanyAvatar } from "../components/CompanyAvatar.js";
 // right after the portals; desktop has no "lo más nuevo" strip). The <h1>
 // is getHomeContent().heading verbatim because server.ts injects that same
 // string into the raw HTML before hydration.
-
-// Light tints cycled across city cards / steps — same family as the
-// source-badge colors so the page gets color without new brand hues.
-const TINTS = [
-  { bg: "#fdf1d3", fg: "#2a1d06", sub: "#7a5a0f" },
-  { bg: "#e8f1fb", fg: "#082f5c", sub: "#0a4f96" },
-  { bg: "#fde8dc", fg: "#4a1c05", sub: "#9a3d0c" },
-  { bg: "#e4f6f5", fg: "#063d3b", sub: "#0b6f6b" },
-  { bg: "#efe9fd", fg: "#2e1065", sub: "#6d28d9" }
-];
 
 // Role pages that exist in sitemap-categories.xml (DEFAULT_ROLES_200) —
 // labels slugify to exactly those URLs through buildCategoryPath.
@@ -87,30 +79,6 @@ function SearchIcon({ className = "w-5 h-5" }: { className?: string }) {
       <circle cx="11" cy="11" r="7" />
       <path d="M20 20l-3.5-3.5" />
     </svg>
-  );
-}
-
-function SourceLogo({ source }: { source: string }) {
-  const [failed, setFailed] = useState(false);
-  const url = getSourceLogoUrl(source);
-  const color = getSourceColor(source.replace(/ Jobs$/, ""));
-  if (url && !failed) {
-    return (
-      <img
-        src={url}
-        alt=""
-        width={28}
-        height={28}
-        decoding="async"
-        onError={() => setFailed(true)}
-        className="w-6 h-6 md:w-7 md:h-7 rounded-md object-contain bg-white"
-      />
-    );
-  }
-  return (
-    <span aria-hidden="true" className="w-6 h-6 md:w-7 md:h-7 rounded-md grid place-items-center text-xs font-bold text-white" style={{ backgroundColor: color.text }}>
-      {source.charAt(0)}
-    </span>
   );
 }
 
@@ -403,60 +371,6 @@ const STEPS = [
   { n: "03", text: "Quitamos repetidas y vencidas", bg: "bg-[#e8f1fb]", fg: "text-[#0a4f96]" },
   { n: "04", text: "Te postulas en la fuente original", bg: "bg-[#fde8dc]", fg: "text-[#9a3d0c]" }
 ];
-
-// "Lite embed": until the visitor clicks, this is a self-hosted thumbnail
-// (YouTube's own maxresdefault, so it matches what plays) inside a plain
-// link to the video — no YouTube script, cookie or connection on page load.
-// The click swaps in the youtube-nocookie iframe with autoplay. Without JS
-// the link still opens the video on YouTube.
-const YOUTUBE_ID = "R0qO40Sbtw0";
-const YOUTUBE_TITLE = "Busca empleo sin abrir diez portales | buscotrabajo.co";
-
-function YouTubeLite() {
-  const [playing, setPlaying] = useState(false);
-  return (
-    <div className="relative aspect-video bg-white">
-      {playing ? (
-        <iframe
-          src={`https://www.youtube-nocookie.com/embed/${YOUTUBE_ID}?autoplay=1&rel=0&playsinline=1`}
-          title={YOUTUBE_TITLE}
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-          referrerPolicy="strict-origin-when-cross-origin"
-          allowFullScreen
-          className="absolute inset-0 w-full h-full border-0"
-        />
-      ) : (
-        <a
-          href={`https://www.youtube.com/watch?v=${YOUTUBE_ID}`}
-          onClick={(event) => {
-            event.preventDefault();
-            setPlaying(true);
-          }}
-          aria-label="Reproducir video: cómo funciona BuscoTrabajo"
-          className="group absolute inset-0 block"
-        >
-          <img
-            src="/home/como-funciona-video.webp"
-            alt=""
-            width={1280}
-            height={720}
-            loading="lazy"
-            decoding="async"
-            className="block w-full h-full object-cover"
-          />
-          <span
-            aria-hidden="true"
-            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-14 h-14 md:w-20 md:h-20 rounded-full bg-primary border-2 border-white shadow-[3px_3px_0_hsl(var(--foreground))] md:shadow-[5px_5px_0_hsl(var(--foreground))] grid place-items-center transition-transform group-hover:scale-110 group-focus-visible:scale-110"
-          >
-            <svg viewBox="0 0 24 24" className="w-6 h-6 md:w-8 md:h-8 ml-1 fill-white">
-              <path d="M8 5v14l11-7z" />
-            </svg>
-          </span>
-        </a>
-      )}
-    </div>
-  );
-}
 
 function Video() {
   return (
