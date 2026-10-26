@@ -168,9 +168,10 @@ answers `BYPASS`):
   cold, CO again 0.07 s; complete responses carry the public edge
   `Cache-Control`; `country=XX` returns 400. The figures match `/api/jobs`
   (CO 28,535 vs 28,534, read minutes apart from two caches).
-- `dashboard_cache_warmed` in the Render logs: not checked from here (no
-  Render log access in this environment); the owner should confirm it on
-  the deploy's log.
+- Render deploy log (source `9e80c3c`, shared by the owner): startup
+  logged `dashboard_cache_warmed` with `durationMs: 2003` for CO and VE
+  before the port opened (baseline warmup: 10,496 ms), then "Your service
+  is live" with `/api/health` 200.
 
 **CLS found while verifying.** With a throttled phone (4x CPU, slow 4G),
 the server-rendered `/dashboard` body (H1 and job list, before React
