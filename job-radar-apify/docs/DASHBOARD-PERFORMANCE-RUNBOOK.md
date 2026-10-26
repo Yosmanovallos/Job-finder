@@ -76,7 +76,8 @@ offset was its own cold projection.
   share one total and don't repeat jobs.
 - **After deploy:** with unique filters (so every key is cold), request
   offsets 24, 48, 72 and 96. Expect one cold response of about 1.3 s and
-  then cached ones of about 0.25 s.
+  then cached ones of about 0.25 s. Verified 2026-10-25 (see the
+  after-deploy table below).
 
 ### Homepage figures stay out of the dashboard cache
 
@@ -143,9 +144,43 @@ The redesign (phase E) only changes client components: `Dashboard.tsx`
 markup, `JobListItem`, `JobCard`, `FilterBar` and an opt-in `variant="ink"`
 on `JobDetailPanel`. It does not touch `server.ts`, the SSR branch, the
 job-page cache or the startup warmup, so the server-side cold path is
-unchanged by construction. **Still pending, only possible after deploying:**
-repeat these same unique-URL `MISS` checks and Lighthouse runs, check
-`dashboard_cache_warmed` in the Render logs, and record the results here.
+unchanged by construction. (The same release also added the 96-row block
+cache and `/api/home-stats` described above, which do touch the server.)
+
+### 2026-10-25 after deploying PR #40 (`9e80c3c`, live 02:55 UTC)
+
+Same method as the baseline above: unique URLs, all Cloudflare `MISS` (`/`
+answers `BYPASS`):
+
+| Measurement | Before | After |
+| --- | ---: | ---: |
+| `/dashboard` time to first byte | 444, 259, 252 ms | 301, 248, 274 ms |
+| `/ve/dashboard` time to first byte | 303, 268, 248 ms | 293, 266, 239 ms |
+| `/` time to first byte | n/a | 239, 223, 243 ms |
+| Lighthouse `/dashboard` desktop | 94, LCP 1.4-1.5 s | 98, LCP 1.06-1.11 s |
+| Lighthouse `/dashboard` mobile | 70-71, LCP 5.4-5.7 s, CLS 0 | 66-81, LCP 4.5-5.7 s, CLS 0-0.095 |
+| Lighthouse `/` mobile / desktop | n/a | 92-95 / 96-98 |
+
+- Blocks, with a filter no one had requested (cold keys): offset 0
+  1.27 s and offset 24 1.22 s (cold), offsets 48/72/96 0.25-0.26 s (served
+  from the block), offset 120 1.19 s (next block). As designed.
+- `/api/home-stats`: CO 0.23 s (warmed by the deploy check), VE 1.54 s
+  cold, CO again 0.07 s; complete responses carry the public edge
+  `Cache-Control`; `country=XX` returns 400. The figures match `/api/jobs`
+  (CO 28,535 vs 28,534, read minutes apart from two caches).
+- Render deploy log (source `9e80c3c`, shared by the owner): startup
+  logged `dashboard_cache_warmed` with `durationMs: 2003` for CO and VE
+  before the port opened (baseline warmup: 10,496 ms), then "Your service
+  is live" with `/api/health` 200.
+
+**CLS found while verifying.** With a throttled phone (4x CPU, slow 4G),
+the server-rendered `/dashboard` body (H1 and job list, before React
+mounts) shifted 24 px when the Google web fonts swapped in: CLS 0.416 on
+every run. Serving the pre-redesign render-blocking font stylesheet gives
+the same 0.416, so it predates this release; the old Lighthouse baseline
+missed it. `/` and `/empresas` measure 0.000. Fixed by metric-matched
+fallback fonts (`index.css`): the same test with the fixed CSS measures
+0.000, 0.000, 0.001. Re-measure after that change deploys.
 
 ## Required regression check
 
