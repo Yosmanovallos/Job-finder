@@ -974,6 +974,21 @@
       ]
     },
     {
+      "slug": "tp-colombia",
+      "displayName": "TP",
+      "websiteDomain": "tp.com",
+      "aliases": [
+        "Teleperformance Colombia"
+      ],
+      "sources": [
+        {
+          "atsType": "tp",
+          "atsRef": "colombia",
+          "enabled": true
+        }
+      ]
+    },
+    {
       "slug": "cemex",
       "displayName": "Cemex",
       "websiteDomain": "cemex.com",
