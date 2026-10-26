@@ -192,11 +192,18 @@ function Hero({ country, data }: { country: string; data: HomeData }) {
 
 function Portals({ country }: { country: string }) {
   const sources = SOURCES_BY_COUNTRY[country] ?? SOURCES_BY_COUNTRY.CO;
-  const chip = (source: string, hidden: boolean) => (
+  // Each half of the track repeats the list until it is wider than any
+  // screen (one set is ~1,150 px on desktop), so the right edge never runs
+  // empty before the loop restarts. Spacing is a right margin on every chip,
+  // not flex gap, so translateX(-50%) lands exactly on the second half.
+  // Duration scales with the repeats to keep the same speed in px/s.
+  const REPEATS = 3;
+  const half = Array.from({ length: REPEATS }, () => sources).flat();
+  const chip = (source: string, key: string, hidden: boolean) => (
     <span
-      key={`${source}-${hidden ? "b" : "a"}`}
+      key={key}
       aria-hidden={hidden || undefined}
-      className="inline-flex items-center gap-2 rounded-full border-2 border-foreground bg-white py-1 pl-1 pr-3 md:py-1.5 md:pl-1.5 md:pr-4 font-heading font-bold text-[13px] md:text-[15px] whitespace-nowrap"
+      className="mr-2 md:mr-3.5 inline-flex items-center gap-2 rounded-full border-2 border-foreground bg-white py-1 pl-1 pr-3 md:py-1.5 md:pl-1.5 md:pr-4 font-heading font-bold text-[13px] md:text-[15px] whitespace-nowrap"
     >
       <SourceLogo source={source} />
       {source}
@@ -204,9 +211,9 @@ function Portals({ country }: { country: string }) {
   );
   return (
     <section aria-label="Portales que reúne BuscoTrabajo" className="order-2 overflow-hidden border-y-2 border-foreground bg-[#fdf1d3] py-2.5 md:py-[18px]">
-      <div className="marquee-track flex w-max gap-2 md:gap-3.5">
-        {sources.map((s) => chip(s, false))}
-        {sources.map((s) => chip(s, true))}
+      <div className="marquee-track flex w-max" style={{ animationDuration: `${22 * REPEATS}s` }}>
+        {half.map((s, i) => chip(s, `a-${i}`, i >= sources.length))}
+        {half.map((s, i) => chip(s, `b-${i}`, true))}
       </div>
     </section>
   );

@@ -2,7 +2,6 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Search } from "lucide-react";
 import { PageHero, ContentCta } from "../components/ContentPage.js";
-import { TINTS } from "../lib/brand-tints.js";
 import { CompanyAvatar } from "../components/CompanyAvatar.js";
 import { usePageMeta } from "../lib/use-page-meta.js";
 import { companiesDirectoryMeta } from "../lib/page-meta.js";
@@ -227,8 +226,7 @@ export default function CompaniesDirectory() {
           <p className="ink-card-sm rounded-2xl bg-[#fdf1d3] p-5 text-[#3d413e]">Sin empresas que coincidan con tu búsqueda.</p>
         ) : (
           <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
-            {companies.map((c, index) => {
-              const tint = TINTS[index % TINTS.length]!;
+            {companies.map((c) => {
               return (
                 <li key={c.company}>
                   <Link
@@ -238,7 +236,7 @@ export default function CompaniesDirectory() {
                     <CompanyAvatar name={c.company} logoUrl={c.logoUrl} className="w-12 h-12 text-lg" />
                     <span className="min-w-0 flex-1">
                       <strong className="block font-heading font-bold text-[15px] md:text-base truncate">{c.company}</strong>
-                      <span className="mt-1 inline-block rounded-full px-2 py-0.5 font-mono text-[11px] font-semibold" style={{ backgroundColor: tint.bg, color: tint.sub }}>
+                      <span className="mt-1 inline-block rounded-full px-2 py-0.5 font-mono text-[11px] font-semibold bg-green-soft text-primary">
                         {c.count.toLocaleString("es-CO")} vacante{c.count === 1 ? "" : "s"} activa{c.count === 1 ? "" : "s"}
                       </span>
                     </span>
