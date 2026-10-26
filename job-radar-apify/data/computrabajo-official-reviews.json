@@ -29,6 +29,12 @@
       "status": "blocked",
       "evidenceUrl": "https://www.bancamia.com.co/somos_bancamia-nosotros/",
       "reviewedAt": "2026-10-25"
+    },
+    {
+      "company": "NEXA BPO",
+      "status": "blocked",
+      "evidenceUrl": "https://github.com/Yosmanovallos/Job-finder/actions/runs/40260839750",
+      "reviewedAt": "2026-10-25"
     }
   ]
 }

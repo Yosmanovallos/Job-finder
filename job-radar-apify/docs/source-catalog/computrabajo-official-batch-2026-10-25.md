@@ -1,4 +1,4 @@
-# Computrabajo Colombia: primera revisión manual posterior a TP
+# Computrabajo Colombia: revisiones manuales posteriores a TP
 
 Fecha: 2026-10-25 (Colombia). Conjunto: empresas con vacantes vigentes de Computrabajo CO, según el [censo 40257210332](https://github.com/Yosmanovallos/Job-finder/actions/runs/40257210332). Una revisión de portal propio es distinta del sondeo automatizado por nombre de ATS. Los estados son observaciones que se deben volver a comprobar antes de habilitar un tablero.
 
@@ -9,7 +9,8 @@ Fecha: 2026-10-25 (Colombia). Conjunto: empresas con vacantes vigentes de Comput
 | Salesland Colombia | 27 | El [portal de empleos propio](https://trabajo.salesland.net/jobs) ofrece RSS Teamtailor permitido por robots. Se paginaron 100 + 68 entradas; ninguna tenía `tt:country` Colombia/CO. No se debe inferir que sus ofertas de Computrabajo estén en ese feed. | `official_no_colombia` |
 | D1 S A S | 2 | El [sitio de reclutamiento](https://reclutamiento.d1.com.co/) presenta un formulario de hoja de vida, sin listado verificable de vacantes en la página observada. | `form_only` |
 | Bancamia S.A. | 15 | Su [página corporativa](https://www.bancamia.com.co/somos_bancamia-nosotros/) enlaza `bancamia-co.sherlockhr.com` y Pandapé. El primero falló la validación TLS por nombre de certificado con el UA del bot; no se desactiva la verificación TLS. Pandapé pertenece al ecosistema de Computrabajo. | `blocked` |
+| NEXA BPO | 95 | Su [sitio corporativo](https://www.nexabpo.com/) enlaza Workeando. La API devolvió cinco ofertas recientes colombianas atribuibles en un [canario local](workeando-nexa.md), pero el [runner de producción](https://github.com/Yosmanovallos/Job-finder/actions/runs/40260839750) recibió HTTP 403. El tablero se dejó deshabilitado; no se cambió de IP o ruta para evitar el bloqueo. | `blocked` |
 
-`data/computrabajo-official-reviews.json` guarda los estados y enlaces. La revisión no implica que todas las vacantes de Computrabajo tengan una contraparte oficial. Ninguno de estos cinco tableros se habilita en este lote.
+`data/computrabajo-official-reviews.json` guarda los estados y enlaces. La revisión no implica que todas las vacantes de Computrabajo tengan una contraparte oficial. Ninguno de estos seis tableros está habilitado.
 
 El modo manual `computrabajo-backlog` del workflow Direct Employers Tick imprime una línea JSON por empresa con `companyKey`, cantidad de vacantes, tablero habilitado, decisión automática y estado manual. El resumen `computrabajo-coverage` informa cuántas empresas tienen revisión manual documentada y cuántas siguen pendientes. La exportación no lee páginas de Computrabajo ni escribe en la base.
