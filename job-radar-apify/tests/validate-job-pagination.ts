@@ -74,6 +74,51 @@ async function run(): Promise<void> {
     }
   }
 
+  // Pages after the first come from 96-row blocks (getJobsPage): one cold
+  // query must serve pages 2-4, and their rows/order/total must be exactly
+  // what a direct query for the same range returns. A filter no other check
+  // here uses keeps the cache cold for this part.
+  {
+    const filters = { country: "CO", freshness: "7d" };
+    let queries = 0;
+    const originalQuery = pool.query.bind(pool);
+    (pool as unknown as { query: (...args: unknown[]) => unknown }).query = (...args: unknown[]) => {
+      queries++;
+      return (originalQuery as (...a: unknown[]) => unknown)(...args);
+    };
+    let blockPages: Awaited<ReturnType<typeof getJobsPage>>[] = [];
+    try {
+      blockPages = [];
+      for (const offset of [24, 48, 72]) {
+        blockPages.push(await getJobsPage({ filters, limit: 24, offset, includeDetails: true }));
+      }
+    } finally {
+      (pool as unknown as { query: unknown }).query = originalQuery;
+    }
+    check(queries === 1, "Las páginas 2-4 salen de una sola consulta (bloque de 96).", `Las páginas 2-4 hicieron ${queries} consultas.`);
+
+    // limit 100 from offset 24 crosses the block, so it takes the direct path.
+    const direct = await getJobsPage({ filters, limit: 100, offset: 24, includeDetails: true });
+    const blockIds = blockPages.flatMap((page) => page.jobs.map((job) => job.jobId));
+    const directIds = direct.jobs.slice(0, blockIds.length).map((job) => job.jobId);
+    check(
+      blockIds.length > 0 && JSON.stringify(blockIds) === JSON.stringify(directIds),
+      `Las páginas por bloque (${blockIds.length} vacantes) coinciden en contenido y orden con la consulta directa.`,
+      "Las páginas por bloque no coinciden con la consulta directa."
+    );
+    check(
+      blockPages.every((page) => page.total === direct.total) && new Set(blockIds).size === blockIds.length,
+      `Todas las páginas reportan el mismo total (${direct.total}) y no repiten vacantes.`,
+      "Las páginas por bloque reportan totales distintos o repiten vacantes."
+    );
+    const beyond = await getJobsPage({ filters, limit: 24, offset: 24 * 40, includeDetails: true });
+    check(
+      beyond.jobs.length === 0 && beyond.total === direct.total,
+      "Una página más allá del final devuelve 0 vacantes y el total real.",
+      `Página fuera de rango: ${beyond.jobs.length} vacantes, total ${beyond.total}.`
+    );
+  }
+
   const companies = await searchActiveCompanies(
     "",
     "CO",

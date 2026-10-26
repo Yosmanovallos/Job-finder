@@ -768,8 +768,35 @@ function buildJobWhere(filters: JobFilterParams, sql: SqlParts): string[] {
  * the Node heap; detail columns are joined after the bounded page is chosen.
  */
 export async function getJobsPage(options: JobsPageOptions = {}): Promise<JobsPage> {
-  const cacheKey = jobsPageCacheKey(options);
-  return jobsPageCache.get(cacheKey, () => queryJobsPage(options));
+  const limit = Math.min(Math.max(options.limit ?? 24, 1), 100);
+  const offset = Math.max(options.offset ?? 0, 0);
+  const block = jobsBlockFor(offset, limit);
+  if (block === null) {
+    const cacheKey = jobsPageCacheKey(options);
+    return jobsPageCache.get(cacheKey, () => queryJobsPage(options));
+  }
+  const blockOptions = { ...options, limit: JOBS_BLOCK_SIZE, offset: block };
+  const page = await jobsPageCache.get(jobsPageCacheKey(blockOptions), () => queryJobsPage(blockOptions));
+  // `get` already returned a private copy, so slicing it is safe.
+  return { jobs: page.jobs.slice(offset - block, offset - block + limit), total: page.total };
+}
+
+// Infinite scroll asks for 24 jobs at a time, and every new offset used to
+// be its own cold run of the canonical projection (~1 s in production, 6 s
+// under load). Pages after the first now come from blocks of 96 rows that
+// start right after it (24-119, 120-215, ...): one cold query serves the
+// next four pages, and the projection costs the same with LIMIT 96 as with
+// LIMIT 24. The first page (offset 0) keeps its exact query and cache key,
+// so the startup warmup and the SSR/category/company first pages are
+// untouched (docs/DASHBOARD-PERFORMANCE-RUNBOOK.md).
+const JOBS_BLOCK_SIZE = 96;
+const JOBS_BLOCK_START = 24;
+
+function jobsBlockFor(offset: number, limit: number): number | null {
+  if (offset < JOBS_BLOCK_START) return null;
+  const block = JOBS_BLOCK_START + Math.floor((offset - JOBS_BLOCK_START) / JOBS_BLOCK_SIZE) * JOBS_BLOCK_SIZE;
+  // A page that would cross into the next block keeps its own query.
+  return offset - block + limit <= JOBS_BLOCK_SIZE ? block : null;
 }
 
 async function queryJobsPage(options: JobsPageOptions): Promise<JobsPage> {

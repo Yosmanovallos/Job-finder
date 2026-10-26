@@ -47,6 +47,37 @@ The implementation currently lives in:
 - `src/server.ts`
 - `tests/validate-stale-cache.test.ts`
 
+### Pages after the first are served from 96-row blocks
+
+Since 2026-10-25, `getJobsPage()` serves any page at offset 24 or later that
+fits inside a block (24-119, 120-215, ...) by running the canonical query once
+with `LIMIT 96` at the block start and slicing the requested page out of it.
+The block is stored in the same bounded LRU, under the same freshness policy.
+Infinite scroll asks for 24 jobs at a time, and before this change every new
+offset was its own cold projection.
+
+- Offset 0 is unchanged: same query, same cache key. The startup warmup, the
+  `/dashboard` SSR page and the category/company first pages behave exactly
+  as before.
+- A request that would cross a block boundary (for example `limit=100`)
+  keeps its own direct query.
+- Measured on production's public API, cold and with fresh offsets (median
+  of 5): `LIMIT 24` about 1.14 s (one run 6.6 s), `LIMIT 96` about 1.30 s.
+  One block costs about 0.15 s more, once, and replaces three more cold
+  queries (pages 3-5).
+- Memory: a block holds up to 96 jobs with details instead of 24. In the
+  worst case, 64 such entries are a few MB of the 512 MB instance. Database
+  egress per block is up to 4x a single page, but only for visitors who
+  scroll past the first page, and it replaces the per-page queries they
+  would otherwise trigger (see `SEO-IMPROVEMENT-PLAN.md` §1.21 for the
+  egress history).
+- `tests/validate-job-pagination.ts` (part of `test:integration`) checks
+  that pages 2-4 cost one database query, match a direct query row for row,
+  share one total and don't repeat jobs.
+- **After deploy:** with unique filters (so every key is cold), request
+  offsets 24, 48, 72 and 96. Expect one cold response of about 1.3 s and
+  then cached ones of about 0.25 s.
+
 ### Homepage figures stay out of the dashboard cache
 
 Since 2026-10-25 the homepage reads all its figures from one endpoint,
