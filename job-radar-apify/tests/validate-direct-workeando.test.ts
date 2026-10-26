@@ -66,7 +66,6 @@ test("Workeando: unsafe or incomplete source data never authorizes closures", as
     [{ ...offer(1), ciudad: [999] }],
     [offer(1, "2026-02-30T00:00:00")],
     [{ ...offer(1), status: "draft" }],
-    [{ ...offer(1), content: { rendered: "" } }],
     [offer(1), offer(1)]
   ];
   for (const rows of cases) assert.equal((await listBoard(ref, valid(rows))).kind, "error");
@@ -79,10 +78,13 @@ test("Workeando: unsafe or incomplete source data never authorizes closures", as
 });
 
 test("Workeando: an unbranded offer is not attributed to NEXA", async () => {
-  const listing = await listBoard(ref, valid([offer(1), { ...offer(2), content: { rendered: "<p>Otro empleador.</p>" } }]));
+  const unrelated = { ...offer(2), link: `${origin}/ofertas/__trashed/`, content: { rendered: "<p>Otro empleador.</p>" } };
+  const listing = await listBoard(ref, valid([offer(1), unrelated]));
   assert.equal(listing.kind, "complete");
   if (listing.kind === "complete") {
     assert.equal(listing.boardTotal, 2);
     assert.deepEqual(listing.postings.map((row) => row.externalId), ["1"]);
   }
+  const changed = await listBoard(ref, valid([unrelated]), { knownIds: new Set(["2"]) });
+  assert.equal(changed.kind, "error");
 });

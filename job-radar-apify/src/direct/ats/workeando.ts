@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { htmlToText, safeJson, text } from "../text.js";
-import type { BoardListing, HttpGet, RawAtsPosting } from "../types.js";
+import type { BoardListing, HttpGet, ListOptions, RawAtsPosting } from "../types.js";
 import { allowedUrl, readRobots } from "./site.js";
 
 /** Public WordPress collections on the career site linked by nexaBPO.com. */
@@ -96,7 +96,7 @@ function posting(row: z.infer<typeof Offer>, cities: Map<number, string>): RawAt
   };
 }
 
-export async function listWorkeando(ref: string, http: HttpGet): Promise<BoardListing> {
+export async function listWorkeando(ref: string, http: HttpGet, options: ListOptions = {}): Promise<BoardListing> {
   if (ref !== "nexa-bpo") return { kind: "error", detail: "referencia Workeando inválida" };
   const robots = await readRobots(ORIGIN, http);
   const allowed = (url: string) => allowedUrl(robots, url);
@@ -111,11 +111,15 @@ export async function listWorkeando(ref: string, http: HttpGet): Promise<BoardLi
   const cities = new Map(cityRows.map((row) => [row.id, row.name]));
   const postings: RawAtsPosting[] = [];
   for (const offer of offers) {
+    // An unrelated old entry even points to /ofertas/__trashed/ while its
+    // WordPress status is publish. It is not a NEXA posting. A previously
+    // stored NEXA id losing its attribution is an error, never a closure.
+    if (!/\bnexa(?:\s+bpo)?\b/i.test(htmlToText(offer.content.rendered))) {
+      if (options.knownIds?.has(String(offer.id))) return { kind: "error", detail: `vacante NEXA ${offer.id} perdió atribución` };
+      continue;
+    }
     const mapped = posting(offer, cities);
     if (!mapped) return { kind: "error", detail: `vacante Workeando ${offer.id} incompleta o inválida` };
-    // Workeando also carries postings that do not identify NEXA. Do not
-    // attribute those to this employer merely because the domain is linked.
-    if (!/\bnexa(?:\s+bpo)?\b/i.test(mapped.descriptionText ?? "")) continue;
     postings.push(mapped);
   }
   return { kind: "complete", boardTotal: offers.length, postings };
