@@ -16,13 +16,15 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "tick | dry-run | migrate-dry-run | migrate | seed-dry-run | seed | seed-one-dry-run | seed-one | domain-census | discover-dry-run | discover | coverage | computrabajo-coverage | computrabajo-backlog | db-size | cc-tenants | review-list | review-approve-dry-run | review-approve | cv-purge-dry-run | cv-purge"
+        description: "tick | dry-run | dry-run-one | tick-one | migrate-dry-run | migrate | seed-dry-run | seed | seed-one-dry-run | seed-one | domain-census | discover-dry-run | discover | coverage | computrabajo-coverage | computrabajo-backlog | db-size | cc-tenants | review-list | review-approve-dry-run | review-approve | cv-purge-dry-run | cv-purge"
         required: true
         default: "dry-run"
         type: choice
         options:
           - tick
           - dry-run
+          - dry-run-one
+          - tick-one
           - migrate-dry-run
           - migrate
           - seed-dry-run
@@ -62,7 +64,7 @@ on:
         required: false
         type: string
       seed_slug:
-        description: "seed-one: slug exacto del seed (p. ej. cemex)"
+        description: "seed-one / dry-run-one / tick-one: slug exacto del seed"
         required: false
         type: string
 
@@ -107,6 +109,13 @@ jobs:
           case "$MODE" in
             tick)            cmd="npx tsx scripts/run-direct-tick.ts --allow-remote-db --limit 1000 --deadline-min 14" ;;
             dry-run)         cmd="npx tsx scripts/run-direct-tick.ts --dry-run" ;;
+            dry-run-one|tick-one)
+              [[ "$SEED_SLUG" =~ ^[a-z0-9]+(-[a-z0-9]+)*$ ]] || { echo "seed_slug inválido"; exit 1; }
+              if [ "$MODE" = "dry-run-one" ]; then
+                cmd="npx tsx scripts/run-direct-tick.ts --dry-run --employer $SEED_SLUG --include-disabled --allow-live-sources"
+              else
+                cmd="npx tsx scripts/run-direct-tick.ts --employer $SEED_SLUG --force --allow-remote-db --allow-live-sources"
+              fi ;;
             migrate-dry-run) cmd="npx tsx scripts/migrate-direct-employers.ts --dry-run --allow-remote-db" ;;
             migrate)         cmd="npx tsx scripts/migrate-direct-employers.ts --allow-remote-db" ;;
             seed-dry-run)    cmd="npx tsx scripts/seed-direct-employers.ts --dry-run" ;;

@@ -75,6 +75,10 @@ test("Workeando: unsafe or incomplete source data never authorizes closures", as
   assert.equal((await listBoard(ref, fakeHttp({ ...robots,
     [url("ofertas", 1)]: { status: 200, body: JSON.stringify([offer(1)]) }
   }))).kind, "error");
+  const blocked = await listBoard(ref, fakeHttp({ ...robots,
+    [url("ofertas", 1)]: { status: 403, body: "" }
+  }));
+  assert.deepEqual(blocked, { kind: "error", detail: "ofertas página 1: HTTP 403" });
 });
 
 test("Workeando: an unbranded offer is not attributed to NEXA", async () => {
