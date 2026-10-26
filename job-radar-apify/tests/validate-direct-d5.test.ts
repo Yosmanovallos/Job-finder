@@ -99,6 +99,25 @@ test("SuccessFactors: search page rows and label from the real listing", () => {
   assert.equal(parseSearchPage('<tr class="data-row"><td>no link</td></tr>'), null, "a row without its link is a format change");
 });
 
+test("SuccessFactors: tile listing counts jobs and rejects an unknown tile format", () => {
+  const tile = `<span id="tile-search-results-label">Showing 1 to 1 of 1 Jobs</span>
+    <ul id="job-tile-list"><li class="job-tile job-id-1375290357" data-url="/Holcim_abs/job/Medellin-Analista/1375290357/">
+    <a class="jobTitle-link fontcolor" href="/Holcim_abs/job/Medellin-Analista/1375290357/">ANALISTA DE COBRO</a>
+    <div id="job-1375290357-desktop-section-department-value">Finanzas</div>
+    <div id="job-1375290357-desktop-section-multilocation-value">Medellín, Antioquía, CO, 050010</div></li></ul>`;
+  const parsed = parseSearchPage(tile);
+  assert.deepEqual([parsed?.from, parsed?.to, parsed?.total], [1, 1, 1]);
+  assert.deepEqual(parsed?.rows[0], {
+    id: "1375290357", href: "/Holcim_abs/job/Medellin-Analista/1375290357/", title: "ANALISTA DE COBRO",
+    location: "Medellín, Antioquía, CO, 050010", date: null, department: "Finanzas"
+  });
+  assert.equal(parseSearchPage(tile.replace("jobTitle-link", "unknown-link")), null);
+  assert.equal(parseSearchPage(tile.replace('href="/Holcim_abs/job/Medellin-Analista/1375290357/"', 'href="/Holcim_abs/job/Other/1375290357/"')), null);
+  assert.equal(parseSearchPage(tile.replace("Showing 1 to 1 of 1 Jobs", "unrecognized total")), null);
+  assert.equal(parseSearchPage('<a class="jobTitle-link" href="/job/foo/1234/">Foo</a>'), null, "a new layout cannot close a board");
+  assert.deepEqual(parseSearchPage('<span id="tile-search-results-label">Showing 0 to 0 of 0 Jobs</span><ul id="job-tile-list"></ul>'), { from: 0, to: 0, total: 0, rows: [] });
+});
+
 test("SuccessFactors: posting microdata — classic and new templates", () => {
   const classic = parsePostingPage(fixture(SF, "bancolombia-job-1438237700.trimmed.html"));
   assert.equal(classic?.publishedAt, "2026-10-08T00:00:00.000Z");
