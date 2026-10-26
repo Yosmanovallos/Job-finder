@@ -60,6 +60,7 @@
     "direct:local": "tsx scripts/direct-local.ts",
     "direct:discover": "tsx scripts/discover-direct-employers.ts",
     "direct:coverage": "tsx scripts/direct-coverage.ts",
+    "direct:computrabajo-coverage": "tsx scripts/direct-computrabajo-coverage.ts",
     "direct:review": "tsx scripts/direct-discovery-review.ts",
     "direct:domain-census": "tsx scripts/direct-domain-census.ts",
     "test:direct": "tsx scripts/run-isolated-tests.ts direct"

@@ -15,6 +15,14 @@ on:
         options:
           - dry-run
           - execute
+      focus:
+        description: "computrabajo (Colombia) | all (todas las bolsas)"
+        required: true
+        default: computrabajo
+        type: choice
+        options:
+          - computrabajo
+          - all
 
 permissions:
   contents: read
@@ -41,11 +49,20 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           MODE: ${{ github.event_name == 'schedule' && 'execute' || inputs.mode }}
+          FOCUS: ${{ github.event_name == 'schedule' && 'computrabajo' || inputs.focus }}
         run: |
+          if [ "$FOCUS" = computrabajo ]; then
+            focus_arg="--focus-computrabajo"
+          elif [ "$FOCUS" = all ]; then
+            focus_arg=""
+          else
+            echo "Unsupported discovery focus" >&2
+            exit 1
+          fi
           if [ "$MODE" = dry-run ]; then
-            npx tsx scripts/discover-direct-employers.ts --dry-run --allow-remote-db --limit 100 --min-count 1 --deadline-min 12
+            npx tsx scripts/discover-direct-employers.ts --dry-run --allow-remote-db --limit 100 --min-count 1 --deadline-min 12 $focus_arg
           elif [ "$MODE" = execute ]; then
-            npx tsx scripts/discover-direct-employers.ts --allow-remote-db --limit 1000 --min-count 1 --max-enables 10 --deadline-min 12
+            npx tsx scripts/discover-direct-employers.ts --allow-remote-db --limit 1000 --min-count 1 --max-enables 10 --deadline-min 12 $focus_arg
           else
             echo "Unsupported discovery mode" >&2
             exit 1
