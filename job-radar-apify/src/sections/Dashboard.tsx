@@ -27,6 +27,9 @@ type SsrJobsWindow = Window & {
 };
 
 const PAGE_SIZE = 24;
+// How far below the viewport the next page starts loading (it's usually
+// prefetched already by then).
+const LOAD_MORE_MARGIN_PX = 1200;
 // Debounce the free-text search box so we don't fire a request per keystroke
 // — everything else (checkboxes/radios) triggers immediately since those are
 // discrete, deliberate clicks.
@@ -235,20 +238,55 @@ export default function Dashboard() {
     // Dependencies intentionally limited to the list below.
   }, [accessToken, filterKey, retryNonce]);
 
+  // Each new offset is a cold query on the server (~1 s, more under load),
+  // so the next page is requested as soon as the current one is on screen
+  // and kept here until the visitor scrolls to it. Keyed by filters +
+  // session + offset: a prefetch made for other filters is never used.
+  const prefetchRef = useRef<{ key: string; promise: Promise<{ jobs?: Job[]; hasMore?: boolean }> } | null>(null);
+  const pageKey = useCallback(
+    (offset: number) => `${filterKey}|${accessToken || ""}|${offset}`,
+    [filterKey, accessToken]
+  );
+  const fetchPage = useCallback(
+    (offset: number) => {
+      const headers: Record<string, string> = {};
+      if (accessToken) headers["Authorization"] = `Bearer ${accessToken}`;
+      return fetch(`/api/jobs?${buildQuery(offset)}`, { headers }).then((res) => {
+        if (!res.ok) throw new Error(`GET /api/jobs respondió ${res.status}`);
+        return res.json() as Promise<{ jobs?: Job[]; hasMore?: boolean }>;
+      });
+    },
+    [accessToken, buildQuery]
+  );
+
+  useEffect(() => {
+    if (isLoading || isLoadingMore || !hasMore || personalFilterActive || jobs.length === 0) return;
+    const offset = jobs.length;
+    const key = pageKey(offset);
+    if (prefetchRef.current?.key === key) return;
+    // Let the page that just arrived paint first.
+    const timer = window.setTimeout(() => {
+      const promise = fetchPage(offset);
+      promise.catch(() => {
+        // loadMore retries for real (and shows the error) if this failed.
+        if (prefetchRef.current?.key === key) prefetchRef.current = null;
+      });
+      prefetchRef.current = { key, promise };
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [jobs.length, hasMore, isLoading, isLoadingMore, personalFilterActive, pageKey, fetchPage]);
+
   const loadMore = useCallback(() => {
     if (isLoadingMore || !hasMore || personalFilterActive) return;
     const myRequestId = requestIdRef.current;
     setIsLoadingMore(true);
     setLoadMoreError(false);
 
-    const headers: Record<string, string> = {};
-    if (accessToken) headers["Authorization"] = `Bearer ${accessToken}`;
+    const key = pageKey(jobs.length);
+    const prefetched = prefetchRef.current?.key === key ? prefetchRef.current.promise : null;
+    prefetchRef.current = null;
 
-    fetch(`/api/jobs?${buildQuery(jobs.length)}`, { headers })
-      .then((res) => {
-        if (!res.ok) throw new Error(`GET /api/jobs respondió ${res.status}`);
-        return res.json();
-      })
+    (prefetched ?? fetchPage(jobs.length))
       .then((data) => {
         if (myRequestId !== requestIdRef.current) return;
         setJobs((prev) => [...prev, ...(Array.isArray(data.jobs) ? data.jobs : [])]);
@@ -256,7 +294,7 @@ export default function Dashboard() {
       })
       .catch(() => setLoadMoreError(true))
       .finally(() => setIsLoadingMore(false));
-  }, [accessToken, buildQuery, jobs.length, hasMore, isLoadingMore, personalFilterActive]);
+  }, [fetchPage, pageKey, jobs.length, hasMore, isLoadingMore, personalFilterActive]);
 
   // loadMore's identity changes on every jobs-length/hasMore update (it's a
   // useCallback closing over both). The observer effects below must NOT
@@ -287,11 +325,25 @@ export default function Dashboard() {
       (entries) => {
         if (entries[0].isIntersecting) loadMoreRef.current();
       },
-      { rootMargin: "400px" }
+      { rootMargin: `${LOAD_MORE_MARGIN_PX}px` }
     );
     observer.observe(el);
     return () => observer.disconnect();
   }, [isLoading]);
+
+  // The observer only fires when the sentinel crosses the margin. If an
+  // appended page is too short to push it back out, nothing would fire
+  // again, so check once after the new rows are laid out.
+  useEffect(() => {
+    if (isLoading || isLoadingMore || !hasMore) return;
+    const frame = window.requestAnimationFrame(() => {
+      const el = sentinelRef.current;
+      if (el && el.getBoundingClientRect().top < window.innerHeight + LOAD_MORE_MARGIN_PX) {
+        loadMoreRef.current();
+      }
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [jobs.length, isLoading, isLoadingMore, hasMore]);
 
   // Wompi redirects back here with ?checkout=return after the sandbox
   // payment. The webhook that actually flips the tier to 'pro' can take a
@@ -380,30 +432,41 @@ export default function Dashboard() {
     // Dependencies intentionally limited to the list below.
   }, [accessToken]);
 
-  const handleSaveToggle = (jobId: string) => {
-    const next = new Set(savedJobIds);
-    if (next.has(jobId)) next.delete(jobId);
-    else next.add(jobId);
-    setSavedJobIds(next);
-  };
+  // Stable identities (functional updates) so the memoized cards don't
+  // re-render on every Dashboard render.
+  const handleSaveToggle = useCallback((jobId: string) => {
+    setSavedJobIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(jobId)) next.delete(jobId);
+      else next.add(jobId);
+      return next;
+    });
+  }, []);
 
-  const handleAppliedToggle = (jobId: string) => {
-    const next = new Set(appliedJobIds);
-    if (next.has(jobId)) next.delete(jobId);
-    else next.add(jobId);
-    setAppliedJobIds(next);
-  };
+  const handleAppliedToggle = useCallback((jobId: string) => {
+    setAppliedJobIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(jobId)) next.delete(jobId);
+      else next.add(jobId);
+      return next;
+    });
+  }, []);
 
-  const visibleJobs = jobs.filter((j) => {
-    if (filters.savedOnly && !savedJobIds.has(j.jobId)) return false;
-    if (filters.appliedOnly && !appliedJobIds.has(j.jobId)) return false;
-    return true;
-  });
+  const visibleJobs = useMemo(
+    () =>
+      jobs.filter((j) => {
+        if (filters.savedOnly && !savedJobIds.has(j.jobId)) return false;
+        if (filters.appliedOnly && !appliedJobIds.has(j.jobId)) return false;
+        return true;
+      }),
+    [jobs, filters.savedOnly, filters.appliedOnly, savedJobIds, appliedJobIds]
+  );
 
   // Desktop split-pane: which job the right-hand detail panel shows. Only
   // meaningful at lg+ (mobile keeps the old stacked JobCard list, no
   // detail pane) but tracked unconditionally since it's cheap either way.
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const handleSelectJob = useCallback((jobId: string) => setSelectedJobId(jobId), []);
   useEffect(() => {
     if (visibleJobs.length === 0) {
       setSelectedJobId(null);
@@ -761,7 +824,7 @@ export default function Dashboard() {
                           key={job.jobId || job.url}
                           job={job}
                           selected={job.jobId === selectedJobId}
-                          onClick={() => setSelectedJobId(job.jobId)}
+                          onSelect={handleSelectJob}
                         />
                       )
                     )}
@@ -833,11 +896,9 @@ export default function Dashboard() {
                     ) : (
                       <JobCard
                         key={job.jobId || job.url}
-                        job={{
-                          ...job,
-                          isSaved: savedJobIds.has(job.jobId),
-                          isApplied: appliedJobIds.has(job.jobId)
-                        }}
+                        job={job}
+                        isSaved={savedJobIds.has(job.jobId)}
+                        isApplied={appliedJobIds.has(job.jobId)}
                         onSaveToggle={handleSaveToggle}
                         onAppliedToggle={handleAppliedToggle}
                         country={country}
