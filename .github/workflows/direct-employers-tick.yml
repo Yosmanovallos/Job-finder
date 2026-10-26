@@ -16,7 +16,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "tick | dry-run | migrate-dry-run | migrate | seed-dry-run | seed | seed-one-dry-run | seed-one | domain-census | discover-dry-run | discover | coverage | computrabajo-coverage | db-size | cc-tenants | review-list | review-approve-dry-run | review-approve | cv-purge-dry-run | cv-purge"
+        description: "tick | dry-run | migrate-dry-run | migrate | seed-dry-run | seed | seed-one-dry-run | seed-one | domain-census | discover-dry-run | discover | coverage | computrabajo-coverage | computrabajo-backlog | db-size | cc-tenants | review-list | review-approve-dry-run | review-approve | cv-purge-dry-run | cv-purge"
         required: true
         default: "dry-run"
         type: choice
@@ -36,6 +36,7 @@ on:
           - discover
           - coverage
           - computrabajo-coverage
+          - computrabajo-backlog
           # Read-only size report (pg_database_size + biggest tables).
           - db-size
           # Read-only, no database: Workday / SmartRecruiters boards seen by
@@ -119,6 +120,7 @@ jobs:
             discover)        cmd="npx tsx scripts/discover-direct-employers.ts --allow-remote-db --limit 1500 --max-enables 50 --deadline-min 16" ;;
             coverage)        cmd="npx tsx scripts/direct-coverage.ts --allow-remote-db" ;;
             computrabajo-coverage) cmd="npx tsx scripts/direct-computrabajo-coverage.ts --allow-remote-db" ;;
+            computrabajo-backlog) cmd="npx tsx scripts/direct-computrabajo-coverage.ts --all --allow-remote-db" ;;
             db-size)         cmd="npx tsx scripts/direct-db-size.ts --allow-remote-db" ;;
             cc-tenants)      cmd="npx tsx scripts/direct-cc-tenants.ts --max-boards 500 --deadline-min 17" ;;
             review-list)     cmd="npx tsx scripts/direct-discovery-review.ts list --decision needs_review --limit 100 --allow-remote-db" ;;
@@ -133,6 +135,11 @@ jobs:
             *) echo "modo desconocido: $MODE"; exit 1 ;;
           esac
           echo "## Direct employers — $MODE" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$MODE" = "computrabajo-backlog" ]; then
+            echo 'Listado completo en el log de esta corrida (JSONL); ninguna escritura en la base de datos.' >> "$GITHUB_STEP_SUMMARY"
+            $cmd
+            exit 0
+          fi
           echo '```' >> "$GITHUB_STEP_SUMMARY"
           $cmd 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
