@@ -618,10 +618,10 @@ async function runHttpTests() {
       );
     }
     check(
-      homeHtml.includes("<title>Busco trabajo en Colombia | Vacantes de empleo | BuscoTrabajo</title>") &&
-        homeHtml.includes("<h1>Busco trabajo en Colombia: vacantes de empleo en un solo lugar</h1>") &&
-        veHtml.includes("<title>Busco trabajo en Venezuela | Vacantes de empleo | BuscoTrabajo</title>") &&
-        veHtml.includes("<h1>Busco trabajo en Venezuela: vacantes de empleo en un solo lugar</h1>") &&
+      homeHtml.includes("<title>Busco trabajo en Colombia: ofertas de empleo | BuscoTrabajo</title>") &&
+        homeHtml.includes("<h1>Busco trabajo en Colombia: todas las ofertas de empleo en un solo lugar</h1>") &&
+        veHtml.includes("<title>Busco trabajo en Venezuela: ofertas de empleo | BuscoTrabajo</title>") &&
+        veHtml.includes("<h1>Busco trabajo en Venezuela: todas las ofertas de empleo en un solo lugar</h1>") &&
         veHtml.includes('"alternateName": ["Busco Trabajo", "BuscoTrabajo.co"]'),
       "/ y /ve orientan title/H1 a la intención exacta 'busco trabajo', conservan el país correcto y declaran el nombre alternativo de marca.",
       "La portada de Colombia o Venezuela no sirve el nuevo title/H1 de intención, o falta alternateName en el HTML crudo."
@@ -940,10 +940,31 @@ async function runHttpTests() {
     );
 
     const pagesRes = await fetch(`${BASE_URL}/sitemap-pages.xml`);
+    const pagesXml = await pagesRes.text();
     check(
-      pagesRes.status === 200 && (await pagesRes.text()).includes("<urlset"),
+      pagesRes.status === 200 && pagesXml.includes("<urlset"),
       "/sitemap-pages.xml responde 200 con un <urlset> válido.",
       `/sitemap-pages.xml respondió ${pagesRes.status} o no es un urlset.`
+    );
+
+    // /pricing is hidden while the paywall is off: out of the sitemap, and
+    // a 301 home instead of a checkout for plans that unlock nothing.
+    check(
+      !pagesXml.includes("/pricing<"),
+      "/sitemap-pages.xml ya no lista /pricing.",
+      "/sitemap-pages.xml todavía lista /pricing."
+    );
+    const checkoutRes = await fetch(`${BASE_URL}/api/checkout/start`, { method: "POST" });
+    check(
+      checkoutRes.status === 404,
+      "POST /api/checkout/start responde 404 con el paywall apagado (no se puede iniciar un pago).",
+      `POST /api/checkout/start respondió ${checkoutRes.status} con el paywall apagado.`
+    );
+    const pricingRes = await fetch(`${BASE_URL}/pricing`, { redirect: "manual" });
+    check(
+      pricingRes.status === 301 && pricingRes.headers.get("location") === "/",
+      "GET /pricing responde 301 a / con el paywall apagado.",
+      `GET /pricing respondió ${pricingRes.status} (Location: ${pricingRes.headers.get("location")}) en vez de 301 a /.`
     );
 
     const jobsSitemapRes = await fetch(`${BASE_URL}/sitemap-jobs.xml`);

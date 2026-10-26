@@ -768,8 +768,35 @@ function buildJobWhere(filters: JobFilterParams, sql: SqlParts): string[] {
  * the Node heap; detail columns are joined after the bounded page is chosen.
  */
 export async function getJobsPage(options: JobsPageOptions = {}): Promise<JobsPage> {
-  const cacheKey = jobsPageCacheKey(options);
-  return jobsPageCache.get(cacheKey, () => queryJobsPage(options));
+  const limit = Math.min(Math.max(options.limit ?? 24, 1), 100);
+  const offset = Math.max(options.offset ?? 0, 0);
+  const block = jobsBlockFor(offset, limit);
+  if (block === null) {
+    const cacheKey = jobsPageCacheKey(options);
+    return jobsPageCache.get(cacheKey, () => queryJobsPage(options));
+  }
+  const blockOptions = { ...options, limit: JOBS_BLOCK_SIZE, offset: block };
+  const page = await jobsPageCache.get(jobsPageCacheKey(blockOptions), () => queryJobsPage(blockOptions));
+  // `get` already returned a private copy, so slicing it is safe.
+  return { jobs: page.jobs.slice(offset - block, offset - block + limit), total: page.total };
+}
+
+// Infinite scroll asks for 24 jobs at a time, and every new offset used to
+// be its own cold run of the canonical projection (~1 s in production, 6 s
+// under load). Pages after the first now come from blocks of 96 rows that
+// start right after it (24-119, 120-215, ...): one cold query serves the
+// next four pages, and the projection costs the same with LIMIT 96 as with
+// LIMIT 24. The first page (offset 0) keeps its exact query and cache key,
+// so the startup warmup and the SSR/category/company first pages are
+// untouched (docs/DASHBOARD-PERFORMANCE-RUNBOOK.md).
+const JOBS_BLOCK_SIZE = 96;
+const JOBS_BLOCK_START = 24;
+
+function jobsBlockFor(offset: number, limit: number): number | null {
+  if (offset < JOBS_BLOCK_START) return null;
+  const block = JOBS_BLOCK_START + Math.floor((offset - JOBS_BLOCK_START) / JOBS_BLOCK_SIZE) * JOBS_BLOCK_SIZE;
+  // A page that would cross into the next block keeps its own query.
+  return offset - block + limit <= JOBS_BLOCK_SIZE ? block : null;
 }
 
 async function queryJobsPage(options: JobsPageOptions): Promise<JobsPage> {
@@ -962,6 +989,147 @@ async function querySearchActiveCompanies(
   return {
     companies: rows.map((row) => ({ company: row.company, count: Number(row.count) })),
     total: Number(rows[0]?.total_count || 0)
+  };
+}
+
+export interface HomeJobCounts {
+  totalJobs: number;
+  last7Days: number;
+  last24Hours: number;
+  onSite: number;
+  remote: number;
+  cityCounts: Record<string, number>;
+  latestJobs: Array<{
+    jobId: string;
+    title: string;
+    company: string;
+    location: string;
+    source: string;
+    dateText: string;
+    publishedAt: string;
+    isLocked: boolean;
+  }>;
+}
+
+// The homepage's figures. They used to be ~13 separate /api/jobs and
+// /api/companies/search calls per visit, each one a key in the 64-entry
+// LRU that keeps the dashboard's warmed first page, so homepage traffic
+// could evict it. They now live in their own small caches (two keys per
+// country) with the dashboard's freshness policy, and the job figures come
+// from ONE pass over the canonical set instead of one projection per count.
+const homeJobCountsCache = new StaleWhileRevalidateCache<string, HomeJobCounts>({
+  freshForMs: JOBS_PAGE_CACHE_FRESH_MS,
+  staleForMs: JOBS_PAGE_CACHE_STALE_MS,
+  maxEntries: 8,
+  clone: (value) => ({
+    ...value,
+    cityCounts: { ...value.cityCounts },
+    latestJobs: value.latestJobs.map((job) => ({ ...job }))
+  }),
+  onBackgroundRefreshError: () => {
+    console.warn("[home-stats-cache] Background refresh failed; serving the last valid counts.");
+  }
+});
+
+const homeCompaniesCache = new StaleWhileRevalidateCache<string, CompanyPage>({
+  freshForMs: JOBS_PAGE_CACHE_FRESH_MS,
+  staleForMs: JOBS_PAGE_CACHE_STALE_MS,
+  maxEntries: 8,
+  clone: cloneCompanyPage,
+  onBackgroundRefreshError: () => {
+    console.warn("[home-companies-cache] Background refresh failed; serving the last valid page.");
+  }
+});
+
+export async function getHomeJobCounts(country: string, cities: string[]): Promise<HomeJobCounts> {
+  const key = JSON.stringify({ country: country.toUpperCase(), cities });
+  return homeJobCountsCache.get(key, () => queryHomeJobCounts(country, cities));
+}
+
+// Same query and ordering as the /empresas directory's first page, outside
+// companySearchCache for the same reason as the counts above.
+export async function getHomeCompanies(
+  country: string,
+  limit: number,
+  prioritizedCompanies: string[]
+): Promise<CompanyPage> {
+  const key = JSON.stringify({ country: country.toUpperCase(), limit });
+  return homeCompaniesCache.get(key, () =>
+    querySearchActiveCompanies("", country, limit, 0, prioritizedCompanies)
+  );
+}
+
+// Every count is buildJobWhere() — the predicates GET /api/jobs applies —
+// over the same canonical projection as queryJobsPage(): DISTINCT ON across
+// all live rows first, country scoping after, so each figure equals the
+// `total` the dashboard shows for that filter. The latest jobs ride along
+// as LATERAL rows (same ORDER BY as an unfiltered dashboard page), so the
+// whole homepage reads the canonical set once.
+async function queryHomeJobCounts(country: string, cities: string[]): Promise<HomeJobCounts> {
+  const sql = createSqlParts();
+  const scope = buildJobWhere({ country }, sql);
+  const countWhere = (filters: JobFilterParams) =>
+    `COUNT(*) FILTER (WHERE ${buildJobWhere(filters, sql).join(" AND ")})`;
+  const metrics = [
+    "COUNT(*) AS total_jobs",
+    `${countWhere({ freshness: "7d" })} AS last_7_days`,
+    `${countWhere({ freshness: "24h" })} AS last_24_hours`,
+    `${countWhere({ modality: "presencial" })} AS on_site`,
+    `${countWhere({ modality: "remoto" })} AS remote`,
+    ...cities.map((city, index) => `${countWhere({ cities: [city] })} AS city_${index}`)
+  ];
+
+  const result = await pool.query(
+    `WITH canonical AS MATERIALIZED (
+       SELECT DISTINCT ON (${VACANCY_IDENTITY_KEYS})
+              id, title, company, company_key, location, url, source, sources, date_text, published_at,
+              role_origin, country, (published_at > NOW() - INTERVAL '48 hours') AS is_locked
+       FROM ${vacancyIdentitySourceSql(`is_active = TRUE AND ${liveJobSql()}`)} jobs
+       ORDER BY ${VACANCY_IDENTITY_KEYS}, published_at DESC, id DESC
+     ), scoped AS MATERIALIZED (
+       SELECT * FROM canonical WHERE ${scope.join(" AND ")}
+     ), counts AS (
+       SELECT ${metrics.join(", ")} FROM scoped
+     )
+     SELECT counts.*, latest.id, latest.title, latest.company, latest.location, latest.source,
+            latest.date_text, latest.published_at, latest.is_locked
+     FROM counts
+     LEFT JOIN LATERAL (
+       SELECT id, title, company, location, source, date_text, published_at, is_locked
+       FROM scoped
+       ORDER BY published_at DESC, id DESC
+       LIMIT 6
+     ) latest ON TRUE
+     ORDER BY latest.published_at DESC, latest.id DESC`,
+    sql.values
+  );
+
+  const rows = result.rows as Array<Record<string, unknown>>;
+  const first = rows[0] || {};
+  const count = (column: string) => Number(first[column] || 0);
+  const cityCounts: Record<string, number> = {};
+  cities.forEach((city, index) => {
+    cityCounts[city] = count(`city_${index}`);
+  });
+  return {
+    totalJobs: count("total_jobs"),
+    last7Days: count("last_7_days"),
+    last24Hours: count("last_24_hours"),
+    onSite: count("on_site"),
+    remote: count("remote"),
+    cityCounts,
+    latestJobs: rows
+      .filter((row) => row.id)
+      .map((row) => ({
+        jobId: String(row.id),
+        title: String(row.title),
+        company: row.company as string,
+        location: row.location as string,
+        source: String(row.source),
+        dateText: row.date_text as string,
+        publishedAt: row.published_at as string,
+        isLocked: Boolean(row.is_locked)
+      }))
   };
 }
 

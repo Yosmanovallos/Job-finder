@@ -49,6 +49,9 @@ export interface JobDetailPanelProps {
   // pre-existing tag, unchanged for the Dashboard case — so only
   // JobLanding.tsx needs to opt in.
   headingLevel?: "h1" | "h2";
+  // "ink": the dashboard's homepage-style card. /empleos/:id (JobLanding)
+  // keeps the default look until its own redesign phase.
+  variant?: "default" | "ink";
 }
 
 const MODALITY_VARIANT: Record<string, "remote" | "hybrid" | "default"> = {
@@ -75,14 +78,15 @@ export const JobDetailPanel: React.FC<JobDetailPanelProps> = ({
   onAppliedToggle,
   onApplyClick,
   country,
-  headingLevel = "h2"
+  headingLevel = "h2",
+  variant = "default"
 }) => {
   const { isAuthenticated } = useAuth();
   const TitleTag = headingLevel;
 
   if (!job) {
     return (
-      <div className="hidden lg:flex h-full min-h-[400px] flex-col items-center justify-center rounded-lg border border-border bg-card text-center p-8">
+      <div className={`hidden lg:flex h-full min-h-[400px] flex-col items-center justify-center text-center p-8 ${variant === "ink" ? "rounded-2xl border-2 border-foreground bg-green-soft" : "rounded-lg border border-border bg-card"}`}>
         <Search className="h-8 w-8 text-ink-faint mb-3" />
         <p className="text-sm text-muted-foreground">
           Selecciona una vacante de la lista para ver el detalle.
@@ -152,7 +156,7 @@ export const JobDetailPanel: React.FC<JobDetailPanelProps> = ({
   };
 
   return (
-    <div className="hud-corners rounded-lg border border-border bg-card overflow-hidden">
+    <div className={variant === "ink" ? "rounded-2xl border-2 border-foreground bg-white overflow-hidden shadow-[5px_5px_0_hsl(var(--foreground))]" : "hud-corners rounded-lg border border-border bg-card overflow-hidden"}>
       <div className="h-1.5 bg-gradient-to-r from-green-soft via-primary to-gold-2" />
 
       <div className="p-6">

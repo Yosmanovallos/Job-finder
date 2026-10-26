@@ -26,6 +26,7 @@ const suites: Record<string, string[]> = {
     "validate-fetch-context.test.ts",
     "validate-source-contract.test.ts",
     "validate-agent-readiness.test.ts",
+    "validate-page-meta.test.ts",
     "validate-source-closure.test.ts",
     "validate-job-freshness.test.ts",
     "validate-company-identity.test.ts",
@@ -55,6 +56,7 @@ const suites: Record<string, string[]> = {
     "validate-job-pagination.ts",
     "validate-seo-job-pages.ts",
     "validate-companies-search.ts",
+    "validate-home-stats.ts",
     "validate-sitemap-streaming.ts",
     "validate-run-observability.ts",
     "validate-execution-deadlines.ts",
@@ -75,6 +77,7 @@ const suites: Record<string, string[]> = {
   pagination: ["validate-job-pagination.ts"],
   seo: ["validate-seo-job-pages.ts"],
   companies: ["validate-company-identity.test.ts", "validate-companies-search.ts"],
+  home: ["validate-home-stats.ts"],
   baseline: ["validate-public-baseline.ts"],
   "agent-readiness": ["validate-agent-readiness.test.ts", "validate-agent-readiness.ts"],
   "job-seo": [
@@ -87,7 +90,7 @@ const selection = process.argv[2] || "unit";
 const offline = selection === "unit" || selection === "job-render";
 if (!Object.hasOwn(suites, selection) || process.argv.slice(3).some((arg) => arg !== "--dry-run")) {
   throw new Error(
-    "[P0] Suite inválida. Usa unit, integration, job-render, sitemap, observability, pagination, seo, companies, baseline, agent-readiness, job-seo, source-closure, job-freshness o direct; --dry-run es opcional."
+    "[P0] Suite inválida. Usa unit, integration, job-render, sitemap, observability, pagination, seo, companies, home, baseline, agent-readiness, job-seo, source-closure, job-freshness o direct; --dry-run es opcional."
   );
 }
 

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { memo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Star, Check, ArrowRight } from "lucide-react";
 import { Job } from "../sources/types.js";
@@ -22,6 +22,10 @@ export interface JobCardProps {
     salary?: string;
     reputation?: ReputationEntryProps[];
   };
+  // Passed apart from `job` so the Dashboard can hand over the same job
+  // object on every render and memo() can skip unchanged cards.
+  isSaved?: boolean;
+  isApplied?: boolean;
   onSaveToggle?: (jobId: string) => void;
   onAppliedToggle?: (jobId: string) => void;
   // Which dashboard context this card is rendered in ("CO" default, "VE" on
@@ -51,14 +55,16 @@ const MODALITY_VARIANT: Record<string, "remote" | "hybrid" | "default"> = {
   Presencial: "default"
 };
 
-export const JobCard: React.FC<JobCardProps> = ({
+export const JobCard = memo(function JobCard({
   job,
+  isSaved,
+  isApplied,
   onSaveToggle,
   onAppliedToggle,
   country
-}) => {
-  const [saved, setSaved] = useState(job.isSaved || false);
-  const [applied, setApplied] = useState(job.isApplied || false);
+}: JobCardProps) {
+  const [saved, setSaved] = useState(isSaved ?? job.isSaved ?? false);
+  const [applied, setApplied] = useState(isApplied ?? job.isApplied ?? false);
 
   const handleSave = () => {
     setSaved(!saved);
@@ -84,10 +90,10 @@ export const JobCard: React.FC<JobCardProps> = ({
       // Green rail = unlocked/free, matching the gold rail PaywallCard uses
       // for locked/Pro, so the two states read as siblings, not opposites.
       className={cn(
-        "hud-corners grid grid-cols-[4px_1fr] rounded-lg border overflow-hidden transition-colors",
+        "grid grid-cols-[6px_1fr] rounded-2xl border-2 overflow-hidden transition-colors [content-visibility:auto] [contain-intrinsic-size:auto_240px]",
         applied
-          ? "border-border bg-muted opacity-60"
-          : "border-border bg-card hover:border-border-strong"
+          ? "border-foreground/30 bg-muted opacity-60"
+          : "border-foreground bg-white shadow-[3px_3px_0_hsl(var(--foreground))]"
       )}
     >
       <div
@@ -112,9 +118,9 @@ export const JobCard: React.FC<JobCardProps> = ({
           {/* Body — title, company, location first (the scan path), tags and
               timestamp last and quietest. */}
           <div className="flex-1 min-w-0">
-            <h3 className="font-heading font-semibold text-base text-foreground leading-snug mb-1">
+            <h2 className="font-heading font-bold text-base text-foreground leading-snug mb-1">
               {job.title}
-            </h3>
+            </h2>
 
             <p className="text-sm text-foreground/80 mb-2">
               {job.company && !isPlaceholderEmployer(job.company) ? (
@@ -137,12 +143,12 @@ export const JobCard: React.FC<JobCardProps> = ({
             </p>
 
             <div className="flex flex-wrap items-center gap-1.5 mb-2">
-              {modality && <Badge variant={MODALITY_VARIANT[modality]}>{modality}</Badge>}
-              {job.salary && <Badge>{job.salary}</Badge>}
-              {isFresh(job) && <Badge variant="primary">Nueva</Badge>}
               <Badge style={{ background: sourceColor.bg, color: sourceColor.text }}>
                 {job.source}
               </Badge>
+              {modality && <Badge variant={MODALITY_VARIANT[modality]}>{modality}</Badge>}
+              {job.salary && <Badge>{job.salary}</Badge>}
+              {isFresh(job) && <Badge variant="primary">Nueva</Badge>}
             </div>
 
             <p className="text-[11px] font-mono text-ink-faint">
@@ -189,4 +195,4 @@ export const JobCard: React.FC<JobCardProps> = ({
       </div>
     </div>
   );
-};
+});

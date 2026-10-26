@@ -496,10 +496,13 @@ export function buildCompanyMeta(
 ): CompanyMeta {
   const countryName = getCountryConfig(country || DEFAULT_COUNTRY).name;
   const countLabel = totalCount === 1 ? "1 vacante activa" : `${totalCount} vacantes activas`;
+  // "Empleos en <empresa>" is the query shape autocomplete shows people
+  // actually type ("empleos bancolombia", 2026-10-25); the count stays out
+  // of the title (it changes daily) and lives in the description.
   return {
-    title: `${companyName} | BuscoTrabajo`,
+    title: `Empleos en ${companyName} | BuscoTrabajo`,
     heading: companyName,
-    description: `${companyName}: ${countLabel} en BuscoTrabajo — reputación real en ${countryName}.`,
+    description: `Empleos en ${companyName}: ${countLabel} en ${countryName}. Compara sus ofertas y su reputación, y postúlate en el portal original.`,
     canonicalUrl: buildCompanyUrl(companyName, country)
   };
 }

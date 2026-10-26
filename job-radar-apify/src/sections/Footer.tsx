@@ -1,325 +1,144 @@
-import type { CSSProperties } from "react";
-import { Link } from "react-router-dom";
-import { hoverStyle } from "../lib/hover-style.js";
-import { PAYWALL_ENABLED } from "../config.js";
+import type { ReactNode } from "react";
+import { Link, useLocation } from "react-router-dom";
+import { CONTACT_EMAIL } from "../lib/agent-readiness.js";
 
-// Navigation data
-const navLinks = [
-  { label: "Cómo funciona", href: "/como-funciona" },
-  { label: "Fuentes", href: "/fuentes" },
-  ...(PAYWALL_ENABLED ? [{ label: "Precios", href: "/pricing" }] : []),
-  { label: "Preguntas", href: "/preguntas" }
+// Site-wide footer in the homepage's ink style (design canvas R3,
+// 2026-10-25). The old "Probar gratis / sin tarjeta" CTA block is gone:
+// BuscoTrabajo is free, so that copy no longer described anything real.
+
+interface FooterLink {
+  label: string;
+  href: string;
+  icon: ReactNode;
+}
+
+const iconProps = {
+  "aria-hidden": true,
+  width: 16,
+  height: 16,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  strokeWidth: 2,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const
+};
+
+const resourceLinks: FooterLink[] = [
+  { label: "Cómo funciona", href: "/como-funciona", icon: <svg {...iconProps} stroke="#9c7518"><circle cx="12" cy="12" r="9" /><path d="M10 8l6 4-6 4z" /></svg> },
+  { label: "Fuentes de datos", href: "/fuentes", icon: <svg {...iconProps} stroke="#9c7518"><path d="M4 6h16M4 12h16M4 18h10" /></svg> },
+  { label: "Empresas", href: "/empresas", icon: <svg {...iconProps} stroke="#9c7518"><path d="M3 21h18M5 21V7l7-4 7 4v14" /></svg> },
+  { label: "API y agentes", href: "/docs", icon: <svg {...iconProps} stroke="#9c7518"><path d="M8 9l-4 3 4 3M16 9l4 3-4 3" /></svg> },
+  { label: "Acerca de", href: "/about", icon: <svg {...iconProps} stroke="#9c7518"><circle cx="12" cy="12" r="9" /><path d="M12 8h.01M11 12h1v4h1" /></svg> }
 ];
 
-const productLinks = [
-  { label: "Búsqueda inteligente", href: "/#hero-demo" },
-  { label: "Deduplicación", href: "/#product-features-pricing-faq" },
-  { label: "Verificación de vigencia", href: "/#product-features-pricing-faq" },
-  ...(PAYWALL_ENABLED
-    ? [{ label: "Paywall de frescura 48h", href: "/#product-features-pricing-faq" }]
-    : []),
-  { label: "Guardar y marcar aplicadas", href: "/#product-features-pricing-faq" }
+const legalLinks: FooterLink[] = [
+  { label: "Términos de uso", href: "/legal/terminos", icon: <svg {...iconProps} stroke="#0a4f96"><path d="M6 3h9l3 3v15H6z" /><path d="M9 11h6M9 15h6" /></svg> },
+  { label: "Política de privacidad", href: "/legal/privacidad", icon: <svg {...iconProps} stroke="#0a4f96"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z" /></svg> },
+  { label: "Uso aceptable", href: "/legal/uso-aceptable", icon: <svg {...iconProps} stroke="#0a4f96"><circle cx="12" cy="12" r="9" /><path d="M8 12l3 3 5-6" /></svg> },
+  { label: "Cookies", href: "/legal/cookies", icon: <svg {...iconProps} stroke="#0a4f96"><circle cx="12" cy="12" r="9" /><circle cx="9" cy="10" r="1" /><circle cx="14" cy="14" r="1" /></svg> }
 ];
 
-const resourceLinks = [
-  { label: "Preguntas frecuentes", href: "/preguntas" },
-  { label: "Cómo funciona", href: "/como-funciona" },
-  { label: "Fuentes de datos", href: "/fuentes" },
-  { label: "API y agentes", href: "/docs" },
-  { label: "Acerca de", href: "/about" },
-  { label: "Contacto", href: "/contact" }
+// Official accounts (confirmed by the owner, 2026-10-25).
+const socialLinks = [
+  {
+    label: "BuscoTrabajo en Instagram",
+    href: "https://www.instagram.com/buscotrabajocolombia.co/",
+    bg: "bg-[#fde8dc]",
+    icon: (
+      <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+        <rect x="3" y="3" width="18" height="18" rx="5" />
+        <circle cx="12" cy="12" r="4" />
+        <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" />
+      </svg>
+    )
+  },
+  {
+    label: "BuscoTrabajo en TikTok",
+    href: "https://www.tiktok.com/@busco.trabajo09",
+    bg: "bg-[#fdf1d3]",
+    icon: (
+      <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M16.6 2h-3.4v13.3a2.9 2.9 0 1 1-2.9-2.9c.3 0 .6 0 .9.1V9a6.3 6.3 0 1 0 5.4 6.3V8.6a7.9 7.9 0 0 0 4.4 1.4V6.6a4.5 4.5 0 0 1-4.4-4.6z" />
+      </svg>
+    )
+  },
+  {
+    label: "BuscoTrabajo en X",
+    href: "https://x.com/Buscotrabajoco",
+    bg: "bg-white",
+    icon: (
+      <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M17.8 3h3.1l-6.8 7.8L22 21h-6.2l-4.9-6.4L5.3 21H2.2l7.3-8.3L2 3h6.4l4.4 5.8L17.8 3zm-1.1 16.2h1.7L7.4 4.7H5.6l11.1 14.5z" />
+      </svg>
+    )
+  },
+  {
+    label: "BuscoTrabajo en YouTube",
+    href: "https://www.youtube.com/@buscotrabajo-d5n",
+    bg: "bg-green-soft",
+    icon: (
+      <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M22 8.2a3 3 0 0 0-2.1-2.1C18 5.6 12 5.6 12 5.6s-6 0-7.9.5A3 3 0 0 0 2 8.2 31 31 0 0 0 1.6 12 31 31 0 0 0 2 15.8a3 3 0 0 0 2.1 2.1c1.9.5 7.9.5 7.9.5s6 0 7.9-.5a3 3 0 0 0 2.1-2.1 31 31 0 0 0 .4-3.8 31 31 0 0 0-.4-3.8zM10 15.1V8.9l5.2 3.1z" />
+      </svg>
+    )
+  }
 ];
 
-const legalLinks = [
-  { label: "Términos de uso", href: "/legal/terminos" },
-  { label: "Política de privacidad", href: "/legal/privacidad" },
-  { label: "Uso aceptable", href: "/legal/uso-aceptable" },
-  { label: "Cookies", href: "/legal/cookies" }
-];
-
-const contactLinks = [{ label: "buscotrabajocolombia123@gmail.com", href: "mailto:buscotrabajocolombia123@gmail.com" }];
+function LinkColumn({ title, links }: { title: string; links: FooterLink[] }) {
+  return (
+    <nav aria-label={title} className="flex flex-col gap-0.5 md:gap-2.5">
+      <strong className="font-mono text-[11px] md:text-xs font-bold tracking-[0.1em] py-1.5 md:py-0">{title.toUpperCase()}</strong>
+      {links.map((link) => (
+        <Link key={link.href} to={link.href} className="flex items-center gap-2 py-2 md:py-0 text-sm text-[#3d413e] hover:text-foreground">
+          <span className="hidden md:inline-flex">{link.icon}</span>
+          {link.label}
+        </Link>
+      ))}
+    </nav>
+  );
+}
 
 export default function Footer() {
+  const { pathname } = useLocation();
+  // The homepage's fixed phone bottom bar (HomeLanding.tsx) would cover the
+  // last footer row without this extra room.
+  const isHome = pathname === "/" || pathname === "/ve";
+
   return (
-    <footer
-      id="footer"
-      className="bg-muted border-t border-border"
-      style={{
-        fontFamily:
-          'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
-      }}
-    >
-      {/* Final CTA Block */}
-      <div className="w-full border-b border-border" style={{ backgroundColor: "#fafafa" }}>
-        <div className="max-w-6xl mx-auto px-4 md:px-8 lg:px-16 py-20 flex flex-col items-center text-center">
-          {/* Mono eyebrow */}
-          <span
-            className="text-xs uppercase tracking-widest mb-6 block"
-            style={{
-              fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
-              color: "#0f6b4c"
-            }}
-          >
-            // siguiente paso
-          </span>
-
-          <h2
-            className="font-heading font-semibold mb-4 leading-tight tracking-tight"
-            style={{
-              fontSize: "clamp(1.5rem, 3vw, 2.25rem)",
-              color: "#0e0f10",
-              letterSpacing: "-0.01em"
-            }}
-          >
-            Tu próxima vacante ya se publicó
-          </h2>
-
-          <p
-            className="mb-8 max-w-md"
-            style={{
-              fontSize: "0.9375rem",
-              lineHeight: "1.65",
-              color: "#5b5f5c"
-            }}
-          >
-            Empieza gratis hoy. Sin tarjeta de crédito, sin compromisos. Encuentra antes que los
-            demás.
+    <footer id="footer" className={`border-t-2 border-foreground bg-[#fbfaf6] ${isHome ? "pb-16 md:pb-0" : ""}`}>
+      <div className="max-w-[1240px] mx-auto px-4 md:px-6 pt-[22px] md:pt-14 pb-6 md:pb-8 grid grid-cols-2 md:grid-cols-[repeat(auto-fit,minmax(190px,1fr))] gap-4 md:gap-8">
+        <div className="col-span-2 md:col-span-1">
+          <img src="/BT.png" alt="Buscotrabajo.co" className="h-[18px] md:h-[22px] w-auto" />
+          <p className="hidden md:block mt-3.5 mb-[18px] text-sm leading-relaxed text-[#3d413e]">
+            Todas las ofertas de empleo de Colombia en un solo lugar. Gratis.
           </p>
-
-          <Link
-            to="/dashboard"
-            className="inline-flex items-center justify-center px-8 py-3 rounded-sm font-semibold text-sm transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-            style={{
-              backgroundColor: "#0f6b4c",
-              color: "#fafafa",
-              minHeight: "44px",
-              borderRadius: "8px",
-              "--tw-ring-color": "#0f6b4c",
-              "--tw-ring-offset-color": "#fafafa"
-            } as CSSProperties}
-            {...hoverStyle<HTMLAnchorElement>(
-              { backgroundColor: "#14805a" },
-              { backgroundColor: "#0f6b4c" }
-            )}
-          >
-            Probar gratis
-          </Link>
+          <div className="mt-4 md:mt-0 grid grid-cols-4 md:flex gap-2 md:gap-2.5">
+            {socialLinks.map((social) => (
+              <a
+                key={social.href}
+                href={social.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={social.label}
+                className={`ink-card-sm ink-lift h-12 md:w-11 md:h-11 rounded-xl grid place-items-center text-foreground ${social.bg}`}
+              >
+                {social.icon}
+              </a>
+            ))}
+          </div>
+        </div>
+        <LinkColumn title="Recursos" links={resourceLinks} />
+        <LinkColumn title="Legal" links={legalLinks} />
+        <div className="col-span-2 md:col-span-1 flex flex-col gap-2.5">
+          <strong className="hidden md:block font-mono text-xs font-bold tracking-[0.1em]">CONTACTO</strong>
+          <a href={`mailto:${CONTACT_EMAIL}`} className="text-[13px] md:text-sm text-[#3d413e] break-all">
+            {CONTACT_EMAIL}
+          </a>
         </div>
       </div>
-
-      {/* Grid separator with mono label */}
-      <div className="w-full" style={{ backgroundColor: "#ffffff" }}>
-        <div className="max-w-6xl mx-auto px-4 md:px-8 lg:px-16">
-          {/* Retícula line with mono label */}
-          <div className="flex items-center gap-4 py-4 border-b border-border">
-            <span
-              className="text-xs shrink-0"
-              style={{
-                fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
-                color: "#9a9d98"
-              }}
-            >
-              // footer.nav
-            </span>
-            <div className="flex-1 h-px" style={{ backgroundColor: "#e6e8e4" }} />
-          </div>
-
-          {/* 4-column footer grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 py-12">
-            {/* Column 1: Producto */}
-            <div>
-              <div className="flex items-center gap-2 mb-5">
-                <span
-                  className="text-xs uppercase tracking-widest"
-                  style={{
-                    fontFamily:
-                      'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
-                    color: "#9a9d98"
-                  }}
-                >
-                  Producto
-                </span>
-              </div>
-              <ul className="space-y-3">
-                {productLinks.map((link) => (
-                  <li key={link.label}>
-                    <Link
-                      to={link.href}
-                      className="text-sm transition-colors duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 rounded-sm"
-                      style={{
-                        color: "#5b5f5c",
-                        fontSize: "0.9375rem",
-                        "--tw-ring-color": "#0f6b4c",
-                        "--tw-ring-offset-color": "#ffffff"
-                      } as CSSProperties}
-                      {...hoverStyle<HTMLAnchorElement>({ color: "#0e0f10" }, { color: "#5b5f5c" })}
-                    >
-                      {link.label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Column 2: Recursos */}
-            <div>
-              <div className="flex items-center gap-2 mb-5">
-                <span
-                  className="text-xs uppercase tracking-widest"
-                  style={{
-                    fontFamily:
-                      'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
-                    color: "#9a9d98"
-                  }}
-                >
-                  Recursos
-                </span>
-              </div>
-              <ul className="space-y-3">
-                {resourceLinks.map((link) => (
-                  <li key={link.label}>
-                    <Link
-                      to={link.href}
-                      className="transition-colors duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 rounded-sm"
-                      style={{
-                        color: "#5b5f5c",
-                        fontSize: "0.9375rem",
-                        "--tw-ring-color": "#0f6b4c",
-                        "--tw-ring-offset-color": "#ffffff"
-                      } as CSSProperties}
-                      {...hoverStyle<HTMLAnchorElement>({ color: "#0e0f10" }, { color: "#5b5f5c" })}
-                    >
-                      {link.label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Column 3: Legal */}
-            <div>
-              <div className="flex items-center gap-2 mb-5">
-                <span
-                  className="text-xs uppercase tracking-widest"
-                  style={{
-                    fontFamily:
-                      'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
-                    color: "#9a9d98"
-                  }}
-                >
-                  Legal
-                </span>
-              </div>
-              <ul className="space-y-3">
-                {legalLinks.map((link) => (
-                  <li key={link.label}>
-                    <Link
-                      to={link.href}
-                      className="transition-colors duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 rounded-sm"
-                      style={{
-                        color: "#5b5f5c",
-                        fontSize: "0.9375rem",
-                        "--tw-ring-color": "#0f6b4c",
-                        "--tw-ring-offset-color": "#ffffff"
-                      } as CSSProperties}
-                      {...hoverStyle<HTMLAnchorElement>({ color: "#0e0f10" }, { color: "#5b5f5c" })}
-                    >
-                      {link.label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Column 4: Contacto */}
-            <div>
-              <div className="flex items-center gap-2 mb-5">
-                <span
-                  className="text-xs uppercase tracking-widest"
-                  style={{
-                    fontFamily:
-                      'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
-                    color: "#9a9d98"
-                  }}
-                >
-                  Contacto
-                </span>
-              </div>
-              <ul className="space-y-3 mb-6">
-                {contactLinks.map((link) => (
-                  <li key={link.label}>
-                    <a
-                      href={link.href}
-                      className="transition-colors duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 rounded-sm"
-                      style={{
-                        color: "#5b5f5c",
-                        fontSize: "0.9375rem",
-                        fontFamily: link.label.includes("@")
-                          ? 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace'
-                          : "inherit",
-                        "--tw-ring-color": "#0f6b4c",
-                        "--tw-ring-offset-color": "#ffffff"
-                      } as CSSProperties}
-                      {...hoverStyle<HTMLAnchorElement>({ color: "#0e0f10" }, { color: "#5b5f5c" })}
-                    >
-                      {link.label}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-
-          {/* Bottom bar */}
-          <div
-            className="border-t py-6 flex flex-col sm:flex-row items-center justify-between gap-4"
-            style={{ borderColor: "#e6e8e4" }}
-          >
-            {/* Wordmark */}
-            <div className="flex items-center gap-2">
-              {/* Radar SVG icon */}
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                <circle cx="10" cy="10" r="9" stroke="#0f6b4c" strokeWidth={1} opacity={0.3} />
-                <circle cx="10" cy="10" r="6" stroke="#0f6b4c" strokeWidth={1} opacity={0.5} />
-                <circle cx="10" cy="10" r="3" stroke="#0f6b4c" strokeWidth={1} opacity={0.8} />
-                <circle cx="10" cy="10" r="1.5" fill="#0f6b4c" />
-              </svg>
-              <span className="font-semibold text-sm" style={{ color: "#0e0f10" }}>
-                BuscoTrabajo
-              </span>
-            </div>
-
-            {/* Copyright */}
-            <p
-              className="text-xs text-center"
-              style={{
-                fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
-                color: "#9a9d98"
-              }}
-            >
-              © 2026 BuscoTrabajo. Hecho en Medellín, Colombia.
-            </p>
-
-            {/* Nav links */}
-            <nav className="flex items-center gap-4 flex-wrap justify-center">
-              {navLinks.map((link) => (
-                <Link
-                  key={link.label}
-                  to={link.href}
-                  className="text-xs transition-colors duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 rounded-sm"
-                  style={{
-                    color: "#9a9d98",
-                    "--tw-ring-color": "#0f6b4c",
-                    "--tw-ring-offset-color": "#ffffff"
-                  } as CSSProperties}
-                  {...hoverStyle<HTMLAnchorElement>({ color: "#5b5f5c" }, { color: "#9a9d98" })}
-                >
-                  {link.label}
-                </Link>
-              ))}
-            </nav>
-          </div>
-        </div>
+      <div className="max-w-[1240px] mx-auto px-4 md:px-6 pt-4 pb-7 border-t-2 border-foreground flex flex-wrap justify-between gap-3 text-xs md:text-[13px] text-muted-foreground">
+        <span>© 2026 Buscotrabajo.co</span>
+        <span>Las marcas de los portales indican la procedencia de cada vacante; no implican alianza ni patrocinio.</span>
       </div>
     </footer>
   );

@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Search } from "lucide-react";
-import { MonoLabel } from "../components/MonoLabel.js";
-import { Input } from "../components/ui/input.js";
+import { PageHero, ContentCta } from "../components/ContentPage.js";
 import { CompanyAvatar } from "../components/CompanyAvatar.js";
 import { usePageMeta } from "../lib/use-page-meta.js";
+import { companiesDirectoryMeta } from "../lib/page-meta.js";
 import { buildCompanyPath } from "../lib/job-seo.js";
 import { getCountryConfig } from "../countries/index.js";
 
@@ -37,10 +37,8 @@ export default function CompaniesDirectory() {
   const country = location.pathname.startsWith("/ve") ? "VE" : "CO";
   const countryName = getCountryConfig(country).name;
 
-  usePageMeta({
-    title: `Empresas en ${countryName} | BuscoTrabajo`,
-    description: `Explora empresas con vacantes activas en ${countryName} en BuscoTrabajo — su reputación y ofertas.`
-  });
+  const directoryMeta = companiesDirectoryMeta(countryName);
+  usePageMeta({ title: directoryMeta.title, description: directoryMeta.description });
 
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -173,39 +171,50 @@ export default function CompaniesDirectory() {
     return () => observer.disconnect();
   }, [isLoading]);
 
+  const dashboardPath = country === "VE" ? "/ve/dashboard" : "/dashboard";
+
   return (
-    <section className="relative w-full min-h-screen bg-background">
-      <div className="relative max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-20">
-        <MonoLabel>EMPRESAS</MonoLabel>
-        <h1 className="mt-2 font-heading font-semibold text-2xl sm:text-3xl text-foreground">
-          Explora empresas con vacantes activas
-        </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
+    <div className="bg-white">
+      <PageHero
+        eyebrow="Empresas"
+        heading={directoryMeta.heading}
+        aside={
+          <form
+            role="search"
+            onSubmit={(e) => e.preventDefault()}
+            className="ink-card rounded-[18px] md:rounded-[22px] bg-white p-3 md:p-4 md:shadow-[6px_6px_0_hsl(var(--foreground))]"
+          >
+            <label htmlFor="company-search" className="block mb-2 font-mono text-xs font-semibold tracking-wider text-muted-foreground">
+              BUSCAR EMPRESA
+            </label>
+            <div className="relative">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground pointer-events-none" aria-hidden="true" />
+              <input
+                id="company-search"
+                type="search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Buscar empresa..."
+                className="w-full h-[54px] md:h-[60px] rounded-xl md:rounded-[14px] border-2 border-foreground bg-[#fbfaf6] pl-12 pr-4 text-[17px] focus:outline-none focus:ring-4 focus:ring-gold-1/60"
+              />
+            </div>
+          </form>
+        }
+      >
+        <p>
           {total > 0
             ? `${total.toLocaleString("es-CO")} empresas con vacantes activas ahora mismo.`
             : "Busca cualquier empresa por nombre."}{" "}
           Haz clic en una para ver su reputación y vacantes.
         </p>
+      </PageHero>
 
-        <div className="relative mt-6 mb-8 max-w-md">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-ink-faint pointer-events-none" />
-          <Input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar empresa..."
-            className="h-12 pl-11 rounded-full bg-card border-border-strong shadow-sm focus-visible:border-gold-2 focus-visible:ring-4 focus-visible:ring-gold-1/40"
-          />
-        </div>
-
+      <section className="max-w-[1240px] w-full mx-auto px-4 md:px-6 py-8 md:py-12">
         {isLoading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
             {Array.from({ length: 12 }).map((_, i) => (
-              <div
-                key={i}
-                className="rounded-lg border border-border bg-card p-4 animate-pulse flex items-center gap-3"
-              >
-                <div className="w-11 h-11 rounded-lg bg-muted shrink-0" />
+              <div key={i} className="rounded-2xl border-2 border-foreground/15 bg-white p-4 animate-pulse flex items-center gap-3">
+                <div className="w-12 h-12 rounded-xl bg-muted shrink-0" />
                 <div className="flex-1 space-y-2">
                   <div className="h-3 w-3/4 rounded bg-muted" />
                   <div className="h-2.5 w-1/2 rounded bg-muted" />
@@ -214,35 +223,41 @@ export default function CompaniesDirectory() {
             ))}
           </div>
         ) : companies.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Sin empresas que coincidan con tu búsqueda.</p>
+          <p className="ink-card-sm rounded-2xl bg-[#fdf1d3] p-5 text-[#3d413e]">Sin empresas que coincidan con tu búsqueda.</p>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {companies.map((c) => (
-              <Link
-                key={c.company}
-                to={buildCompanyPath(c.company, country)}
-                className="hud-corners flex items-center gap-3 rounded-lg border border-border bg-card p-4 hover:border-border-strong transition-colors"
-              >
-                <CompanyAvatar name={c.company} logoUrl={c.logoUrl} className="w-11 h-11 text-lg" />
-                <div className="min-w-0 flex-1">
-                  <p className="font-heading font-semibold text-sm text-foreground truncate">
-                    {c.company}
-                  </p>
-                  <p className="text-xs font-mono text-muted-foreground mt-0.5">
-                    <span className="text-primary font-semibold">{c.count}</span> vacante
-                    {c.count === 1 ? "" : "s"} activa{c.count === 1 ? "" : "s"}
-                  </p>
-                </div>
-              </Link>
-            ))}
-          </div>
+          <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
+            {companies.map((c) => {
+              return (
+                <li key={c.company}>
+                  <Link
+                    to={buildCompanyPath(c.company, country)}
+                    className="ink-card-sm ink-lift h-full flex items-center gap-3 rounded-2xl bg-white p-4 text-foreground no-underline"
+                  >
+                    <CompanyAvatar name={c.company} logoUrl={c.logoUrl} className="w-12 h-12 text-lg" />
+                    <span className="min-w-0 flex-1">
+                      <strong className="block font-heading font-bold text-[15px] md:text-base truncate">{c.company}</strong>
+                      {/* Plain text, no pill: 48 tinted pills side by side read as
+                          noise. The number carries the weight, the label stays quiet. */}
+                      <span className="mt-0.5 block text-[13px] text-muted-foreground">
+                        <strong className="font-bold text-foreground">{c.count.toLocaleString("es-CO")}</strong>{" "}
+                        vacante{c.count === 1 ? "" : "s"} activa{c.count === 1 ? "" : "s"}
+                      </span>
+                    </span>
+                    <span aria-hidden="true" className="font-bold text-muted-foreground">→</span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
         )}
 
         <div ref={sentinelRef} className="h-4" />
         {isLoadingMore && (
           <p className="text-center text-xs font-mono text-ink-faint py-4">Cargando más empresas...</p>
         )}
-      </div>
-    </section>
+      </section>
+
+      {!hasMore && !isLoading ? <ContentCta to={dashboardPath} /> : null}
+    </div>
   );
 }

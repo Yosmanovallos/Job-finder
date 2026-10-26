@@ -7,6 +7,8 @@ import dotenv from "dotenv";
 import {
   getJobsPage,
   getJobById,
+  getHomeJobCounts,
+  getHomeCompanies,
   getSupersedingTarget,
   isJobExpiredInPlace,
   getActiveCompanyNames,
@@ -31,6 +33,8 @@ import { isPlaceholderEmployer } from "./lib/company-key.js";
 import { COMPANY_LOGO_DOMAINS, getCompanyLogoUrl } from "./data/company-logo-domains.js";
 import { getOfficialCareersUrl } from "./data/official-careers-links.js";
 import { getCountryConfig } from "./countries/index.js";
+import { PAYWALL_ENABLED } from "./config.js";
+import { getHomeCities, isHomeCountry, type HomeData } from "./lib/home-stats.js";
 import {
   escapeHtml,
   escapeJsonForScriptTag,
@@ -78,9 +82,11 @@ import {
   NOT_FOUND_MARKDOWN,
   getHomeContent,
   injectPublicContent,
+  injectRouteMeta,
   renderContentMarkdown,
   wantsMarkdown
 } from "./lib/agent-readiness.js";
+import { ROUTE_META, companiesDirectoryMeta, dashboardDescription } from "./lib/page-meta.js";
 import {
   SOURCE_DIRECTORY_SLUGS,
   SOURCES_PAGE_DESCRIPTION,
@@ -471,6 +477,76 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     return;
   }
 
+  // 3z. GET /api/home-stats?country=CO|VE — every figure the homepage shows,
+  //     in one response (it used to be ~13 /api/jobs + /api/companies/search
+  //     calls per visit). Same payload for every visitor: no session lookup,
+  //     only known countries and the homepage's own city list, so it can't be
+  //     turned into an arbitrary-filter query. A part whose query fails comes
+  //     back null/empty (the page hides it) and the response is then never
+  //     shared by the edge.
+  if (pathname === "/api/home-stats" && method === "GET") {
+    const country = (parsedUrl.searchParams.get("country") || "").toUpperCase();
+    if (!isHomeCountry(country)) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "País no soportado" }));
+      return;
+    }
+    const cities = getHomeCities(country);
+    const [counts, companies] = await Promise.allSettled([
+      getHomeJobCounts(country, cities),
+      getHomeCompanies(country, 12, Object.keys(COMPANY_LOGO_DOMAINS))
+    ]);
+    const jobs = counts.status === "fulfilled" ? counts.value : null;
+    const companyPage = companies.status === "fulfilled" ? companies.value : null;
+    const latest = jobs ? maskLockedFields(jobs.latestJobs, "free") : [];
+    const body: HomeData = {
+      totalJobs: jobs?.totalJobs ?? null,
+      last7Days: jobs?.last7Days ?? null,
+      last24Hours: jobs?.last24Hours ?? null,
+      onSite: jobs?.onSite ?? null,
+      remote: jobs?.remote ?? null,
+      totalCompanies: companyPage?.total ?? null,
+      cityCounts: Object.fromEntries(cities.map((city) => [city, jobs?.cityCounts[city] ?? null])),
+      latestJobs: latest.map((job) => ({
+        jobId: job.jobId,
+        title: job.title,
+        company: job.company,
+        location: job.location,
+        source: job.source,
+        dateText: job.dateText,
+        publishedAt: job.publishedAt
+      })),
+      companies: (companyPage?.companies ?? []).map((item) => ({
+        company: item.company,
+        count: item.count,
+        logoUrl: getCompanyLogoUrl(item.company)
+      }))
+    };
+    if (!jobs || !companyPage) {
+      console.warn(
+        JSON.stringify({
+          ts: new Date().toISOString(),
+          event: "home_stats_partial",
+          country,
+          countsFailed: !jobs,
+          companiesFailed: !companyPage
+        })
+      );
+    }
+    await sendBody(
+      req,
+      res,
+      200,
+      {
+        "Content-Type": "application/json",
+        "Cache-Control":
+          jobs && companyPage ? "public, max-age=60, s-maxage=300, stale-while-revalidate=600" : "private, no-store"
+      },
+      JSON.stringify(body)
+    );
+    return;
+  }
+
   // 4. GET /api/jobs — tier is always resolved server-side from a verified
   //    session; free/anonymous callers get the 48h freshness paywall masking.
   //    PostgreSQL filters/counts/paginates; only the requested page enters
@@ -849,6 +925,15 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
   // 6. POST /api/checkout/start (requiere sesión autenticada) — inicia un
   //    Wompi Web Checkout real (sandbox) para el plan Pro o Pro Max mensual.
   if (pathname === "/api/checkout/start" && method === "POST") {
+    // The service is free while the paywall is off (config.ts), so no
+    // payment can start; the same flag brings checkout back with the paid
+    // plans. The Wompi webhook below stays live on purpose: it only ever
+    // confirms a payment that some earlier checkout started.
+    if (!PAYWALL_ENABLED) {
+      res.writeHead(404, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Los pagos no están disponibles por ahora." }));
+      return;
+    }
     const session = await verifySession(req);
     if (!session) {
       res.writeHead(401, { "Content-Type": "application/json" });
@@ -1437,10 +1522,11 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
         logoUrl: getCompanyLogoUrl(item.company)
       }));
       const total = companyPage.total;
-      const heading = `Empresas en ${countryConfig.name}`;
+      const directoryMeta = companiesDirectoryMeta(countryConfig.name);
+      const heading = directoryMeta.heading;
       const meta = {
-        title: `${heading} | BuscoTrabajo`,
-        description: `Explora empresas con vacantes activas en ${countryConfig.name} en BuscoTrabajo — su reputación y ofertas.`,
+        title: directoryMeta.title,
+        description: directoryMeta.description,
         canonicalUrl: `${SITE_URL}${isVeEmpresas ? "/ve" : ""}/empresas`
       };
 
@@ -1762,13 +1848,13 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     // meta.ts) — this just makes them true in the raw HTML too, instead of
     // only after JS runs.
     const dashboardTitle = `Vacantes de Empleo en ${countryConfig.name} | BuscoTrabajo`;
-    const dashboardDescription = `Explora vacantes actualizadas de LinkedIn, Computrabajo${country === "CO" ? ", Elempleo" : ""} y más en ${countryConfig.name}, filtradas y sin duplicados. Gratis para vacantes con más de 48h publicadas.`;
+    const dashboardDescriptionText = dashboardDescription(country, countryConfig.name);
     const dashboardCanonical = `${SITE_URL}${pathname}`;
     indexHtml = indexHtml
       .replace(/<title>[\s\S]*?<\/title>/, `<title>${escapeHtml(dashboardTitle)}</title>`)
       .replace(
         /<meta[^>]*name=["']description["'][^>]*>/,
-        `<meta name="description" content="${escapeHtml(dashboardDescription)}" />`
+        `<meta name="description" content="${escapeHtml(dashboardDescriptionText)}" />`
       )
       .replace(
         /<link[^>]*rel=["']canonical["'][^>]*>/,
@@ -1803,7 +1889,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       )
       .replace(
         /<meta[^>]*property=["']og:description["'][^>]*>/,
-        `<meta property="og:description" content="${escapeHtml(dashboardDescription)}" />`
+        `<meta property="og:description" content="${escapeHtml(dashboardDescriptionText)}" />`
       )
       .replace(
         /<meta[^>]*name=["']twitter:title["'][^>]*>/,
@@ -1811,7 +1897,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       )
       .replace(
         /<meta[^>]*name=["']twitter:description["'][^>]*>/,
-        `<meta name="twitter:description" content="${escapeHtml(dashboardDescription)}" />`
+        `<meta name="twitter:description" content="${escapeHtml(dashboardDescriptionText)}" />`
       );
 
     // Lets the client skip its own redundant first fetch to /api/jobs when
@@ -2046,6 +2132,15 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       (canonicalTag) => `${canonicalTag}\n${hreflangTags}`
     );
 
+    // The homepage's desktop LCP is its dashboard screenshot
+    // (HomeLanding.tsx), which the client-rendered page would otherwise
+    // only request after the JS bundle runs. Wide screens only: phones
+    // never render that art.
+    indexHtml = indexHtml.replace(
+      "</head>",
+      `    <link rel="preload" as="image" href="/home/dash-desktop.webp" imagesrcset="/home/dash-desktop-960.webp 960w, /home/dash-desktop.webp 1600w" imagesizes="680px" type="image/webp" media="(min-width: 768px)" fetchpriority="high" />\n</head>`
+    );
+
     if (isVe) {
       // Real, already-established facts only (AGENTS.md #5): VE's own
       // source list (SOURCES_BY_COUNTRY.VE — 7 sources, not CO's 10; no
@@ -2077,6 +2172,17 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     return;
   }
 
+  // /pricing sells the Pro plans, which unlock nothing while the paywall is
+  // off (job-repository.ts gives every tier every job). Send old links and
+  // bookmarks home instead of to a live checkout for an empty plan. Same
+  // flag as the client route, so turning the paywall back on restores the
+  // page; the bounded max-age keeps browsers from pinning the 301 forever.
+  if (pathname === "/pricing" && !PAYWALL_ENABLED && (method === "GET" || method === "HEAD")) {
+    res.writeHead(301, { Location: "/", "Cache-Control": "public, max-age=3600" });
+    res.end();
+    return;
+  }
+
   // 6. Static Files (HTML, CSS, JS) + SPA fallback. Any path without a file
   // extension is a client-side route (/dashboard, /pricing, /legal/terminos,
   // etc.) — those must serve index.html so React Router can mount and take
@@ -2097,6 +2203,30 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     );
     return;
   }
+
+  // Client-rendered routes with no SSR body of their own (/como-funciona,
+  // /preguntas, /legal/*, sign-in/account pages): they used to ship the
+  // homepage's <title>, description and canonical="/" — every one of them
+  // declared itself a duplicate of the home. Inject their own head (and H1
+  // where they have one) from the same registry the React pages read.
+  const routeMeta = !hasFileExtension ? ROUTE_META[pathname] : undefined;
+  if (routeMeta && (method === "GET" || method === "HEAD")) {
+    try {
+      const indexHtml = (await readStaticFile(path.join(PUBLIC_DIR, "index.html"))).toString("utf-8");
+      await sendBody(
+        req,
+        res,
+        200,
+        { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "private, no-store", Vary: "Accept" },
+        injectRouteMeta(indexHtml, pathname, routeMeta)
+      );
+    } catch {
+      res.writeHead(500, { "Content-Type": "text/plain" });
+      res.end("Server Error: build not found");
+    }
+    return;
+  }
+
   const filePath = path.join(PUBLIC_DIR, hasFileExtension ? pathname : "index.html");
 
   const ext = path.extname(filePath);
@@ -2111,7 +2241,13 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     // is exactly the kind of thing Search Console's sitemap validator
     // rejects as "invalid" — robots.txt is correctly text/plain already.
     ".xml": "application/xml",
-    ".txt": "text/plain"
+    ".txt": "text/plain",
+    // Homepage images (static/home/). Without these they fell through to
+    // text/plain, which browsers may refuse to render as an image.
+    ".webp": "image/webp",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".ico": "image/x-icon"
   };
 
   const contentType = mimeTypes[ext] || "text/plain";

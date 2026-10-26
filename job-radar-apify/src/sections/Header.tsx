@@ -1,10 +1,8 @@
-import { useState, useEffect, useRef, type CSSProperties } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { ChevronDown, Check } from "lucide-react";
-import { hoverStyle } from "../lib/hover-style.js";
 import { useAuth } from "../auth/auth-provider.js";
 import { PAYWALL_ENABLED } from "../config.js";
-import { Button } from "../components/ui/button.js";
 import { FlagIcon } from "../components/FlagIcon.js";
 import { getEffectiveCountry, setStoredCountry, isVePrefixed } from "../lib/country-context.js";
 
@@ -85,18 +83,10 @@ function CountrySwitcher({ country, pathname, variant, onNavigate }: CountrySwit
     onNavigate?.();
   };
 
-  const optionStyle = (code: string): CSSProperties => ({
-    display: "flex",
-    alignItems: "center",
-    gap: "0.5rem",
-    padding: "0.5rem 0.75rem",
-    borderRadius: "6px",
-    fontSize: "0.875rem",
-    color: code === country ? "#0e0f10" : "#5b5f5c",
-    fontWeight: code === country ? 600 : 400,
-    textDecoration: "none",
-    background: code === country ? "#f1f2f0" : "transparent"
-  });
+  const optionClass = (code: string) =>
+    `flex items-center gap-2 rounded-lg px-3 py-2 text-sm no-underline ${
+      code === country ? "bg-green-soft font-bold text-foreground" : "text-[#3d413e] hover:bg-[#f4f5f2]"
+    }`;
 
   if (variant === "mobile") {
     return (
@@ -106,17 +96,15 @@ function CountrySwitcher({ country, pathname, variant, onNavigate }: CountrySwit
             key={code}
             to={getCountryTargetHref(pathname, code)}
             onClick={() => handleSelect(code)}
-            style={{
-              ...optionStyle(code),
-              flex: 1,
-              justifyContent: "center",
-              border: `1px solid ${code === country ? "#0f6b4c" : "#e6e8e4"}`,
-              minHeight: "44px"
-            }}
+            className={`flex-1 min-h-[48px] justify-center rounded-xl border-2 ${
+              code === country
+                ? "border-foreground bg-green-soft font-bold shadow-[3px_3px_0_hsl(var(--foreground))]"
+                : "border-foreground/20 bg-white"
+            } flex items-center gap-2 text-sm text-foreground no-underline`}
           >
             <FlagIcon code={code} className="w-5 h-3.5 shrink-0" />
             {COUNTRY_LABELS[code]}
-            {code === country && <Check className="h-3.5 w-3.5" style={{ color: "#0f6b4c" }} />}
+            {code === country && <Check className="h-4 w-4 text-primary" />}
           </Link>
         ))}
       </div>
@@ -124,53 +112,23 @@ function CountrySwitcher({ country, pathname, variant, onNavigate }: CountrySwit
   }
 
   return (
-    <div ref={containerRef} style={{ position: "relative" }}>
+    <div ref={containerRef} className="relative">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label={`País: ${COUNTRY_LABELS[country]}. Cambiar país`}
-        className="flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-        style={{
-          padding: "0.5rem 0.75rem",
-          borderRadius: "999px",
-          border: "1px solid #e6e8e4",
-          background: "#ffffff",
-          minHeight: "44px",
-          cursor: "pointer"
-        }}
-        {...hoverStyle<HTMLButtonElement>({ borderColor: "#d3d6cf" }, { borderColor: "#e6e8e4" })}
+        className="flex items-center gap-1.5 h-11 rounded-full border-2 border-foreground bg-white px-3 text-sm font-bold text-foreground transition-colors hover:bg-green-soft focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gold-1/60"
       >
         <FlagIcon code={country} className="w-5 h-3.5 shrink-0" />
-        <span className="text-sm font-mono" style={{ color: "#5b5f5c" }}>
-          {country}
-        </span>
-        <ChevronDown
-          className="h-3.5 w-3.5"
-          style={{
-            color: "#9a9d98",
-            transform: open ? "rotate(180deg)" : "none",
-            transition: "transform 150ms ease-out"
-          }}
-        />
+        <span className="font-mono">{country}</span>
+        <ChevronDown className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
         <div
           role="listbox"
-          className="flex flex-col gap-1"
-          style={{
-            position: "absolute",
-            top: "calc(100% + 6px)",
-            right: 0,
-            minWidth: "168px",
-            padding: "0.375rem",
-            borderRadius: "10px",
-            border: "1px solid #e6e8e4",
-            background: "#ffffff",
-            boxShadow: "0 8px 24px rgba(14,15,16,0.10)",
-            zIndex: 60
-          }}
+          className="absolute right-0 top-[calc(100%+8px)] z-[60] min-w-[180px] flex flex-col gap-1 rounded-xl border-2 border-foreground bg-white p-1.5 shadow-[4px_4px_0_hsl(var(--foreground))]"
         >
           {COUNTRY_ORDER.map((code) => (
             <Link
@@ -179,17 +137,11 @@ function CountrySwitcher({ country, pathname, variant, onNavigate }: CountrySwit
               role="option"
               aria-selected={code === country}
               onClick={() => handleSelect(code)}
-              style={optionStyle(code)}
-              {...hoverStyle<HTMLAnchorElement>(
-                { background: "#f1f2f0" },
-                { background: code === country ? "#f1f2f0" : "transparent" }
-              )}
+              className={optionClass(code)}
             >
               <FlagIcon code={code} className="w-5 h-3.5 shrink-0" />
               {COUNTRY_LABELS[code]}
-              {code === country && (
-                <Check className="h-3.5 w-3.5 ml-auto" style={{ color: "#0f6b4c" }} />
-              )}
+              {code === country && <Check className="h-4 w-4 ml-auto text-primary" />}
             </Link>
           ))}
         </div>
@@ -236,131 +188,76 @@ export default function Header() {
   const homeHref = isVenezuela ? "/ve" : "/";
   const dashboardHref = isVenezuela ? "/ve/dashboard" : "/dashboard";
 
+  const isActive = (to: string) => location.pathname === to || location.pathname.startsWith(`${to}/`);
+  const ghostButton =
+    "ink-card-sm ink-lift inline-flex h-11 items-center justify-center rounded-xl bg-white px-4 text-sm font-bold text-foreground no-underline";
+  const ctaButton =
+    "ink-card-sm ink-lift inline-flex h-11 items-center justify-center rounded-xl bg-gold-2 px-5 text-sm font-bold text-[#2a1d06] no-underline";
+
+  // Same look as the rest of the redesign: ink outline, hard offset shadows,
+  // gold call to action. Height stays 64px: the dashboard's sticky search
+  // bar sits at top-16 right under it.
   return (
-    <header
-      id="header"
-      className="sticky top-0 z-50 w-full"
-      style={{
-        backgroundColor: "rgba(250,250,250, 0.85)",
-        backdropFilter: "blur(12px)",
-        WebkitBackdropFilter: "blur(12px)",
-        borderBottom: "1px solid #e6e8e4"
-      }}
-    >
-      {/* Main nav bar */}
-      <div
-        className="mx-auto flex items-center justify-between px-4 md:px-8"
-        style={{ maxWidth: "1200px", height: "64px" }}
-      >
-        {/* Brand */}
+    <header id="header" className="sticky top-0 z-50 w-full border-b-2 border-foreground bg-white/90 backdrop-blur-md">
+      <div className="mx-auto flex h-16 max-w-[1240px] items-center justify-between gap-4 px-4 md:px-6">
         <Link
           to={homeHref}
-          className="flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 rounded-sm"
-          style={{
-            color: "#0e0f10"
-          }}
+          className="flex shrink-0 items-center rounded-md focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gold-1/60"
           aria-label="BuscoTrabajo — inicio"
         >
-          <img
-            src="/BT.png"
-            alt="BuscoTrabajo.co"
-            style={{ display: "block", height: "28px", width: "auto" }}
-          />
+          <img src="/BT.png" alt="BuscoTrabajo.co" className="block h-7 w-auto" />
         </Link>
 
-        {/* Desktop center nav */}
         <nav className="hidden lg:flex items-center gap-1" aria-label="Navegación principal">
           {navLinks.map((link) => (
             <Link
               key={link.to}
               to={link.to}
-              className="relative px-4 py-2 rounded-sm transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-              style={{
-                fontFamily:
-                  'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-                fontSize: "0.9375rem",
-                color: "#5b5f5c",
-                textDecoration: "none",
-                minHeight: "44px",
-                display: "flex",
-                alignItems: "center"
-              }}
-              {...hoverStyle<HTMLAnchorElement>({ color: "#0e0f10" }, { color: "#5b5f5c" })}
+              aria-current={isActive(link.to) ? "page" : undefined}
+              className={`flex h-11 items-center rounded-full px-4 text-[15px] font-semibold no-underline transition-colors focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gold-1/60 ${
+                isActive(link.to) ? "bg-green-soft text-primary" : "text-[#3d413e] hover:bg-[#f4f5f2] hover:text-foreground"
+              }`}
             >
               {link.label}
             </Link>
           ))}
         </nav>
 
-        {/* Desktop right actions */}
-        <div className="hidden lg:flex items-center gap-2">
+        <div className="hidden lg:flex items-center gap-2.5">
           <CountrySwitcher country={country} pathname={location.pathname} variant="desktop" />
           {loading ? (
             // Avoid a flash of "logged out" while the session (incl. an OAuth
             // redirect hash) is still being resolved on first paint.
-            <div className="w-24" style={{ height: "44px" }} />
+            <div className="h-11 w-24" />
           ) : isAuthenticated ? (
-            <Button variant="outline" size="lg" className="font-mono text-xs" asChild>
-              <Link to="/cuenta">{accountLabel}</Link>
-            </Button>
+            <Link to="/cuenta" className={`${ghostButton} max-w-[220px] truncate font-mono text-xs`}>
+              {accountLabel}
+            </Link>
           ) : (
             <>
-              <Button variant="outline" size="lg" asChild>
-                <Link to={loginHref}>Iniciar sesión</Link>
-              </Button>
-              <Button size="lg" asChild>
-                <Link to={dashboardHref}>Probar gratis</Link>
-              </Button>
+              <Link to={loginHref} className={ghostButton}>
+                Iniciar sesión
+              </Link>
+              <Link to={dashboardHref} className={ctaButton}>
+                Ver vacantes
+              </Link>
             </>
           )}
         </div>
 
-        {/* Mobile hamburger */}
         <button
-          className="lg:hidden flex items-center justify-center rounded-sm transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-          style={{
-            width: "44px",
-            height: "44px",
-            color: "#5b5f5c",
-            backgroundColor: "transparent",
-            border: "1px solid #e6e8e4",
-            borderRadius: "8px"
-          }}
+          className="lg:hidden ink-card-sm flex h-11 w-11 items-center justify-center rounded-xl bg-white text-foreground focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gold-1/60"
           aria-expanded={mobileNavOpen}
           aria-label={mobileNavOpen ? "Cerrar menú" : "Abrir menú"}
           onClick={() => setMobileNavOpen((prev) => !prev)}
-          {...hoverStyle<HTMLButtonElement>(
-            { color: "#0e0f10", borderColor: "#d3d6cf" },
-            { color: "#5b5f5c", borderColor: "#e6e8e4" }
-          )}
         >
           {mobileNavOpen ? (
-            /* X icon */
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 18 18"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              aria-hidden="true"
-            >
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
               <line x1="3" y1="3" x2="15" y2="15" />
               <line x1="15" y1="3" x2="3" y2="15" />
             </svg>
           ) : (
-            /* Hamburger icon */
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 18 18"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              aria-hidden="true"
-            >
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
               <line x1="2" y1="5" x2="16" y2="5" />
               <line x1="2" y1="9" x2="16" y2="9" />
               <line x1="2" y1="13" x2="16" y2="13" />
@@ -369,107 +266,47 @@ export default function Header() {
         </button>
       </div>
 
-      {/* Mobile dropdown panel */}
       {mobileNavOpen && (
         <div
-          className="lg:hidden w-full"
-          style={{
-            backgroundColor: "#ffffff",
-            borderTop: "1px solid #e6e8e4",
-            borderBottom: "1px solid #e6e8e4"
-          }}
+          className="lg:hidden w-full border-t-2 border-foreground bg-white"
           role="dialog"
           aria-modal="true"
           aria-label="Menú de navegación"
         >
-          {/* Mono system label */}
-          <div
-            className="px-4 pt-4 pb-2"
-            style={{
-              fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
-              fontSize: "0.6875rem",
-              color: "#9a9d98",
-              letterSpacing: "0.1em",
-              textTransform: "uppercase",
-              borderBottom: "1px solid #e6e8e4"
-            }}
-          >
-            — navegación
-          </div>
-
-          <nav className="flex flex-col px-4 py-3 gap-1" aria-label="Navegación móvil">
+          <nav className="flex flex-col gap-1.5 px-4 pt-4" aria-label="Navegación móvil">
             {navLinks.map((link) => (
               <Link
                 key={link.to}
                 to={link.to}
                 onClick={handleNavClick}
-                className="flex items-center rounded-sm transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-                style={{
-                  fontFamily:
-                    'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-                  fontSize: "1rem",
-                  color: "#5b5f5c",
-                  textDecoration: "none",
-                  minHeight: "48px",
-                  padding: "0 8px"
-                }}
-                {...hoverStyle<HTMLAnchorElement>(
-                  { color: "#0e0f10", backgroundColor: "#f1f2f0" },
-                  { color: "#5b5f5c", backgroundColor: "transparent" }
-                )}
+                aria-current={isActive(link.to) ? "page" : undefined}
+                className={`flex min-h-[52px] items-center justify-between rounded-xl px-4 font-heading text-lg font-bold no-underline ${
+                  isActive(link.to) ? "bg-green-soft text-primary" : "text-foreground hover:bg-[#f4f5f2]"
+                }`}
               >
                 {link.label}
+                <span aria-hidden="true" className="text-muted-foreground">→</span>
               </Link>
             ))}
-            <div className="px-2 pt-2">
-              <CountrySwitcher
-                country={country}
-                pathname={location.pathname}
-                variant="mobile"
-                onNavigate={handleNavClick}
-              />
-            </div>
           </nav>
-
-          {/* Divider */}
-          <div style={{ borderTop: "1px solid #e6e8e4", margin: "0 16px" }} />
-
-          {/* Mobile actions */}
-          <div className="flex flex-col gap-3 px-4 py-4">
+          <div className="px-4 pt-4">
+            <CountrySwitcher country={country} pathname={location.pathname} variant="mobile" onNavigate={handleNavClick} />
+          </div>
+          <div className="flex flex-col gap-3 px-4 py-5">
             {loading ? null : isAuthenticated ? (
-              <Button variant="outline" size="lg" className="font-mono text-sm" asChild>
-                <Link to="/cuenta" onClick={handleNavClick}>
-                  {accountLabel}
-                </Link>
-              </Button>
+              <Link to="/cuenta" onClick={handleNavClick} className={`${ghostButton} h-12 font-mono`}>
+                {accountLabel}
+              </Link>
             ) : (
               <>
-                <Button variant="outline" size="lg" className="text-base" asChild>
-                  <Link to={loginHref} onClick={handleNavClick}>
-                    Iniciar sesión
-                  </Link>
-                </Button>
-                <Button size="lg" className="text-base" asChild>
-                  <Link to={dashboardHref} onClick={handleNavClick}>
-                    Probar gratis
-                  </Link>
-                </Button>
+                <Link to={dashboardHref} onClick={handleNavClick} className={`${ctaButton} h-12 text-base`}>
+                  Ver vacantes
+                </Link>
+                <Link to={loginHref} onClick={handleNavClick} className={`${ghostButton} h-12 text-base`}>
+                  Iniciar sesión
+                </Link>
               </>
             )}
-          </div>
-
-          {/* Bottom mono system line */}
-          <div
-            className="px-4 py-2"
-            style={{
-              fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
-              fontSize: "0.6875rem",
-              color: "#9a9d98",
-              letterSpacing: "0.08em",
-              borderTop: "1px solid #e6e8e4"
-            }}
-          >
-            sys://buscotrabajo/nav · v1.0
           </div>
         </div>
       )}

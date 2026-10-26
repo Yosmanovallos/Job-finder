@@ -28,6 +28,8 @@ export function CompanyAvatar({ name, logoUrl, className }: CompanyAvatarProps) 
       <img
         src={logoUrl}
         alt=""
+        loading="lazy"
+        decoding="async"
         onError={() => setFailed(true)}
         className={cn(
           "shrink-0 rounded-lg object-contain bg-white border border-border p-1.5",

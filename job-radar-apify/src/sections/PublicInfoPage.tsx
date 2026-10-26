@@ -1,58 +1,67 @@
-import { Link, useLocation } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { PUBLIC_PAGES } from "../lib/agent-readiness.js";
 import { usePageMeta } from "../lib/use-page-meta.js";
+import { TINTS } from "../lib/brand-tints.js";
+import { ContentCta, ContentSection, InkPanel, PageHero, PillLink } from "../components/ContentPage.js";
+
+// /docs, /about, /contact and /privacy. The copy is the agent-readiness
+// contract (PUBLIC_PAGES, also served as HTML/Markdown by server.ts) and is
+// rendered verbatim — only the presentation lives here.
+const EYEBROW: Record<string, string> = {
+  "/docs": "Documentación",
+  "/about": "Sobre BuscoTrabajo",
+  "/contact": "Contacto",
+  "/privacy": "Privacidad"
+};
 
 export default function PublicInfoPage() {
   const { pathname } = useLocation();
   const page = PUBLIC_PAGES[pathname] || PUBLIC_PAGES["/about"]!;
   usePageMeta({ title: page.title, description: page.description });
+  const lastIsAlone = page.sections.length % 2 === 1;
 
   return (
-    <section className="min-h-screen px-4 py-16" style={{ backgroundColor: "#fafafa" }}>
-      <article className="max-w-3xl mx-auto">
-        <Link to="/" className="inline-block mb-6 text-sm font-mono text-primary">
-          ← Volver al inicio
-        </Link>
-        <h1 className="text-3xl md:text-4xl font-bold mb-6 font-heading" style={{ color: "#0e0f10" }}>
-          {page.heading}
-        </h1>
-        <div className="space-y-4 mb-10">
-          {page.introduction.map((paragraph) => (
-            <p key={paragraph} className="leading-relaxed" style={{ color: "#5b5f5c" }}>
-              {paragraph}
-            </p>
-          ))}
-        </div>
-        <div className="space-y-10">
-          {page.sections.map((section) => (
-            <section key={section.heading}>
-              <h2 className="text-xl font-semibold mb-3 font-heading" style={{ color: "#0e0f10" }}>
-                {section.heading}
-              </h2>
-              <div className="space-y-3">
-                {section.paragraphs.map((paragraph) => (
-                  <p key={paragraph} className="text-sm md:text-base leading-relaxed" style={{ color: "#5b5f5c" }}>
-                    {paragraph}
-                  </p>
-                ))}
-              </div>
-              {section.links?.length ? (
-                <ul className="mt-4 space-y-2">
-                  {section.links.map((link) => (
-                    <li key={link.href}>
-                      {link.href.startsWith("mailto:") ? (
-                        <a className="text-sm font-medium text-primary underline" href={link.href}>{link.label}</a>
-                      ) : (
-                        <Link className="text-sm font-medium text-primary underline" to={link.href}>{link.label}</Link>
-                      )}
-                    </li>
+    <div className="bg-white">
+      <PageHero eyebrow={EYEBROW[pathname] ?? "BuscoTrabajo"} heading={page.heading}>
+        {page.introduction.map((paragraph) => (
+          <p key={paragraph}>{paragraph}</p>
+        ))}
+      </PageHero>
+      <ContentSection>
+        <div className="sr-stagger grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+          {page.sections.map((section, index) => {
+            const tint = TINTS[index % TINTS.length]!;
+            const wide = lastIsAlone && index === page.sections.length - 1;
+            return (
+              <InkPanel key={section.heading} tint={tint.bg} className={wide ? "md:col-span-2" : ""}>
+                <p className="font-mono text-xs font-bold" style={{ color: tint.sub }}>
+                  {String(index + 1).padStart(2, "0")}
+                </p>
+                <h2 className="mt-1 font-heading font-bold text-xl md:text-[28px] leading-tight tracking-[-0.02em]" style={{ color: tint.fg }}>
+                  {section.heading}
+                </h2>
+                <div className="mt-3 space-y-3">
+                  {section.paragraphs.map((paragraph) => (
+                    <p key={paragraph} className="text-[15px] md:text-base leading-relaxed text-[#3d413e]">
+                      {paragraph}
+                    </p>
                   ))}
-                </ul>
-              ) : null}
-            </section>
-          ))}
+                </div>
+                {section.links?.length ? (
+                  <ul className="mt-5 flex flex-wrap gap-2.5">
+                    {section.links.map((link) => (
+                      <li key={link.href}>
+                        <PillLink href={link.href}>{link.label}</PillLink>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </InkPanel>
+            );
+          })}
         </div>
-      </article>
-    </section>
+      </ContentSection>
+      <ContentCta />
+    </div>
   );
 }

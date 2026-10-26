@@ -1,4 +1,7 @@
-import { useState } from "react";
+import { ROUTE_META } from "../lib/page-meta.js";
+import { TINTS } from "../lib/brand-tints.js";
+import { YouTubeLite } from "../components/YouTubeLite.js";
+import { ContentCta, ContentSection, PageHero, PillLink, SectionHeading } from "../components/ContentPage.js";
 
 // Process steps data — kept deliberately close to what the product actually
 // does today: no "AI" claim for what is really a synonym dictionary
@@ -12,8 +15,8 @@ const processSteps = [
       "Un cargo, una palabra clave o el área en la que quieres trabajar. Sin formularios largos.",
     icon: (
       <svg
-        width="20"
-        height="20"
+        width="24"
+        height="24"
         viewBox="0 0 20 20"
         fill="none"
         stroke="currentColor"
@@ -33,8 +36,8 @@ const processSteps = [
       "Cruzamos sinónimos y variantes del cargo para no dejar publicaciones por fuera, en español o inglés.",
     icon: (
       <svg
-        width="20"
-        height="20"
+        width="24"
+        height="24"
         viewBox="0 0 20 20"
         fill="none"
         stroke="currentColor"
@@ -54,8 +57,8 @@ const processSteps = [
       "Duplicados fusionados y enlaces caídos descartados antes de que los veas.",
     icon: (
       <svg
-        width="20"
-        height="20"
+        width="24"
+        height="24"
         viewBox="0 0 20 20"
         fill="none"
         stroke="currentColor"
@@ -74,8 +77,8 @@ const processSteps = [
       "Ordenados por frescura, con scroll infinito y filtros por ciudad, modalidad y portal.",
     icon: (
       <svg
-        width="20"
-        height="20"
+        width="24"
+        height="24"
         viewBox="0 0 20 20"
         fill="none"
         stroke="currentColor"
@@ -93,172 +96,52 @@ const processSteps = [
 ];
 
 export default function ComparisonAndProcess() {
-  const [hoveredStep, setHoveredStep] = useState<number | null>(null);
+  const meta = ROUTE_META["/como-funciona"]!;
 
   return (
-    <section
-      id="comparison-and-process"
-      className="bg-background py-16 md:py-20 px-4 md:px-8 lg:px-16 overflow-x-hidden"
-      style={{ backgroundColor: "#fafafa" }}
-    >
-      <div className="max-w-6xl mx-auto">
-        {/* ── PROCESS BLOCK ── */}
-        <div id="como-funciona">
-          {/* Section label */}
-          <div
-            className="mb-6 flex items-center gap-3"
-            style={{
-              fontFamily:
-                "ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace",
-            }}
-          >
-            <span
-              className="text-xs uppercase tracking-widest"
-              style={{ color: "#9a9d98" }}
-            >
-              proceso
-            </span>
-            <span
-              className="h-px flex-1 max-w-12"
-              style={{ backgroundColor: "#e6e8e4" }}
-            />
+    <div id="comparison-and-process" className="bg-white">
+      <PageHero
+        eyebrow="Cómo funciona"
+        heading={meta.heading!}
+        aside={
+          <div className="ink-card overflow-hidden rounded-2xl md:rounded-[22px] md:shadow-[8px_8px_0_hsl(var(--primary))]">
+            <YouTubeLite priority />
           </div>
+        }
+      >
+        <p>{meta.introduction}</p>
+      </PageHero>
 
-          <h2
-            className="font-semibold mb-10 leading-tight"
-            style={{
-              fontSize: "clamp(1.5rem, 3vw, 2.25rem)",
-              letterSpacing: "-0.01em",
-              color: "#0e0f10",
-              fontFamily:
-                "ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
-            }}
-          >
-            Cómo funciona
-          </h2>
-
-          {/* Steps grid with connector line on desktop */}
-          <div className="relative">
-            {/* Connector line — desktop only */}
-            <div
-              className="hidden lg:block absolute top-8 left-0 right-0 h-px"
-              style={{
-                backgroundColor: "#e6e8e4",
-                zIndex: 0,
-                marginLeft: "calc(12.5% + 16px)",
-                marginRight: "calc(12.5% + 16px)",
-              }}
-            />
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 relative">
-              {processSteps.map((step, i) => (
-                <div
-                  key={step.number}
-                  className="relative flex flex-col rounded-xl p-6 transition-all duration-150"
-                  style={{
-                    border:
-                      hoveredStep === i
-                        ? "1px solid #d3d6cf"
-                        : "1px solid #e6e8e4",
-                    backgroundColor: hoveredStep === i ? "#f1f2f0" : "#ffffff",
-                    cursor: "default",
-                    zIndex: 1,
-                  }}
-                  onMouseEnter={() => setHoveredStep(i)}
-                  onMouseLeave={() => setHoveredStep(null)}
-                >
-                  {/* Step number */}
-                  <div className="mb-4 flex items-center justify-between">
-                    <span
-                      className="text-2xl font-semibold leading-none"
-                      style={{
-                        color: hoveredStep === i ? "#0f6b4c" : "#e6e8e4",
-                        fontFamily:
-                          "ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace",
-                        transition: "color 150ms ease-out",
-                      }}
-                    >
+      <ContentSection>
+        <div id="como-funciona">
+          <SectionHeading>Paso a paso</SectionHeading>
+          <ol className="sr-stagger grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
+            {processSteps.map((step, index) => {
+              const tint = TINTS[index % TINTS.length]!;
+              return (
+                <li key={step.number} className="sr ink-card-sm md:ink-card ink-lift rounded-2xl md:rounded-3xl p-5 md:p-6 flex flex-col gap-3" style={{ backgroundColor: tint.bg }}>
+                  <div className="flex items-center justify-between">
+                    <span className="w-11 h-11 rounded-xl border-2 border-foreground bg-white grid place-items-center font-mono font-bold text-sm" style={{ color: tint.sub }}>
                       {step.number}
                     </span>
-                    <span
-                      style={{
-                        color: hoveredStep === i ? "#0f6b4c" : "#9a9d98",
-                        transition: "color 150ms ease-out",
-                      }}
-                    >
-                      {step.icon}
-                    </span>
+                    <span style={{ color: tint.sub }}>{step.icon}</span>
                   </div>
-
-                  {/* Hairline separator */}
-                  <div
-                    className="mb-4 h-px w-full"
-                    style={{ backgroundColor: "#e6e8e4" }}
-                  />
-
-                  {/* Title */}
-                  <h3
-                    className="font-semibold mb-2 leading-snug"
-                    style={{
-                      fontSize: "1.0625rem",
-                      color: "#0e0f10",
-                      fontFamily:
-                        "ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
-                    }}
-                  >
+                  <h3 className="font-heading font-bold text-lg md:text-xl leading-snug" style={{ color: tint.fg }}>
                     {step.title}
                   </h3>
-
-                  {/* Description */}
-                  <p
-                    className="text-sm leading-relaxed"
-                    style={{
-                      color: "#5b5f5c",
-                      fontFamily:
-                        "ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
-                      lineHeight: "1.65",
-                    }}
-                  >
-                    {step.description}
-                  </p>
-
-                  {/* Bottom accent line on hover */}
-                  <div
-                    className="mt-4 h-px w-full transition-all duration-150"
-                    style={{
-                      backgroundColor:
-                        hoveredStep === i
-                          ? "rgba(15,107,76,0.4)"
-                          : "transparent",
-                    }}
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Faint grid label row */}
-          <div
-            className="mt-8 flex items-center gap-4"
-            style={{
-              fontFamily:
-                "ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace",
-            }}
-          >
-            <span
-              className="h-px flex-1"
-              style={{ backgroundColor: "#e6e8e4" }}
-            />
-            <span className="text-xs" style={{ color: "#9a9d98" }}>
-              fin del proceso · resultados en menos de 2 min
-            </span>
-            <span
-              className="h-px flex-1"
-              style={{ backgroundColor: "#e6e8e4" }}
-            />
-          </div>
+                  <p className="text-[15px] leading-relaxed text-[#3d413e]">{step.description}</p>
+                </li>
+              );
+            })}
+          </ol>
+          <nav aria-label="Más sobre BuscoTrabajo" className="sr mt-6 md:mt-8 flex flex-wrap gap-2.5">
+            <PillLink href="/fuentes">De qué portales vienen las vacantes</PillLink>
+            <PillLink href="/preguntas">Preguntas frecuentes</PillLink>
+          </nav>
         </div>
-      </div>
-    </section>
+      </ContentSection>
+
+      <ContentCta />
+    </div>
   );
 }

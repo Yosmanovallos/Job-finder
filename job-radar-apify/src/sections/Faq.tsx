@@ -1,8 +1,9 @@
-import { useState } from "react";
 import { useLocation } from "react-router-dom";
-import { MonoLabel } from "../components/MonoLabel.js";
 import { SOURCES_BY_COUNTRY } from "../countries/index.js";
 import { getEffectiveCountry } from "../lib/country-context.js";
+import { ROUTE_META } from "../lib/page-meta.js";
+import { TINTS } from "../lib/brand-tints.js";
+import { ContentCta, ContentSection, PageHero } from "../components/ContentPage.js";
 
 // Every item except faq-1 is country-neutral (how the product works, not
 // what it's connected to).
@@ -57,63 +58,6 @@ function buildFaqItems(country: string) {
   ];
 }
 
-function FaqItem({
-  item,
-  isOpen,
-  onToggle
-}: {
-  item: ReturnType<typeof buildFaqItems>[0];
-  isOpen: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <div
-      className="rounded-xl overflow-hidden transition-all duration-150"
-      style={{
-        border: `1px solid ${isOpen ? "#d3d6cf" : "#e6e8e4"}`,
-        background: isOpen ? "#f1f2f0" : "#ffffff"
-      }}
-    >
-      <button
-        className="w-full flex items-center justify-between gap-4 px-5 py-4 text-left transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 min-h-[56px]"
-        aria-expanded={isOpen}
-        onClick={onToggle}
-        style={{ color: "#0e0f10" }}
-        onMouseEnter={(e) =>
-          ((e.currentTarget as HTMLButtonElement).style.background = "rgba(14,15,16,0.03)")
-        }
-        onMouseLeave={(e) =>
-          ((e.currentTarget as HTMLButtonElement).style.background = "transparent")
-        }
-      >
-        <span className="font-semibold text-sm md:text-base leading-snug">{item.question}</span>
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 16 16"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={1.5}
-          className="flex-shrink-0 transition-transform duration-150"
-          style={{
-            color: "#5b5f5c",
-            transform: isOpen ? "rotate(180deg)" : "rotate(0deg)"
-          }}
-        >
-          <path d="M3 6l5 5 5-5" />
-        </svg>
-      </button>
-      {isOpen && (
-        <div className="px-5 pb-5">
-          <p className="text-sm leading-relaxed" style={{ color: "#5b5f5c" }}>
-            {item.answer}
-          </p>
-        </div>
-      )}
-    </div>
-  );
-}
-
 export interface FaqProps {
   // Optional: callers that already know their country (e.g.
   // ProductFeaturesPricingFaq, itself given `country` by Landing) pass it
@@ -127,40 +71,34 @@ export default function Faq({ country }: FaqProps) {
   const location = useLocation();
   const effectiveCountry = country || getEffectiveCountry(location.pathname);
   const faqItems = buildFaqItems(effectiveCountry);
+  const meta = ROUTE_META["/preguntas"]!;
 
-  const [openFaq, setOpenFaq] = useState<string>("faq-1");
-
-  const handleFaqToggle = (id: string) => {
-    setOpenFaq((prev) => (prev === id ? "" : id));
-  };
-
+  // <details>, not a JS accordion: every answer is in the DOM (crawlers and
+  // in-page search see them all) and opening one needs no React state.
   return (
-    <div id="preguntas" className="w-full py-16 md:py-20">
-      <div className="max-w-[1200px] mx-auto px-4 md:px-8">
-        <div className="mb-8 md:mb-12">
-          <MonoLabel>11 / PREGUNTAS</MonoLabel>
-          <h2
-            className="mt-3 font-semibold tracking-tight leading-tight"
-            style={{
-              fontSize: "clamp(1.5rem, 3vw, 2.25rem)",
-              color: "#0e0f10"
-            }}
-          >
-            Preguntas frecuentes
-          </h2>
+    <div id="preguntas" className="bg-white">
+      <PageHero eyebrow="Preguntas frecuentes" heading={meta.heading!}>
+        <p>{meta.introduction}</p>
+      </PageHero>
+      <ContentSection>
+        <div className="sr-stagger max-w-[880px] flex flex-col gap-3 md:gap-4">
+          {faqItems.map((item, index) => {
+            const tint = TINTS[index % TINTS.length]!;
+            return (
+              <details key={item.id} open={index === 0} className="sr group ink-card-sm rounded-2xl bg-white open:bg-[var(--faq-tint)]" style={{ ["--faq-tint" as string]: tint.bg }}>
+                <summary className="flex items-center justify-between gap-4 cursor-pointer list-none px-5 md:px-6 py-4 md:py-5 min-h-[56px] [&::-webkit-details-marker]:hidden">
+                  <h2 className="font-heading font-bold text-[17px] md:text-xl leading-snug">{item.question}</h2>
+                  <span aria-hidden="true" className="shrink-0 w-9 h-9 rounded-full border-2 border-foreground bg-white grid place-items-center font-bold transition-transform group-open:rotate-45">
+                    +
+                  </span>
+                </summary>
+                <p className="px-5 md:px-6 pb-5 md:pb-6 -mt-1 text-[15px] md:text-base leading-relaxed text-[#3d413e]">{item.answer}</p>
+              </details>
+            );
+          })}
         </div>
-
-        <div className="max-w-3xl space-y-3">
-          {faqItems.map((item) => (
-            <FaqItem
-              key={item.id}
-              item={item}
-              isOpen={openFaq === item.id}
-              onToggle={() => handleFaqToggle(item.id)}
-            />
-          ))}
-        </div>
-      </div>
+      </ContentSection>
+      <ContentCta />
     </div>
   );
 }

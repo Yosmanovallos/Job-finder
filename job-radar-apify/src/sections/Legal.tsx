@@ -1,6 +1,8 @@
 import { Link } from "react-router-dom";
-import { PRO_MONTHLY_PRICE_COP, formatCOP } from "../config.js";
 import { usePageMeta } from "../lib/use-page-meta.js";
+import { ROUTE_META } from "../lib/page-meta.js";
+import { TINTS } from "../lib/brand-tints.js";
+import { ContentSection, InkPanel, PageHero } from "../components/ContentPage.js";
 
 export type LegalPageType = "terminos" | "privacidad" | "uso-aceptable" | "cookies";
 
@@ -9,16 +11,11 @@ interface LegalSection {
   paragraphs: string[];
 }
 
-const metaDescriptions: Record<LegalPageType, string> = {
-  terminos: "Términos de uso de BuscoTrabajo: qué es el servicio, planes y pago, y disponibilidad de los datos de vacantes.",
-  privacidad: "Política de privacidad de BuscoTrabajo: qué datos recolectamos, qué no recolectamos y tus derechos sobre tu información.",
-  "uso-aceptable": "Uso aceptable de BuscoTrabajo: qué está permitido y qué no al usar el servicio de búsqueda de empleo.",
-  cookies: "Política de cookies de BuscoTrabajo: qué cookies usamos y cómo controlarlas desde tu navegador."
-};
 
-const content: Record<LegalPageType, { title: string; sections: LegalSection[] }> = {
+const content: Record<LegalPageType, { title: string; updated: string; sections: LegalSection[] }> = {
   terminos: {
     title: "Términos de uso",
+    updated: "octubre de 2026",
     sections: [
       {
         title: "Qué es BuscoTrabajo",
@@ -28,10 +25,10 @@ const content: Record<LegalPageType, { title: string; sections: LegalSection[] }
         ],
       },
       {
-        title: "Planes y pago",
+        title: "Costo del servicio",
         paragraphs: [
-          `El plan Gratis da acceso ilimitado a vacantes con más de 48 horas de publicadas. El plan Pro (${formatCOP(PRO_MONTHLY_PRICE_COP)} COP/mes) desbloquea el acceso inmediato a vacantes desde el momento en que se publican.`,
-          "Los pagos del plan Pro se procesan a través de Wompi. BuscoTrabajo no almacena datos de tarjetas — eso lo maneja Wompi directamente.",
+          "BuscoTrabajo es gratuito. Puedes buscar y ver todas las vacantes, incluidas las recién publicadas, sin pagar. Crear una cuenta también es gratis y sirve para guardar vacantes y marcar las que ya aplicaste.",
+          "Más adelante podríamos ofrecer funciones opcionales de pago. Si eso ocurre, lo anunciaremos y actualizaremos estos términos antes de cobrar cualquier cosa.",
         ],
       },
       {
@@ -44,19 +41,19 @@ const content: Record<LegalPageType, { title: string; sections: LegalSection[] }
   },
   privacidad: {
     title: "Política de privacidad",
+    updated: "octubre de 2026",
     sections: [
       {
         title: "Qué datos recolectamos",
         paragraphs: [
           "Tu correo electrónico y credenciales de sesión, gestionadas por Supabase Auth (incluye inicio de sesión con Google o con correo/contraseña).",
-          "El estado de tu suscripción (free/pro) y el historial de transacciones de pago, gestionado junto con Wompi.",
           "Vacantes que marques como guardadas o aplicadas — se guardan asociadas a tu sesión, no se comparten con nadie.",
         ],
       },
       {
         title: "Qué NO recolectamos",
         paragraphs: [
-          "No almacenamos datos de tarjetas de crédito ni información financiera directamente — eso lo procesa Wompi bajo sus propios estándares de seguridad.",
+          "Hoy no procesamos pagos: no recibimos ni almacenamos datos de tarjetas de crédito ni otra información financiera.",
           "No vendemos ni compartimos tu información con terceros con fines publicitarios.",
         ],
       },
@@ -70,18 +67,20 @@ const content: Record<LegalPageType, { title: string; sections: LegalSection[] }
   },
   "uso-aceptable": {
     title: "Uso aceptable",
+    updated: "octubre de 2026",
     sections: [
       {
         title: "Qué sí puedes hacer",
         paragraphs: [
-          "Usar BuscoTrabajo para buscar empleo, guardar vacantes, marcar las que ya aplicaste y suscribirte al plan Pro para ver resultados desde el minuto 0.",
+          "Usar BuscoTrabajo para buscar empleo, guardar vacantes y marcar las que ya aplicaste.",
+          "Si desarrollas una herramienta o un agente, puedes usar la API pública de solo lectura dentro de los límites publicados en /docs.",
         ],
       },
       {
         title: "Qué no está permitido",
         paragraphs: [
           "Extraer masivamente (scraping) el contenido de BuscoTrabajo para redistribuirlo o revenderlo.",
-          "Automatizar solicitudes al servicio fuera de lo que la interfaz permite, o intentar evadir el paywall de frescura de 48 horas.",
+          "Automatizar solicitudes al servicio fuera de la interfaz y de la API pública documentada, o superar sus límites de uso.",
           "Usar el servicio para fines distintos a la búsqueda de empleo legítima.",
         ],
       },
@@ -95,6 +94,7 @@ const content: Record<LegalPageType, { title: string; sections: LegalSection[] }
   },
   cookies: {
     title: "Política de cookies",
+    updated: "julio de 2026",
     sections: [
       {
         title: "Qué cookies usamos",
@@ -113,49 +113,67 @@ const content: Record<LegalPageType, { title: string; sections: LegalSection[] }
   },
 };
 
+const LEGAL_LINKS: Array<{ type: LegalPageType; label: string }> = [
+  { type: "terminos", label: "Términos de uso" },
+  { type: "privacidad", label: "Privacidad" },
+  { type: "uso-aceptable", label: "Uso aceptable" },
+  { type: "cookies", label: "Cookies" }
+];
+
+// Presentation only: the legal text above is the user's to change.
 export default function Legal({ type }: { type: LegalPageType }) {
   const page = content[type];
 
-  usePageMeta({
-    title: `${page.title} — BuscoTrabajo`,
-    description: metaDescriptions[type]
-  });
+  usePageMeta(ROUTE_META[`/legal/${type}`]!);
 
   return (
-    <section className="min-h-screen px-4 py-16" style={{ backgroundColor: "#fafafa" }}>
-      <div className="max-w-2xl mx-auto">
-        <Link
-          to="/"
-          className="inline-block mb-6 text-sm font-mono text-primary hover:text-primary"
-        >
-          ← Volver al inicio
-        </Link>
-
-        <h1 className="text-3xl font-bold mb-8 font-heading" style={{ color: "#0e0f10" }}>
-          {page.title}
-        </h1>
-
-        <div className="space-y-8">
-          {page.sections.map((section) => (
-            <div key={section.title}>
-              <h2 className="text-lg font-semibold mb-2" style={{ color: "#0e0f10" }}>
-                {section.title}
-              </h2>
-              <div className="space-y-3">
-                {section.paragraphs.map((p, i) => (
-                  <p key={i} className="text-sm leading-relaxed" style={{ color: "#5b5f5c" }}>
-                    {p}
+    <div className="bg-white">
+      <PageHero eyebrow="Legal" heading={page.title}>
+        <p>Última actualización: {page.updated}. Preguntas: buscotrabajocolombia123@gmail.com</p>
+      </PageHero>
+      <ContentSection>
+        <div className="flex flex-col md:flex-row gap-6 md:gap-10 items-start">
+          <nav aria-label="Documentos legales" className="md:sticky md:top-24 w-full md:w-[240px] shrink-0">
+            <ul className="flex md:flex-col flex-wrap gap-2">
+              {LEGAL_LINKS.map((link) => (
+                <li key={link.type}>
+                  <Link
+                    to={`/legal/${link.type}`}
+                    aria-current={link.type === type ? "page" : undefined}
+                    className={`ink-card-sm inline-flex md:flex w-full rounded-xl px-4 py-2.5 text-sm font-semibold no-underline ${
+                      link.type === type ? "bg-primary text-white" : "bg-white text-foreground ink-lift"
+                    }`}
+                  >
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
+          <div className="sr-stagger flex-1 min-w-0 flex flex-col gap-4 md:gap-6">
+            {page.sections.map((section, index) => {
+              const tint = TINTS[index % TINTS.length]!;
+              return (
+                <InkPanel key={section.title} tint={tint.bg}>
+                  <p className="font-mono text-xs font-bold" style={{ color: tint.sub }}>
+                    {String(index + 1).padStart(2, "0")}
                   </p>
-                ))}
-              </div>
-            </div>
-          ))}
+                  <h2 className="mt-1 font-heading font-bold text-xl md:text-[26px] leading-tight tracking-[-0.02em]" style={{ color: tint.fg }}>
+                    {section.title}
+                  </h2>
+                  <div className="mt-3 space-y-3">
+                    {section.paragraphs.map((p, i) => (
+                      <p key={i} className="text-[15px] md:text-base leading-relaxed text-[#3d413e]">
+                        {p}
+                      </p>
+                    ))}
+                  </div>
+                </InkPanel>
+              );
+            })}
+          </div>
         </div>
-
-        <p className="mt-10 text-xs font-mono" style={{ color: "#9a9d98" }}>
-          Última actualización: julio de 2026. Preguntas: buscotrabajocolombia123@gmail.com
-        </p>
-      </div>
-    </section>
+      </ContentSection>
+    </div>
   );
 }

@@ -1,14 +1,14 @@
-import { Suspense, lazy, useEffect, useRef } from "react";
+import { Suspense, lazy, useEffect, useRef, type ReactNode } from "react";
 import { BrowserRouter, Routes, Route, useLocation, Navigate } from "react-router-dom";
 import Header from "./sections/Header.js";
-import HeroDemo from "./sections/HeroDemo.js";
+import HomeLanding from "./sections/HomeLanding.js";
 import SourcesAndProblem from "./sections/SourcesAndProblem.js";
 import ComparisonAndProcess from "./sections/ComparisonAndProcess.js";
-import ProductFeaturesPricingFaq from "./sections/ProductFeaturesPricingFaq.js";
 import Faq from "./sections/Faq.js";
 import Footer from "./sections/Footer.js";
 import ScrollToTop from "./components/ScrollToTop.js";
 import { usePageMeta, PageMeta } from "./lib/use-page-meta.js";
+import { ROUTE_META } from "./lib/page-meta.js";
 import { getHomeContent } from "./lib/agent-readiness.js";
 import {
   getEffectiveCountry,
@@ -17,6 +17,7 @@ import {
   isCountryScopedUnprefixed,
   isVePrefixed
 } from "./lib/country-context.js";
+import { PAYWALL_ENABLED } from "./config.js";
 import { AuthProvider } from "./auth/auth-provider.js";
 import RequireAuth from "./auth/require-auth.js";
 import { registerBuscoTrabajoWebMcp } from "./lib/webmcp.js";
@@ -56,14 +57,7 @@ function Landing() {
     description: homeContent.description
   });
 
-  return (
-    <>
-      <HeroDemo country={country} />
-      <SourcesAndProblem country={country} />
-      <ComparisonAndProcess />
-      <ProductFeaturesPricingFaq country={country} />
-    </>
-  );
+  return <HomeLanding country={country} />;
 }
 
 // Wraps <Routes> instead of sitting beside it as a plain redirect
@@ -130,10 +124,12 @@ function AppRoutes() {
       <Route path="/empresas/:slug" element={<CompanyLanding />} />
       <Route path="/ve/empresas" element={<CompaniesDirectory />} />
       <Route path="/ve/empresas/:slug" element={<CompanyLanding />} />
-      <Route path="/login" element={<Login />} />
-      <Route path="/reset-password" element={<ResetPassword />} />
-      <Route path="/auth/callback" element={<AuthCallback />} />
-      <Route path="/pricing" element={<Pricing />} />
+      <Route path="/login" element={<><PageMeta {...ROUTE_META["/login"]!} /><Login /></>} />
+      <Route path="/reset-password" element={<><PageMeta {...ROUTE_META["/reset-password"]!} /><ResetPassword /></>} />
+      <Route path="/auth/callback" element={<><PageMeta {...ROUTE_META["/auth/callback"]!} /><AuthCallback /></>} />
+      {/* Pro plans unlock nothing while the paywall is off — server.ts 301s
+          this path to "/" under the same flag. */}
+      <Route path="/pricing" element={PAYWALL_ENABLED ? <Pricing /> : <Navigate to="/" replace />} />
       <Route path="/legal/terminos" element={<Legal type="terminos" />} />
       <Route path="/legal/privacidad" element={<Legal type="privacidad" />} />
       <Route path="/legal/uso-aceptable" element={<Legal type="uso-aceptable" />} />
@@ -146,7 +142,10 @@ function AppRoutes() {
         path="/cuenta"
         element={
           <RequireAuth>
-            <Account />
+            <>
+              <PageMeta {...ROUTE_META["/cuenta"]!} />
+              <Account />
+            </>
           </RequireAuth>
         }
       />
@@ -154,10 +153,7 @@ function AppRoutes() {
         path="/como-funciona"
         element={
           <>
-            <PageMeta
-              title="Cómo funciona BuscoTrabajo — Deduplicación y verificación de vacantes"
-              description="BuscoTrabajo escanea varios portales de empleo en paralelo, elimina duplicados y verifica que cada vacante siga vigente antes de mostrarla."
-            />
+            <PageMeta {...ROUTE_META["/como-funciona"]!} />
             <ComparisonAndProcess />
           </>
         }
@@ -175,16 +171,22 @@ function AppRoutes() {
         path="/preguntas"
         element={
           <>
-            <PageMeta
-              title="Preguntas frecuentes — BuscoTrabajo"
-              description="Resolvemos las dudas más comunes sobre fuentes, actualidad de las vacantes, el plan Pro y cómo funciona la deduplicación."
-            />
+            <PageMeta {...ROUTE_META["/preguntas"]!} />
             <Faq />
           </>
         }
       />
     </Routes>
   );
+}
+
+// Scroll-driven section reveal (index.css `.scroll-reveal`) for every page
+// except the dashboard, whose first-entry latency and sticky split pane are
+// protected (docs/DASHBOARD-PERFORMANCE-RUNBOOK.md).
+function RevealMain({ children }: { children: ReactNode }) {
+  const { pathname } = useLocation();
+  const isDashboard = /^\/(ve\/)?dashboard/.test(pathname);
+  return <main className={isDashboard ? undefined : "scroll-reveal"}>{children}</main>;
 }
 
 function RouteFallback() {
@@ -224,11 +226,11 @@ export default function App() {
             overflow-x-hidden locally instead. */}
         <div className="min-h-screen bg-background text-foreground font-sans">
           <Header />
-          <main>
+          <RevealMain>
             <Suspense fallback={<RouteFallback />}>
               <AppRoutes />
             </Suspense>
-          </main>
+          </RevealMain>
           <Footer />
         </div>
       </BrowserRouter>

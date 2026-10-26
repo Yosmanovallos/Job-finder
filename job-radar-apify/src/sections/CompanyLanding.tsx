@@ -2,9 +2,14 @@ import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
 import { ReputationBadges, ReputationEntryProps } from "../components/ReputationBadges.js";
 import { CompanyAvatar } from "../components/CompanyAvatar.js";
-import { CategoryJobRow } from "../components/CategoryJobRow.js";
+import { ContentCta } from "../components/ContentPage.js";
+import { buildLocationLabel } from "../countries/index.js";
+import { getModalityLabel } from "../lib/job-filters.js";
+import { getSourceColor } from "../lib/source-colors.js";
+import { jobDateLabel } from "../lib/job-date-label.js";
 import { useAuth } from "../auth/auth-provider.js";
 import { usePageMeta } from "../lib/use-page-meta.js";
+import { buildCompanyMeta, buildJobPath } from "../lib/job-seo.js";
 import { Button } from "../components/ui/button.js";
 import { Job } from "../sources/types.js";
 import { ArrowLeft, ExternalLink } from "lucide-react";
@@ -103,92 +108,142 @@ export default function CompanyLanding() {
       .catch(() => setState("not-found"));
   }, [slug, accessToken, authLoading, country]);
 
+  // Same builder as server.ts's SSR head, so title/description don't change
+  // when React mounts.
+  const companyMeta = companyName ? buildCompanyMeta(companyName, total, country) : null;
   usePageMeta({
-    title: companyName ? `${companyName} | BuscoTrabajo` : "Cargando empresa... | BuscoTrabajo",
-    description: companyName
-      ? `Reputación y vacantes activas de ${companyName} en BuscoTrabajo.`
-      : "Cargando información de la empresa."
+    title: companyMeta ? companyMeta.title : "Cargando empresa... | BuscoTrabajo",
+    description: companyMeta ? companyMeta.description : "Cargando información de la empresa."
   });
 
+  const directoryPath = country === "VE" ? "/ve/empresas" : "/empresas";
+  const dashboardPath = country === "VE" ? "/ve/dashboard" : "/dashboard";
+
   return (
-    <section className="relative w-full min-h-screen bg-background">
-      <div className="relative max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-20">
-        <Link
-          to="/dashboard"
-          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-6"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Ver todas las vacantes
-        </Link>
+    <div className="bg-white">
+      <section className="bg-gradient-to-b from-green-soft to-white">
+        <div className="max-w-[1240px] mx-auto px-4 md:px-6 pt-6 pb-8 md:pt-12 md:pb-14">
+          <nav aria-label="Ruta" className="mb-5 md:mb-7 flex flex-wrap items-center gap-2 text-sm font-semibold">
+            <Link to={directoryPath} className="ink-card-sm ink-lift inline-flex items-center gap-1.5 rounded-full bg-white px-3.5 py-1.5 text-foreground no-underline">
+              <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+              Empresas
+            </Link>
+            <Link to={dashboardPath} className="rounded-full px-3 py-1.5 text-[#3d413e] hover:text-foreground">
+              Ver todas las vacantes
+            </Link>
+          </nav>
 
-        {state === "not-found" && (
-          <div className="text-center py-16 px-4 rounded-2xl border border-border bg-card text-muted-foreground font-mono">
-            <span className="text-3xl block mb-2">🔍</span>
-            No encontramos esta empresa.
-            <div className="mt-4">
-              <Button onClick={() => navigate(country === "VE" ? "/ve/dashboard" : "/dashboard")}>
-                Ver todas las vacantes
-              </Button>
+          {state === "loading" && (
+            <div className="flex items-center gap-4 md:gap-6 animate-pulse">
+              <div className="w-16 h-16 md:w-24 md:h-24 rounded-2xl bg-white border-2 border-foreground/20" />
+              <div className="flex-1 space-y-3">
+                <div className="h-8 w-2/3 rounded-lg bg-foreground/10" />
+                <div className="h-5 w-40 rounded-full bg-foreground/10" />
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {state === "loading" && (
-          <div className="rounded-xl p-5 border border-border bg-card animate-pulse space-y-3">
-            <div className="h-4 w-3/4 rounded bg-muted" />
-            <div className="h-3 w-1/2 rounded bg-muted" />
-          </div>
-        )}
+          {state === "not-found" && (
+            <div className="ink-card rounded-3xl bg-white p-8 md:p-12 text-center">
+              <p className="font-heading font-bold text-2xl md:text-3xl">No encontramos esta empresa</p>
+              <p className="mt-2 text-[#3d413e]">Puede que ya no tenga vacantes activas en {country === "VE" ? "Venezuela" : "Colombia"}.</p>
+              <div className="mt-6 flex flex-wrap justify-center gap-2.5">
+                <Button onClick={() => navigate(dashboardPath)}>Ver todas las vacantes</Button>
+                <Button variant="outline" onClick={() => navigate(directoryPath)}>Explorar empresas</Button>
+              </div>
+            </div>
+          )}
 
-        {state === "found" && companyName && (
-          <>
-            <div className="hud-corners flex items-center gap-4 rounded-xl border border-border bg-card p-5 sm:p-6 mb-6">
-              <CompanyAvatar name={companyName} logoUrl={logoUrl} className="w-14 h-14 text-2xl" />
-              <div className="min-w-0">
-                <h1 className="font-heading font-semibold text-2xl text-foreground leading-snug break-words">
+          {state === "found" && companyName && (
+            <div className="flex flex-wrap items-center gap-5 md:gap-8">
+              <CompanyAvatar
+                name={companyName}
+                logoUrl={logoUrl}
+                className="ink-card-sm md:ink-card w-16 h-16 md:w-24 md:h-24 text-2xl md:text-4xl rounded-2xl bg-white"
+              />
+              <div className="min-w-0 flex-[1_1_320px]">
+                <h1 className="font-heading font-bold tracking-[-0.04em] leading-[1.05] text-[30px] md:text-[clamp(38px,4.5vw,58px)] break-words">
                   {companyName}
                 </h1>
-                <p className="text-sm font-mono text-muted-foreground mt-1">
-                  <span className="text-primary font-semibold">{total}</span> vacante
-                  {total === 1 ? "" : "s"} activa{total === 1 ? "" : "s"}
-                </p>
+                <div className="mt-3 md:mt-4 flex flex-wrap items-center gap-2.5">
+                  <span className="ink-card-sm inline-flex items-center gap-2 rounded-full bg-[#fdf1d3] px-3 py-1 text-sm font-semibold shadow-none">
+                    <span aria-hidden="true" className="w-2.5 h-2.5 rounded-full bg-primary" />
+                    {total.toLocaleString("es-CO")} vacante{total === 1 ? "" : "s"} activa{total === 1 ? "" : "s"}
+                  </span>
+                  {/* Employers whose own vacancies can't be read: a link to
+                      their careers site, nothing copied
+                      (src/data/official-careers-links.ts). */}
+                  {officialCareersUrl && (
+                    <a
+                      href={officialCareersUrl}
+                      target="_blank"
+                      rel="nofollow noopener noreferrer"
+                      className="ink-card-sm ink-lift inline-flex items-center gap-1.5 rounded-full bg-white px-3.5 py-1 text-sm font-semibold text-foreground no-underline"
+                    >
+                      Ver todas sus vacantes en su portal oficial
+                      <ExternalLink className="h-4 w-4" aria-hidden="true" />
+                    </a>
+                  )}
+                </div>
               </div>
             </div>
+          )}
+        </div>
+      </section>
 
-            {reputation.length > 0 && (
-              <div className="mb-6">
+      {state === "found" && companyName && (
+        <>
+          {reputation.length > 0 && (
+            <section className="sr-host max-w-[1240px] w-full mx-auto px-4 md:px-6 pt-2 md:pt-4">
+              <div className="sr ink-card-sm md:ink-card rounded-2xl md:rounded-3xl bg-[#e8f1fb] p-5 md:p-7">
+                <h2 className="font-heading font-bold text-xl md:text-2xl tracking-[-0.02em] text-[#082f5c] mb-3">Reputación de {companyName}</h2>
                 <ReputationBadges entries={reputation} />
               </div>
-            )}
+            </section>
+          )}
 
-            {/* Employers whose own vacancies can't be read: a link to their
-                careers site, nothing copied (src/data/official-careers-links.ts). */}
-            {officialCareersUrl && (
-              <a
-                href={officialCareersUrl}
-                target="_blank"
-                rel="nofollow noopener noreferrer"
-                className="mb-6 inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
-              >
-                Ver todas sus vacantes en su portal oficial
-                <ExternalLink className="h-4 w-4" aria-hidden="true" />
-              </a>
-            )}
-
+          <section className="sr-host max-w-[1240px] w-full mx-auto px-4 md:px-6 py-8 md:py-12">
+            <h2 className="sr font-heading font-bold text-[24px] md:text-[36px] leading-tight tracking-[-0.03em] mb-4 md:mb-6">
+              Vacantes activas de {companyName}
+            </h2>
             {jobs.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
+              <p className="sr ink-card-sm rounded-2xl bg-[#fdf1d3] p-5 text-[#3d413e]">
                 Sin vacantes activas de esta empresa por ahora.
               </p>
             ) : (
-              <div className="space-y-3">
+              <ul className="sr-stagger grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
                 {jobs.map((job) => (
-                  <CategoryJobRow key={job.jobId} job={job} />
+                  <li key={job.jobId} className="sr">
+                    <CompanyJobCard job={job} />
+                  </li>
                 ))}
-              </div>
+              </ul>
             )}
-          </>
-        )}
+          </section>
+          <ContentCta to={dashboardPath} />
+        </>
+      )}
+    </div>
+  );
+}
+
+// Internal link to /empleos/:id (the company page is a hub for its jobs,
+// same as the category pages), in the homepage's card style.
+function CompanyJobCard({ job }: { job: Job }) {
+  const modality = getModalityLabel(job.location);
+  const color = getSourceColor(job.source);
+  return (
+    <Link
+      to={buildJobPath(job)}
+      className="ink-card-sm ink-lift h-full rounded-2xl bg-white p-4 md:p-5 flex flex-col gap-2.5 text-foreground no-underline"
+    >
+      <h3 className="font-heading font-bold text-base md:text-lg leading-snug line-clamp-2">{job.title}</h3>
+      <p className="text-sm text-[#3d413e] truncate">{buildLocationLabel(job)}</p>
+      <div className="mt-auto flex flex-wrap gap-1.5">
+        <span className="rounded-full px-2 py-0.5 font-mono text-[11px]" style={{ backgroundColor: color.bg, color: color.text }}>{job.source}</span>
+        {modality ? <span className="rounded-full px-2 py-0.5 font-mono text-[11px] bg-[#efe9fd] text-[#6d28d9]">{modality}</span> : null}
+        <span className="rounded-full px-2 py-0.5 font-mono text-[11px] bg-green-soft text-primary">{jobDateLabel(job)}</span>
       </div>
-    </section>
+    </Link>
   );
 }

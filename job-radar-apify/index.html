@@ -2,10 +2,10 @@
 <html lang="es">
   <head>
     <meta charset="utf-8" />
-    <title>Busco trabajo en Colombia | Vacantes de empleo | BuscoTrabajo</title>
+    <title>Busco trabajo en Colombia: ofertas de empleo | BuscoTrabajo</title>
     <meta
       name="description"
-      content="Busca trabajo en Colombia entre vacantes de empleo públicas, deduplicadas y verificadas. Filtra oportunidades y aplica en el portal original."
+      content="Busca trabajo en Colombia en un solo lugar: vacantes de Computrabajo, LinkedIn, Elempleo y más, sin duplicados. Gratis y con enlace a la oferta original."
     />
     <meta
       name="keywords"
@@ -49,20 +49,34 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Non-render-blocking: the stylesheet is fetched as a preload and only
+         applied once it arrives (display=swap keeps text visible with the
+         fallback meanwhile), so first paint no longer waits on a second
+         origin. Space Grotesk 700 and JetBrains Mono 600 are used by the
+         homepage redesign; without them the browser synthesised fake bold. -->
     <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="preload"
+      as="style"
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      onload="this.onload=null;this.rel='stylesheet'"
     />
+    <noscript>
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      />
+    </noscript>
 
     <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="BuscoTrabajo" />
     <meta property="og:locale" content="es_CO" />
     <meta
       property="og:title"
-      content="Busco trabajo en Colombia | Vacantes de empleo | BuscoTrabajo"
+      content="Busco trabajo en Colombia: ofertas de empleo | BuscoTrabajo"
     />
     <meta
       property="og:description"
-      content="Busca trabajo en Colombia entre vacantes de empleo públicas, deduplicadas y verificadas. Filtra oportunidades y aplica en el portal original."
+      content="Busca trabajo en Colombia en un solo lugar: vacantes de Computrabajo, LinkedIn, Elempleo y más, sin duplicados. Gratis y con enlace a la oferta original."
     />
     <meta property="og:image" content="https://buscotrabajo.co/og-image.png" />
     <meta property="og:image:width" content="1200" />
@@ -72,11 +86,11 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta
       name="twitter:title"
-      content="Busco trabajo en Colombia | Vacantes de empleo | BuscoTrabajo"
+      content="Busco trabajo en Colombia: ofertas de empleo | BuscoTrabajo"
     />
     <meta
       name="twitter:description"
-      content="Busca trabajo en Colombia entre vacantes de empleo públicas, deduplicadas y verificadas."
+      content="Busca trabajo en Colombia en un solo lugar: vacantes de Computrabajo, LinkedIn, Elempleo y más, sin duplicados. Gratis y con enlace a la oferta original."
     />
     <meta name="twitter:image" content="https://buscotrabajo.co/og-image.png" />
     <meta name="twitter:image:alt" content="BuscoTrabajo — vacantes de empleo en un solo lugar" />
@@ -106,7 +120,8 @@
         "sameAs": [
           "https://x.com/Buscotrabajoco",
           "https://www.tiktok.com/@busco.trabajo09",
-          "https://www.instagram.com/buscotrabajocolombia.co/"
+          "https://www.instagram.com/buscotrabajocolombia.co/",
+          "https://www.youtube.com/@buscotrabajo-d5n"
         ]
       }
     </script>

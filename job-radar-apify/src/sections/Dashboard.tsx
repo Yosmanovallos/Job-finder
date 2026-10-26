@@ -10,6 +10,7 @@ import { FilterBar, FilterState, EMPTY_FILTERS } from "../components/FilterBar.j
 import { StatsBar } from "../components/StatsBar.js";
 import { useAuth } from "../auth/auth-provider.js";
 import { usePageMeta } from "../lib/use-page-meta.js";
+import { dashboardDescription } from "../lib/page-meta.js";
 import { jobAnalyticsParams, trackEvent } from "../lib/analytics.js";
 import { getCityOptionsForCountry } from "../lib/job-filters.js";
 import { getCountryConfig } from "../countries/index.js";
@@ -26,6 +27,9 @@ type SsrJobsWindow = Window & {
 };
 
 const PAGE_SIZE = 24;
+// How far below the viewport the next page starts loading (it's usually
+// prefetched already by then).
+const LOAD_MORE_MARGIN_PX = 1200;
 // Debounce the free-text search box so we don't fire a request per keystroke
 // — everything else (checkboxes/radios) triggers immediately since those are
 // discrete, deliberate clicks.
@@ -45,7 +49,7 @@ export default function Dashboard() {
 
   usePageMeta({
     title: `Vacantes de Empleo en ${countryConfig.name} | BuscoTrabajo`,
-    description: `Explora vacantes actualizadas de LinkedIn, Computrabajo${country === "CO" ? ", Elempleo" : ""} y más en ${countryConfig.name}, filtradas y sin duplicados. Gratis para vacantes con más de 48h publicadas.`
+    description: dashboardDescription(country, countryConfig.name)
   });
 
   const { tier, isAuthenticated, accessToken, user, refreshTier } = useAuth();
@@ -234,20 +238,55 @@ export default function Dashboard() {
     // Dependencies intentionally limited to the list below.
   }, [accessToken, filterKey, retryNonce]);
 
+  // Each new offset is a cold query on the server (~1 s, more under load),
+  // so the next page is requested as soon as the current one is on screen
+  // and kept here until the visitor scrolls to it. Keyed by filters +
+  // session + offset: a prefetch made for other filters is never used.
+  const prefetchRef = useRef<{ key: string; promise: Promise<{ jobs?: Job[]; hasMore?: boolean }> } | null>(null);
+  const pageKey = useCallback(
+    (offset: number) => `${filterKey}|${accessToken || ""}|${offset}`,
+    [filterKey, accessToken]
+  );
+  const fetchPage = useCallback(
+    (offset: number) => {
+      const headers: Record<string, string> = {};
+      if (accessToken) headers["Authorization"] = `Bearer ${accessToken}`;
+      return fetch(`/api/jobs?${buildQuery(offset)}`, { headers }).then((res) => {
+        if (!res.ok) throw new Error(`GET /api/jobs respondió ${res.status}`);
+        return res.json() as Promise<{ jobs?: Job[]; hasMore?: boolean }>;
+      });
+    },
+    [accessToken, buildQuery]
+  );
+
+  useEffect(() => {
+    if (isLoading || isLoadingMore || !hasMore || personalFilterActive || jobs.length === 0) return;
+    const offset = jobs.length;
+    const key = pageKey(offset);
+    if (prefetchRef.current?.key === key) return;
+    // Let the page that just arrived paint first.
+    const timer = window.setTimeout(() => {
+      const promise = fetchPage(offset);
+      promise.catch(() => {
+        // loadMore retries for real (and shows the error) if this failed.
+        if (prefetchRef.current?.key === key) prefetchRef.current = null;
+      });
+      prefetchRef.current = { key, promise };
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [jobs.length, hasMore, isLoading, isLoadingMore, personalFilterActive, pageKey, fetchPage]);
+
   const loadMore = useCallback(() => {
     if (isLoadingMore || !hasMore || personalFilterActive) return;
     const myRequestId = requestIdRef.current;
     setIsLoadingMore(true);
     setLoadMoreError(false);
 
-    const headers: Record<string, string> = {};
-    if (accessToken) headers["Authorization"] = `Bearer ${accessToken}`;
+    const key = pageKey(jobs.length);
+    const prefetched = prefetchRef.current?.key === key ? prefetchRef.current.promise : null;
+    prefetchRef.current = null;
 
-    fetch(`/api/jobs?${buildQuery(jobs.length)}`, { headers })
-      .then((res) => {
-        if (!res.ok) throw new Error(`GET /api/jobs respondió ${res.status}`);
-        return res.json();
-      })
+    (prefetched ?? fetchPage(jobs.length))
       .then((data) => {
         if (myRequestId !== requestIdRef.current) return;
         setJobs((prev) => [...prev, ...(Array.isArray(data.jobs) ? data.jobs : [])]);
@@ -255,7 +294,7 @@ export default function Dashboard() {
       })
       .catch(() => setLoadMoreError(true))
       .finally(() => setIsLoadingMore(false));
-  }, [accessToken, buildQuery, jobs.length, hasMore, isLoadingMore, personalFilterActive]);
+  }, [fetchPage, pageKey, jobs.length, hasMore, isLoadingMore, personalFilterActive]);
 
   // loadMore's identity changes on every jobs-length/hasMore update (it's a
   // useCallback closing over both). The observer effects below must NOT
@@ -286,11 +325,25 @@ export default function Dashboard() {
       (entries) => {
         if (entries[0].isIntersecting) loadMoreRef.current();
       },
-      { rootMargin: "400px" }
+      { rootMargin: `${LOAD_MORE_MARGIN_PX}px` }
     );
     observer.observe(el);
     return () => observer.disconnect();
   }, [isLoading]);
+
+  // The observer only fires when the sentinel crosses the margin. If an
+  // appended page is too short to push it back out, nothing would fire
+  // again, so check once after the new rows are laid out.
+  useEffect(() => {
+    if (isLoading || isLoadingMore || !hasMore) return;
+    const frame = window.requestAnimationFrame(() => {
+      const el = sentinelRef.current;
+      if (el && el.getBoundingClientRect().top < window.innerHeight + LOAD_MORE_MARGIN_PX) {
+        loadMoreRef.current();
+      }
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [jobs.length, isLoading, isLoadingMore, hasMore]);
 
   // Wompi redirects back here with ?checkout=return after the sandbox
   // payment. The webhook that actually flips the tier to 'pro' can take a
@@ -379,30 +432,41 @@ export default function Dashboard() {
     // Dependencies intentionally limited to the list below.
   }, [accessToken]);
 
-  const handleSaveToggle = (jobId: string) => {
-    const next = new Set(savedJobIds);
-    if (next.has(jobId)) next.delete(jobId);
-    else next.add(jobId);
-    setSavedJobIds(next);
-  };
+  // Stable identities (functional updates) so the memoized cards don't
+  // re-render on every Dashboard render.
+  const handleSaveToggle = useCallback((jobId: string) => {
+    setSavedJobIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(jobId)) next.delete(jobId);
+      else next.add(jobId);
+      return next;
+    });
+  }, []);
 
-  const handleAppliedToggle = (jobId: string) => {
-    const next = new Set(appliedJobIds);
-    if (next.has(jobId)) next.delete(jobId);
-    else next.add(jobId);
-    setAppliedJobIds(next);
-  };
+  const handleAppliedToggle = useCallback((jobId: string) => {
+    setAppliedJobIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(jobId)) next.delete(jobId);
+      else next.add(jobId);
+      return next;
+    });
+  }, []);
 
-  const visibleJobs = jobs.filter((j) => {
-    if (filters.savedOnly && !savedJobIds.has(j.jobId)) return false;
-    if (filters.appliedOnly && !appliedJobIds.has(j.jobId)) return false;
-    return true;
-  });
+  const visibleJobs = useMemo(
+    () =>
+      jobs.filter((j) => {
+        if (filters.savedOnly && !savedJobIds.has(j.jobId)) return false;
+        if (filters.appliedOnly && !appliedJobIds.has(j.jobId)) return false;
+        return true;
+      }),
+    [jobs, filters.savedOnly, filters.appliedOnly, savedJobIds, appliedJobIds]
+  );
 
   // Desktop split-pane: which job the right-hand detail panel shows. Only
   // meaningful at lg+ (mobile keeps the old stacked JobCard list, no
   // detail pane) but tracked unconditionally since it's cheap either way.
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const handleSelectJob = useCallback((jobId: string) => setSelectedJobId(jobId), []);
   useEffect(() => {
     if (visibleJobs.length === 0) {
       setSelectedJobId(null);
@@ -443,14 +507,21 @@ export default function Dashboard() {
   }, [mobileFiltersOpen, isDesktop]);
 
   return (
-    <section className="relative w-full min-h-screen" style={{ backgroundColor: "#fafafa" }}>
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-20">
-        {/* Visually hidden — the visible page identity is the filter bar +
-            hero copy above, but the DOM needs exactly one real <h1>. Text
-            mirrors server.ts's /dashboard SSR snippet verbatim (see its
-            2026-08-04 fix comment) so raw HTML and post-hydration DOM never
-            disagree. */}
-        <h1 className="sr-only">Vacantes de Empleo en {countryConfig.name}</h1>
+    <section className="relative w-full min-h-screen bg-white">
+      {/* Same green-soft band as the rest of the site. The H1 text mirrors
+          server.ts's /dashboard SSR snippet verbatim (see its 2026-08-04
+          fix comment) so raw HTML and post-hydration DOM never disagree. */}
+      <div className="bg-gradient-to-b from-green-soft to-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 md:pt-8 pb-1">
+          {/* Two lines reserved on phones: "…en Colombia" fits on one line in
+              the fallback font and wraps once the heading font loads, which
+              pushed the whole job list down (CLS 0.29). */}
+          <h1 className="font-heading font-bold tracking-[-0.035em] leading-tight text-[26px] md:text-[38px] min-h-[2.5em] md:min-h-0">
+            Vacantes de Empleo en {countryConfig.name}
+          </h1>
+        </div>
+      </div>
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-1 pb-20">
         {checkoutBanner && (
           <div
             className={`mb-4 p-3 rounded-xl text-xs font-mono flex items-center gap-2 ${
@@ -551,7 +622,7 @@ export default function Dashboard() {
             content scrolling underneath doesn't show through, and its own
             padding (not a negative-margin bleed trick) so nothing below it
             can end up visually clipped. */}
-        <div className="sticky top-16 z-40 bg-background pt-3 pb-4">
+        <div className="sticky top-16 z-40 bg-white pt-3 pb-4">
           <div className="flex gap-2">
             <div className="relative flex-1">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-ink-faint pointer-events-none" />
@@ -560,7 +631,7 @@ export default function Dashboard() {
                 value={filters.search}
                 onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
                 placeholder="Título, empresa o palabra clave..."
-                className="h-12 pl-11 rounded-full bg-card border-border-strong shadow-sm focus-visible:border-gold-2 focus-visible:ring-4 focus-visible:ring-gold-1/40"
+                className="h-12 pl-11 rounded-xl border-2 border-foreground bg-[#fbfaf6] text-base shadow-[3px_3px_0_hsl(var(--foreground))] focus-visible:border-foreground focus-visible:ring-4 focus-visible:ring-gold-1/60"
               />
             </div>
 
@@ -571,7 +642,7 @@ export default function Dashboard() {
             <select
               value={filters.freshness}
               onChange={(e) => setFilters((f) => ({ ...f, freshness: e.target.value }))}
-              className="hidden lg:block h-12 rounded-full border border-border-strong bg-card px-4 text-sm shadow-sm"
+              className="hidden lg:block h-12 rounded-xl border-2 border-foreground bg-white px-4 text-sm font-semibold"
               aria-label="Fecha de publicación"
             >
               <option value="all">Cualquier fecha</option>
@@ -582,7 +653,7 @@ export default function Dashboard() {
             <select
               value={filters.modality}
               onChange={(e) => setFilters((f) => ({ ...f, modality: e.target.value }))}
-              className="hidden lg:block h-12 rounded-full border border-border-strong bg-card px-4 text-sm shadow-sm"
+              className="hidden lg:block h-12 rounded-xl border-2 border-foreground bg-white px-4 text-sm font-semibold"
               aria-label="Modalidad"
             >
               <option value="all">Cualquier modalidad</option>
@@ -598,7 +669,7 @@ export default function Dashboard() {
                   cities: e.target.value === "all" ? [] : [e.target.value]
                 }))
               }
-              className="hidden lg:block h-12 rounded-full border border-border-strong bg-card px-4 text-sm shadow-sm"
+              className="hidden lg:block h-12 rounded-xl border-2 border-foreground bg-white px-4 text-sm font-semibold"
               aria-label="Ciudad"
             >
               <option value="all">Cualquier ciudad</option>
@@ -614,7 +685,7 @@ export default function Dashboard() {
                 type="button"
                 variant="outline"
                 onClick={() => setMobileFiltersOpen((v) => !v)}
-                className="relative h-12 rounded-full px-5 shadow-sm"
+                className="relative h-12 rounded-xl px-5 border-2 border-foreground bg-gold-2 text-foreground font-bold shadow-[3px_3px_0_hsl(var(--foreground))] hover:bg-gold-1"
               >
                 <SlidersHorizontal className="h-4 w-4" />
                 Filtros
@@ -636,7 +707,7 @@ export default function Dashboard() {
                   {/* FilterBar already renders its own card (border, title,
                       "Limpiar todo") — this wrapper only positions/sizes/
                       scrolls it, no second header on top of that one. */}
-                  <div className="absolute right-0 top-full mt-2 w-[26rem] max-h-[70vh] overflow-y-auto rounded-xl shadow-xl z-20">
+                  <div className="absolute right-0 top-full mt-2 w-[26rem] max-h-[70vh] overflow-y-auto rounded-2xl shadow-[6px_6px_0_hsl(var(--foreground))] z-20">
                     <FilterBar
                       filters={filters}
                       onFilterChange={setFilters}
@@ -711,7 +782,7 @@ export default function Dashboard() {
               {Array.from({ length: 6 }).map((_, i) => (
                 <div
                   key={i}
-                  className="rounded-xl p-5 border border-[#e6e8e4] bg-[#ffffff] animate-pulse space-y-3"
+                  className="rounded-2xl p-5 border-2 border-foreground/15 bg-white animate-pulse space-y-3"
                 >
                   <div className="h-4 w-3/4 rounded bg-[#f1f2f0]" />
                   <div className="h-3 w-1/2 rounded bg-[#f1f2f0]" />
@@ -722,7 +793,7 @@ export default function Dashboard() {
           ) : loadError ? (
             <div
               role="alert"
-              className="text-center py-16 px-4 rounded-2xl border border-destructive/30 bg-card text-muted-foreground"
+              className="text-center py-16 px-4 rounded-2xl border-2 border-foreground bg-[#fde8dc] text-[#4a1c05] shadow-[4px_4px_0_hsl(var(--foreground))]"
             >
               <span className="text-3xl block mb-3">⚠️</span>
               <p className="font-mono text-sm">{loadError}</p>
@@ -753,7 +824,7 @@ export default function Dashboard() {
                           key={job.jobId || job.url}
                           job={job}
                           selected={job.jobId === selectedJobId}
-                          onClick={() => setSelectedJobId(job.jobId)}
+                          onSelect={handleSelectJob}
                         />
                       )
                     )}
@@ -779,7 +850,7 @@ export default function Dashboard() {
                         scrolls — same fix does nothing for the old
                         short-content case (nothing to scroll, no visual
                         change). */}
-                  <div className="sticky top-40 max-h-[calc(100vh-11rem)] overflow-y-auto">
+                  <div className="sticky top-40 max-h-[calc(100vh-11rem)] overflow-y-auto pr-2 pb-2">
                     {selectedJob?.isLocked ? (
                       <div className="rounded-lg border border-border bg-card p-8 text-center">
                         <p className="text-sm text-muted-foreground mb-4">
@@ -805,6 +876,7 @@ export default function Dashboard() {
                         onAppliedToggle={handleAppliedToggle}
                         onApplyClick={setApplyGateJob}
                         country={country}
+                        variant="ink"
                       />
                     )}
                   </div>
@@ -824,11 +896,9 @@ export default function Dashboard() {
                     ) : (
                       <JobCard
                         key={job.jobId || job.url}
-                        job={{
-                          ...job,
-                          isSaved: savedJobIds.has(job.jobId),
-                          isApplied: appliedJobIds.has(job.jobId)
-                        }}
+                        job={job}
+                        isSaved={savedJobIds.has(job.jobId)}
+                        isApplied={appliedJobIds.has(job.jobId)}
                         onSaveToggle={handleSaveToggle}
                         onAppliedToggle={handleAppliedToggle}
                         country={country}
@@ -857,7 +927,7 @@ export default function Dashboard() {
               )}
             </>
           ) : (
-            <div className="text-center py-16 px-4 rounded-2xl border border-[#e6e8e4] bg-[#ffffff] text-muted-foreground font-mono">
+            <div className="text-center py-16 px-4 rounded-2xl border-2 border-foreground bg-[#fdf1d3] text-[#2a1d06] shadow-[4px_4px_0_hsl(var(--foreground))]">
               <span className="text-3xl block mb-2">🔍</span>
               No se encontraron vacantes con los filtros seleccionados.
             </div>

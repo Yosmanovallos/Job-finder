@@ -1,7 +1,10 @@
 import { BrowsersIcon as Browsers } from "@phosphor-icons/react/dist/csr/Browsers";
 import { CopyIcon as Copy } from "@phosphor-icons/react/dist/csr/Copy";
 import { LinkBreakIcon as LinkBreak } from "@phosphor-icons/react/dist/csr/LinkBreak";
-import { SOURCES_BY_COUNTRY } from "../countries/index.js";
+import { getCountryConfig, SOURCES_BY_COUNTRY } from "../countries/index.js";
+import { TINTS } from "../lib/brand-tints.js";
+import { SourceLogo } from "../components/SourceLogo.js";
+import { ContentCta, ContentSection, InkPanel, PageHero, PillLink, SectionHeading } from "../components/ContentPage.js";
 import {
   SOURCES_PAGE_DISCLOSURES,
   SOURCES_PAGE_HEADING,
@@ -34,297 +37,85 @@ export interface SourcesAndProblemProps {
   // Defaults to "CO" so /fuentes (rendered outside the country-aware
   // Landing route) keeps today's exact source list.
   country?: string;
+  // Kept for the /fuentes route's call site; the page is always standalone
+  // now (the homepage has its own portal marquee).
   standalone?: boolean;
 }
 
-export default function SourcesAndProblem({
-  country = "CO",
-  standalone = false
-}: SourcesAndProblemProps) {
+// /fuentes. Heading, intro, disclosures and links come from sources-page.ts,
+// the same strings server.ts puts in the raw HTML.
+export default function SourcesAndProblem({ country = "CO" }: SourcesAndProblemProps) {
   const sources = SOURCES_BY_COUNTRY[country] || SOURCES_BY_COUNTRY.CO;
+  const countryName = getCountryConfig(country).name;
+
   return (
-    <section
-      id="fuentes"
-      className="bg-muted"
-      style={{
-        borderTop: "1px solid #e6e8e4",
-        borderBottom: "1px solid #e6e8e4"
-      }}
-    >
-      {standalone && (
-        <div className="bg-white" style={{ borderBottom: "1px solid #e6e8e4" }}>
-          <article
-            className="mx-auto px-4 md:px-8 lg:px-16 py-14 md:py-20"
-            style={{ maxWidth: "1200px" }}
-            data-sources-page
-          >
-            <p
-              className="mb-4 text-xs uppercase tracking-widest"
-              style={{
-                fontFamily: "ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace",
-                color: "#0f6b4c",
-                letterSpacing: "0.12em"
-              }}
-            >
-              Transparencia de fuentes
-            </p>
-            <h1
-              className="font-heading font-semibold leading-tight"
-              style={{
-                fontSize: "clamp(2rem, 5vw, 3.75rem)",
-                letterSpacing: "-0.035em",
-                color: "#0e0f10",
-                maxWidth: "900px"
-              }}
-            >
-              {SOURCES_PAGE_HEADING}
-            </h1>
-            <p
-              className="mt-6 leading-relaxed"
-              style={{ color: "#5b5f5c", fontSize: "1.0625rem", maxWidth: "780px" }}
-            >
-              {SOURCES_PAGE_INTRO}
-            </p>
+    <div id="fuentes" className="bg-white" data-sources-page>
+      <PageHero eyebrow="Transparencia de fuentes" heading={SOURCES_PAGE_HEADING}>
+        <p>{SOURCES_PAGE_INTRO}</p>
+      </PageHero>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-10">
-              <section
-                className="p-6 md:p-8"
-                style={{ border: "1px solid #e6e8e4", borderRadius: "12px" }}
-              >
-                <h2 className="font-heading font-semibold text-xl" style={{ color: "#0e0f10" }}>
-                  Fuentes disponibles en Colombia
-                </h2>
-                <ul className="grid grid-cols-2 gap-x-5 gap-y-3 mt-5">
-                  {sources.map((source) => (
-                    <li key={source} className="flex items-center gap-2" style={{ color: "#343735" }}>
-                      <span aria-hidden="true" style={{ color: "#0f6b4c" }}>•</span>
-                      {source}
-                    </li>
-                  ))}
-                </ul>
-              </section>
-
-              <section
-                className="p-6 md:p-8"
-                style={{ border: "1px solid #e6e8e4", borderRadius: "12px" }}
-              >
-                <h2 className="font-heading font-semibold text-xl" style={{ color: "#0e0f10" }}>
-                  Qué significa que rastreamos una fuente
-                </h2>
-                <ul className="flex flex-col gap-4 mt-5">
-                  {SOURCES_PAGE_DISCLOSURES.map((disclosure) => (
-                    <li key={disclosure} className="flex gap-3 leading-relaxed" style={{ color: "#5b5f5c" }}>
-                      <span aria-hidden="true" style={{ color: "#0f6b4c" }}>✓</span>
-                      <span>{disclosure}</span>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            </div>
-
-            <nav aria-label="Explorar BuscoTrabajo" className="flex flex-wrap gap-3 mt-8">
-              {SOURCES_PAGE_LINKS.map((link) => (
-                <a
-                  key={link.href}
-                  href={link.href}
-                  className="inline-flex items-center px-4 py-2 text-sm font-medium transition-colors"
-                  style={{
-                    color: "#0f6b4c",
-                    border: "1px solid rgba(15,107,76,0.28)",
-                    borderRadius: "999px",
-                    background: "rgba(15,107,76,0.05)"
-                  }}
+      <ContentSection>
+        <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_1fr] gap-4 md:gap-6">
+          <InkPanel tint="#fdf1d3">
+            <h2 className="font-heading font-bold text-xl md:text-[28px] leading-tight tracking-[-0.02em] text-[#2a1d06]">
+              Fuentes disponibles en {countryName}
+            </h2>
+            <ul className="mt-5 flex flex-wrap gap-2 md:gap-2.5">
+              {sources.map((source) => (
+                <li
+                  key={source}
+                  className="inline-flex items-center gap-2 rounded-full border-2 border-foreground bg-white py-1 pl-1 pr-3 md:py-1.5 md:pl-1.5 md:pr-4 font-heading font-bold text-[13px] md:text-[15px] whitespace-nowrap"
                 >
-                  {link.label}
-                </a>
+                  <SourceLogo source={source} lazy />
+                  {source}
+                </li>
               ))}
-            </nav>
-          </article>
+            </ul>
+          </InkPanel>
+          <InkPanel tint="#e6f4ec">
+            <h2 className="font-heading font-bold text-xl md:text-[28px] leading-tight tracking-[-0.02em] text-green-deep">
+              Qué significa que rastreamos una fuente
+            </h2>
+            <ul className="mt-5 flex flex-col gap-4">
+              {SOURCES_PAGE_DISCLOSURES.map((disclosure) => (
+                <li key={disclosure} className="flex gap-3 text-[15px] md:text-base leading-relaxed text-[#3d413e]">
+                  <span aria-hidden="true" className="shrink-0 w-7 h-7 rounded-full border-2 border-foreground bg-primary text-white grid place-items-center text-sm font-bold">✓</span>
+                  <span>{disclosure}</span>
+                </li>
+              ))}
+            </ul>
+          </InkPanel>
         </div>
-      )}
+        <nav aria-label="Explorar BuscoTrabajo" className="sr mt-6 md:mt-8 flex flex-wrap gap-2.5">
+          {SOURCES_PAGE_LINKS.map((link) => (
+            <PillLink key={link.href} href={link.href}>
+              {link.label}
+            </PillLink>
+          ))}
+        </nav>
+      </ContentSection>
 
-      {/* Sources Strip */}
-      {!standalone && (
-        <div
-        style={{
-          borderBottom: "1px solid #e6e8e4",
-          background: "#ffffff"
-        }}
-      >
-        <div className="mx-auto px-4 md:px-8 lg:px-16" style={{ maxWidth: "1200px" }}>
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3 py-5">
-            {/* Label */}
-            <span
-              className="shrink-0 text-xs uppercase tracking-widest"
-              style={{
-                fontFamily: "ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace",
-                color: "#9a9d98",
-                letterSpacing: "0.12em"
-              }}
-            >
-              Conectado a
-            </span>
-
-            {/* Divider line — desktop only */}
-            <div
-              className="hidden sm:block shrink-0 w-px self-stretch"
-              style={{ background: "#e6e8e4" }}
-            />
-
-            {/* Chips row — continuously scrolling marquee, paused on hover
-                and frozen for prefers-reduced-motion via the .marquee-track
-                CSS rule (see index.css). The list is duplicated once so the
-                loop point is invisible. */}
-            <div className="relative flex-1 min-w-0 overflow-hidden">
-              {/* Left gradient mask */}
-              <div
-                className="pointer-events-none absolute left-0 top-0 bottom-0 w-6 z-10 hidden sm:block"
-                style={{
-                  background: "linear-gradient(to right, #ffffff, transparent)"
-                }}
-              />
-              {/* Right gradient mask */}
-              <div
-                className="pointer-events-none absolute right-0 top-0 bottom-0 w-8 z-10"
-                style={{
-                  background: "linear-gradient(to left, #ffffff, transparent)"
-                }}
-              />
-
-              <div className="marquee-track flex flex-row gap-2 w-max">
-                {[...sources, ...sources].map((source, i) => (
-                  <span
-                    key={`${source}-${i}`}
-                    className="shrink-0 inline-flex items-center px-3 py-1 text-xs whitespace-nowrap transition-colors duration-150"
-                    style={{
-                      fontFamily:
-                        "ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace",
-                      color: "#5b5f5c",
-                      background: "#f1f2f0",
-                      border: "1px solid #e6e8e4",
-                      borderRadius: "999px",
-                      fontSize: "0.8125rem"
-                    }}
-                  >
-                    {source}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-        </div>
-      )}
-
-      {/* Problem Section */}
-      <div className="mx-auto px-4 md:px-8 lg:px-16 py-16 md:py-20" style={{ maxWidth: "1200px" }}>
-        {/* Section heading block */}
-        <div className="mb-10 md:mb-12">
-          <span
-            className="inline-block mb-4 text-xs uppercase tracking-widest"
-            style={{
-              fontFamily: "ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace",
-              color: "#9a9d98",
-              letterSpacing: "0.12em"
-            }}
-          >
-            El problema
-          </span>
-          <h2
-            className="font-heading font-semibold leading-tight"
-            style={{
-              fontSize: "clamp(1.5rem, 3vw, 2.25rem)",
-              letterSpacing: "-0.01em",
-              color: "#0e0f10",
-              maxWidth: "640px"
-            }}
-          >
-            Buscar empleo hoy es un trabajo de tiempo completo
-          </h2>
-        </div>
-
-        {/* Problem cards grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
-          {problems.map(({ icon: Icon, title, description }, index) => (
-            <div
-              key={title}
-              className="group relative flex flex-col gap-4 p-6 transition-all duration-150 cursor-default"
-              style={{
-                background: "#ffffff",
-                border: "1px solid #e6e8e4",
-                borderRadius: "12px"
-              }}
-              onMouseEnter={(e) => {
-                const el = e.currentTarget as HTMLDivElement;
-                el.style.background = "#f1f2f0";
-                el.style.borderColor = "#d3d6cf";
-              }}
-              onMouseLeave={(e) => {
-                const el = e.currentTarget as HTMLDivElement;
-                el.style.background = "#ffffff";
-                el.style.borderColor = "#e6e8e4";
-              }}
-            >
-              {/* Grid line accent — top-left corner decoration */}
-              <div
-                className="absolute top-0 left-0 w-6 h-6 pointer-events-none"
-                style={{
-                  borderTop: "1px solid #0f6b4c",
-                  borderLeft: "1px solid #0f6b4c",
-                  borderTopLeftRadius: "12px",
-                  opacity: 0.35
-                }}
-              />
-
-              {/* Step index — mono label */}
-              <span
-                className="text-xs"
-                style={{
-                  fontFamily: "ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace",
-                  color: "#9a9d98",
-                  fontSize: "0.8125rem"
-                }}
-              >
-                {String(index + 1).padStart(2, "0")}
-              </span>
-
-              {/* Icon */}
-              <div
-                className="flex items-center justify-center w-10 h-10 rounded-lg"
-                style={{
-                  background: "rgba(15,107,76,0.10)",
-                  border: "1px solid rgba(15,107,76,0.20)"
-                }}
-              >
-                <Icon weight="duotone" size={20} style={{ color: "#0f6b4c" }} />
-              </div>
-
-              {/* Text */}
-              <div className="flex flex-col gap-2">
-                <h3
-                  className="font-heading font-semibold leading-snug"
-                  style={{
-                    fontSize: "1.125rem",
-                    color: "#0e0f10"
-                  }}
-                >
+      <ContentSection>
+        <SectionHeading>Buscar empleo hoy es un trabajo de tiempo completo</SectionHeading>
+        <div className="sr-stagger grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+          {problems.map(({ icon: Icon, title, description }, index) => {
+            const tint = TINTS[(index + 1) % TINTS.length]!;
+            return (
+              <div key={title} className="sr ink-card-sm md:ink-card ink-lift rounded-2xl md:rounded-3xl p-5 md:p-7 flex flex-col gap-3" style={{ backgroundColor: tint.bg }}>
+                <span className="w-12 h-12 rounded-xl border-2 border-foreground bg-white grid place-items-center">
+                  <Icon weight="duotone" size={24} style={{ color: tint.sub }} />
+                </span>
+                <h3 className="font-heading font-bold text-lg md:text-xl leading-snug" style={{ color: tint.fg }}>
                   {title}
                 </h3>
-                <p
-                  className="leading-relaxed"
-                  style={{
-                    fontSize: "0.9375rem",
-                    color: "#5b5f5c",
-                    lineHeight: "1.65"
-                  }}
-                >
-                  {description}
-                </p>
+                <p className="text-[15px] leading-relaxed text-[#3d413e]">{description}</p>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
-      </div>
-    </section>
+      </ContentSection>
+
+      <ContentCta />
+    </div>
   );
 }
