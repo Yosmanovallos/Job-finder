@@ -9,4 +9,5 @@
 - [x] Incorporar Cemex desde `jobs.cemex.com` tras canario completo de 5 vacantes colombianas; usar seed dirigido con revisión previa de conflictos y comprobar el [tick](https://github.com/Yosmanovallos/Job-finder/actions/runs/40239337651).
 - [x] Incorporar TP Colombia desde el listado oficial de `tp.com`: conector paginado, canario completo, [seed sin conflictos](https://github.com/Yosmanovallos/Job-finder/actions/runs/40257036353) y [tick de producción](https://github.com/Yosmanovallos/Job-finder/actions/runs/40257107820).
 - [x] Exportar el censo completo como JSONL desde un modo manual de solo lectura, con estado de revisión humana separado del sondeo ATS automatizado.
+- [ ] Incorporar NEXA BPO desde Workeando tras pruebas, seed dirigido y tick de producción; [evidencia](../../../docs/source-catalog/workeando-nexa.md). La fuente solo atribuye ofertas que mencionan NEXA.
 - [ ] Revisar todas las empresas objetivo pendientes; conservar evidencia y clasificación de cada una. El [primer lote](../../../docs/source-catalog/computrabajo-official-batch-2026-10-25.md) documenta cinco casos, ninguno importable todavía.

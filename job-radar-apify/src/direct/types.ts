@@ -4,7 +4,7 @@
  * here is ever written to that table.
  */
 
-export const DIRECT_ATS_TYPES = ["greenhouse", "lever", "ashby", "smartrecruiters", "successfactors", "teamtailor", "workday", "phenom", "eightfold", "magneto", "google", "tp"] as const;
+export const DIRECT_ATS_TYPES = ["greenhouse", "lever", "ashby", "smartrecruiters", "successfactors", "teamtailor", "workday", "phenom", "eightfold", "magneto", "google", "tp", "workeando"] as const;
 export type DirectAtsType = (typeof DIRECT_ATS_TYPES)[number];
 
 export type Workplace = "onsite" | "hybrid" | "remote";
@@ -95,6 +95,8 @@ export interface EmployerSourceRef {
 export interface HttpResponse {
   status: number;
   body: string;
+  /** Only pagination headers used by public WordPress collection endpoints. */
+  headers?: { "x-wp-total"?: string; "x-wp-totalpages"?: string };
 }
 /**
  * GET by default. `json` turns it into a POST with a JSON body (Workday's

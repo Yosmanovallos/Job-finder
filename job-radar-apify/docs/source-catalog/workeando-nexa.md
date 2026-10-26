@@ -1,0 +1,9 @@
+# NEXA BPO: portal oficial Workeando
+
+Revisión: 2026-10-25. El [sitio corporativo de NEXA](https://www.nexabpo.com/) enlaza [Workeando](https://workeando.com/). `robots.txt` de Workeando permite sus colecciones públicas de WordPress. El conector usa `GET /wp-json/wp/v2/ofertas` y `GET /wp-json/wp/v2/ciudad`, con `per_page=100`, paginación completa y máximo diez páginas. No usa Computrabajo para obtener estas ofertas.
+
+La lectura pública del 25 de octubre devolvió 32 entradas `ofertas` con `status=publish` y 77 términos de ciudad, ambos en una página según `X-WP-Total` y `X-WP-TotalPages`. Seis entradas tenían `date_gmt` dentro de 30 días; cinco de ellas mencionaban NEXA en el contenido. Los seis enlaces de detalle respondieron 200 a una comprobación HEAD. La sexta entrada reciente no se atribuye a NEXA sin respaldo textual. Las otras 26 entradas son anteriores al límite de 30 días, desde marzo de 2026. El censo de Computrabajo registró 95 vacantes bajo NEXA BPO; las cinco ofertas oficiales elegibles no se equiparan automáticamente con esas 95.
+
+El conector conserva la hora UTC declarada en `date_gmt`; `modified_gmt` y la hora de lectura nunca pasan por fecha de publicación. Rechaza cambios de total, páginas ausentes, IDs repetidos, URL fuera de `/ofertas/` en el mismo origen, fechas inválidas y ciudades referidas que falten en la taxonomía. Una entrada sin ciudad queda fuera del filtro colombiano. Una entrada que no menciona NEXA se valida como parte del listado, pero no se atribuye a NEXA. El conector no confirma cierres mediante 404 de detalle: se aplican las dos lecturas completas y el guardia de caída masiva existentes.
+
+Límite: `publish` y una URL que responde 200 prueban que el portal oficial la expone; no prueban que exista una contraparte exacta de cada anuncio de Computrabajo ni que el empleador siga aceptando candidatos. La cifra debe revisarse después del tick de producción.

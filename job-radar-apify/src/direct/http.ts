@@ -12,7 +12,7 @@ const TIMEOUT_MS = 15_000;
 const MAX_BODY_BYTES = 15 * 1024 * 1024;
 const MAX_RETRY_WAIT_MS = 10_000;
 
-async function once(url: string, init: HttpRequestInit = {}): Promise<{ status: number; body: string; retryAfterMs: number | null }> {
+async function once(url: string, init: HttpRequestInit = {}): Promise<{ status: number; body: string; headers: { "x-wp-total"?: string; "x-wp-totalpages"?: string }; retryAfterMs: number | null }> {
   const post = init.json !== undefined;
   const response = await fetch(url, {
     method: post ? "POST" : "GET",
@@ -38,6 +38,10 @@ async function once(url: string, init: HttpRequestInit = {}): Promise<{ status: 
   return {
     status: response.status,
     body,
+    headers: {
+      "x-wp-total": response.headers.get("x-wp-total") ?? undefined,
+      "x-wp-totalpages": response.headers.get("x-wp-totalpages") ?? undefined
+    },
     retryAfterMs: Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : null
   };
 }

@@ -989,6 +989,21 @@
       ]
     },
     {
+      "slug": "nexa-bpo",
+      "displayName": "NEXA BPO",
+      "websiteDomain": "nexabpo.com",
+      "aliases": [
+        "NEXA BPO"
+      ],
+      "sources": [
+        {
+          "atsType": "workeando",
+          "atsRef": "nexa-bpo",
+          "enabled": true
+        }
+      ]
+    },
+    {
       "slug": "cemex",
       "displayName": "Cemex",
       "websiteDomain": "cemex.com",

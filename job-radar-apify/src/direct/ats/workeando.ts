@@ -1,0 +1,122 @@
+import { z } from "zod";
+import { htmlToText, safeJson, text } from "../text.js";
+import type { BoardListing, HttpGet, RawAtsPosting } from "../types.js";
+import { allowedUrl, readRobots } from "./site.js";
+
+/** Public WordPress collections on the career site linked by nexaBPO.com. */
+const ORIGIN = "https://workeando.com";
+const PAGE_SIZE = 100;
+const MAX_PAGES = 10;
+const Offer = z.object({
+  id: z.number().int().positive(),
+  date_gmt: z.string(),
+  status: z.literal("publish"),
+  type: z.literal("ofertas"),
+  link: z.string(),
+  title: z.object({ rendered: z.string() }),
+  content: z.object({ rendered: z.string() }),
+  ciudad: z.array(z.number().int().positive())
+});
+const City = z.object({ id: z.number().int().positive(), name: z.string().min(1) });
+
+function collectionUrl(collection: "ofertas" | "ciudad", page: number): string {
+  return `${ORIGIN}/wp-json/wp/v2/${collection}?per_page=${PAGE_SIZE}&page=${page}`;
+}
+
+function count(value: string | undefined): number | null {
+  if (!value || !/^(0|[1-9]\d*)$/.test(value)) return null;
+  const result = Number(value);
+  return Number.isSafeInteger(result) ? result : null;
+}
+
+async function readCollection<T>(
+  collection: "ofertas" | "ciudad",
+  schema: z.ZodType<T>,
+  http: HttpGet,
+  allowed: (url: string) => boolean
+): Promise<T[] | null> {
+  const rows: T[] = [];
+  let total: number | null = null;
+  let pages: number | null = null;
+  for (let page = 1; page <= MAX_PAGES; page++) {
+    const url = collectionUrl(collection, page);
+    if (!allowed(url)) return null;
+    // Supplying accept also disables redirect following in boundedGet; the
+    // fixed public origin is the only host this connector may read.
+    const response = await http(url, { accept: "application/json" });
+    if (response.status !== 200) return null;
+    const nextTotal = count(response.headers?.["x-wp-total"]);
+    const nextPages = count(response.headers?.["x-wp-totalpages"]);
+    if (nextTotal === null || nextPages === null || nextPages < 1 || nextPages > MAX_PAGES ||
+        nextPages !== Math.max(1, Math.ceil(nextTotal / PAGE_SIZE)) ||
+        (total !== null && (nextTotal !== total || nextPages !== pages))) return null;
+    total = nextTotal;
+    pages = nextPages;
+    const parsed = z.array(schema).safeParse(safeJson(response.body));
+    if (!parsed.success || parsed.data.length > PAGE_SIZE ||
+        parsed.data.length !== Math.min(PAGE_SIZE, total - rows.length)) return null;
+    rows.push(...parsed.data);
+    if (page === pages) return rows.length === total ? rows : null;
+  }
+  return null;
+}
+
+function wpDate(value: string): string | null {
+  // WordPress date_gmt explicitly states UTC; never substitute modified_gmt
+  // or the time this board was read.
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(value)) return null;
+  const date = new Date(`${value}Z`);
+  return Number.isFinite(date.getTime()) && date.toISOString() === `${value}.000Z` ? date.toISOString() : null;
+}
+
+function posting(row: z.infer<typeof Offer>, cities: Map<number, string>): RawAtsPosting | null {
+  let url: URL;
+  try { url = new URL(row.link); } catch { return null; }
+  if (url.origin !== ORIGIN || !/^\/ofertas\/[a-z0-9-]+\/$/.test(url.pathname) || url.search || url.hash) return null;
+  const title = text(htmlToText(row.title.rendered));
+  const description = text(htmlToText(row.content.rendered));
+  const publishedAt = wpDate(row.date_gmt);
+  if (!title || !description || !publishedAt || row.ciudad.some((id) => !cities.has(id))) return null;
+  return {
+    externalId: String(row.id),
+    title,
+    applyUrl: url.toString(),
+    locationTexts: row.ciudad.map((id) => cities.get(id)!),
+    countryCodes: [],
+    structuredCity: null,
+    workplace: null,
+    descriptionText: description,
+    department: null,
+    employmentType: null,
+    publishedAt,
+    validThrough: null,
+    // The site is linked by NEXA, but its individual postings do not all
+    // identify an employer. Association belongs to the reviewed seed.
+    companyName: null
+  };
+}
+
+export async function listWorkeando(ref: string, http: HttpGet): Promise<BoardListing> {
+  if (ref !== "nexa-bpo") return { kind: "error", detail: "referencia Workeando inválida" };
+  const robots = await readRobots(ORIGIN, http);
+  const allowed = (url: string) => allowedUrl(robots, url);
+  const offers = await readCollection("ofertas", Offer, http, allowed);
+  if (!offers || new Set(offers.map((row) => row.id)).size !== offers.length) {
+    return { kind: "error", detail: "listado Workeando incompleto o inválido" };
+  }
+  const cityRows = await readCollection("ciudad", City, http, allowed);
+  if (!cityRows || new Set(cityRows.map((row) => row.id)).size !== cityRows.length) {
+    return { kind: "error", detail: "taxonomía de ciudades Workeando incompleta o inválida" };
+  }
+  const cities = new Map(cityRows.map((row) => [row.id, row.name]));
+  const postings: RawAtsPosting[] = [];
+  for (const offer of offers) {
+    const mapped = posting(offer, cities);
+    if (!mapped) return { kind: "error", detail: `vacante Workeando ${offer.id} incompleta o inválida` };
+    // Workeando also carries postings that do not identify NEXA. Do not
+    // attribute those to this employer merely because the domain is linked.
+    if (!/\bnexa(?:\s+bpo)?\b/i.test(mapped.descriptionText ?? "")) continue;
+    postings.push(mapped);
+  }
+  return { kind: "complete", boardTotal: offers.length, postings };
+}
