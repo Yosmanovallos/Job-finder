@@ -25,7 +25,7 @@ export interface RouteMeta {
 const LEGAL: Record<string, { heading: string; description: string }> = {
   "/legal/terminos": {
     heading: "Términos de uso",
-    description: "Términos de uso de BuscoTrabajo: qué es el servicio, planes y pago, y disponibilidad de los datos de vacantes."
+    description: "Términos de uso de BuscoTrabajo: qué es el servicio, su costo y la disponibilidad de los datos de vacantes."
   },
   "/legal/privacidad": {
     heading: "Política de privacidad",

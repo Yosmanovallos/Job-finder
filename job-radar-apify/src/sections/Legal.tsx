@@ -1,5 +1,4 @@
 import { Link } from "react-router-dom";
-import { PRO_MONTHLY_PRICE_COP, formatCOP } from "../config.js";
 import { usePageMeta } from "../lib/use-page-meta.js";
 import { ROUTE_META } from "../lib/page-meta.js";
 import { TINTS } from "../lib/brand-tints.js";
@@ -13,9 +12,10 @@ interface LegalSection {
 }
 
 
-const content: Record<LegalPageType, { title: string; sections: LegalSection[] }> = {
+const content: Record<LegalPageType, { title: string; updated: string; sections: LegalSection[] }> = {
   terminos: {
     title: "Términos de uso",
+    updated: "octubre de 2026",
     sections: [
       {
         title: "Qué es BuscoTrabajo",
@@ -25,10 +25,10 @@ const content: Record<LegalPageType, { title: string; sections: LegalSection[] }
         ],
       },
       {
-        title: "Planes y pago",
+        title: "Costo del servicio",
         paragraphs: [
-          `El plan Gratis da acceso ilimitado a vacantes con más de 48 horas de publicadas. El plan Pro (${formatCOP(PRO_MONTHLY_PRICE_COP)} COP/mes) desbloquea el acceso inmediato a vacantes desde el momento en que se publican.`,
-          "Los pagos del plan Pro se procesan a través de Wompi. BuscoTrabajo no almacena datos de tarjetas — eso lo maneja Wompi directamente.",
+          "BuscoTrabajo es gratuito. Puedes buscar y ver todas las vacantes, incluidas las recién publicadas, sin pagar. Crear una cuenta también es gratis y sirve para guardar vacantes y marcar las que ya aplicaste.",
+          "Más adelante podríamos ofrecer funciones opcionales de pago. Si eso ocurre, lo anunciaremos y actualizaremos estos términos antes de cobrar cualquier cosa.",
         ],
       },
       {
@@ -41,6 +41,7 @@ const content: Record<LegalPageType, { title: string; sections: LegalSection[] }
   },
   privacidad: {
     title: "Política de privacidad",
+    updated: "julio de 2026",
     sections: [
       {
         title: "Qué datos recolectamos",
@@ -67,18 +68,20 @@ const content: Record<LegalPageType, { title: string; sections: LegalSection[] }
   },
   "uso-aceptable": {
     title: "Uso aceptable",
+    updated: "octubre de 2026",
     sections: [
       {
         title: "Qué sí puedes hacer",
         paragraphs: [
-          "Usar BuscoTrabajo para buscar empleo, guardar vacantes, marcar las que ya aplicaste y suscribirte al plan Pro para ver resultados desde el minuto 0.",
+          "Usar BuscoTrabajo para buscar empleo, guardar vacantes y marcar las que ya aplicaste.",
+          "Si desarrollas una herramienta o un agente, puedes usar la API pública de solo lectura dentro de los límites publicados en /docs.",
         ],
       },
       {
         title: "Qué no está permitido",
         paragraphs: [
           "Extraer masivamente (scraping) el contenido de BuscoTrabajo para redistribuirlo o revenderlo.",
-          "Automatizar solicitudes al servicio fuera de lo que la interfaz permite, o intentar evadir el paywall de frescura de 48 horas.",
+          "Automatizar solicitudes al servicio fuera de la interfaz y de la API pública documentada, o superar sus límites de uso.",
           "Usar el servicio para fines distintos a la búsqueda de empleo legítima.",
         ],
       },
@@ -92,6 +95,7 @@ const content: Record<LegalPageType, { title: string; sections: LegalSection[] }
   },
   cookies: {
     title: "Política de cookies",
+    updated: "julio de 2026",
     sections: [
       {
         title: "Qué cookies usamos",
@@ -126,7 +130,7 @@ export default function Legal({ type }: { type: LegalPageType }) {
   return (
     <div className="bg-white">
       <PageHero eyebrow="Legal" heading={page.title}>
-        <p>Última actualización: julio de 2026. Preguntas: buscotrabajocolombia123@gmail.com</p>
+        <p>Última actualización: {page.updated}. Preguntas: buscotrabajocolombia123@gmail.com</p>
       </PageHero>
       <ContentSection>
         <div className="flex flex-col md:flex-row gap-6 md:gap-10 items-start">
