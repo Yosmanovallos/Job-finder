@@ -70,7 +70,7 @@ export function InkPanel({
 }
 
 // Same closing band as the homepage, pointing to the vacancies.
-export function ContentCta({ heading = "La vacante que buscas ya se publicó" }: { heading?: string }) {
+export function ContentCta({ heading = "La vacante que buscas ya se publicó", to = "/dashboard" }: { heading?: string; to?: string }) {
   return (
     <section className="sr-host px-4 md:px-6 pt-4 pb-10 md:pb-24">
       <div className="sr relative overflow-hidden max-w-[1240px] mx-auto rounded-[20px] md:rounded-[32px] bg-green-deep text-white text-center px-5 py-8 md:px-10 md:py-16">
@@ -78,7 +78,7 @@ export function ContentCta({ heading = "La vacante que buscas ya se publicó" }:
         <div aria-hidden="true" className="absolute -right-28 -bottom-64 w-[520px] h-[520px] rounded-full bg-[radial-gradient(circle,rgba(31,163,122,0.6),rgba(31,163,122,0)_65%)]" />
         <h2 className="relative font-heading font-bold text-2xl md:text-[clamp(30px,4vw,48px)] leading-[1.1] tracking-[-0.03em]">{heading}</h2>
         <Link
-          to="/dashboard"
+          to={to}
           className="relative mt-5 md:mt-7 flex md:inline-flex h-[52px] md:h-[58px] items-center justify-center rounded-xl md:rounded-[14px] border-2 border-foreground bg-gold-2 px-[30px] font-bold text-[#2a1d06] no-underline"
         >
           Ver vacantes de hoy →
