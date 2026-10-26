@@ -1004,6 +1004,21 @@
       ]
     },
     {
+      "slug": "holcim-abs",
+      "displayName": "Holcim ABS",
+      "websiteDomain": "abs.holcim.com",
+      "aliases": [
+        "Holcim ABS"
+      ],
+      "sources": [
+        {
+          "atsType": "successfactors",
+          "atsRef": "careers.holcimgroup.com/Holcim_abs",
+          "enabled": false
+        }
+      ]
+    },
+    {
       "slug": "cemex",
       "displayName": "Cemex",
       "websiteDomain": "cemex.com",

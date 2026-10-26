@@ -81,6 +81,41 @@ function firstSpan(html: string, className: string): string | null {
 }
 
 export function parseSearchPage(html: string): { from: number; to: number; total: number; rows: SearchRow[] } | null {
+  // Newer RMK sites render job tiles instead of the classic data-row table.
+  // Never interpret an unfamiliar non-empty listing as zero: that would
+  // eventually close every previously imported posting on the board.
+  if (/<ul id="job-tile-list"/.test(html)) {
+    const label = /id="tile-search-results-label"[^>]*>\s*(?:Showing\s+([\d,.]+)\s+to\s+([\d,.]+)\s+of\s+([\d,.]+)|Mostrando\s+([\d,.]+)\s+a\s+([\d,.]+)\s+de\s+([\d,.]+))/i.exec(html);
+    if (!label) return null;
+    const number = (value: string) => Number(value.replace(/[.,]/g, ""));
+    const from = number(label[1] ?? label[4]);
+    const to = number(label[2] ?? label[5]);
+    const total = number(label[3] ?? label[6]);
+    const rows: SearchRow[] = [];
+    for (const chunk of html.split(/<li class="job-tile\b/).slice(1)) {
+      const tile = chunk.split("</li>", 1)[0];
+      const link = /\bdata-url="([^"]*\/job\/[^"]*\/(\d{4,20})\/)"/.exec(tile);
+      const title = /<a\b[^>]*\bclass="[^"]*\bjobTitle-link\b[^"]*"[^>]*\bhref="([^"]+)"[^>]*>([\s\S]*?)<\/a>/.exec(tile);
+      if (!link || !title || decodeEntities(link[1]) !== decodeEntities(title[1])) return null;
+      const id = link[2];
+      const titleText = text(decodeEntities(title[2].replace(/<[^>]+>/g, " ")).replace(/\s+/g, " "));
+      if (!titleText) return null;
+      const field = (name: string): string | null => {
+        const match = new RegExp(`id="job-${id}-desktop-section-${name}-value"[^>]*>([\\s\\S]*?)<\\/div>`).exec(tile);
+        return match ? text(decodeEntities(match[1].replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ")) : null;
+      };
+      rows.push({
+        id,
+        href: decodeEntities(link[1]),
+        title: titleText,
+        location: field("multilocation") ?? field("location"),
+        date: field("date"),
+        department: field("department")
+      });
+    }
+    if (![from, to, total].every(Number.isInteger) || rows.length !== (total === 0 ? 0 : to - from + 1)) return null;
+    return { from, to, total, rows };
+  }
   const rows: SearchRow[] = [];
   for (const chunk of html.split(/<tr class="data-row"/).slice(1)) {
     const link = /<a href="([^"]*\/job\/[^"]*\/(\d{4,20})\/)"[^>]*class="jobTitle-link"[^>]*>([\s\S]*?)<\/a>/.exec(chunk)
@@ -97,6 +132,7 @@ export function parseSearchPage(html: string): { from: number; to: number; total
   }
   const label = /(?:Resultados|Results)\s*<b>\s*([\d.,]+)\s*[–-]\s*([\d.,]+)\s*<\/b>\s*(?:de|of)\s*<b>\s*([\d.,]+)\s*<\/b>/i.exec(html);
   const number = (value: string) => Number(value.replace(/[.,]/g, ""));
+  if (rows.length === 0 && /jobTitle-link/.test(html)) return null;
   if (!label) return rows.length === 0 ? { from: 0, to: 0, total: 0, rows } : null;
   return { from: number(label[1]), to: number(label[2]), total: number(label[3]), rows };
 }
