@@ -39,15 +39,15 @@ export const JobListItem: React.FC<JobListItemProps> = ({ job, selected, onClick
       type="button"
       onClick={onClick}
       className={cn(
-        "w-full text-left rounded-lg border p-4 transition-colors",
+        "w-full text-left rounded-2xl border-2 border-foreground p-4 transition-all",
         selected
-          ? "border-primary bg-primary/5"
-          : "border-border bg-card hover:border-border-strong"
+          ? "bg-green-soft shadow-[4px_4px_0_hsl(var(--primary))]"
+          : "bg-white shadow-[3px_3px_0_hsl(var(--foreground))] hover:-translate-x-0.5 hover:-translate-y-0.5 hover:shadow-[5px_5px_0_hsl(var(--foreground))]"
       )}
     >
-      <h3 className="font-heading font-semibold text-sm text-foreground leading-snug mb-1 line-clamp-2">
+      <h2 className="font-heading font-bold text-[15px] text-foreground leading-snug mb-1 line-clamp-2">
         {job.title}
-      </h3>
+      </h2>
       <p className="text-xs text-foreground/80 mb-2 truncate">
         {job.company || "Confidencial"}
         <span className="text-muted-foreground"> · {buildLocationLabel(job)}</span>

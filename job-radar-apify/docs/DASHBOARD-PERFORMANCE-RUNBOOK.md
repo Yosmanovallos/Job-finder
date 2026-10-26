@@ -95,6 +95,27 @@ The deploy reached `Live` only after the warmup completed. Normal network,
 Cloudflare and browser variation is expected; compare trends and internal
 Render duration rather than requiring an identical millisecond value.
 
+### 2026-10-25 baseline before the dashboard redesign (branch `codex/homepage-redesign`)
+
+Production as deployed (`origin/main`), measured from outside before the
+redesign ships. Each request used a unique `?coldcheck=` URL, and Cloudflare
+answered `MISS` on every one:
+
+| Measurement | Result |
+| --- | ---: |
+| `/dashboard` time to first byte (3 unique URLs) | 444 ms, 259 ms, 252 ms |
+| `/ve/dashboard` time to first byte (3 unique URLs) | 303 ms, 268 ms, 248 ms |
+| Lighthouse `/dashboard` mobile (3 runs, unique URLs) | score 70-71, LCP 5.4-5.7 s, TBT 137-169 ms |
+| Lighthouse `/dashboard` desktop (3 runs, unique URLs) | score 94, LCP 1.4-1.5 s |
+
+The redesign (phase E) only changes client components: `Dashboard.tsx`
+markup, `JobListItem`, `JobCard`, `FilterBar` and an opt-in `variant="ink"`
+on `JobDetailPanel`. It does not touch `server.ts`, the SSR branch, the
+job-page cache or the startup warmup, so the server-side cold path is
+unchanged by construction. **Still pending, only possible after deploying:**
+repeat these same unique-URL `MISS` checks and Lighthouse runs, check
+`dashboard_cache_warmed` in the Render logs, and record the results here.
+
 ## Required regression check
 
 For any change that can affect this path:

@@ -84,10 +84,10 @@ export const JobCard: React.FC<JobCardProps> = ({
       // Green rail = unlocked/free, matching the gold rail PaywallCard uses
       // for locked/Pro, so the two states read as siblings, not opposites.
       className={cn(
-        "hud-corners grid grid-cols-[4px_1fr] rounded-lg border overflow-hidden transition-colors",
+        "grid grid-cols-[6px_1fr] rounded-2xl border-2 overflow-hidden transition-colors",
         applied
-          ? "border-border bg-muted opacity-60"
-          : "border-border bg-card hover:border-border-strong"
+          ? "border-foreground/30 bg-muted opacity-60"
+          : "border-foreground bg-white shadow-[3px_3px_0_hsl(var(--foreground))]"
       )}
     >
       <div
@@ -112,9 +112,9 @@ export const JobCard: React.FC<JobCardProps> = ({
           {/* Body — title, company, location first (the scan path), tags and
               timestamp last and quietest. */}
           <div className="flex-1 min-w-0">
-            <h3 className="font-heading font-semibold text-base text-foreground leading-snug mb-1">
+            <h2 className="font-heading font-bold text-base text-foreground leading-snug mb-1">
               {job.title}
-            </h3>
+            </h2>
 
             <p className="text-sm text-foreground/80 mb-2">
               {job.company && !isPlaceholderEmployer(job.company) ? (

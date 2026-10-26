@@ -444,14 +444,21 @@ export default function Dashboard() {
   }, [mobileFiltersOpen, isDesktop]);
 
   return (
-    <section className="relative w-full min-h-screen" style={{ backgroundColor: "#fafafa" }}>
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-20">
-        {/* Visually hidden — the visible page identity is the filter bar +
-            hero copy above, but the DOM needs exactly one real <h1>. Text
-            mirrors server.ts's /dashboard SSR snippet verbatim (see its
-            2026-08-04 fix comment) so raw HTML and post-hydration DOM never
-            disagree. */}
-        <h1 className="sr-only">Vacantes de Empleo en {countryConfig.name}</h1>
+    <section className="relative w-full min-h-screen bg-white">
+      {/* Same green-soft band as the rest of the site. The H1 text mirrors
+          server.ts's /dashboard SSR snippet verbatim (see its 2026-08-04
+          fix comment) so raw HTML and post-hydration DOM never disagree. */}
+      <div className="bg-gradient-to-b from-green-soft to-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 md:pt-8 pb-1">
+          {/* Two lines reserved on phones: "…en Colombia" fits on one line in
+              the fallback font and wraps once the heading font loads, which
+              pushed the whole job list down (CLS 0.29). */}
+          <h1 className="font-heading font-bold tracking-[-0.035em] leading-tight text-[26px] md:text-[38px] min-h-[2.5em] md:min-h-0">
+            Vacantes de Empleo en {countryConfig.name}
+          </h1>
+        </div>
+      </div>
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-1 pb-20">
         {checkoutBanner && (
           <div
             className={`mb-4 p-3 rounded-xl text-xs font-mono flex items-center gap-2 ${
@@ -552,7 +559,7 @@ export default function Dashboard() {
             content scrolling underneath doesn't show through, and its own
             padding (not a negative-margin bleed trick) so nothing below it
             can end up visually clipped. */}
-        <div className="sticky top-16 z-40 bg-background pt-3 pb-4">
+        <div className="sticky top-16 z-40 bg-white pt-3 pb-4">
           <div className="flex gap-2">
             <div className="relative flex-1">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-ink-faint pointer-events-none" />
@@ -561,7 +568,7 @@ export default function Dashboard() {
                 value={filters.search}
                 onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
                 placeholder="Título, empresa o palabra clave..."
-                className="h-12 pl-11 rounded-full bg-card border-border-strong shadow-sm focus-visible:border-gold-2 focus-visible:ring-4 focus-visible:ring-gold-1/40"
+                className="h-12 pl-11 rounded-xl border-2 border-foreground bg-[#fbfaf6] text-base shadow-[3px_3px_0_hsl(var(--foreground))] focus-visible:border-foreground focus-visible:ring-4 focus-visible:ring-gold-1/60"
               />
             </div>
 
@@ -572,7 +579,7 @@ export default function Dashboard() {
             <select
               value={filters.freshness}
               onChange={(e) => setFilters((f) => ({ ...f, freshness: e.target.value }))}
-              className="hidden lg:block h-12 rounded-full border border-border-strong bg-card px-4 text-sm shadow-sm"
+              className="hidden lg:block h-12 rounded-xl border-2 border-foreground bg-white px-4 text-sm font-semibold"
               aria-label="Fecha de publicación"
             >
               <option value="all">Cualquier fecha</option>
@@ -583,7 +590,7 @@ export default function Dashboard() {
             <select
               value={filters.modality}
               onChange={(e) => setFilters((f) => ({ ...f, modality: e.target.value }))}
-              className="hidden lg:block h-12 rounded-full border border-border-strong bg-card px-4 text-sm shadow-sm"
+              className="hidden lg:block h-12 rounded-xl border-2 border-foreground bg-white px-4 text-sm font-semibold"
               aria-label="Modalidad"
             >
               <option value="all">Cualquier modalidad</option>
@@ -599,7 +606,7 @@ export default function Dashboard() {
                   cities: e.target.value === "all" ? [] : [e.target.value]
                 }))
               }
-              className="hidden lg:block h-12 rounded-full border border-border-strong bg-card px-4 text-sm shadow-sm"
+              className="hidden lg:block h-12 rounded-xl border-2 border-foreground bg-white px-4 text-sm font-semibold"
               aria-label="Ciudad"
             >
               <option value="all">Cualquier ciudad</option>
@@ -615,7 +622,7 @@ export default function Dashboard() {
                 type="button"
                 variant="outline"
                 onClick={() => setMobileFiltersOpen((v) => !v)}
-                className="relative h-12 rounded-full px-5 shadow-sm"
+                className="relative h-12 rounded-xl px-5 border-2 border-foreground bg-gold-2 text-foreground font-bold shadow-[3px_3px_0_hsl(var(--foreground))] hover:bg-gold-1"
               >
                 <SlidersHorizontal className="h-4 w-4" />
                 Filtros
@@ -637,7 +644,7 @@ export default function Dashboard() {
                   {/* FilterBar already renders its own card (border, title,
                       "Limpiar todo") — this wrapper only positions/sizes/
                       scrolls it, no second header on top of that one. */}
-                  <div className="absolute right-0 top-full mt-2 w-[26rem] max-h-[70vh] overflow-y-auto rounded-xl shadow-xl z-20">
+                  <div className="absolute right-0 top-full mt-2 w-[26rem] max-h-[70vh] overflow-y-auto rounded-2xl shadow-[6px_6px_0_hsl(var(--foreground))] z-20">
                     <FilterBar
                       filters={filters}
                       onFilterChange={setFilters}
@@ -712,7 +719,7 @@ export default function Dashboard() {
               {Array.from({ length: 6 }).map((_, i) => (
                 <div
                   key={i}
-                  className="rounded-xl p-5 border border-[#e6e8e4] bg-[#ffffff] animate-pulse space-y-3"
+                  className="rounded-2xl p-5 border-2 border-foreground/15 bg-white animate-pulse space-y-3"
                 >
                   <div className="h-4 w-3/4 rounded bg-[#f1f2f0]" />
                   <div className="h-3 w-1/2 rounded bg-[#f1f2f0]" />
@@ -723,7 +730,7 @@ export default function Dashboard() {
           ) : loadError ? (
             <div
               role="alert"
-              className="text-center py-16 px-4 rounded-2xl border border-destructive/30 bg-card text-muted-foreground"
+              className="text-center py-16 px-4 rounded-2xl border-2 border-foreground bg-[#fde8dc] text-[#4a1c05] shadow-[4px_4px_0_hsl(var(--foreground))]"
             >
               <span className="text-3xl block mb-3">⚠️</span>
               <p className="font-mono text-sm">{loadError}</p>
@@ -780,7 +787,7 @@ export default function Dashboard() {
                         scrolls — same fix does nothing for the old
                         short-content case (nothing to scroll, no visual
                         change). */}
-                  <div className="sticky top-40 max-h-[calc(100vh-11rem)] overflow-y-auto">
+                  <div className="sticky top-40 max-h-[calc(100vh-11rem)] overflow-y-auto pr-2 pb-2">
                     {selectedJob?.isLocked ? (
                       <div className="rounded-lg border border-border bg-card p-8 text-center">
                         <p className="text-sm text-muted-foreground mb-4">
@@ -806,6 +813,7 @@ export default function Dashboard() {
                         onAppliedToggle={handleAppliedToggle}
                         onApplyClick={setApplyGateJob}
                         country={country}
+                        variant="ink"
                       />
                     )}
                   </div>
@@ -858,7 +866,7 @@ export default function Dashboard() {
               )}
             </>
           ) : (
-            <div className="text-center py-16 px-4 rounded-2xl border border-[#e6e8e4] bg-[#ffffff] text-muted-foreground font-mono">
+            <div className="text-center py-16 px-4 rounded-2xl border-2 border-foreground bg-[#fdf1d3] text-[#2a1d06] shadow-[4px_4px_0_hsl(var(--foreground))]">
               <span className="text-3xl block mb-2">🔍</span>
               No se encontraron vacantes con los filtros seleccionados.
             </div>

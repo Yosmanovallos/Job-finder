@@ -166,7 +166,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
 
   return (
     <div className="w-full">
-      <div className="rounded-xl border border-border bg-card p-4">
+      <div className="rounded-2xl border-2 border-foreground bg-white p-4">
         <div className="flex items-center justify-between mb-3">
           <h2 className="font-heading font-semibold text-sm text-foreground">Filtros</h2>
           {hasActiveFilters && (
