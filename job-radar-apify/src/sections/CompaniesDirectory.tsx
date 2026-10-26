@@ -236,8 +236,11 @@ export default function CompaniesDirectory() {
                     <CompanyAvatar name={c.company} logoUrl={c.logoUrl} className="w-12 h-12 text-lg" />
                     <span className="min-w-0 flex-1">
                       <strong className="block font-heading font-bold text-[15px] md:text-base truncate">{c.company}</strong>
-                      <span className="mt-1 inline-block rounded-full px-2 py-0.5 font-mono text-[11px] font-semibold bg-green-soft text-primary">
-                        {c.count.toLocaleString("es-CO")} vacante{c.count === 1 ? "" : "s"} activa{c.count === 1 ? "" : "s"}
+                      {/* Plain text, no pill: 48 tinted pills side by side read as
+                          noise. The number carries the weight, the label stays quiet. */}
+                      <span className="mt-0.5 block text-[13px] text-muted-foreground">
+                        <strong className="font-bold text-foreground">{c.count.toLocaleString("es-CO")}</strong>{" "}
+                        vacante{c.count === 1 ? "" : "s"} activa{c.count === 1 ? "" : "s"}
                       </span>
                     </span>
                     <span aria-hidden="true" className="font-bold text-muted-foreground">→</span>
