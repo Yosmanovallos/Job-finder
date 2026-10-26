@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Mail, Check, X } from "lucide-react";
+import { Mail, X } from "lucide-react";
 import { Job } from "../sources/types.js";
 import { useAuth } from "../auth/auth-provider.js";
 import { translateAuthError } from "../lib/auth-error-messages.js";
-import { Button } from "./ui/button.js";
 import { GoogleIcon } from "./ui/google-icon.js";
 import { jobAnalyticsParams, trackEvent } from "../lib/analytics.js";
 
@@ -43,8 +42,10 @@ export function ApplyGateModal({ job, onClose }: ApplyGateModalProps) {
     }
   };
 
-  const handleEmail = () => {
-    navigate(`/login?return_to=${encodeURIComponent(returnTo)}`);
+  const handleEmail = (mode: "signup" | "login") => {
+    const params = new URLSearchParams({ return_to: returnTo });
+    if (mode === "signup") params.set("mode", "signup");
+    navigate(`/login?${params}`);
   };
 
   useEffect(() => {
@@ -64,82 +65,91 @@ export function ApplyGateModal({ job, onClose }: ApplyGateModalProps) {
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
-      style={{ background: "rgba(14,15,16,0.45)" }}
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-foreground/50 p-4 backdrop-blur-[2px]"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="hud-corners w-full max-w-md rounded-2xl border border-border bg-card p-6 sm:p-8 shadow-lg relative">
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Cerrar"
-          className="absolute top-4 right-4 text-muted-foreground hover:text-foreground"
-        >
-          <X className="h-5 w-5" />
-        </button>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="apply-gate-title"
+        className="relative w-full max-w-md overflow-hidden rounded-[24px] border-2 border-foreground bg-white shadow-[8px_8px_0_hsl(var(--foreground))]"
+      >
+        <div className="bg-gradient-to-b from-green-soft to-white px-6 pb-4 pt-6 sm:px-8 sm:pt-8">
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Cerrar"
+            className="absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-xl border-2 border-foreground bg-white text-foreground hover:bg-[#f4f5f2]"
+          >
+            <X className="h-5 w-5" />
+          </button>
+          <p className="ink-card-sm mb-3 inline-flex items-center gap-2 rounded-full bg-[#fdf1d3] py-1 pl-2 pr-3 font-mono text-xs font-semibold uppercase tracking-wider shadow-none">
+            <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-primary" />
+            Para aplicar a
+          </p>
+          <h2 id="apply-gate-title" className="pr-10 font-heading text-[22px] font-bold leading-snug tracking-[-0.02em] text-foreground">
+            {job.title}
+          </h2>
+          <p className="mt-1.5 text-[15px] text-[#3d413e]">
+            {job.company || "Confidencial"} · Crea tu cuenta gratis o inicia sesión para continuar a la oferta original.
+          </p>
+        </div>
 
-        <p className="text-xs font-mono text-ink-faint mb-1 pr-8">Para aplicar a</p>
-        <h2 className="font-heading font-semibold text-xl text-foreground mb-1 leading-snug pr-8">
-          {job.title}
-        </h2>
-        <p className="text-sm text-muted-foreground mb-6">
-          {job.company || "Confidencial"} · Regístrate o inicia sesión gratis para continuar a la oferta original.
-        </p>
+        <div className="px-6 pb-6 sm:px-8 sm:pb-8">
+          {error && <p role="alert" className="mb-4 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>}
 
-        {error && <p className="text-xs text-destructive font-mono mb-4">{error}</p>}
+          <button
+            type="button"
+            onClick={handleGoogle}
+            disabled={busy}
+            className="ink-card-sm ink-lift mb-3 flex h-12 w-full items-center justify-center gap-3 rounded-xl bg-white text-base font-bold text-foreground disabled:opacity-60"
+          >
+            <GoogleIcon className="h-5 w-5" />
+            Continuar con Google
+          </button>
+          <button
+            type="button"
+            onClick={() => handleEmail("signup")}
+            disabled={busy}
+            className="ink-card-sm ink-lift mb-3 flex h-12 w-full items-center justify-center gap-2.5 rounded-xl bg-gold-2 text-base font-bold text-[#2a1d06] disabled:opacity-60"
+          >
+            <Mail className="h-5 w-5" />
+            Crear cuenta con correo
+          </button>
+          <p className="mb-5 text-center text-sm text-[#3d413e]">
+            ¿Ya tienes cuenta?{" "}
+            <button type="button" onClick={() => handleEmail("login")} className="font-bold text-primary hover:underline">
+              Inicia sesión
+            </button>
+          </p>
 
-        <Button
-          type="button"
-          variant="google"
-          size="lg"
-          className="w-full mb-3"
-          onClick={handleGoogle}
-          disabled={busy}
-        >
-          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white">
-            <GoogleIcon className="h-3.5 w-3.5" />
-          </span>
-          Continuar con Google
-        </Button>
+          <ul className="mb-5 space-y-2.5 rounded-xl bg-[#f4f5f2] p-4">
+            {[
+              "Vacantes sin duplicados de LinkedIn, Computrabajo, Elempleo y más.",
+              "Te mostramos primero lo que coincide con lo que buscas.",
+              "Es gratis."
+            ].map((line) => (
+              <li key={line} className="flex items-start gap-2.5 text-sm text-[#3d413e]">
+                <span aria-hidden="true" className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-primary text-[11px] font-bold text-white">✓</span>
+                {line}
+              </li>
+            ))}
+          </ul>
 
-        <Button
-          type="button"
-          variant="outline"
-          size="lg"
-          className="w-full mb-6"
-          onClick={handleEmail}
-          disabled={busy}
-        >
-          <Mail className="h-4 w-4" />
-          Continuar con correo electrónico
-        </Button>
-
-        <ul className="space-y-2 mb-6">
-          {[
-            "Vacantes sin duplicados de LinkedIn, Computrabajo, Elempleo y más.",
-            "Te mostramos primero lo que coincide con lo que buscas.",
-            "Es gratis — el plan Pro es opcional, nunca obligatorio."
-          ].map((line) => (
-            <li key={line} className="flex items-start gap-2 text-xs text-muted-foreground">
-              <Check className="h-3.5 w-3.5 text-primary shrink-0 mt-0.5" />
-              {line}
-            </li>
-          ))}
-        </ul>
-
-        <p className="text-[11px] text-ink-faint text-center">
-          Al crear tu cuenta aceptas nuestros{" "}
-          <Link to="/legal/terminos" className="underline hover:text-foreground">
-            Términos
-          </Link>{" "}
-          y la{" "}
-          <Link to="/legal/privacidad" className="underline hover:text-foreground">
-            Política de Privacidad
-          </Link>
-          .
-        </p>
+          <p className="text-center text-xs text-muted-foreground">
+            Al crear tu cuenta aceptas nuestros{" "}
+            <Link to="/legal/terminos" className="underline hover:text-foreground">
+              Términos
+            </Link>{" "}
+            y la{" "}
+            <Link to="/legal/privacidad" className="underline hover:text-foreground">
+              Política de Privacidad
+            </Link>
+            .
+          </p>
+        </div>
       </div>
     </div>
   );
