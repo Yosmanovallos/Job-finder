@@ -18,6 +18,7 @@ const Offer = z.object({
   ciudad: z.array(z.number().int().positive())
 });
 const City = z.object({ id: z.number().int().positive(), name: z.string().min(1) });
+type CollectionResult<T> = { kind: "ok"; rows: T[] } | { kind: "error"; detail: string };
 
 function collectionUrl(collection: "ofertas" | "ciudad", page: number): string {
   return `${ORIGIN}/wp-json/wp/v2/${collection}?per_page=${PAGE_SIZE}&page=${page}`;
@@ -34,31 +35,37 @@ async function readCollection<T>(
   schema: z.ZodType<T>,
   http: HttpGet,
   allowed: (url: string) => boolean
-): Promise<T[] | null> {
+): Promise<CollectionResult<T>> {
   const rows: T[] = [];
   let total: number | null = null;
   let pages: number | null = null;
   for (let page = 1; page <= MAX_PAGES; page++) {
     const url = collectionUrl(collection, page);
-    if (!allowed(url)) return null;
+    if (!allowed(url)) return { kind: "error", detail: `${collection} página ${page}: robots.txt no permite la lectura` };
     // Supplying accept also disables redirect following in boundedGet; the
     // fixed public origin is the only host this connector may read.
     const response = await http(url, { accept: "application/json" });
-    if (response.status !== 200) return null;
+    if (response.status !== 200) return { kind: "error", detail: `${collection} página ${page}: HTTP ${response.status}` };
     const nextTotal = count(response.headers?.["x-wp-total"]);
     const nextPages = count(response.headers?.["x-wp-totalpages"]);
     if (nextTotal === null || nextPages === null || nextPages < 1 || nextPages > MAX_PAGES ||
         nextPages !== Math.max(1, Math.ceil(nextTotal / PAGE_SIZE)) ||
-        (total !== null && (nextTotal !== total || nextPages !== pages))) return null;
+        (total !== null && (nextTotal !== total || nextPages !== pages))) {
+      return { kind: "error", detail: `${collection} página ${page}: cabeceras de paginación ausentes o inconsistentes` };
+    }
     total = nextTotal;
     pages = nextPages;
     const parsed = z.array(schema).safeParse(safeJson(response.body));
-    if (!parsed.success || parsed.data.length > PAGE_SIZE ||
-        parsed.data.length !== Math.min(PAGE_SIZE, total - rows.length)) return null;
+    if (!parsed.success) return { kind: "error", detail: `${collection} página ${page}: forma JSON inesperada` };
+    if (parsed.data.length > PAGE_SIZE || parsed.data.length !== Math.min(PAGE_SIZE, total - rows.length)) {
+      return { kind: "error", detail: `${collection} página ${page}: cantidad de filas inesperada` };
+    }
     rows.push(...parsed.data);
-    if (page === pages) return rows.length === total ? rows : null;
+    if (page === pages) return rows.length === total
+      ? { kind: "ok", rows }
+      : { kind: "error", detail: `${collection}: listado incompleto` };
   }
-  return null;
+  return { kind: "error", detail: `${collection}: se excedió el límite de páginas` };
 }
 
 function wpDate(value: string): string | null {
@@ -101,16 +108,14 @@ export async function listWorkeando(ref: string, http: HttpGet, options: ListOpt
   const robots = await readRobots(ORIGIN, http);
   const allowed = (url: string) => allowedUrl(robots, url);
   const offers = await readCollection("ofertas", Offer, http, allowed);
-  if (!offers || new Set(offers.map((row) => row.id)).size !== offers.length) {
-    return { kind: "error", detail: "listado Workeando incompleto o inválido" };
-  }
+  if (offers.kind === "error") return { kind: "error", detail: offers.detail };
+  if (new Set(offers.rows.map((row) => row.id)).size !== offers.rows.length) return { kind: "error", detail: "ofertas: IDs repetidos" };
   const cityRows = await readCollection("ciudad", City, http, allowed);
-  if (!cityRows || new Set(cityRows.map((row) => row.id)).size !== cityRows.length) {
-    return { kind: "error", detail: "taxonomía de ciudades Workeando incompleta o inválida" };
-  }
-  const cities = new Map(cityRows.map((row) => [row.id, row.name]));
+  if (cityRows.kind === "error") return { kind: "error", detail: cityRows.detail };
+  if (new Set(cityRows.rows.map((row) => row.id)).size !== cityRows.rows.length) return { kind: "error", detail: "ciudad: IDs repetidos" };
+  const cities = new Map(cityRows.rows.map((row) => [row.id, row.name]));
   const postings: RawAtsPosting[] = [];
-  for (const offer of offers) {
+  for (const offer of offers.rows) {
     // An unrelated old entry even points to /ofertas/__trashed/ while its
     // WordPress status is publish. It is not a NEXA posting. A previously
     // stored NEXA id losing its attribution is an error, never a closure.
@@ -122,5 +127,5 @@ export async function listWorkeando(ref: string, http: HttpGet, options: ListOpt
     if (!mapped) return { kind: "error", detail: `vacante Workeando ${offer.id} incompleta o inválida` };
     postings.push(mapped);
   }
-  return { kind: "complete", boardTotal: offers.length, postings };
+  return { kind: "complete", boardTotal: offers.rows.length, postings };
 }
