@@ -262,6 +262,9 @@ test("agencies are excluded before any request", async () => {
   const outcome = await probeCandidate(adecco, { http, probeSite: noSite }, NOW);
   assert.equal(outcome.decision, "excluded");
   assert.equal(calls, 0);
+  for (const name of ["Grupo Soluciones Horizonte", "Jiro S.A.", "Redes Humanas", "Productividad Empresarial SAS", "Tiempos SAS", "Soluciones Inmediatas", "GRUPO ALIANZA"]) {
+    assert.ok(agencyKeys.has(companyKey(name)), `${name} publica empleos de clientes`);
+  }
   assert.ok(!agencyKeys.has(companyKey("Comfama")), "a caja as employer is not an agency; only its employment agency is");
 });
 

@@ -1,5 +1,5 @@
 {
-  "$comment": "Agencias de empleo, temporales, reclutadoras y bolsas que aparecen en el directorio de producción (top 300 de /api/companies/search?country=CO, consultado el 2026-10-20). Publican vacantes de sus clientes y enlazan tableros ajenos, así que el descubrimiento D3 nunca las empareja con un tablero (docs/adr/0006-direct-employers.md §7.1). Curada a mano: solo nombres que se declaran agencia/temporal/empleo o marcas conocidas del sector; ante la duda NO se incluye. Las cajas de compensación como empleadoras (Comfama, Colsubsidio, Cafam) no están: solo sus agencias de empleo. Se compara por company_key.",
+  "$comment": "Agencias de empleo, temporales, reclutadoras y bolsas que aparecen en el directorio de producción y en el censo de Computrabajo Colombia (revisiones 2026-10-20 y 2026-10-25). Publican vacantes de sus clientes y enlazan tableros ajenos, así que el descubrimiento D3 nunca las empareja con un tablero (docs/adr/0006-direct-employers.md §7.1). Curada a mano: solo nombres que se declaran agencia/temporal/empleo o marcas conocidas del sector; ante la duda NO se incluye. Las cajas de compensación como empleadoras (Comfama, Colsubsidio, Cafam) no están: solo sus agencias de empleo. Se compara por company_key.",
   "agencies": [
     "Adecco",
     "ADECCO SERVICIOS COLOMBIA S.A",
@@ -45,6 +45,13 @@
     "Magneto empleos",
     "Torre.ai",
     "Universia Colombia",
-    "Jobgether"
+    "Jobgether",
+    "Grupo Soluciones Horizonte",
+    "Jiro S.A.",
+    "Redes Humanas",
+    "Productividad Empresarial SAS",
+    "Tiempos SAS",
+    "Soluciones Inmediatas",
+    "GRUPO ALIANZA"
   ]
 }
