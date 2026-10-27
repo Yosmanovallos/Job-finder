@@ -5,7 +5,10 @@
 - [x] Medir cobertura y censo de Computrabajo en producción (corridas 40579329181 y 40584309357).
 - [x] Registrar decisiones del dueño: `Internacional`, habilitación automática, costo cero adicional, sin duplicados, prioridad oficial.
 - [x] Enmienda §13 del ADR 0006.
-- [ ] Medir `db-size` y throughput actual del tick (tableros por corrida, duración) como línea base de costo.
+- [x] Medir `db-size` y throughput actual del tick como línea base de costo:
+  - [db-size 40587905336](https://github.com/Yosmanovallos/Job-finder/actions/runs/40587905336): 415 MB de los 8 GB del plan Pro (`docs/direct/baseline-2026-10-20.md`). `direct_jobs` 1.482 filas, 6,3 MB (~4,3 kB por fila); `employer_discovery` 10.060 filas, 7 MB.
+  - Tick programado ([40569371808](https://github.com/Yosmanovallos/Job-finder/actions/runs/40569371808) y anteriores): 106–107 tableros por corrida, ~6 min de job con plazo de 14 min.
+  - Las corridas programadas del 26 y 27 de octubre arrancaron con 3 a 7 h de separación, aunque el cron es horario. A eso se suma `MIN_INTERVAL_HOURS = 5`.
 
 ## I1 — inventario (solo lectura sobre producción, escribe solo `ats_board_inventory`)
 

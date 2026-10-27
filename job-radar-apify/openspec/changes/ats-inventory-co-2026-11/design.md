@@ -35,7 +35,7 @@ No se usan APIs de búsqueda pagas (regla de gasto cero, ADR 0006 §11). El pars
 | `probe_attempts`, `last_probed_at`, `next_probe_at` | Reintentos con backoff y recheck |
 | `employer_source_id` | Enlace cuando se habilita |
 
-RLS sin políticas + `REVOKE` para `anon`/`authenticated`, igual que las demás tablas `direct`. Tamaño estimado: ~200 B por fila; 50.000 refs ≈ 10 MB. Se mide con `db-size` antes y después.
+RLS sin políticas + `REVOKE` para `anon`/`authenticated`, igual que las demás tablas `direct`. Tamaño estimado: ~200 B por fila; 50.000 refs ≈ 10 MB. Cada vacante oficial ocupa ~4,3 kB en `direct_jobs` más su proyección en `jobs`: 10.000 vacantes nuevas serían del orden de 100 MB, dentro del margen del plan (415 MB de 8 GB). Se mide con `db-size` antes y después de cada lote.
 
 ## 4. Habilitación automática
 
@@ -81,7 +81,7 @@ Mismo workflow (`17 * * * *`), mismo `timeout-minutes: 20`, mismo plazo de 14 mi
 | B | 0 vacantes elegibles en las últimas 3 lecturas | 7 días |
 | C | Fallas seguidas | Backoff exponencial, tope 7 días; `suspect` según §3 del ADR |
 
-Se mide el throughput real (tableros por corrida) antes de subir topes. Si el nivel A no cabe en 6 h con el plazo actual, se reduce `--max-enable` y se publica el déficit en `coverage`; no se agregan corridas ni minutos.
+**Línea base I0:** 107 tableros caben en ~6 min de job. El límite real no es la capacidad sino la cadencia: GitHub arrancó las corridas programadas con 3 a 7 h de separación pese al cron horario, y `MIN_INTERVAL_HOURS = 5` impide releer antes. Con eso, la ventana de 6 h del nivel A no está garantizada hoy. I4 debe medir la cadencia real durante una semana. Si no alcanza, evaluará opciones sin costo: bajar `MIN_INTERVAL_HOURS` solo para el nivel A, o leer el nivel A primero en cada corrida que GitHub sí lance. No se contratarán servicios externos. Antes de subir topes se mide el throughput real (tableros por corrida). Si el nivel A no cabe en 6 h con el plazo actual, se reduce `--max-enable` y se publica el déficit en `coverage`; no se agregan corridas ni minutos.
 
 El descubrimiento usa el workflow `direct-employers-discovery.yml` con sus tres horarios actuales (`31 3,11,19`), sin horarios nuevos. Cada corrida reparte su presupuesto: primero sondea el inventario ATS y después la vía por nombre.
 
