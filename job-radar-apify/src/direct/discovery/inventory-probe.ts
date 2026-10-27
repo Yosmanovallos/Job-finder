@@ -91,9 +91,15 @@ export type Verdict =
   | ({ status: "no_colombia" | "agency" | "ambiguous" | "blocked" | "error"; reason: string; notFound?: boolean } & Counts);
 
 const BOARD_LABEL = /\b(external|internal|website|careers?|jobs?|job board|hiring|openings|positions|clients?|vacantes|trabaja con nosotros)\b/;
+// Workday's hiringOrganization prefixes the legal entity with an internal
+// code ("1838 AIRBUS COLOMBIA SAS", "CO02 Gases Indust. Colombia SA"). Cutting
+// it off would be a guess ("3M Colombia" starts the same way): not enabled.
+const ENTITY_CODE = /^(?=[A-Za-z]*\d)[A-Za-z0-9]{2,}[\s-]/;
+// A staging or test board ("thltestcareers"): its postings are no evidence.
+const TEST_REF = /(?:^|[^a-z])test|test(?:$|[^a-z]|careers|board|jobs)/i;
 
 /** The decision the board's own listing supports, before any database conflict. */
-export function judgeBoard(atsType: DirectAtsType, read: BoardRead, agencyKeys: ReadonlySet<string>): Verdict {
+export function judgeBoard(atsType: DirectAtsType, read: BoardRead, agencyKeys: ReadonlySet<string>, atsRef = ""): Verdict {
   if (read.kind === "failed") return { status: read.status, reason: read.reason, notFound: read.notFound, declaredName: null, colombiaCount: null, totalCount: null };
   const counts = { declaredName: read.declaredNames[0] ?? null, colombiaCount: read.colombiaCount, totalCount: read.totalCount };
   if (read.colombiaCount === 0) {
@@ -110,6 +116,9 @@ export function judgeBoard(atsType: DirectAtsType, read: BoardRead, agencyKeys: 
   // measured in the 2026-10-27 dry run): such a name is not the employer's.
   const label = read.declaredNames.find((name) => BOARD_LABEL.test(foldName(name)));
   if (label) return { status: "ambiguous", reason: clip(`el nombre declarado parece una etiqueta del tablero: ${label}`), ...counts };
+  const coded = read.declaredNames.find((name) => ENTITY_CODE.test(name.trim()));
+  if (coded) return { status: "ambiguous", reason: clip(`el nombre declarado empieza con un código interno: ${coded}`), ...counts };
+  if (TEST_REF.test(atsRef)) return { status: "ambiguous", reason: "el tablero parece de prueba", ...counts };
   const keys = new Set(read.declaredNames.map(companyKey));
   if (keys.size > 1) return { status: "ambiguous", reason: clip(`el tablero declara varias empresas: ${read.declaredNames.slice(0, 3).join(" | ")}`), ...counts };
   const key = [...keys][0];
@@ -228,7 +237,7 @@ export async function runInventoryProbe(boards: InventoryBoard[], deps: ProbeRun
       await finish(board, { status: "owned", reason: "el tablero ya pertenece a una empresa (employer_sources)", declaredName: null, colombiaCount: null, totalCount: null, nextProbeDays: null });
       return;
     }
-    const verdict = judgeBoard(board.atsType, await readBoard(board, deps.http, deps.now()), deps.agencyKeys);
+    const verdict = judgeBoard(board.atsType, await readBoard(board, deps.http, deps.now()), deps.agencyKeys, board.atsRef);
     if (verdict.status !== "eligible") {
       const { notFound = false, ...rest } = verdict;
       await finish(board, { ...rest, nextProbeDays: nextProbeDays(verdict.status, board.probeAttempts, notFound) });

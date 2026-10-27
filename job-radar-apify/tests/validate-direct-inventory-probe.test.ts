@@ -169,6 +169,17 @@ test("INV-010: short, generic, placeholder or several names are ambiguous; Magne
   // Two spellings of one company are one name.
   assert.equal(judgeBoard("smartrecruiters", listed(["Acme Colombia S.A.S.", "ACME"]), AGENCIES).status, "eligible");
   assert.equal(judgeBoard("magneto", listed(["Vanti"]), AGENCIES).status, "ambiguous");
+  // Workday entity codes in front of the legal name (2026-10-27 dry run): not cut, not enabled.
+  for (const name of ["1838 AIRBUS COLOMBIA SAS", "CO02 Gases Indust. Colombia SA", "C26902 Alfa Laval S.A. (Colombia)", "CO11192-ALCOLOM Air Liquide Colombia S.A.S."]) {
+    const verdict = judgeBoard("workday", listed([name]), AGENCIES);
+    assert.equal(verdict.status, "ambiguous", name);
+    assert.match(verdict.reason, /código interno/, name);
+  }
+  // Digits inside a single-word name are part of it.
+  for (const name of ["Exit83", "Blend360", "Brenntag Colombia S.A."]) assert.equal(judgeBoard("workday", listed([name]), AGENCIES).status, "eligible", name);
+  // A staging board's postings are no evidence.
+  for (const ref of ["thltestcareers", "acme-test", "test-acme", "acmetest"]) assert.equal(judgeBoard("greenhouse", listed(["Acme"]), AGENCIES, ref).status, "ambiguous", ref);
+  for (const ref of ["acme", "contestgroup", "latestinc"]) assert.equal(judgeBoard("greenhouse", listed(["Acme"]), AGENCIES, ref).status, "eligible", ref);
 });
 
 const CLEAN: EnablementContext = { boardOwned: false, employerIds: [], sameAtsBoards: [], rejected: false, slugOwnerKey: null };
