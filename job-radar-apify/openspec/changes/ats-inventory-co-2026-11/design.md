@@ -20,7 +20,7 @@ fuentes de referencias ──► ats_board_inventory ──► sondeo Colombia �
 | Huella del `site-probe` | Enlaces a ATS desde sitios con dominio respaldado | Mismas reglas de robots y redirects |
 | Sitemaps públicos de un ATS | Listado de tableros cuando el ATS lo publica y robots lo permite | Solo tras revisión `source-researcher` por ATS |
 
-No se usan APIs de búsqueda pagas (regla de gasto cero, ADR 0006 §11). El parser de cada fuente reutiliza `src/direct/discovery/ats-links.ts` y `cc-refs.ts`, ampliados a cada `ats_type` con conector.
+No se usan APIs de búsqueda pagas (regla de gasto cero, ADR 0006 §11). **Un solo normalizador** (`atsLinkFromUrl`, que usa los parsers de Workday y SmartRecruiters de `cc-refs.ts`) para todas las fuentes; antes los dos divergían en `_`, locale y exclusiones. Common Crawl cubre los conectores cuya ref está en la URL (Workday, SmartRecruiters, Greenhouse, Lever, Ashby, Teamtailor); Eightfold, SuccessFactors y Magneto quedan fuera porque su ref no sale de la URL o Magneto es también bolsa. Los enlaces de vacantes se filtran en SQL: solo salen de la base URLs de hosts ATS, y en la tabla solo se guarda la ref.
 
 ## 3. Esquema (aditivo, `migrate-direct-employers.ts` con `--dry-run`)
 
@@ -28,9 +28,10 @@ No se usan APIs de búsqueda pagas (regla de gasto cero, ADR 0006 §11). El pars
 
 | Columna | Uso |
 |---|---|
-| `ats_type`, `ats_ref` | Referencia normalizada; `UNIQUE (ats_type, ats_ref)` |
+| `ats_type`, `ats_ref` | Referencia normalizada, en la forma que lee su conector |
 | `first_source`, `sources` | Procedencia (`commoncrawl`, `job_link`, `site_probe`, `sitemap`) |
-| `status` | `pending`, `enabled`, `no_colombia`, `agency`, `ambiguous`, `blocked`, `error`, `owned` |
+| `ref_key` | `lower(ats_ref)` generado; `UNIQUE (ats_type, ref_key)` evita duplicados por grafía |
+| `status` | `pending`, `enabled`, `no_colombia`, `agency`, `ambiguous`, `blocked`, `error`, `owned`, `unsupported_ats` |
 | `declared_name`, `colombia_count`, `total_count` | Evidencia del último sondeo |
 | `probe_attempts`, `last_probed_at`, `next_probe_at` | Reintentos con backoff y recheck |
 | `employer_source_id` | Enlace cuando se habilita |

@@ -6,7 +6,8 @@
 - **INV-002** Inventory sources MUST be free and permitted: Common Crawl, ATS links found in stored postings, site-probe evidence and ATS sitemaps allowed by robots.txt. Paid search APIs MUST NOT be used.
 - **INV-003** A source that fails or times out MUST be reported as "no data", never as zero boards.
 - **INV-004** Text from postings MUST be treated as untrusted: only references that match a strict per-ATS pattern are stored, and no foreign domain is followed.
-- **INV-005** Inventory writes MUST be idempotent and insert-only; manual runs MUST default to dry run.
+- **INV-005** Inventory writes MUST be idempotent and insert-only (an existing row may only gain a new provenance); manual runs MUST default to dry run.
+- **INV-006** Every source MUST go through one normalizer per ATS, and references MUST be unique case-insensitively, so the same board from two sources is one row. A board no connector can read MUST be stored as `unsupported_ats`; one already in `employer_sources` as `owned`.
 
 Scenario: running the inventory twice with the same input produces the same rows and no updates to existing evidence.
 
@@ -16,7 +17,7 @@ Scenario: running the inventory twice with the same input produces the same rows
 - **INV-011** The employer name MUST come from the ATS, not from a job board.
 - **INV-012** A board already owned by another employer, a company key already linked to another board of the same ATS type, or an ATS that does not declare a name MUST go to `ambiguous` and MUST NOT be enabled.
 - **INV-013** Each run MUST enable at most `--max-enable` boards and stop at its deadline.
-- **INV-014** Every inventory row MUST end in a classified state with evidence: `enabled`, `no_colombia`, `agency`, `ambiguous`, `blocked`, `error` or `owned`. A blocked or failed probe MUST NOT be classified as `no_colombia`.
+- **INV-014** Every inventory row MUST end in a classified state with evidence: `enabled`, `no_colombia`, `agency`, `ambiguous`, `blocked`, `error`, `owned` or `unsupported_ats`. A blocked or failed probe MUST NOT be classified as `no_colombia`.
 
 Scenario: an ATS board declaring "Acme Colombia SAS" with 3 Bogotá postings and no conflicts is enabled; the same board with name "Adecco" is classified `agency`.
 

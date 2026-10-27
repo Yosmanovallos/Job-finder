@@ -3,10 +3,13 @@ import { WORKDAY_REF } from "../ats/workday.js";
 /**
  * Board references from URLs seen by Common Crawl (scripts/direct-cc-tenants.ts).
  * Only the reference is taken; the board is then checked live, and enabled
- * only after human review.
+ * only after human review. atsLinkFromUrl (ats-links.ts) uses these same
+ * parsers, so a board reads the same from any source.
  */
 
-const LOCALE = /^[a-z]{2}(-[A-Z]{2})?$/;
+const LOCALE = /^[a-z]{2}(-[A-Za-z]{2})?$/;
+/** SmartRecruiters paths that are pages of the ATS itself, never a company. */
+export const SMARTRECRUITERS_NOT_A_COMPANY = new Set(["sr-jobs", "oneclick-ui", "ni"]);
 const NOT_A_SITE = new Set(["wday", "job", "jobs", "login", "refreshFacet", "robots.txt", "siteMap.xml"]);
 
 export function workdayRefFromUrl(raw: string): string | null {
@@ -34,6 +37,6 @@ export function smartRecruitersIdFromUrl(raw: string): string | null {
   }
   if (url.hostname !== "jobs.smartrecruiters.com") return null;
   const id = url.pathname.split("/").filter(Boolean)[0];
-  return id && /^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/.test(id) && !["sr-jobs", "oneclick-ui", "ni"].includes(id) ? id : null;
+  return id && /^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/.test(id) && !SMARTRECRUITERS_NOT_A_COMPANY.has(id) ? id : null;
 }
 

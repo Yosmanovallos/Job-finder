@@ -12,11 +12,16 @@
 
 ## I1 — inventario (solo lectura sobre producción, escribe solo `ats_board_inventory`)
 
-- [ ] Pruebas que fallan primero: parsers de refs por ATS, normalización, adversariales (INV-001…INV-005).
-- [ ] Migración aditiva con `--dry-run`; RLS + `REVOKE`.
-- [ ] Ampliar `cc-refs.ts` a todos los ATS con conector; extraer refs de vacantes guardadas y del `site-probe`.
-- [ ] Modo `ats-inventory` (dry-run por defecto) en el workflow existente.
-- [ ] Corrida en producción: tamaño del inventario por fuente y por ATS.
+- [x] Pruebas que fallan primero: normalizador único, refs canónicas, adversariales, idempotencia, "sin datos" de Common Crawl (`tests/validate-direct-inventory.test.ts`, INV-001…INV-006).
+- [x] Bloque aditivo `direct-inventory` en `migrate-direct-employers.ts` (con `--dry-run`); RLS + `REVOKE`; integración en Postgres desechable (`tests/validate-direct-inventory.ts`).
+- [x] Un solo normalizador para todas las fuentes; Common Crawl para los conectores con ref en la URL; refs de vacantes vigentes (filtradas en SQL) y de la evidencia del `site-probe`.
+- [x] Modos `ats-inventory-dry-run` y `ats-inventory` en `direct-employers-tick.yml`; el dry-run funciona sin la tabla.
+- [x] Corrida en producción: tamaño del inventario por fuente y por ATS. [Dry-run 40591248620](https://github.com/Yosmanovallos/Job-finder/actions/runs/40591248620) (solo lectura, tabla aún sin crear, 13 min, `--cc-max-pages 3`): **5.179 tableros distintos**.
+  - Por fuente: Common Crawl 5.168, site-probe 9, enlaces en vacantes 2 (solo 4 URLs de ATS en vacantes vigentes: las bolsas casi nunca enlazan al ATS).
+  - Por ATS: Greenhouse 2.292, Ashby 1.055, Workday 736, Teamtailor 568, SmartRecruiters 520, Lever 2, SuccessFactors 2, Magneto 2, Buk 1, Gupy 1.
+  - Estado inicial: 5.145 `pending`, 30 `owned` (ya en `employer_sources`), 4 `unsupported_ats`.
+  - Todos los patrones de Common Crawl respondieron; Lever trajo solo 72 URLs y `boards.greenhouse.io` 77 (el índice casi no los cubre, como anotaba ADR 0006 §7). Con 3 páginas por patrón el inventario es parcial: subir `--cc-max-pages` se mide en I2 contra el plazo.
+  - Pendiente con aprobación del dueño, desde `main` tras integrar #61 y #62: `migrate` y después `ats-inventory` (escribe solo `ats_board_inventory`).
 
 ## I2 — sondeo y habilitación automática
 
