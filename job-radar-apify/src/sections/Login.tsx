@@ -262,10 +262,17 @@ export default function Login() {
                     required
                     minLength={mode === "signup" ? 8 : undefined}
                     placeholder={mode === "signup" ? "Mínimo 8 caracteres" : "Tu contraseña"}
+                    aria-describedby={mode === "signup" ? "signup-password-hint" : undefined}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className={inputClass}
                   />
+                  {mode === "signup" && (
+                    <p id="signup-password-hint" className="mt-1.5 text-xs text-muted-foreground">
+                      Mínimo 8 caracteres. Evita contraseñas comunes o que hayas usado en otros sitios
+                      (como 12345678 o tu nombre).
+                    </p>
+                  )}
                 </div>
               )}
 
