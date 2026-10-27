@@ -58,6 +58,20 @@
   descent-override: 26.7%;
   line-gap-override: 0%;
 }
+/* Homepage H1 and H2 only. At their tight tracking Space Grotesk runs
+   5-8% wider than the fallback above, so words changed lines on the font
+   swap (H1: 79 of 112 phone widths) and the swap shifted the page below
+   (CLS up to 0.22 at 414-430px). Arial scaled to match the width instead:
+   the same words land on the same lines at every common phone width.
+   Ascent and descent keep the same absolute values as the fallback above. */
+@font-face {
+  font-family: "Space Grotesk Home Fallback";
+  src: local("Arial");
+  size-adjust: 108.5%;
+  ascent-override: 83.45%;
+  descent-override: 24.76%;
+  line-gap-override: 0%;
+}
 @font-face {
   font-family: "Inter Fallback";
   src: local("Arial");

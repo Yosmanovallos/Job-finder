@@ -25,9 +25,12 @@ import { YouTubeLite } from "../components/YouTubeLite.js";
 // and all text uses the five sizes below. The phone H1 keeps production's
 // exact 34px / -0.045em: at 32px the metric-matched fallback font wrapped it
 // in 3 lines and the web font in 4, a 34px layout shift on load.
+const HOME_HEADING_FONT = "font-['Space_Grotesk','Space_Grotesk_Home_Fallback',sans-serif]";
 const T = {
-  h1: "font-heading font-bold text-[34px] md:text-[56px] leading-[1.04] md:leading-[1.06] tracking-[-0.045em] md:tracking-[-0.04em]",
-  h2: "font-heading font-bold text-2xl md:text-[40px] leading-[1.1] tracking-[-0.03em]",
+  // H1 and H2 use their own fallback face (index.css), width-matched to
+  // Space Grotesk so headings keep their line breaks when the font swaps.
+  h1: `${HOME_HEADING_FONT} font-bold text-[34px] md:text-[56px] leading-[1.04] md:leading-[1.06] tracking-[-0.045em] md:tracking-[-0.04em]`,
+  h2: `${HOME_HEADING_FONT} font-bold text-2xl md:text-[40px] leading-[1.1] tracking-[-0.03em]`,
   h3: "font-heading font-bold text-[17px] md:text-xl leading-snug",
   body: "text-base leading-relaxed",
   small: "text-[13px]"
@@ -142,7 +145,13 @@ function Hero({ country, data }: { country: string; data: HomeData }) {
             <span aria-hidden="true" className="home-live-dot w-2.5 h-2.5 rounded-full bg-primary" />
             {total ? `${total} vacantes activas en ${countryConfig.name}` : `Vacantes activas en ${countryConfig.name}`}
           </p>
-          <h1 className={T.h1}>
+          {/* Phone H1 reserves 4 lines: the web font wraps it in 4 from 324
+              to 430px, and before the width-matched fallback, Arial fit 3
+              from 406px up (Pixel 412, iPhone Pro Max 430), so the font swap
+              pushed everything below 35px down (Lighthouse CLS 0.032). Kept
+              as a backstop for the few widths where the two still differ;
+              browsers without the lh unit ignore it. */}
+          <h1 className={`${T.h1} min-h-[4lh] md:min-h-0`}>
             {headingLead}: <span className="text-primary">{headingTail}</span>
           </h1>
           {/* Desktop only: on a phone the hero keeps one message (the H1)
