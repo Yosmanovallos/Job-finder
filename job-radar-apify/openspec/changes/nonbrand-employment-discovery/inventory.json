@@ -1,0 +1,92 @@
+{
+  "observedAt": "2026-10-27T22:16:25.54Z",
+  "source": "Anonymous public SSR. totalVisible is the visible inventory, not Google eligibility. sampleEmployers counts distinct company labels in the first 60 rows, not verified unique employers. Category projections omit job descriptions; description coverage was not measured.",
+  "rows": [
+    {
+      "path": "/",
+      "status": 200,
+      "ms": 381,
+      "cache": "BYPASS",
+      "canonical": "https://buscotrabajo.co/",
+      "robots": "no explicit noindex",
+      "title": "Busco trabajo en Colombia: ofertas de empleo | BuscoTrabajo",
+      "h1": "Busco trabajo en Colombia: todas las ofertas de empleo en un solo lugar",
+      "sampleSize": 0,
+      "sampleEmployers": 0,
+      "sampleJobCountries": [],
+      "categorySnapshot": false
+    },
+    {
+      "path": "/empleos/bogota",
+      "status": 200,
+      "ms": 240,
+      "cache": "EXPIRED",
+      "canonical": "https://buscotrabajo.co/empleos/bogota",
+      "robots": "no explicit noindex",
+      "title": "Empleos en Bogotá: trabajo y ofertas de empleo | BuscoTrabajo",
+      "h1": "Empleos en Bogotá: trabajo y ofertas de empleo",
+      "country": "CO",
+      "totalVisible": 10890,
+      "sampleSize": 60,
+      "sampleEmployers": 51,
+      "sampleJobCountries": [
+        "CO"
+      ],
+      "categorySnapshot": true
+    },
+    {
+      "path": "/empleos/cucuta",
+      "status": 200,
+      "ms": 6537,
+      "cache": "MISS",
+      "canonical": "https://buscotrabajo.co/empleos/cucuta",
+      "robots": "no explicit noindex",
+      "title": "Empleos en Cúcuta: trabajo y ofertas de empleo | BuscoTrabajo",
+      "h1": "Empleos en Cúcuta: trabajo y ofertas de empleo",
+      "country": "CO",
+      "totalVisible": 187,
+      "sampleSize": 60,
+      "sampleEmployers": 34,
+      "sampleJobCountries": [
+        "CO"
+      ],
+      "categorySnapshot": true
+    },
+    {
+      "path": "/empleos/manizales",
+      "status": 200,
+      "ms": 952,
+      "cache": "MISS",
+      "canonical": "https://buscotrabajo.co/empleos/manizales",
+      "robots": "no explicit noindex",
+      "title": "Empleos en Manizales: trabajo y ofertas de empleo | BuscoTrabajo",
+      "h1": "Empleos en Manizales: trabajo y ofertas de empleo",
+      "country": "CO",
+      "totalVisible": 226,
+      "sampleSize": 60,
+      "sampleEmployers": 39,
+      "sampleJobCountries": [
+        "CO"
+      ],
+      "categorySnapshot": true
+    },
+    {
+      "path": "/empleos/caracas",
+      "status": 200,
+      "ms": 884,
+      "cache": "MISS",
+      "canonical": "https://buscotrabajo.co/empleos/caracas",
+      "robots": "no explicit noindex",
+      "title": "Empleos en Caracas: trabajo y ofertas de empleo | BuscoTrabajo",
+      "h1": "Empleos en Caracas: trabajo y ofertas de empleo",
+      "country": "VE",
+      "totalVisible": 940,
+      "sampleSize": 60,
+      "sampleEmployers": 43,
+      "sampleJobCountries": [
+        "VE"
+      ],
+      "categorySnapshot": true
+    }
+  ]
+}
