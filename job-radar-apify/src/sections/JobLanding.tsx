@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
 import { JobDetailPanel } from "../components/JobDetailPanel.js";
 import { PaywallCard } from "../components/PaywallCard.js";
 import { ApplyGateModal } from "../components/ApplyGateModal.js";
@@ -8,6 +8,8 @@ import { usePageMeta } from "../lib/use-page-meta.js";
 import { buildJobMeta } from "../lib/job-seo.js";
 import { Button } from "../components/ui/button.js";
 import { ArrowLeft } from "lucide-react";
+import { isVePrefixed } from "../lib/country-context.js";
+import { readJobOrigin } from "../lib/job-origin.js";
 import { jobAnalyticsParams, trackEvent } from "../lib/analytics.js";
 import { readSsrJob, isMissingJobResponse } from "../lib/job-page-state.js";
 import type { Job } from "../sources/types.js";
@@ -24,6 +26,12 @@ export default function JobLanding() {
   const { id } = useParams<{ id: string }>();
   const { accessToken } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const country = isVePrefixed(location.pathname) ? "VE" : "CO";
+  const dashboardPath = country === "VE" ? "/ve/dashboard" : "/dashboard";
+  // A company/city/role page that linked here; otherwise back to the
+  // dashboard (a job opened from search or a shared link).
+  const origin = readJobOrigin(location.state);
 
   const [load, setLoad] = useState<{ id?: string; job: Job | null; state: LoadState }>(() => {
     const snapshot = readSsrJob(id, window.__SSR_JOB__);
@@ -103,38 +111,63 @@ export default function JobLanding() {
       : null
   );
 
+  // Same page shell as the company and category pages: ink breadcrumb on a
+  // soft-green band, then the dashboard's ink detail card.
   return (
-    <section className="relative w-full min-h-screen" style={{ backgroundColor: "#fafafa" }}>
-      <div className="relative max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-20">
-        <Link
-          to="/dashboard"
-          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-6"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Ver todas las vacantes
-        </Link>
+    <div className="bg-white min-h-screen">
+      <section className="bg-gradient-to-b from-green-soft to-white">
+        <div className="max-w-[880px] mx-auto px-4 md:px-6 pt-6 pb-4 md:pt-10 md:pb-6">
+          <nav aria-label="Ruta" className="flex flex-wrap items-center gap-2 text-sm font-semibold">
+            <Link
+              to={origin?.path ?? dashboardPath}
+              className="ink-card-sm ink-lift inline-flex items-center gap-1.5 rounded-full bg-white px-3.5 py-1.5 text-foreground no-underline max-w-full"
+            >
+              <ArrowLeft className="h-4 w-4 shrink-0" aria-hidden="true" />
+              <span className="truncate">{origin ? origin.label : "Ver todas las vacantes"}</span>
+            </Link>
+            {origin ? (
+              <Link to={dashboardPath} className="rounded-full px-3 py-1.5 text-[#3d413e] hover:text-foreground">
+                Ver todas las vacantes
+              </Link>
+            ) : null}
+          </nav>
+        </div>
+      </section>
 
+      <div className="max-w-[880px] mx-auto px-4 md:px-6 pb-16 md:pb-24">
         {state === "loading" && (
-          <div className="rounded-xl p-5 border border-[#e6e8e4] bg-[#ffffff] animate-pulse space-y-3">
-            <div className="h-4 w-3/4 rounded bg-[#f1f2f0]" />
-            <div className="h-3 w-1/2 rounded bg-[#f1f2f0]" />
-            <div className="h-3 w-2/3 rounded bg-[#f1f2f0]" />
+          <div aria-busy="true" className="rounded-2xl border-2 border-foreground/15 bg-white p-6 animate-pulse space-y-4 min-h-[60vh]">
+            <div className="flex gap-3">
+              <div className="w-11 h-11 rounded-lg bg-foreground/10" />
+              <div className="flex-1 space-y-2">
+                <div className="h-5 w-3/4 rounded bg-foreground/10" />
+                <div className="h-4 w-1/2 rounded bg-foreground/10" />
+              </div>
+            </div>
+            <div className="h-12 rounded-xl bg-foreground/10" />
+            <div className="h-3 w-full rounded bg-foreground/10" />
+            <div className="h-3 w-5/6 rounded bg-foreground/10" />
           </div>
         )}
 
         {state === "not-found" && (
-          <div className="text-center py-16 px-4 rounded-2xl border border-[#e6e8e4] bg-[#ffffff] text-muted-foreground font-mono">
-            <span className="text-3xl block mb-2">🔍</span>
-            Esta vacante ya no está disponible.
-            <div className="mt-4">
-              <Button onClick={() => navigate("/dashboard")}>Ver otras vacantes</Button>
+          <div className="ink-card rounded-3xl bg-white p-8 md:p-12 text-center">
+            <p className="font-heading font-bold text-2xl md:text-3xl">Esta vacante ya no está disponible.</p>
+            <p className="mt-2 text-[#3d413e]">Venció o la fuente la cerró. Hay muchas otras activas.</p>
+            <div className="mt-6 flex flex-wrap justify-center gap-2.5">
+              <Button onClick={() => navigate(dashboardPath)}>Ver otras vacantes</Button>
+              {origin ? (
+                <Button variant="outline" onClick={() => navigate(origin.path)}>
+                  Volver a {origin.label}
+                </Button>
+              ) : null}
             </div>
           </div>
         )}
 
         {state === "error" && (
-          <div role="alert" className="rounded-xl p-5 border border-[#e6e8e4] bg-[#ffffff]">
-            <p>No pudimos actualizar la vacante. Intenta de nuevo.</p>
+          <div role="alert" className="ink-card-sm mb-4 rounded-2xl bg-[#fdf1d3] p-5 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-[#3d413e]">No pudimos actualizar la vacante. Intenta de nuevo.</p>
             <Button onClick={() => setRetry((value) => value + 1)}>Reintentar</Button>
           </div>
         )}
@@ -150,11 +183,13 @@ export default function JobLanding() {
               onAppliedToggle={() => setIsApplied((v) => !v)}
               onApplyClick={setApplyGateJob}
               headingLevel="h1"
+              country={country}
+              variant="ink"
             />
           ))}
       </div>
 
       {applyGateJob && <ApplyGateModal job={applyGateJob} onClose={() => setApplyGateJob(null)} />}
-    </section>
+    </div>
   );
 }

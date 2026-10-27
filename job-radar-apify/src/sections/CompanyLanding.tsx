@@ -3,13 +3,10 @@ import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
 import { ReputationBadges, ReputationEntryProps } from "../components/ReputationBadges.js";
 import { CompanyAvatar } from "../components/CompanyAvatar.js";
 import { ContentCta } from "../components/ContentPage.js";
-import { buildLocationLabel } from "../countries/index.js";
-import { getModalityLabel } from "../lib/job-filters.js";
-import { getSourceColor } from "../lib/source-colors.js";
-import { jobDateLabel } from "../lib/job-date-label.js";
+import { CategoryJobRow } from "../components/CategoryJobRow.js";
 import { useAuth } from "../auth/auth-provider.js";
 import { usePageMeta } from "../lib/use-page-meta.js";
-import { buildCompanyMeta, buildCompanyPath, buildJobPath } from "../lib/job-seo.js";
+import { buildCompanyMeta, buildCompanyPath } from "../lib/job-seo.js";
 import { fetchCompanyPage, type CompanyPagePayload, type CompanyPreview } from "../lib/company-page-client.js";
 import { Button } from "../components/ui/button.js";
 import { Job } from "../sources/types.js";
@@ -243,7 +240,7 @@ export default function CompanyLanding() {
               <ul className="sr-stagger grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
                 {jobs.map((job) => (
                   <li key={job.jobId} className="sr">
-                    <CompanyJobCard job={job} />
+                    <CategoryJobRow job={job} showCompany={false} origin={{ label: companyName, path: location.pathname }} />
                   </li>
                 ))}
               </ul>
@@ -253,26 +250,5 @@ export default function CompanyLanding() {
         </>
       )}
     </div>
-  );
-}
-
-// Internal link to /empleos/:id (the company page is a hub for its jobs,
-// same as the category pages), in the homepage's card style.
-function CompanyJobCard({ job }: { job: Job }) {
-  const modality = getModalityLabel(job.location);
-  const color = getSourceColor(job.source);
-  return (
-    <Link
-      to={buildJobPath(job)}
-      className="ink-card-sm ink-lift h-full rounded-2xl bg-white p-4 md:p-5 flex flex-col gap-2.5 text-foreground no-underline"
-    >
-      <h3 className="font-heading font-bold text-base md:text-lg leading-snug line-clamp-2">{job.title}</h3>
-      <p className="text-sm text-[#3d413e] truncate">{buildLocationLabel(job)}</p>
-      <div className="mt-auto flex flex-wrap gap-1.5">
-        <span className="rounded-full px-2 py-0.5 font-mono text-[11px]" style={{ backgroundColor: color.bg, color: color.text }}>{job.source}</span>
-        {modality ? <span className="rounded-full px-2 py-0.5 font-mono text-[11px] bg-[#efe9fd] text-[#6d28d9]">{modality}</span> : null}
-        <span className="rounded-full px-2 py-0.5 font-mono text-[11px] bg-green-soft text-primary">{jobDateLabel(job)}</span>
-      </div>
-    </Link>
   );
 }
