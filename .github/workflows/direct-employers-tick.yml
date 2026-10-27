@@ -158,7 +158,7 @@ jobs:
             cc-tenants)      cmd="npx tsx scripts/direct-cc-tenants.ts --max-boards 500 --deadline-min 17" ;;
             ats-inventory-dry-run) cmd="npx tsx scripts/direct-ats-inventory.ts --allow-remote-db --deadline-min 15" ;;
             ats-inventory)   cmd="npx tsx scripts/direct-ats-inventory.ts --execute --allow-remote-db --deadline-min 15" ;;
-            ats-probe-dry-run) cmd="npx tsx scripts/direct-ats-probe.ts --allow-remote-db --limit 1500 --deadline-min 15" ;;
+            ats-probe-dry-run) cmd="npx tsx scripts/direct-ats-probe.ts --allow-remote-db --limit 5000 --deadline-min 15" ;;
             ats-probe)       cmd="npx tsx scripts/direct-ats-probe.ts --execute --allow-remote-db --limit 1500 --max-enable 25 --deadline-min 15" ;;
             review-list)     cmd="npx tsx scripts/direct-discovery-review.ts list --decision needs_review --limit 100 --allow-remote-db" ;;
             review-approve-dry-run|review-approve)
