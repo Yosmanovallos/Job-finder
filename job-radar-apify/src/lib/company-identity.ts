@@ -15,7 +15,8 @@
 // fold different words: "Grupo Falabella" vs "Falabella" stay separate, and
 // the same title in two different cities stays two vacancies.
 //
-// Stored, not computed per read: Postgres regex costs 20-50µs per row, and
+// The three shared title/company/location keys are stored, not computed per read:
+// Postgres regex costs 20-50µs per row, and
 // computing these keys inside every canonical query took the directory from
 // 0.25s to 14-27s on 60k rows. A BEFORE INSERT/UPDATE trigger (generated from
 // the builders below — schema.sql block `company-identity`, applied by
@@ -23,12 +24,13 @@
 // location_key once per write, whichever code path writes the row. Reads use
 // the stored column and only fall back to the expression for a row the
 // backfill hasn't reached yet (COALESCE is lazy, so that costs nothing once
-// backfilled).
+// backfilled). The additional official-only instance key below hashes the
+// description of direct projections; board rows use the empty string.
 //
 // Deliberately NOT used by content_fingerprint / canonicalSql / the sitemap
-// stream / getJobById: those keep the strict key. That is safe because the
-// row this looser key keeps is always the newest row of its strict group too,
-// so nothing a listing shows is missing from the sitemap.
+// stream / getJobById: those keep their existing key. With distinct official
+// texts, a public listing may show more cards than the sitemap; the SEO work
+// is tracked separately and is outside this identity-read phase.
 
 // lower() runs first, so only lowercase accented letters are listed.
 const ACCENTED = "áàäâãåāéèëêēíìïîīóòöôõōúùüûūñç";
@@ -98,25 +100,30 @@ export function storedCompanyKeySql(): string {
   return `COALESCE(company_key, ${companyKeySql()})`;
 }
 
-/** Column list naming the three identity keys (for DISTINCT ON / ORDER BY). */
-export const VACANCY_IDENTITY_KEYS = "identity_title, identity_company, identity_location";
+/** Column list naming the public-listing identity keys (for DISTINCT ON / ORDER BY). */
+export const VACANCY_IDENTITY_KEYS = "identity_title, identity_company, identity_location, identity_instance";
 
 /**
- * Select-list fragment over `jobs` columns giving the three vacancy keys,
+ * Select-list fragment over `jobs` columns giving the vacancy keys,
  * e.g.
  *   SELECT DISTINCT ON (VACANCY_IDENTITY_KEYS) ...
  *   FROM (SELECT jobs.*, ${vacancyIdentityColumnsSql()} FROM jobs WHERE ...) jobs
  *   ORDER BY VACANCY_IDENTITY_KEYS, published_at DESC, id DESC
- * Confidential employers keep the previous exact-spelling behavior inside
- * the vacancy key: two different anonymous employers posting the same title
- * in the same city must not collapse into one row.
+ * Official postings with the same title and city remain separate when their
+ * descriptions differ. Exact copies of the same official text form one card;
+ * a posting without a description keeps its own direct id. Board-only rows
+ * retain their existing three-key grouping. The CASE avoids reading/hashing
+ * description bodies for the much larger board corpus.
+ * Confidential employers keep their previous exact-spelling behavior.
  */
 export function vacancyIdentityColumnsSql(): string {
   return (
     `COALESCE(title_key, ${titleKeySql()}) AS identity_title, ` +
     `(CASE WHEN lower(COALESCE(company, '')) LIKE '%confidencial%' THEN lower(trim(company)) ` +
     `ELSE ${storedCompanyKeySql()} END) AS identity_company, ` +
-    `COALESCE(location_key, ${locationKeySql()}) AS identity_location`
+    `COALESCE(location_key, ${locationKeySql()}) AS identity_location, ` +
+    `CASE WHEN direct_job_id IS NULL THEN '' ` +
+    `ELSE COALESCE(md5(NULLIF(btrim(description), '')), direct_job_id::text) END AS identity_instance`
   );
 }
 
@@ -130,22 +137,24 @@ const COUNTRY_ONLY_LOCATION_KEYS = "('colombia', 'venezuela')";
  * Use as `SELECT DISTINCT ON (VACANCY_IDENTITY_KEYS) ... FROM <this> ORDER BY
  * VACANCY_IDENTITY_KEYS, published_at DESC, id DESC`.
  *
- * Country-only duplicates (measured on prod 2026-10-05): one source drops the
+ * Country-only board duplicates (measured on prod 2026-10-05): one source drops the
  * city — Accenture "Order to Cash" @ "Colombia" (Glassdoor) and @ "Medellin,
  * Antioquia, Colombia" (LinkedIn). A country-only row is dropped when the
  * same employer posts the same title in a real city of the same country;
  * a country-only posting with no city sibling stays. Confidential employers
  * are excluded (two anonymous employers are not the same employer).
- * Partitioning by the DISTINCT ON prefix lets Postgres reuse one sort.
+ * Official projections are exempt from this older country-only rule: without
+ * a proven shared requisition id, a city-specific posting cannot erase one
+ * whose ATS only stated Colombia.
  */
 export function vacancyIdentitySourceSql(where: string): string {
   return `(SELECT * FROM (
          SELECT keyed.*,
                 bool_or(identity_location NOT IN ${COUNTRY_ONLY_LOCATION_KEYS} AND identity_location NOT IN ('remoto', 'remote'))
-                  OVER (PARTITION BY identity_title, identity_company, country) AS has_city_sibling
+                  OVER (PARTITION BY identity_title, identity_company, identity_instance, country) AS has_city_sibling
          FROM (SELECT jobs.*, ${vacancyIdentityColumnsSql()} FROM jobs WHERE ${where}) keyed
        ) sibling_checked
-       WHERE NOT (identity_location IN ${COUNTRY_ONLY_LOCATION_KEYS} AND has_city_sibling
+       WHERE NOT (direct_job_id IS NULL AND identity_location IN ${COUNTRY_ONLY_LOCATION_KEYS} AND has_city_sibling
                   AND lower(COALESCE(company, '')) NOT LIKE '%confidencial%'))`;
 }
 

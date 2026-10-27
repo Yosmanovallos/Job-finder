@@ -306,10 +306,9 @@ export async function getJobs(
   limit: number = DEFAULT_JOBS_LIMIT,
   offset: number = 0
 ) {
-  // DISTINCT ON (title, company, location) ensures the dashboard never shows
-  // visual duplicates, regardless of how many URL variants exist in the table.
-  // The subquery deduplicates, picking the most-recently-published row for
-  // each unique (title, company, location) group; the outer query re-sorts
+  // The shared identity keys collapse board URL variants. Official rows with
+  // different descriptions remain separate; exact official reposts collapse.
+  // The subquery picks the most-recently-published row for each group; the outer query re-sorts
   // chronologically so the dashboard's default order is preserved.
   const result = await pool.query(
     `SELECT * FROM (
