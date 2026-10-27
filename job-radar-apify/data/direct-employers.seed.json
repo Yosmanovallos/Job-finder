@@ -1030,6 +1030,21 @@
           "enabled": true
         }
       ]
+    },
+    {
+      "slug": "frisby",
+      "displayName": "Frisby",
+      "websiteDomain": "frisby.com.co",
+      "aliases": [
+        "FRISBY S.A"
+      ],
+      "sources": [
+        {
+          "atsType": "frisby",
+          "atsRef": "colombia",
+          "enabled": false
+        }
+      ]
     }
   ]
 }

@@ -35,6 +35,12 @@
       "status": "blocked",
       "evidenceUrl": "https://github.com/Yosmanovallos/Job-finder/actions/runs/40260839750",
       "reviewedAt": "2026-10-25"
+    },
+    {
+      "company": "FRISBY S.A",
+      "status": "blocked",
+      "evidenceUrl": "https://github.com/Yosmanovallos/Job-finder/actions/runs/40521001805",
+      "reviewedAt": "2026-10-27"
     }
   ]
 }

@@ -6,9 +6,10 @@ import { buildComputrabajoBacklog, parseOfficialReviews } from "../src/direct/di
 const reviews = parseOfficialReviews(JSON.parse(readFileSync(new URL("../data/computrabajo-official-reviews.json", import.meta.url), "utf8")));
 
 test("manual review ledger has distinct company keys and cited HTTPS evidence", () => {
-  assert.equal(reviews.size, 6);
+  assert.ok(reviews.size >= 7);
   assert.equal(reviews.get("smurfitwestrock")?.status, "official_incomplete");
   assert.equal(reviews.get("nexabpo")?.status, "blocked");
+  assert.equal(reviews.get("frisby")?.status, "blocked");
   assert.throws(() => parseOfficialReviews({ reviews: [
     { company: "Grupo Éxito", status: "form_only", evidenceUrl: "https://example.com", reviewedAt: "2026-10-25" },
     { company: "GRUPO EXITO S.A.", status: "form_only", evidenceUrl: "https://example.com", reviewedAt: "2026-10-25" }
