@@ -5,7 +5,8 @@ import { PageHero, ContentCta } from "../components/ContentPage.js";
 import { CompanyAvatar } from "../components/CompanyAvatar.js";
 import { usePageMeta } from "../lib/use-page-meta.js";
 import { companiesDirectoryMeta } from "../lib/page-meta.js";
-import { buildCompanyPath } from "../lib/job-seo.js";
+import { companyLinkProps } from "../lib/company-page-client.js";
+import { useAuth } from "../auth/auth-provider.js";
 import { getCountryConfig } from "../countries/index.js";
 
 // Shape of the first-page payload the server inlines for anonymous SSR.
@@ -36,6 +37,7 @@ export default function CompaniesDirectory() {
   const location = useLocation();
   const country = location.pathname.startsWith("/ve") ? "VE" : "CO";
   const countryName = getCountryConfig(country).name;
+  const { accessToken } = useAuth();
 
   const directoryMeta = companiesDirectoryMeta(countryName);
   usePageMeta({ title: directoryMeta.title, description: directoryMeta.description });
@@ -230,7 +232,7 @@ export default function CompaniesDirectory() {
               return (
                 <li key={c.company}>
                   <Link
-                    to={buildCompanyPath(c.company, country)}
+                    {...companyLinkProps({ companyName: c.company, logoUrl: c.logoUrl, count: c.count }, country, accessToken)}
                     className="ink-card-sm ink-lift h-full flex items-center gap-3 rounded-2xl bg-white p-4 text-foreground no-underline"
                   >
                     <CompanyAvatar name={c.company} logoUrl={c.logoUrl} className="w-12 h-12 text-lg" />

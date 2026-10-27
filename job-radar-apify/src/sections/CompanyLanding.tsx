@@ -9,7 +9,8 @@ import { getSourceColor } from "../lib/source-colors.js";
 import { jobDateLabel } from "../lib/job-date-label.js";
 import { useAuth } from "../auth/auth-provider.js";
 import { usePageMeta } from "../lib/use-page-meta.js";
-import { buildCompanyMeta, buildJobPath } from "../lib/job-seo.js";
+import { buildCompanyMeta, buildCompanyPath, buildJobPath } from "../lib/job-seo.js";
+import { fetchCompanyPage, type CompanyPagePayload, type CompanyPreview } from "../lib/company-page-client.js";
 import { Button } from "../components/ui/button.js";
 import { Job } from "../sources/types.js";
 import { ArrowLeft, ExternalLink } from "lucide-react";
@@ -47,66 +48,81 @@ export default function CompanyLanding() {
   const country = location.pathname.startsWith("/ve") ? "VE" : "CO";
   const { accessToken, loading: authLoading } = useAuth();
 
-  const [companyName, setCompanyName] = useState<string | null>(null);
-  const [logoUrl, setLogoUrl] = useState<string | null>(null);
-  const [reputation, setReputation] = useState<ReputationEntryProps[]>([]);
-  const [officialCareersUrl, setOfficialCareersUrl] = useState<string | null>(null);
-  const [jobs, setJobs] = useState<Job[]>([]);
-  const [total, setTotal] = useState(0);
-  const [state, setState] = useState<LoadState>("loading");
+  // server.ts's /empresas/:slug (and /ve/empresas/:slug) route embeds this
+  // exact response in the HTML. It's painted on the first render, before
+  // the auth session resolves: waiting for the session left a short
+  // skeleton on screen, the footer rose into view and then jumped (CLS
+  // 1.1 in 1 of 4 Lighthouse runs, 2026-10-27). Only trusted when BOTH
+  // slug and country match this mount (same reasoning as Dashboard's
+  // ssrJobs.country check), and read once so a later slug can never reuse
+  // it. SSR is the anonymous view; a signed-in visitor refetches below
+  // without dropping back to the skeleton.
+  const [page, setPage] = useState<{ slug?: string; data: CompanyPagePayload | null; state: LoadState; fromSsr?: boolean }>(() => {
+    const ssrCompany = (window as SsrCompanyWindow).__SSR_COMPANY__;
+    delete (window as SsrCompanyWindow).__SSR_COMPANY__;
+    if (ssrCompany && ssrCompany.companyName && ssrCompany.slug === slug && ssrCompany.country === country) {
+      const data: CompanyPagePayload = {
+        companyName: ssrCompany.companyName,
+        logoUrl: ssrCompany.logoUrl || null,
+        reputation: ssrCompany.reputation || [],
+        officialCareersUrl: ssrCompany.officialCareersUrl || null,
+        jobs: ssrCompany.jobs || [],
+        total: ssrCompany.total || 0
+      };
+      return { slug, data, state: "found", fromSsr: true };
+    }
+    return { slug, data: null, state: "loading" };
+  });
+  const current = page.slug === slug ? page : { slug, data: null, state: "loading" as LoadState };
+  const state = current.state;
+  const companyName = current.data?.companyName ?? null;
+  const logoUrl = current.data?.logoUrl ?? null;
+  const reputation = current.data?.reputation ?? [];
+  const officialCareersUrl = current.data?.officialCareersUrl ?? null;
+  const jobs = current.data?.jobs ?? [];
+  const total = current.data?.total ?? 0;
+  const showingSsr = page.slug === slug && page.fromSsr === true;
 
   useEffect(() => {
     if (!slug) {
-      setState("not-found");
+      setPage({ slug, data: null, state: "not-found" });
       return;
     }
-    // Waits for auth-provider's initial session resolution before firing —
-    // otherwise this fires once with accessToken=null, then again once the
-    // session resolves, and the second run's setState("loading") drops an
-    // already-rendered page back to the skeleton for every logged-in visitor.
+    // Waits for auth-provider's initial session resolution: with no session
+    // the SSR view above is already the right one; with one, the refetch
+    // gets the visitor's own tier.
     if (authLoading) return;
+    if (showingSsr && !accessToken) return;
 
-    // server.ts's /empresas/:slug (and /ve/empresas/:slug) route embeds this
-    // exact response directly in the HTML — same shortcut Dashboard.tsx
-    // already uses for window.__SSR_JOBS__. Only trusted when BOTH slug and
-    // country match this mount (never just "one of the two countries", same
-    // reasoning as Dashboard's ssrJobs.country check) and only when
-    // anonymous (!accessToken) — SSR always renders the tier:"free" masked
-    // view, so a signed-in visitor still needs the real fetch below to get
-    // their own unmasked tier. Deleted immediately after one read so a later
-    // slug/filter change can never reuse stale data.
-    const ssrCompany = (window as SsrCompanyWindow).__SSR_COMPANY__;
-    delete (window as SsrCompanyWindow).__SSR_COMPANY__;
-    if (ssrCompany && ssrCompany.slug === slug && ssrCompany.country === country && !accessToken) {
-      setCompanyName(ssrCompany.companyName);
-      setLogoUrl(ssrCompany.logoUrl || null);
-      setReputation(ssrCompany.reputation || []);
-      setOfficialCareersUrl(ssrCompany.officialCareersUrl || null);
-      setJobs(ssrCompany.jobs || []);
-      setTotal(ssrCompany.total || 0);
-      setState("found");
-      return;
-    }
-
-    setState("loading");
-    const headers: HeadersInit = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
-    fetch(`/api/companies/${encodeURIComponent(slug)}?country=${country}`, { headers })
-      .then((res) => (res.ok ? res.json() : null))
+    let cancelled = false;
+    setPage((prev) => (prev.slug === slug && prev.data ? prev : { slug, data: null, state: "loading" }));
+    // Usually already in flight: the link that brought the visitor here
+    // prefetched it on hover/press (company-page-client.ts).
+    fetchCompanyPage(slug, country, accessToken)
       .then((data) => {
-        if (data) {
-          setCompanyName(data.companyName);
-          setLogoUrl(data.logoUrl || null);
-          setReputation(data.reputation || []);
-          setOfficialCareersUrl(data.officialCareersUrl || null);
-          setJobs(data.jobs || []);
-          setTotal(data.total || 0);
-          setState("found");
-        } else {
-          setState("not-found");
-        }
+        if (cancelled) return;
+        setPage(data ? { slug, data, state: "found" } : { slug, data: null, state: "not-found" });
       })
-      .catch(() => setState("not-found"));
+      .catch(() => {
+        if (cancelled) return;
+        // A failed refresh keeps whatever is already on screen.
+        setPage((prev) => (prev.slug === slug && prev.data ? prev : { slug, data: null, state: "not-found" }));
+      });
+    return () => {
+      cancelled = true;
+    };
+    // Dependencies intentionally exclude showingSsr: it only matters for the
+    // first run after mount.
   }, [slug, accessToken, authLoading, country]);
+
+  // A company link passes what it already shows (name, logo, count), so
+  // the header paints at once while the jobs load. Only trusted for the
+  // slug it was built for.
+  const linkPreview = (location.state as { companyPreview?: CompanyPreview } | null)?.companyPreview;
+  const preview = linkPreview && slug && buildCompanyPath(linkPreview.companyName, country).endsWith(`/${slug}`) ? linkPreview : null;
+  const headerName = state === "found" ? companyName : state === "loading" ? preview?.companyName ?? null : null;
+  const headerLogo = state === "found" ? logoUrl : preview?.logoUrl ?? null;
+  const headerTotal = state === "found" ? total : preview?.count ?? 0;
 
   // Same builder as server.ts's SSR head, so title/description don't change
   // when React mounts.
@@ -120,7 +136,9 @@ export default function CompanyLanding() {
   const dashboardPath = country === "VE" ? "/ve/dashboard" : "/dashboard";
 
   return (
-    <div className="bg-white">
+    // While loading, the page keeps a screen's height so the footer never
+    // rises into view and jumps when the content arrives.
+    <div className={`bg-white ${state === "loading" ? "min-h-screen" : ""}`}>
       <section className="bg-gradient-to-b from-green-soft to-white">
         <div className="max-w-[1240px] mx-auto px-4 md:px-6 pt-6 pb-8 md:pt-12 md:pb-14">
           <nav aria-label="Ruta" className="mb-5 md:mb-7 flex flex-wrap items-center gap-2 text-sm font-semibold">
@@ -133,7 +151,7 @@ export default function CompanyLanding() {
             </Link>
           </nav>
 
-          {state === "loading" && (
+          {state === "loading" && !headerName && (
             <div className="flex items-center gap-4 md:gap-6 animate-pulse">
               <div className="w-16 h-16 md:w-24 md:h-24 rounded-2xl bg-white border-2 border-foreground/20" />
               <div className="flex-1 space-y-3">
@@ -154,26 +172,26 @@ export default function CompanyLanding() {
             </div>
           )}
 
-          {state === "found" && companyName && (
+          {headerName && (
             <div className="flex flex-wrap items-center gap-5 md:gap-8">
               <CompanyAvatar
-                name={companyName}
-                logoUrl={logoUrl}
+                name={headerName}
+                logoUrl={headerLogo}
                 className="ink-card-sm md:ink-card w-16 h-16 md:w-24 md:h-24 text-2xl md:text-4xl rounded-2xl bg-white"
               />
               <div className="min-w-0 flex-[1_1_320px]">
                 <h1 className="font-heading font-bold tracking-[-0.04em] leading-[1.05] text-[30px] md:text-[clamp(38px,4.5vw,58px)] break-words">
-                  {companyName}
+                  {headerName}
                 </h1>
                 <div className="mt-3 md:mt-4 flex flex-wrap items-center gap-2.5">
                   <span className="ink-card-sm inline-flex items-center gap-2 rounded-full bg-[#fdf1d3] px-3 py-1 text-sm font-semibold shadow-none">
                     <span aria-hidden="true" className="w-2.5 h-2.5 rounded-full bg-primary" />
-                    {total.toLocaleString("es-CO")} vacante{total === 1 ? "" : "s"} activa{total === 1 ? "" : "s"}
+                    {headerTotal.toLocaleString("es-CO")} vacante{headerTotal === 1 ? "" : "s"} activa{headerTotal === 1 ? "" : "s"}
                   </span>
                   {/* Employers whose own vacancies can't be read: a link to
                       their careers site, nothing copied
                       (src/data/official-careers-links.ts). */}
-                  {officialCareersUrl && (
+                  {state === "found" && officialCareersUrl && (
                     <a
                       href={officialCareersUrl}
                       target="_blank"
@@ -190,6 +208,17 @@ export default function CompanyLanding() {
           )}
         </div>
       </section>
+
+      {state === "loading" && headerName && (
+        <section aria-busy="true" className="max-w-[1240px] w-full mx-auto px-4 md:px-6 py-8 md:py-12">
+          <div className="h-7 md:h-9 w-2/3 max-w-md rounded-lg bg-foreground/10 animate-pulse mb-4 md:mb-6" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
+            {Array.from({ length: Math.min(Math.max(headerTotal, 2), 6) }).map((_, i) => (
+              <div key={i} className="h-[120px] rounded-2xl border-2 border-foreground/15 bg-white animate-pulse" />
+            ))}
+          </div>
+        </section>
+      )}
 
       {state === "found" && companyName && (
         <>
