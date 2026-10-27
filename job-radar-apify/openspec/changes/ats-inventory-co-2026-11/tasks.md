@@ -21,7 +21,11 @@
   - Por ATS: Greenhouse 2.292, Ashby 1.055, Workday 736, Teamtailor 568, SmartRecruiters 520, Lever 2, SuccessFactors 2, Magneto 2, Buk 1, Gupy 1.
   - Estado inicial: 5.145 `pending`, 30 `owned` (ya en `employer_sources`), 4 `unsupported_ats`.
   - Todos los patrones de Common Crawl respondieron; Lever trajo solo 72 URLs y `boards.greenhouse.io` 77 (el índice casi no los cubre, como anotaba ADR 0006 §7). Con 3 páginas por patrón el inventario es parcial: subir `--cc-max-pages` se mide en I2 contra el plazo.
-  - Pendiente con aprobación del dueño, desde `main` tras integrar #61 y #62: `migrate` y después `ats-inventory` (escribe solo `ats_board_inventory`).
+- [x] Aplicado en producción desde `main` (`c724483`) con aprobación del dueño, tras integrar #61 y #62:
+  - [migrate-dry-run 40593778981](https://github.com/Yosmanovallos/Job-finder/actions/runs/40593778981): solo crearía `ats_board_inventory`. [migrate 40593864148](https://github.com/Yosmanovallos/Job-finder/actions/runs/40593864148): tabla creada, RLS activo, 0 permisos para `anon`/`authenticated`.
+  - [ats-inventory 40593946935](https://github.com/Yosmanovallos/Job-finder/actions/runs/40593946935): **4.255 filas nuevas**, ninguna habilitada. Greenhouse 1.335, Workday 1.181, Ashby 1.055, SmartRecruiters 520, Teamtailor 156, otros 8. Estado: 4.220 `pending`, 31 `owned`, 4 `unsupported_ats`.
+  - El índice de Common Crawl no devuelve lo mismo en cada corrida (Workday salió de CC-MAIN-2026-34 porque el crawl 43 no respondió; Teamtailor trajo 4.372 URLs frente a 12.163 del dry-run). El insert-only acumula: cada corrida suma tableros sin borrar los anteriores.
+  - [db-size 40595693262](https://github.com/Yosmanovallos/Job-finder/actions/runs/40595693262): 416 MB (antes 415 MB); `ats_board_inventory` 1,3 MB.
 
 ## I2 — sondeo y habilitación automática
 
