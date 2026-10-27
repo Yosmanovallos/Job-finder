@@ -18,6 +18,7 @@ import { Input } from "../components/ui/input.js";
 import { Button } from "../components/ui/button.js";
 import { Search, SlidersHorizontal, Unlock, ArrowUpRight, X } from "lucide-react";
 import type { Job } from "../sources/types.js";
+import { useSavedJobs } from "../lib/saved-jobs.js";
 
 type CheckoutBannerState = "confirming" | "success" | "pending" | null;
 
@@ -72,8 +73,8 @@ export default function Dashboard() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [total, setTotal] = useState(0);
   const [hasMore, setHasMore] = useState(false);
-  const [savedJobIds, setSavedJobIds] = useState<Set<string>>(new Set());
-  const [appliedJobIds, setAppliedJobIds] = useState<Set<string>>(new Set());
+  // Saved/applied marks live in the account (src/lib/saved-jobs.tsx).
+  const { mode: savedMode, savedIds: savedJobIds, appliedIds: appliedJobIds, toggleSaved: handleSaveToggle, toggleApplied: handleAppliedToggle } = useSavedJobs();
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -147,11 +148,26 @@ export default function Dashboard() {
     [effectiveFilters, country]
   );
 
-  // Personal filters (saved/applied) aren't persisted server-side today, so
-  // they only ever apply to whatever's already been loaded in this session —
-  // scrolling further wouldn't surface more matches, so infinite scroll is
-  // paused while either is active instead of pretending to paginate them.
+  // Personal filters (saved/applied) only ever apply to whatever's already
+  // been loaded in this session — scrolling further wouldn't surface more
+  // matches, so infinite scroll is paused while either is active instead of
+  // pretending to paginate them. With an account, the full list lives in
+  // /cuenta, so those two filters open it instead (handleFilterChange).
   const personalFilterActive = filters.savedOnly || filters.appliedOnly;
+
+  // Turning on "★ Guardadas" / "✓ Aplicadas" with an account opens the full
+  // list in /cuenta: on this page it could only filter the jobs loaded so far.
+  const handleFilterChange = useCallback(
+    (next: typeof filters) => {
+      const turnedOnPersonal = (next.savedOnly && !filters.savedOnly) || (next.appliedOnly && !filters.appliedOnly);
+      if (turnedOnPersonal && savedMode === "account") {
+        navigate("/cuenta#guardadas");
+        return;
+      }
+      setFilters(next);
+    },
+    [filters, savedMode, navigate]
+  );
 
   // Reset + fetch the first page whenever a filter changes.
   useEffect(() => {
@@ -432,26 +448,6 @@ export default function Dashboard() {
     // Dependencies intentionally limited to the list below.
   }, [accessToken]);
 
-  // Stable identities (functional updates) so the memoized cards don't
-  // re-render on every Dashboard render.
-  const handleSaveToggle = useCallback((jobId: string) => {
-    setSavedJobIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(jobId)) next.delete(jobId);
-      else next.add(jobId);
-      return next;
-    });
-  }, []);
-
-  const handleAppliedToggle = useCallback((jobId: string) => {
-    setAppliedJobIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(jobId)) next.delete(jobId);
-      else next.add(jobId);
-      return next;
-    });
-  }, []);
-
   const visibleJobs = useMemo(
     () =>
       jobs.filter((j) => {
@@ -710,7 +706,7 @@ export default function Dashboard() {
                   <div className="absolute right-0 top-full mt-2 w-[26rem] max-h-[70vh] overflow-y-auto rounded-2xl shadow-[6px_6px_0_hsl(var(--foreground))] z-20">
                     <FilterBar
                       filters={filters}
-                      onFilterChange={setFilters}
+                      onFilterChange={handleFilterChange}
                       cityOptions={cityOptions}
                     />
                   </div>
@@ -760,7 +756,7 @@ export default function Dashboard() {
               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-4 max-w-xl w-full mx-auto">
-              <FilterBar filters={filters} onFilterChange={setFilters} cityOptions={cityOptions} />
+              <FilterBar filters={filters} onFilterChange={handleFilterChange} cityOptions={cityOptions} />
             </div>
             <div className="shrink-0 p-4 border-t border-[#e6e8e4] bg-[#ffffff]">
               <button

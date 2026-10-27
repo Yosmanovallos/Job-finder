@@ -19,6 +19,7 @@ import {
 } from "./lib/country-context.js";
 import { PAYWALL_ENABLED } from "./config.js";
 import { AuthProvider } from "./auth/auth-provider.js";
+import { SavedJobsProvider } from "./lib/saved-jobs.js";
 import RequireAuth from "./auth/require-auth.js";
 import { registerBuscoTrabajoWebMcp } from "./lib/webmcp.js";
 import { captureAcquisition, trackPageView } from "./lib/analytics.js";
@@ -209,6 +210,7 @@ export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
+        <SavedJobsProvider>
         <ScrollToTop />
         {/* No overflow-x-hidden here: setting overflow-x alone forces the
             browser to silently promote overflow-y from its default
@@ -233,6 +235,7 @@ export default function App() {
           </RevealMain>
           <Footer />
         </div>
+        </SavedJobsProvider>
       </BrowserRouter>
     </AuthProvider>
   );

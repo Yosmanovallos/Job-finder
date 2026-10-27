@@ -23,6 +23,14 @@ import {
   SitemapStreamAbortedError
 } from "./db/job-repository.js";
 import { markRoleForImmediateRescan } from "./db/scheduler-repository.js";
+import {
+  listSavedJobs,
+  saveJob,
+  removeSavedJob,
+  SavedJobsLimitError,
+  SavedJobsUnavailableError,
+  SAVED_JOBS_LIMIT
+} from "./db/saved-jobs-repository.js";
 import { wasJobPurged } from "./db/indexing-repository.js";
 import {
   getReputationForCompanies,
@@ -378,7 +386,28 @@ const REPUTATION_SOURCE_LABELS: Record<string, string> = {
 // tighter and checked separately inside those routes.
 const GENERAL_API_RATE_LIMIT = 120;
 const GENERAL_API_RATE_WINDOW_MS = 60 * 1000;
-const CHECKOUT_START_BODY_MAX_BYTES = 1 * 1024; // { plan?: "pro" | "pro_max" } — tiny payload, generous cap
+const CHECKOUT_START_BODY_MAX_BYTES = 1 * 1024;
+const SAVED_JOB_BODY_MAX_BYTES = 1 * 1024; // { applied?: boolean }
+
+// Reads a request body up to maxBytes; null when it's larger (the rest is
+// discarded, never buffered).
+function readSmallBody(req: http.IncomingMessage, maxBytes: number): Promise<string | null> {
+  return new Promise((resolve, reject) => {
+    let size = 0;
+    const chunks: Buffer[] = [];
+    let tooLarge = false;
+    req.on("data", (chunk: Buffer) => {
+      size += chunk.length;
+      if (size > maxBytes) {
+        tooLarge = true;
+        return;
+      }
+      chunks.push(chunk);
+    });
+    req.on("end", () => resolve(tooLarge ? null : Buffer.concat(chunks).toString("utf8")));
+    req.on("error", reject);
+  });
+} // { plan?: "pro" | "pro_max" } — tiny payload, generous cap
 
 // Native Node HTTP Server
 const server = http.createServer((req, res) => {
@@ -793,6 +822,56 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       })
     );
     return;
+  }
+
+  // 4b-bis. /api/me/saved-jobs — "Mis vacantes" (saved + applied) of the
+  // signed-in user. The user is always the one verifySession resolved from
+  // the JWT, and the job snapshot comes from `jobs`, never the body. Until
+  // scripts/migrate-saved-jobs.ts runs, every call answers 503 and the
+  // client hides the feature.
+  if (pathname === "/api/me/saved-jobs" || pathname.startsWith("/api/me/saved-jobs/")) {
+    const json = (status: number, body?: unknown) => {
+      res.writeHead(status, { "Content-Type": "application/json", "Cache-Control": "private, no-store" });
+      res.end(body === undefined ? undefined : JSON.stringify(body));
+    };
+    const session = await verifySession(req);
+    if (!session) return json(401, { error: "No autenticado" });
+    const jobId = pathname === "/api/me/saved-jobs" ? null : pathname.slice("/api/me/saved-jobs/".length);
+
+    try {
+      if (jobId === null && method === "GET") {
+        return json(200, { savedJobs: await listSavedJobs(session.id), limit: SAVED_JOBS_LIMIT });
+      }
+      if (jobId === null || !isUuid(jobId)) return json(jobId === null ? 405 : 400, { error: "Vacante no válida" });
+
+      if (method === "DELETE") {
+        await removeSavedJob(session.id, jobId);
+        res.writeHead(204, { "Cache-Control": "private, no-store" });
+        res.end();
+        return;
+      }
+      if (method !== "PUT") return json(405, { error: "Método no permitido" });
+
+      const bodyText = await readSmallBody(req, SAVED_JOB_BODY_MAX_BYTES);
+      if (bodyText === null) return json(413, { error: "Cuerpo demasiado grande" });
+      let parsed: { applied?: unknown };
+      try {
+        parsed = JSON.parse(bodyText || "{}");
+      } catch {
+        return json(400, { error: "JSON inválido" });
+      }
+      if (parsed.applied !== undefined && typeof parsed.applied !== "boolean") {
+        return json(400, { error: "applied debe ser true o false" });
+      }
+      const saved = await saveJob(session.id, jobId, parsed.applied as boolean | undefined);
+      if (!saved) return json(404, { error: "Vacante no encontrada" });
+      return json(200, { savedJob: saved });
+    } catch (e) {
+      if (e instanceof SavedJobsUnavailableError) return json(503, { error: "Las vacantes guardadas aún no están disponibles." });
+      if (e instanceof SavedJobsLimitError) return json(409, { error: `Puedes guardar hasta ${SAVED_JOBS_LIMIT} vacantes.` });
+      respondToUnexpectedError(res, e, "/api/me/saved-jobs", "No se pudieron actualizar tus vacantes guardadas.");
+      return;
+    }
   }
 
   // 4c. PATCH /api/me — lets a user edit their own display name. The id

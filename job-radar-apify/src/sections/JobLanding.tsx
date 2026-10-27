@@ -10,6 +10,7 @@ import { Button } from "../components/ui/button.js";
 import { ArrowLeft } from "lucide-react";
 import { isVePrefixed } from "../lib/country-context.js";
 import { readJobOrigin } from "../lib/job-origin.js";
+import { useSavedJobs } from "../lib/saved-jobs.js";
 import { jobAnalyticsParams, trackEvent } from "../lib/analytics.js";
 import { readSsrJob, isMissingJobResponse } from "../lib/job-page-state.js";
 import type { Job } from "../sources/types.js";
@@ -40,8 +41,7 @@ export default function JobLanding() {
   const job = load.id === id ? load.job : null;
   const state = load.id === id ? load.state : "loading";
   const [retry, setRetry] = useState(0);
-  const [isSaved, setIsSaved] = useState(false);
-  const [isApplied, setIsApplied] = useState(false);
+  const { savedIds, appliedIds, toggleSaved, toggleApplied } = useSavedJobs();
   const [applyGateJob, setApplyGateJob] = useState<Job | null>(null);
 
   useEffect(() => {
@@ -178,9 +178,9 @@ export default function JobLanding() {
             <PaywallCard job={job} onUnlockClick={() => navigate("/pricing")} />
           ) : (
             <JobDetailPanel
-              job={{ ...job, isSaved, isApplied }}
-              onSaveToggle={() => setIsSaved((v) => !v)}
-              onAppliedToggle={() => setIsApplied((v) => !v)}
+              job={{ ...job, isSaved: savedIds.has(job.jobId), isApplied: appliedIds.has(job.jobId) }}
+              onSaveToggle={toggleSaved}
+              onAppliedToggle={toggleApplied}
               onApplyClick={setApplyGateJob}
               headingLevel="h1"
               country={country}
