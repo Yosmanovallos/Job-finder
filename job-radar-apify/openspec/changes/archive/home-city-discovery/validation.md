@@ -45,14 +45,30 @@ Repetición tras corregir tipos y usar la configuración real del repo: todos pa
 - Baseline 13 rutas: `job-radar-test-ad4c69de15cacdbb98662cead5c03fea-CKnmi2/results.json`.
 - Integración 18 suites: `job-radar-test-9304de89705e299f35b295a673313bed-eT664e/results.json`.
 
-## Gate de publicación
+## Publicación y cierre
 
-Fase activa: no archivar ni declarar completa mientras fallen gates globales.
-La autorización del usuario para desplegar sigue vigente; no sustituye la
-verificación exigida por AGENTS.md. PR #66 publicado como draft:
-https://github.com/Yosmanovallos/Job-finder/pull/66.
-Todos los controles locales pasan; pendiente verificar producción tras
-despliegue. Rollback por
-revert del commit; no hay migraciones o escrituras de datos que deshacer.
-No hay evidencia nueva de indexación, posiciones o crecimiento causada por
-esta implementación local.
+PR #66 fusionado en `3c8608222aaef79ba0b850f362183a22fa739915`.
+CI [40597108930](https://github.com/Yosmanovallos/Job-finder/actions/runs/40597108930)
+pasa completo (job-render, unit, job-seo, baseline, integration).
+Render confirma este commit como Last successfully deployed commit en
+el servicio existente Starter, sin cambios de plan o configuración.
+
+Verificación pública 2026-10-27: `/`, `/ve`, Bogotá, Cúcuta, Caracas,
+Manizales, cargo project-manager VE, ambos dashboards y login responden 200.
+`/api/health` 200 y `/api/me` 401 sin sesión. Los dos inicios incluyen los
+destinos esperados en HTML y Markdown con Vary Accept, Accept-Encoding.
+Navegación real del navegador a Cúcuta y Caracas confirmada por URL y H1.
+Comparación antes/después: sin cambios en title, H1, canonical, robots,
+hreflang o tipos de schema en las diez páginas inspeccionadas.
+
+Dashboard con URL única y Cloudflare MISS: CO 221 ms, VE 240 ms en este
+muestreo posterior. No se cambian consultas/cachés/arranque. Bogotá respondió
+200 en 3758 ms con MISS: anotación de latencia de primera carga para investigar
+en otra entrega, no evidencia de regresión atribuible a estos enlaces.
+
+Evidencia HTTP pública en OS temp: home-city-pre.json, home-city-post.json y
+home-city-post-comparison.json. Fase completada y archivada con gates verdes.
+Rollback: revertir el merge del PR #66; sin migraciones o datos que deshacer.
+La entrega prueba descubrimiento y navegación, no una mejora de indexación,
+posiciones o crecimiento. Siguiente fase: ampliar cobertura por ciudad/cargo
+según vacantes reales y demanda medida; no implementada en esta entrega.
