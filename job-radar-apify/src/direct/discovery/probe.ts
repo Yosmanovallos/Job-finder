@@ -84,7 +84,7 @@ export function slugVariants(name: string): string[] {
 const GreenhouseBoardMeta = z.object({ name: z.string() });
 
 /** Greenhouse's own name for a board token (GET /v1/boards/{token}). */
-async function greenhouseBoardName(token: string, http: HttpGet): Promise<{ kind: "found"; name: string } | { kind: "not_found" } | { kind: "error"; detail: string }> {
+export async function greenhouseBoardName(token: string, http: HttpGet): Promise<{ kind: "found"; name: string } | { kind: "not_found" } | { kind: "error"; detail: string }> {
   try {
     const response = await http(`https://boards-api.greenhouse.io/v1/boards/${token}`);
     if (response.status === 404) return { kind: "not_found" };

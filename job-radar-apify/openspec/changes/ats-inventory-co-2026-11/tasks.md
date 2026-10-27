@@ -29,8 +29,13 @@
 
 ## I2 — sondeo y habilitación automática
 
-- [ ] Pruebas: reglas INV-010…INV-014, conflictos de dueño, agencia, ATS sin nombre, listado incompleto.
-- [ ] Sondeo del inventario en el descubrimiento programado, antes de la vía por nombre (INV-025), con `--max-enable` 25.
+- [x] Pruebas: reglas INV-010…INV-014, conflictos de dueño, agencia, ATS sin nombre, listado incompleto (`tests/validate-direct-inventory-probe.test.ts`, offline); integración en Postgres desechable: insert-only, idempotente, guarda de estado, dry-run sin escrituras, `jobs` y `employer_discovery` intactas (`tests/validate-direct-inventory-probe.ts`).
+- [x] Sondeo del inventario en el descubrimiento programado, antes de la vía por nombre (INV-025), con `--max-enable` 25 (`scripts/direct-ats-probe.ts`, dry-run por defecto). Mismo horario y `timeout-minutes: 20`; el plazo se reparte 6 min inventario + 9 min vía por nombre (antes 12). Modos manuales `ats-probe-dry-run` / `ats-probe` en el tick.
+  - Reglas: el nombre sale del ATS (Greenhouse `/v1/boards/{token}`, SmartRecruiters `company.name`, Teamtailor `channel/title`, Workday `hiringOrganization` del detalle); Lever, Ashby, Phenom, SuccessFactors y Eightfold no declaran nombre → `ambiguous`; Magneto → `ambiguous` (también es bolsa). Varios nombres en un tablero → `ambiguous`.
+  - 401/403/429 y robots.txt → `blocked`; 5xx, forma inesperada, páginas incompletas o Workday con detalles sin leer y 0 en Colombia → `error`. Un 404 queda `error` con motivo "tablero inexistente" y reintento a 30 días (no hay estado `not_found` en INV-014).
+  - Backoff: `error`/`blocked` 1, 2, 4… hasta 14 días; `no_colombia` se revisa a los 30 días; `enabled`, `owned`, `agency` y `ambiguous` son finales. Las decisiones finales nunca se sobrescriben (guarda en SQL).
+  - Conflictos (INV-012) → `ambiguous`: la clave ya tiene un tablero del mismo ATS (aunque esté apagado), varias empresas con la clave, empresa rechazada en revisión humana, slug de otra empresa, o dos tableros del mismo ATS con la misma empresa en la corrida. Un tablero que ya está en `employer_sources` → `owned`. La promoción va de a una, con `pg_advisory_xact_lock` por clave.
+  - Reversión: no hay comando todavía; `enabled = false` por `discovery_origin = 'ats_inventory'` (diseño §8) queda pendiente.
 - [ ] Corrida `dry-run` y revisión de la muestra; después `execute`.
 - [ ] Reporte: filas por estado; 100 % clasificadas al terminar el inventario.
 
