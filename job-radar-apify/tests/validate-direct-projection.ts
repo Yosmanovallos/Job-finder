@@ -211,6 +211,16 @@ async function run(): Promise<void> {
   // 8) The scrape tick's pass is a no-op when nothing new matches.
   check((await supersedeCopies()) === 0, "El paso de copias del scrape tick es idempotente.", "supersedeCopies volvió a ocultar algo.");
 
+  // A single remote official posting keeps the existing broad-location rule.
+  const cityCopyOfRemote = await boardRow("Ingeniero de Software", "Proj Co LA", "Bogotá, Colombia", "CO");
+  await supersedeCopies();
+  const cityCopyOfRemoteRow = await row(cityCopyOfRemote);
+  check(
+    cityCopyOfRemoteRow.is_active === false && cityCopyOfRemoteRow.superseded_by === p2,
+    "Una oficial remota única sigue agrupando su copia de bolsa con ciudad.",
+    `Regresión de ubicación amplia: ${JSON.stringify(cityCopyOfRemoteRow)}`
+  );
+
   const veRow = await row(venezuela);
   const queueEnd = await pool.query(`SELECT COUNT(*)::int AS n FROM indexing_queue`);
   check(veRow.is_active === true && veRow.superseded_by === null, "La vacante de Venezuela nunca se tocó.", "Se tocó una vacante de Venezuela.");
@@ -248,6 +258,57 @@ async function run(): Promise<void> {
       Boolean(await getJobById(originalId!)) && Boolean(await getJobById(variantId!)) && Boolean(await getJobById(repostId!)),
     "Dos requisiciones oficiales con contenido distinto se ven; una republicación idéntica ocupa una tarjeta y conserva ambos IDs.",
     `Identidad oficial inesperada: ${JSON.stringify(dataCards.map((job) => job.jobId))}`
+  );
+
+  // A shared employer/title is not enough to redirect a Medellín posting to
+  // a Bogotá requisition. Formatting-only Bogotá D.C. remains a true copy.
+  await saveListing(source, [posting({
+    externalId: "city-official", title: "Ingeniero de Datos",
+    applyUrl: "https://jobs.lever.co/proj-co/city-official"
+  })], false);
+  const cityOfficial = (await pool.query<{ id: string }>(
+    `SELECT id FROM direct_jobs WHERE employer_source_id = $1 AND external_id = 'city-official'`, [source.id]
+  )).rows[0].id;
+  await syncProjections();
+  const wrongCity = await boardRow("Ingeniero de Datos", "Proj Co LA", "Medellín, Antioquia, Colombia", "CO");
+  const bogotaAlias = await boardRow("Ingeniero de Datos", "Proj Co LA", "Bogotá D.C. Metropolitan Area", "CO");
+  await supersedeCopies();
+  const wrongCityBefore = await row(wrongCity);
+  const bogotaAliasRow = await row(bogotaAlias);
+  check(
+    wrongCityBefore.is_active === true && wrongCityBefore.superseded_by === null &&
+      bogotaAliasRow.is_active === false && bogotaAliasRow.superseded_by === cityOfficial,
+    "Otra ciudad no se oculta; Bogotá D.C. y Bogotá sí representan la misma ciudad.",
+    `Emparejamiento de ciudades: ${JSON.stringify({ wrongCityBefore, bogotaAliasRow })}`
+  );
+  await pool.query(
+    `UPDATE jobs SET is_active = FALSE, superseded_by = $1, last_seen_at = NOW() WHERE id = $2`,
+    [cityOfficial, wrongCity]
+  );
+  check(
+    (await getSupersedingTarget(wrongCity))?.target === null &&
+      (await getSupersedingTarget(bogotaAlias))?.target?.jobId === cityOfficial,
+    "Un enlace anterior a otra ciudad no redirige; la copia correcta sí conserva su destino oficial.",
+    "La consulta de un enlace equivocado aún entrega la vacante de otra ciudad."
+  );
+  const cityReversion = await syncProjections();
+  const wrongCityAfter = await row(wrongCity);
+  check(
+    cityReversion.reverted >= 1 && wrongCityAfter.is_active === true && wrongCityAfter.superseded_by === null &&
+      (await getSupersedingTarget(wrongCity)) === undefined && (await row(bogotaAlias)).superseded_by === cityOfficial,
+    "Una copia reciente enlazada antes a otra ciudad se restaura y no reaparece como duplicado de Bogotá.",
+    `Reversión de ciudad: ${JSON.stringify({ cityReversion, wrongCityAfter })}`
+  );
+  await pool.query(
+    `UPDATE jobs SET is_active = FALSE, superseded_by = $1, last_seen_at = NOW() - INTERVAL '3 days' WHERE id = $2`,
+    [cityOfficial, wrongCity]
+  );
+  const staleCityReversion = await syncProjections();
+  check(
+    staleCityReversion.reverted === 0 && (await row(wrongCity)).is_active === false &&
+      (await getSupersedingTarget(wrongCity))?.target === null,
+    "Una copia antigua mal enlazada no reaparece ni redirige a otra ciudad.",
+    `Reversión antigua: ${JSON.stringify(staleCityReversion)}`
   );
 
   await pool.query(`DELETE FROM jobs WHERE company IN ('Proj Co LA', 'Otra Empresa SAS', 'Proj Co')`);

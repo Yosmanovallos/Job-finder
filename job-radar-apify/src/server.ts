@@ -1407,7 +1407,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       if (id && (superseded || (await wasJobPurged(id)) || (await isJobExpiredInPlace(id)))) {
         res.writeHead(410, { "Content-Type": "text/html; charset=utf-8" });
         res.end(
-          '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Vacante ya no disponible | BuscoTrabajo</title><meta name="robots" content="noindex"></head><body><h1>Esta vacante ya no está disponible</h1><p>Fue retirada porque venció: lleva más de 30 días publicada, pasó su fecha límite o la fuente la cerró.</p><p><a href="/dashboard">Ver vacantes activas</a></p></body></html>'
+          '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Vacante ya no disponible | BuscoTrabajo</title><meta name="robots" content="noindex"></head><body><h1>Esta vacante ya no está disponible</h1><p>Consulta otras ofertas activas.</p><p><a href="/dashboard">Ver vacantes activas</a></p></body></html>'
         );
         return;
       }
