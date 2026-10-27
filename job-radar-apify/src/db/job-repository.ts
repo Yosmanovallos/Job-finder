@@ -1168,7 +1168,33 @@ export async function getCompanyGroup(
   return { displayName: variants[0], variants };
 }
 
+// Every cold company page resolves its slug against this list, a DISTINCT
+// over every live row (~30k), so it gets the same freshness policy as the
+// other read projections (one key per country).
+const activeCompanyNamesCache = new StaleWhileRevalidateCache<string, string[]>({
+  freshForMs: JOBS_PAGE_CACHE_FRESH_MS,
+  staleForMs: JOBS_PAGE_CACHE_STALE_MS,
+  maxEntries: 4,
+  clone: (names) => [...names],
+  onBackgroundRefreshError: () => {
+    console.warn("[company-names-cache] Background refresh failed; serving the last valid list.");
+  }
+});
+
 export async function getActiveCompanyNames(country?: string): Promise<string[]> {
+  const key = country?.toUpperCase() || "";
+  return activeCompanyNamesCache.get(key, () => queryActiveCompanyNames(country));
+}
+
+// A company page's first jobs, without the dashboard LRU: company pages are
+// cached whole by their caller (server.ts's companyPageCache), and thousands
+// of employers would otherwise compete with — and evict — the warmed
+// dashboard pages (docs/DASHBOARD-PERFORMANCE-RUNBOOK.md).
+export function queryCompanyJobsPage(company: string, country: string | undefined, limit: number): Promise<JobsPage> {
+  return queryJobsPage({ filters: { company, country }, limit, offset: 0, includeDetails: false });
+}
+
+async function queryActiveCompanyNames(country?: string): Promise<string[]> {
   const values: unknown[] = [];
   const countryWhere = country ? "AND (country IS NULL OR country = $1)" : "";
   if (country) values.push(country.toUpperCase());

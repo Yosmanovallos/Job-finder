@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { getCountryConfig, SOURCES_BY_COUNTRY } from "../countries/index.js";
 import { getHomeContent } from "../lib/agent-readiness.js";
-import { buildCategoryPath, buildCompanyPath, buildJobPath } from "../lib/job-seo.js";
+import { buildCategoryPath, buildJobPath } from "../lib/job-seo.js";
+import { companyLinkProps } from "../lib/company-page-client.js";
+import { useAuth } from "../auth/auth-provider.js";
 import { jobDateLabel } from "../lib/job-date-label.js";
 import { formatCount, useHomeData, type HomeCompany, type HomeData } from "../lib/use-home-data.js";
 import { getHomeCities } from "../lib/home-stats.js";
@@ -323,10 +325,10 @@ function LatestJobs({ country, data }: { country: string; data: HomeData }) {
   );
 }
 
-function CompanyTile({ company, country, className = "" }: { company: HomeCompany; country: string; className?: string }) {
+function CompanyTile({ company, country, accessToken, className = "" }: { company: HomeCompany; country: string; accessToken: string | null; className?: string }) {
   return (
     <Link
-      to={buildCompanyPath(company.company, country)}
+      {...companyLinkProps({ companyName: company.company, logoUrl: company.logoUrl, count: company.count }, country, accessToken)}
       className={`sr ink-card-sm ink-lift rounded-2xl bg-white p-3.5 md:p-4 items-center gap-3 text-foreground no-underline ${className || "flex"}`}
     >
       <CompanyAvatar name={company.company} logoUrl={company.logoUrl} className="w-10 h-10 md:w-11 md:h-11 text-lg shrink-0" />
@@ -339,6 +341,7 @@ function CompanyTile({ company, country, className = "" }: { company: HomeCompan
 }
 
 function Companies({ country, data }: { country: string; data: HomeData }) {
+  const { accessToken } = useAuth();
   if (data.companies.length === 0) return null;
   const [featured, ...rest] = data.companies;
   const directoryPath = country === "VE" ? "/ve/empresas" : "/empresas";
@@ -354,7 +357,7 @@ function Companies({ country, data }: { country: string; data: HomeData }) {
       <div className="flex flex-col md:flex-row md:flex-wrap gap-3 md:gap-5">
         <div className="md:flex-[1_1_380px] md:min-w-0 flex flex-col gap-5">
           <Link
-            to={buildCompanyPath(featured.company, country)}
+            {...companyLinkProps({ companyName: featured.company, logoUrl: featured.logoUrl, count: featured.count }, country, accessToken)}
             className="sr ink-card ink-lift block rounded-2xl md:rounded-3xl bg-[#fdf1d3] p-5 md:p-7 text-foreground no-underline"
           >
             <div className="flex items-center gap-3 md:gap-4">
@@ -385,7 +388,7 @@ function Companies({ country, data }: { country: string; data: HomeData }) {
             shows every tile and the dashed "ver todas" card. */}
         <div className="grid grid-cols-2 gap-3 md:flex-[1.6_1_560px] md:min-w-0 md:grid-cols-[repeat(auto-fill,minmax(200px,1fr))] md:content-start">
           {rest.map((company, i) => (
-            <CompanyTile key={company.company} company={company} country={country} className={i >= 4 ? "hidden md:flex" : "flex"} />
+            <CompanyTile key={company.company} company={company} country={country} accessToken={accessToken} className={i >= 4 ? "hidden md:flex" : "flex"} />
           ))}
           <Link
             to={directoryPath}

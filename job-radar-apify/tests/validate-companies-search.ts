@@ -338,6 +338,32 @@ async function runCompaniesSearchValidation() {
     }
     console.log(`✅ [PASSED] Solo-país duplicado descartado; remoto y solo-país único conservados.`);
 
+    // Test 12: the company page is cached whole (server.ts's
+    // companyPageCache). Cached answers must keep every rule of the cold
+    // path: unknown and placeholder slugs stay 404 on a repeat, a repeat
+    // is identical, and the SSR page agrees with the API. (Country scoping
+    // can't be checked here: these rows have no country, which by design
+    // lists them in both countries.)
+    console.log(`\n🔍 [Test 12] Página de empresa en caché: mismas reglas y mismo resultado que en frío...`);
+    for (let pass = 1; pass <= 2; pass++) {
+      for (const [label, url] of [
+        ["desconocida", `/api/companies/zztest-no-existe?country=CO`],
+        ["placeholder", `/api/companies/empresa-confidencial?country=CO`]
+      ] as const) {
+        const res12 = await fetch(`${BASE_URL}${url}`);
+        if (res12.status !== 404) throw new Error(`[Test 12] ${label} (pasada ${pass}) respondió ${res12.status}, esperaba 404.`);
+      }
+    }
+    const first12 = await (await fetch(`${BASE_URL}/api/companies/zzmerge-holdings-sas?country=CO`)).text();
+    const second12 = await (await fetch(`${BASE_URL}/api/companies/zzmerge-holdings-sas?country=CO`)).text();
+    if (first12 !== second12) throw new Error(`[Test 12] Dos lecturas seguidas de la misma empresa no coinciden.`);
+    const ssr12 = await fetch(`${BASE_URL}/empresas/zzmerge-holdings-sas`);
+    const ssrHtml12 = await ssr12.text();
+    if (ssr12.status !== 200 || !ssrHtml12.includes(MERGE_DISPLAY) || !ssrHtml12.includes('"total":6')) {
+      throw new Error(`[Test 12] /empresas/zzmerge-holdings-sas debía responder 200 con ${MERGE_DISPLAY} y total 6 (status ${ssr12.status}).`);
+    }
+    console.log(`✅ [PASSED] El caché conserva los 404 y la coherencia entre API y SSR.`);
+
     console.log(`\n==================================================`);
     console.log(`🎉 [TEST SUITE PASSED] GET /api/companies/search (Fase E4) verificado contra el servidor HTTP real.`);
     console.log(`==================================================\n`);

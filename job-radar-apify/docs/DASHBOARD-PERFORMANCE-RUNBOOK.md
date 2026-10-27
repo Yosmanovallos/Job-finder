@@ -108,6 +108,44 @@ competed with, and could evict, the warmed dashboard pages.
   homepage visit after a deploy pays for one cold statement, instead of 13
   as before.
 
+### Company pages stay out of the dashboard cache
+
+Since 2026-10-27, `GET /api/companies/:slug` and the `/empresas/:slug` SSR
+page share one loader (`loadCompanyPage` in `src/server.ts`). Before, every
+visit ran five or six queries one after another, with no cache for the
+resolution steps: 0.9-4.4 s cold and ~0.4 s warm, measured on production.
+Each company's first page also took a key in the 64-entry job-page LRU
+above, where thousands of employers competed with the warmed dashboard
+pages.
+
+- `companyPageCache`: 128 entries, the same 5-minute fresh and 6-hour stale
+  policy, with single-flight refresh. It holds the whole result: display
+  name, logo, reputation, careers link, the first 60 jobs and the total.
+  Unknown and placeholder slugs are cached too, so repeated bad slugs don't
+  reach the database. Tier masking (`maskLockedFields`) runs per request,
+  after the cache.
+- Jobs come from `queryCompanyJobsPage()`, which skips the job-page LRU.
+  The dashboard's company filter (`/api/jobs?company=`) still uses it as
+  before.
+- `activeCompanyNamesCache`: 4 entries (one per country scope). This is the
+  `SELECT DISTINCT company` over every live row that slug resolution falls
+  back to when the curated alias table doesn't match.
+- Reputation and jobs run in parallel once the display name is known.
+- The client keeps a 5-minute, 24-entry cache (`src/lib/company-page-client.ts`).
+  Links from `/empresas` and the homepage prefetch on hover, focus and press,
+  and pass the name, logo and count, so the page header paints before the
+  jobs arrive.
+- `CompanyLanding` paints the SSR payload on its first render instead of
+  waiting for the auth session. While it waited, a short skeleton let the
+  footer rise into view and jump: CLS 1.1 in 3 of 5 throttled loads.
+- `tests/validate-companies-search.ts` Test 12 (`test:companies-search`,
+  also part of `test:integration`) checks that cached answers keep the 404s
+  and that the API and the SSR page agree.
+- **After deploy:** request 3 slugs nobody has opened since the deploy, then
+  the same 3 again. Expect the cold time of the old path (about 1-4 s) the
+  first time and well under 0.4 s the second time. The Render log must show
+  no `[company-page-cache]` warnings.
+
 These files may evolve, but the user-visible latency, bounded memory behavior,
 single-flight refresh, startup safety and cost constraints must be preserved or
 improved with measurements.

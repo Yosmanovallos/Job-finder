@@ -13,6 +13,7 @@ import {
   isJobExpiredInPlace,
   getActiveCompanyNames,
   getCompanyGroup,
+  queryCompanyJobsPage,
   searchActiveCompanies,
   maskLockedFields,
   updateUserName,
@@ -29,6 +30,8 @@ import {
 } from "./db/company-reputation-repository.js";
 import type { ReputationEntry } from "./db/company-reputation-repository.js";
 import type { JobFilterParams } from "./lib/job-filters.js";
+import type { Job } from "./sources/types.js";
+import { StaleWhileRevalidateCache } from "./lib/stale-while-revalidate-cache.js";
 import { isPlaceholderEmployer } from "./lib/company-key.js";
 import { COMPANY_LOGO_DOMAINS, getCompanyLogoUrl } from "./data/company-logo-domains.js";
 import { getOfficialCareersUrl } from "./data/official-careers-links.js";
@@ -279,10 +282,7 @@ interface CompanyView {
 // reputation is looked up for every live spelling (plus the resolved name)
 // and kept once per source — the badge must not vanish just because the
 // display name is "Accenture Colombia" while the alias row says "Accenture".
-async function resolveCompanyView(resolvedName: string, country: string | undefined): Promise<CompanyView> {
-  const group = await getCompanyGroup(resolvedName, country, Object.keys(COMPANY_LOGO_DOMAINS));
-  const displayName = group?.displayName ?? resolvedName;
-  const names = [...new Set([displayName, ...(group?.variants ?? []), resolvedName])];
+async function resolveCompanyReputation(names: string[]): Promise<ReputationEntry[]> {
   const reputationMap = await getReputationForCompanies(names);
   const seenSources = new Set<string>();
   const reputation: ReputationEntry[] = [];
@@ -293,8 +293,67 @@ async function resolveCompanyView(resolvedName: string, country: string | undefi
       reputation.push(entry);
     }
   }
+  return reputation;
+}
+
+type CompanyPageResult =
+  | { kind: "unknown" }
+  | { kind: "placeholder" }
+  | { kind: "found"; view: CompanyView; jobs: Job[]; total: number };
+
+// Two-step slug resolution: the curated alias table first (the ~116
+// companies with real Merco/GPTW reputation — resolveCompanyBySlug), then
+// any real company in the country-scoped live corpus. Only a slug matching
+// neither is unknown — never a guessed/invented page. Scoping the fallback
+// by country means a slug that only exists in the other country's jobs
+// never resolves here.
+async function queryCompanyPage(slug: string, country: string | undefined): Promise<CompanyPageResult> {
+  const resolvedName =
+    (await resolveCompanyBySlug(slug)) ||
+    resolveCompanyNameFromJobs(
+      slug,
+      (await getActiveCompanyNames(country)).map((company) => ({ company }))
+    );
+  if (!resolvedName) return { kind: "unknown" };
+  // An undisclosed employer ("Confidencial", "Confidential Careers") is not
+  // a company: no profile.
+  if (isPlaceholderEmployer(resolvedName)) return { kind: "placeholder" };
+  // Same employer grouping as the /empresas directory.
+  const group = await getCompanyGroup(resolvedName, country, Object.keys(COMPANY_LOGO_DOMAINS));
+  const displayName = group?.displayName ?? resolvedName;
+  const names = [...new Set([displayName, ...(group?.variants ?? []), resolvedName])];
+  // Reputation and jobs only need the display name, so they run together.
+  const [reputation, matched] = await Promise.all([
+    resolveCompanyReputation(names),
+    queryCompanyJobsPage(displayName, country, 60)
+  ]);
   const logoUrl = names.map((name) => getCompanyLogoUrl(name)).find(Boolean) ?? null;
-  return { displayName, logoUrl, reputation, officialCareersUrl: getOfficialCareersUrl(names) };
+  return {
+    kind: "found",
+    view: { displayName, logoUrl, reputation, officialCareersUrl: getOfficialCareersUrl(names) },
+    jobs: matched.jobs,
+    total: matched.total
+  };
+}
+
+// A cold company page ran five to six queries one after another (1-4 s in
+// production, 2026-10-27), and every visit paid them again. Whole results —
+// unknown slugs included — get the dashboard's freshness policy in their
+// own bounded cache, so company traffic never evicts the warmed dashboard
+// pages. Tier masking happens per request, after the cache.
+const companyPageCache = new StaleWhileRevalidateCache<string, CompanyPageResult>({
+  freshForMs: 5 * 60_000,
+  staleForMs: 6 * 60 * 60_000,
+  maxEntries: 128,
+  clone: (value) => structuredClone(value),
+  onBackgroundRefreshError: () => {
+    // The key holds a URL slug; keep it out of the log.
+    console.warn("[company-page-cache] Background refresh failed; serving the last valid page.");
+  }
+});
+
+function loadCompanyPage(slug: string, country: string | undefined): Promise<CompanyPageResult> {
+  return companyPageCache.get(`${country?.toUpperCase() ?? ""}|${slug}`, () => queryCompanyPage(slug, country));
 }
 
 // Mirrors ReputationBadges.tsx's SOURCE_LABELS exactly (that file's own
@@ -676,48 +735,28 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     const slug = pathname.slice("/api/companies/".length);
     const country = parsedUrl.searchParams.get("country") || undefined;
 
-    const session = await verifySession(req);
-    const tier = session?.tier || "free";
-    const companyNames = await getActiveCompanyNames(country);
-    // Same country scoping as the search endpoint above, applied BEFORE
-    // resolution — resolveCompanyNameFromJobs()'s fallback only matches
-    // against this country-scoped view, so a slug that only resolves via a
-    // job from the other country correctly falls through to the 404 below
-    // instead of resolving into a company page with zero jobs to show.
-    const resolvedName =
-      (await resolveCompanyBySlug(slug)) ||
-      resolveCompanyNameFromJobs(
-        slug,
-        companyNames.map((company) => ({ company }))
-      );
-    // An undisclosed employer ("Confidencial", "Confidential Careers") is
-    // not a company: no profile, same as an unknown slug.
-    if (!resolvedName || isPlaceholderEmployer(resolvedName) || isPlaceholderEmployer(slug.replace(/-/g, " "))) {
+    // A slug that spells a placeholder employer is a 404 before any query.
+    if (isPlaceholderEmployer(slug.replace(/-/g, " "))) {
       res.writeHead(404, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: "Empresa no encontrada" }));
       return;
     }
-    // Same employer grouping as the /empresas directory (see the SSR branch).
-    const companyView = await resolveCompanyView(resolvedName, country);
-    const companyName = companyView.displayName;
-
-    const matched = await getJobsPage({
-      filters: { company: companyName, country },
-      limit: 60,
-      offset: 0,
-      includeDetails: false
-    });
+    const [session, companyPage] = await Promise.all([verifySession(req), loadCompanyPage(slug, country)]);
+    const tier = session?.tier || "free";
     // resolveCompanyBySlug() (the curated Merco/GPTW alias table) is
     // country-agnostic, so it can resolve a real companyName that simply
     // has no jobs in this country's scoped view (e.g. a Colombia-only
     // curated company hit while browsing from /ve/empresas). Treating that
     // as "not found here" — not an empty-but-200 company page — is what
     // keeps the two countries' directories from ever cross-linking.
-    if (country && matched.total === 0) {
+    if (companyPage.kind !== "found" || (country && companyPage.total === 0)) {
       res.writeHead(404, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: "Empresa no encontrada" }));
       return;
     }
+    const companyView = companyPage.view;
+    const companyName = companyView.displayName;
+    const matched = { jobs: companyPage.jobs, total: companyPage.total };
     const page = maskLockedFields(matched.jobs, tier);
 
     res.writeHead(200, { "Content-Type": "application/json" });
@@ -1617,21 +1656,15 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     // country-scoping rules as GET /api/companies/:slug (server.ts's own
     // API handler below), so SSR never disagrees with what the client
     // fetch would have shown.
-    const companyNames = await getActiveCompanyNames(requestCountry);
-    const resolvedName =
-      (await resolveCompanyBySlug(slug)) ||
-      resolveCompanyNameFromJobs(
-        slug,
-        companyNames.map((company) => ({ company }))
-      );
-    if (!resolvedName) {
+    const companyPage = await loadCompanyPage(slug, requestCountry);
+    if (companyPage.kind === "unknown") {
       res.writeHead(404, { "Content-Type": "text/html; charset=utf-8" });
       res.end(
         '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Empresa no encontrada | BuscoTrabajo</title><meta name="robots" content="noindex"></head><body><h1>Empresa no encontrada</h1><p><a href="/dashboard">Ver todas las vacantes</a></p></body></html>'
       );
       return;
     }
-    if (isPlaceholderEmployer(resolvedName)) {
+    if (companyPage.kind === "placeholder") {
       res.writeHead(410, { "Content-Type": "text/html; charset=utf-8" });
       res.end('<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Empresa no disponible | BuscoTrabajo</title><meta name="robots" content="noindex"></head><body><h1>Esta empresa no está disponible</h1><p>La fuente no publicó el nombre del empleador, así que no existe una página de empresa para estas vacantes.</p><p><a href="/dashboard">Ver todas las vacantes</a></p></body></html>');
       return;
@@ -1639,15 +1672,9 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     // Every spelling of the employer ("accenture" and "accenture-colombia")
     // renders the same page under the directory's display name, and its
     // canonical URL points at that one slug.
-    const companyView = await resolveCompanyView(resolvedName, requestCountry);
+    const companyView = companyPage.view;
     const companyName = companyView.displayName;
-
-    const matched = await getJobsPage({
-      filters: { company: companyName, country: requestCountry },
-      limit: 60,
-      offset: 0,
-      includeDetails: false
-    });
+    const matched = { jobs: companyPage.jobs, total: companyPage.total };
     // A curated (resolveCompanyBySlug) company can resolve to a real name
     // that simply has no jobs in this country's scoped view — treated as
     // "not found here", never an empty-but-200 page, same rule the API
