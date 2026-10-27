@@ -37,7 +37,9 @@ Evidencia local en el directorio temporal del SO, no contiene datos reales:
 
 Fase activa: no archivar ni declarar completa mientras fallen gates globales.
 La autorización del usuario para desplegar sigue vigente; no sustituye la
-verificación exigida por AGENTS.md. Pendientes: PR, resolver lint global y
+verificación exigida por AGENTS.md. PR #66 publicado como draft:
+https://github.com/Yosmanovallos/Job-finder/pull/66.
+Pendientes: resolver lint global y
 verificar producción tras despliegue. Rollback por
 revert del commit; no hay migraciones o escrituras de datos que deshacer.
 No hay evidencia nueva de indexación, posiciones o crecimiento causada por
