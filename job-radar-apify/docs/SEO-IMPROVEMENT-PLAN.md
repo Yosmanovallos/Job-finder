@@ -1355,8 +1355,10 @@ Entrega acotada aprobada 2026-10-27: **home-city-discovery**, enlaces a
 categorías piloto existentes desde el inicio CO/VE. Base `c724483`, diagnóstico
 PR #64. Implementado en HTML inicial, Markdown y React; sin consultas nuevas,
 metadatos o cambios del dashboard. Unitarias (39 suites), typecheck y baseline
-aislado (13 rutas, móvil/escritorio) pasan; lint del cambio sin errores,
-lint global conserva 24 errores heredados. Integración completa pasa (18 suites).
+aislado (13 rutas, móvil/escritorio) pasan. Medición de lint corregida:
+se había usado configuración de otro checkout; el único error real en Job
+se resuelve con metadata opcional explícita. Lint global pasa sin supresiones.
+Integración completa pasa de nuevo tras ajuste de tipos (18 suites).
 Sin despliegue ni mejora de ranking atribuida; fase activa hasta pasar gates.
 Detalle: `../openspec/changes/home-city-discovery/validation.md`.
 

@@ -85,13 +85,14 @@ test("JRD-002 public snapshot rejects wrong ids/locked payloads and escapes sour
   assert.equal(readSsrJob(job.jobId, { job: { ...job, isLocked: true } }), null);
   assert.equal(readSsrJob(job.jobId, null), null);
   assert.equal(readSsrJob(job.jobId, { job: { jobId: job.jobId } }), null);
-  const payload = buildJobPagePayload({
+  const jobWithPrivateFields = {
     ...job,
     title: "</script><script>evil()</script>",
     accessToken: "never-expose",
     email: "never-expose",
     internal: "never-expose"
-  });
+  };
+  const payload = buildJobPagePayload(jobWithPrivateFields);
   const encoded = escapeJsonForScriptTag(payload);
   assert.doesNotMatch(encoded, /<script|<\/script>|never-expose/);
   assert.equal(JSON.parse(encoded).job.title, "</script><script>evil()</script>");

@@ -43,8 +43,10 @@ Entrega SEO acotada, 2026-10-27: `openspec/changes/home-city-discovery/`
 implementa enlaces HTML/Markdown/React a Bogotá y Cúcuta desde `/`, y Caracas
 desde `/ve`. Base `c724483`; sin rutas nuevas ni cambios de consultas, caché,
 arranque, metadatos o servicios. Estado: en validación, sin despliegue ni
-cierre de fase. Evidencia y gates en `validation.md` del cambio; lint global
-mantiene 24 errores heredados (cero nuevos). Baseline diagnóstico: PR #64.
+cierre de fase. Evidencia y gates en `validation.md` del cambio. Se corrige
+la medición anterior de lint (configuración de otro checkout): el único error
+real en Job queda resuelto sin supresiones y lint global pasa.
+Baseline diagnóstico: PR #64.
 
 Leyenda: ✅ done · 🔵 spec/draft · 🟡 en implementación · ⬜ pendiente ·
 🔴 bloqueada.

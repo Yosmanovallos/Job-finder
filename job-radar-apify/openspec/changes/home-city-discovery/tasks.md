@@ -2,7 +2,8 @@
 
 - [x] Inspeccionar inicio actual, baseline y contratos protegidos.
 - [x] Presentar archivos, interfaces y pruebas antes de editar código.
-- [x] Medir controles base: typecheck pasa; lint 24 errores heredados en 4 archivos.
+- [x] Medir controles base y corregir medición: con eslint.config.js de esta rama hay un error en Job; los otros 23 procedían de usar configuración de otro checkout.
+- [x] Resolver el error real declarando metadata opcional de Job sin any ni supresiones; lint global y typecheck pasan.
 - [x] Reproducir ausencia de enlaces en pruebas de contenido.
 - [x] Implementar bloque estático compartido y visible independiente de stats.
 - [x] Pasar unitarias, typecheck, lint del cambio y comparar lint global.
