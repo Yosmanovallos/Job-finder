@@ -8,6 +8,7 @@ import { useAuth } from "../auth/auth-provider.js";
 import { jobDateLabel } from "../lib/job-date-label.js";
 import { formatCount, useHomeData, type HomeCompany, type HomeData } from "../lib/use-home-data.js";
 import { getHomeCities } from "../lib/home-stats.js";
+import { getHomeCityDiscovery } from "../lib/home-city-discovery.js";
 import { CompanyAvatar } from "../components/CompanyAvatar.js";
 import { getSourceColor } from "../lib/source-colors.js";
 import { SourceLogo } from "../components/SourceLogo.js";
@@ -441,6 +442,7 @@ function Explore({ country, data }: { country: string; data: HomeData }) {
   const [tab, setTab] = useState<"ciudad" | "cargo">("ciudad");
   const countryConfig = getCountryConfig(country);
   const cities = getHomeCities(country);
+  const discovery = getHomeCityDiscovery(country === "VE" ? "VE" : "CO");
   const remoteCount = formatCount(data.remote);
   const roles = POPULAR_ROLES;
 
@@ -519,6 +521,19 @@ function Explore({ country, data }: { country: string; data: HomeData }) {
           ))}
         </div>
       </div>
+      <nav aria-label={discovery.heading} className="mt-6 md:mt-8 border-t border-border pt-5">
+        <h3 className={T.h3}>{discovery.heading}</h3>
+        <p className={`${T.small} mt-2 text-muted-foreground`}>{discovery.description}</p>
+        <ul className="mt-3 flex flex-wrap gap-x-6 gap-y-2">
+          {discovery.links.map((link) => (
+            <li key={link.href}>
+              <Link to={link.href} className={`${T.body} inline-flex min-h-11 items-center font-semibold text-primary underline underline-offset-4`}>
+                {link.label}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </nav>
     </section>
   );
 }
