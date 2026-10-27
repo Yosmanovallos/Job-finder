@@ -354,6 +354,39 @@ Las 42 asignaciones entre múltiples
 requisiciones siguen registradas para revisión: la evidencia disponible no
 permite elegir con certeza una vacante oficial concreta.
 
+### 13. Enmienda de inventario ATS y remoto internacional (2026-10-27)
+
+Decisión del dueño. Detalle y requisitos en
+`openspec/changes/ats-inventory-co-2026-11/`.
+
+1. **Embudo invertido (amplía §7 y §7.1).** Además de la vía por nombre,
+   el descubrimiento parte de un inventario de referencias de ATS
+   (Common Crawl, enlaces a ATS en vacantes guardadas, `site-probe` y
+   sitemaps permitidos), sin APIs pagas. El presupuesto de descubrimiento
+   va primero a ese inventario.
+2. **Habilitación automática sin revisión humana (amplía §7.1).** Se permite
+   solo si el ATS declara el nombre de la empresa, el listado está
+   completo, hay al menos una vacante en Colombia o `Internacional`, la
+   empresa no es agencia, la clave no es corta ni genérica y no existe
+   conflicto de dueño. El empleador toma el nombre declarado por el ATS.
+   Todo lo demás queda `ambiguous`. Se mantiene un tope por corrida y
+   la regla insert-only.
+3. **Remoto internacional (enmienda a §4).** "LATAM", "Americas" o remoto
+   mundial siguen sin contar como Colombia. Una vacante con modalidad
+   remota declarada y alcance regional o global explícito, sin restricción
+   a otro país, se incorpora con la etiqueta `Internacional`, sin ciudad,
+   sin `country = 'CO'` y fuera del sitemap, JSON-LD e Indexing API hasta
+   que lo decida el plan SEO.
+4. **Sin duplicados.** Una requisición repetida entre dos tableros del
+   mismo empleador se muestra una vez. Los alias nuevos salen solo de la
+   igualdad exacta de `company_key` con el nombre declarado o de un
+   enlace de la copia al mismo tablero; nunca fuzzy (§8 sigue vigente).
+5. **Tick priorizado, mismo costo (amplía §7.1, capacidad).** El cron, el
+   timeout y el plazo no cambian. Los tableros con vacantes elegibles se
+   leen en ≤ 6 h, los inactivos en ≤ 7 días y los que fallan con backoff.
+   Si no cabe, se frena la habilitación y se informa el déficit; no se
+   agregan corridas ni servicios pagos.
+
 ## Consecuencias
 
 - Volumen honesto de arranque (medido 2026-10-19): 185 vacantes oficiales
