@@ -1032,6 +1032,19 @@
       ]
     },
     {
+      "slug": "altipal",
+      "displayName": "Altipal",
+      "websiteDomain": "altipal.co",
+      "aliases": [],
+      "sources": [
+        {
+          "atsType": "altipal",
+          "atsRef": "creeser",
+          "enabled": false
+        }
+      ]
+    },
+    {
       "slug": "frisby",
       "displayName": "Frisby",
       "websiteDomain": "frisby.com.co",

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { listAltipal } from "./ats/altipal.js";
 import { EIGHTFOLD_REF, listEightfold } from "./ats/eightfold.js";
 import { listFrisby } from "./ats/frisby.js";
 import { listGoogle } from "./ats/google.js";
@@ -394,6 +395,12 @@ const CONNECTORS: Record<DirectAtsType, Connector> = {
     refPattern: /^colombia$/,
     portalUrl: () => "https://frisby.info/gente-frisby/",
     list: listFrisby
+  },
+  // Altipal's CreeSer public vacancies, linked by its corporate site.
+  altipal: {
+    refPattern: /^creeser$/,
+    portalUrl: () => "https://creeser.hr-suite.app/vacantes.php",
+    list: listAltipal
   }
 };
 
