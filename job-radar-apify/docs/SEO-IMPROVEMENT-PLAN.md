@@ -1359,8 +1359,10 @@ aislado (13 rutas, móvil/escritorio) pasan. Medición de lint corregida:
 se había usado configuración de otro checkout; el único error real en Job
 se resuelve con metadata opcional explícita. Lint global pasa sin supresiones.
 Integración completa pasa de nuevo tras ajuste de tipos (18 suites).
-Sin despliegue ni mejora de ranking atribuida; fase activa hasta pasar gates.
-Detalle: `../openspec/changes/home-city-discovery/validation.md`.
+Desplegado y verificado: PR #66, `3c86082`; CI y gates completos pasan.
+HTML/Markdown y navegación real CO/VE confirmados; sin drift de metadatos.
+No se atribuye mejora de ranking. Fase cerrada y archivada.
+Detalle: `../openspec/changes/archive/home-city-discovery/validation.md`.
 
 No hay una fase "10" ya definida — cualquier trabajo más allá de esto
 (backlinks, contenido adicional, un tercer país) es exploratorio y

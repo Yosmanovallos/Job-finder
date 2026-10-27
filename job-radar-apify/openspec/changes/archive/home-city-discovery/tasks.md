@@ -9,6 +9,6 @@
 - [x] Pasar unitarias, typecheck, lint del cambio y comparar lint global.
 - [x] Pasar baseline aislado y revisar capturas móvil/escritorio, incluidos clics sin stats.
 - [x] Pasar integración aislada completa.
-- [x] Publicar PR revisable con evidencia y limitaciones: #66 (draft).
-- [ ] Desplegar tras gates y comprobar producción sin drift.
-- [ ] Cerrar gates globales pendientes antes de declarar fase completa/archivar.
+- [x] Publicar PR revisable con evidencia y limitaciones: #66 fusionado; CI completo pasa.
+- [x] Desplegar tras gates y comprobar producción sin drift: 3c86082 confirmado activo en Render y por HTTP/DOM.
+- [x] Cerrar gates globales pendientes antes de declarar fase completa/archivar: lint y typecheck globales pasan.
