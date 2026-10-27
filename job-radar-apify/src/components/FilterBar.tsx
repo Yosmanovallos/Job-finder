@@ -189,7 +189,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
           />
           <CheckRow
             id="filter-applied"
-            label="✓ Aplicadas"
+            label="✓ Postuladas"
             checked={filters.appliedOnly}
             onChange={(v) => update({ appliedOnly: v })}
           />
