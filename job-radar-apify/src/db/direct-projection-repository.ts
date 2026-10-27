@@ -34,6 +34,14 @@ const PROJECTION_HASH_SQL = `encode(sha256(convert_to('direct:' || d.id::text, '
 // Bounded like mutateReadinessRelevantJobs (500 per transaction).
 const BATCH = 500;
 
+const BROAD_LOCATION_KEYS = "('colombia', 'remoto', 'remote')";
+
+// Formatting-only equivalents in Colombian source locations. This never
+// equates a neighborhood, department or different city with a municipality.
+function copyMatchLocationSql(column: string): string {
+  return `(CASE WHEN ${column} IN ('bogotadc', 'capitaldistrict') THEN 'bogota' ELSE ${column} END)`;
+}
+
 /** A live official vacancy of an enabled board, joined to its employer. */
 const LIVE_PROJECTABLE = `
   FROM direct_jobs d
@@ -135,19 +143,30 @@ async function removeDeadProjections(): Promise<number> {
 
 /**
  * The single reversion rule (§10.6, review B3/I2): a copy whose projection is
- * gone comes back — but only if its job board still listed it in the last
+ * gone, or whose old match points to a different specific city, comes back —
+ * but only if its job board still listed it in the last
  * 48 h, only one row per fingerprint, and with source_checked_at cleared so
  * source closure re-verifies it. An older copy stays hidden; its page answers
  * 410 (the official version closed). Runs every tick, whoever deleted the
  * projection (this tick, purgeOldJobs, a disabled board).
  */
-async function revertOrphanCopies(): Promise<{ reverted: number; skipped: number }> {
+async function revertOrphanOrMismatchedCopies(): Promise<{ reverted: number; skipped: number }> {
   const orphans = await pool.query<{ id: string }>(
     `SELECT DISTINCT ON (COALESCE(c.content_fingerprint, c.id::text)) c.id
      FROM jobs c
      WHERE c.superseded_by IS NOT NULL
        AND c.last_seen_at > NOW() - INTERVAL '48 hours'
-       AND NOT EXISTS (SELECT 1 FROM jobs p WHERE p.id = c.superseded_by AND p.is_active = TRUE AND p.direct_job_id IS NOT NULL)
+       AND (
+         NOT EXISTS (SELECT 1 FROM jobs p WHERE p.id = c.superseded_by AND p.is_active = TRUE AND p.direct_job_id IS NOT NULL)
+         OR EXISTS (
+           SELECT 1 FROM jobs p
+           WHERE p.id = c.superseded_by AND p.is_active = TRUE AND p.direct_job_id IS NOT NULL
+             AND (c.country = 'CO' OR c.country IS NULL)
+             AND c.location_key NOT IN ${BROAD_LOCATION_KEYS}
+             AND p.location_key NOT IN ${BROAD_LOCATION_KEYS}
+             AND ${copyMatchLocationSql("c.location_key")} <> ${copyMatchLocationSql("p.location_key")}
+         )
+       )
        AND NOT EXISTS (
          SELECT 1 FROM jobs a
          WHERE a.is_active = TRUE AND a.content_fingerprint = c.content_fingerprint AND a.id <> c.id
@@ -178,22 +197,24 @@ async function revertOrphanCopies(): Promise<{ reverted: number; skipped: number
  * Hides the job-board copies of live official vacancies (§8, §10.6): same
  * employer through employer_aliases (curated, never fuzzy) and the same
  * title_key (the trigger-maintained key, identical to the dedupe identity).
- * The city breaks ties only when the employer lists that title in several
- * cities; an ambiguous copy (country-only or remote location) is then left
- * alone — unless every official posting of that title is in one city. Colombia and remote rows only — Venezuela is never touched.
+ * Specific cities must match (including formatting-only Bogotá aliases).
+ * A broad board location still matches when the official title is in one
+ * city; a broad official listing can replace a city copy only when it is the
+ * sole official posting for that title. Colombia
+ * and remote rows only — Venezuela is never touched.
  * Exported for the scrape tick, which runs it after saving (review I1).
  */
 export async function supersedeCopies(): Promise<number> {
   const pairs = await pool.query<{ copy_id: string; projection_id: string }>(
     `WITH projections AS (
-       SELECT p.id, p.title_key, p.location_key, d.employer_id
+       SELECT p.id, p.title_key, p.location_key, ${copyMatchLocationSql("p.location_key")} AS match_location, d.employer_id
        FROM jobs p JOIN direct_jobs d ON d.id = p.direct_job_id
        WHERE p.direct_job_id IS NOT NULL AND p.is_active = TRUE
      ), spread AS (
-       SELECT employer_id, title_key, COUNT(*) AS n, COUNT(DISTINCT location_key) AS cities FROM projections GROUP BY 1, 2
+       SELECT employer_id, title_key, COUNT(*) AS n, COUNT(DISTINCT match_location) AS cities FROM projections GROUP BY 1, 2
      ), candidates AS (
        SELECT c.id AS copy_id, p.id AS projection_id,
-              ROW_NUMBER() OVER (PARTITION BY c.id ORDER BY (c.location_key = p.location_key) DESC, p.id) AS rank
+              ROW_NUMBER() OVER (PARTITION BY c.id ORDER BY (${copyMatchLocationSql("c.location_key")} = p.match_location) DESC, p.id) AS rank
        FROM jobs c
        JOIN employer_aliases a ON a.company_key = c.company_key
        JOIN projections p ON p.employer_id = a.employer_id AND p.title_key = c.title_key
@@ -201,11 +222,11 @@ export async function supersedeCopies(): Promise<number> {
        WHERE c.is_active = TRUE AND c.direct_job_id IS NULL AND c.superseded_by IS NULL
          AND (c.country = 'CO' OR c.country IS NULL)
          AND c.title_key <> ''
-         AND (k.n = 1
-              OR (c.location_key = p.location_key AND c.location_key NOT IN ('colombia', 'remoto', 'remote'))
+         AND ((${copyMatchLocationSql("c.location_key")} = p.match_location AND c.location_key NOT IN ${BROAD_LOCATION_KEYS})
               -- A country-only copy when every official posting of that title
               -- is in ONE city: there is only one place it can be a copy of.
-              OR (c.location_key IN ('colombia', 'remoto', 'remote') AND k.cities = 1))
+              OR (c.location_key IN ${BROAD_LOCATION_KEYS} AND k.cities = 1)
+              OR (p.location_key IN ${BROAD_LOCATION_KEYS} AND k.n = 1))
      )
      SELECT copy_id, projection_id FROM candidates WHERE rank = 1`
   );
@@ -228,7 +249,7 @@ export async function syncProjections(): Promise<ProjectionResult> {
   // rows only.
   for (const id of upserted.changedIds) await refreshGoogleReadiness(id, { contentObtained: true, notify: false });
   const removed = await removeDeadProjections();
-  const reversion = await revertOrphanCopies();
+  const reversion = await revertOrphanOrMismatchedCopies();
   const superseded = await supersedeCopies();
   return {
     inserted: upserted.inserted,

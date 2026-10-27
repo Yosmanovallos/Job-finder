@@ -327,6 +327,28 @@ reintentos contra el 429/robots, y feeds pagos (regla de gasto cero). Si una
 empresa concede permiso escrito o publica un ATS público, pasa al seed normal
 y sale del mapa.
 
+### 12. Enmienda de copias entre ciudades (2026-10-27)
+
+Auditoría de solo lectura en producción: 515 copias de bolsas ocultas, 42
+enlazadas a un grupo con varias requisiciones oficiales distintas y 94 con
+una ubicación diferente de la oficial elegida. De estas, 38 declaran una
+ubicación específica en ambos lados; hay casos de Bogotá enlazados a
+Medellín y de Medellín a Barranquilla. Ninguna de las 515 comparte URL ni
+descripción exacta con su oficial, así que título y alias de empresa no
+prueban por sí solos que dos filas sean la misma requisición.
+
+Para nuevas copias con dos ciudades específicas, `supersedeCopies()` exige
+la misma clave de ciudad. Solo se equiparan grafías de Bogotá D.C. y
+Capital District con Bogotá; no se equiparan municipios, barrios ni
+departamentos. Se conserva el tratamiento previo cuando una fuente indica
+solo Colombia o remoto. Las copias enlazadas antes a otra ciudad específica
+se restauran únicamente si la bolsa las vio en las últimas 48 horas y no
+chocan con un fingerprint activo; pasan por la verificación de vigencia
+existente. Las copias antiguas no se resucitan. No cambian los IDs oficiales,
+las fechas ni la consulta pública. Las 42 asignaciones entre múltiples
+requisiciones siguen registradas para revisión: la evidencia disponible no
+permite elegir con certeza una vacante oficial concreta.
+
 ## Consecuencias
 
 - Volumen honesto de arranque (medido 2026-10-19): 185 vacantes oficiales

@@ -18,6 +18,7 @@ const groups = `WITH official_groups AS (
   GROUP BY d.employer_id, p.title_key, p.location_key
 ), hidden AS (
   SELECT c.id, p.id AS projection_id, c.source, c.company, c.title, c.location, c.location_key AS board_location_key,
+         c.last_seen_at,
          p.location AS official_location, p.location_key AS official_location_key,
          c.description AS board_description, p.description AS official_description,
          c.url AS board_url, p.url AS official_url,
@@ -40,6 +41,14 @@ try {
            COUNT(*) FILTER (WHERE instances > 1 AND board_description IS NOT NULL)::int AS ambiguous_with_board_description,
            COUNT(*) FILTER (WHERE NOT same_location)::int AS different_location,
            COUNT(*) FILTER (WHERE NOT same_location AND board_location_key NOT IN ('colombia', 'remoto', 'remote'))::int AS different_specific_location,
+           COUNT(*) FILTER (WHERE NOT same_location
+             AND board_location_key NOT IN ('colombia', 'remoto', 'remote')
+             AND official_location_key NOT IN ('colombia', 'remoto', 'remote'))::int AS both_specific_mismatch,
+           COUNT(*) FILTER (WHERE last_seen_at > NOW() - INTERVAL '48 hours'
+             AND board_location_key NOT IN ('colombia', 'remoto', 'remote')
+             AND official_location_key NOT IN ('colombia', 'remoto', 'remote')
+             AND (CASE WHEN board_location_key IN ('bogotadc', 'capitaldistrict') THEN 'bogota' ELSE board_location_key END)
+                 <> (CASE WHEN official_location_key IN ('bogotadc', 'capitaldistrict') THEN 'bogota' ELSE official_location_key END))::int AS recent_city_mismatch,
            COUNT(*) FILTER (WHERE board_description IS NOT NULL)::int AS board_has_description,
            COUNT(*) FILTER (WHERE board_description IS NOT NULL AND official_description IS NOT NULL
              AND btrim(board_description) = btrim(official_description))::int AS exact_description,

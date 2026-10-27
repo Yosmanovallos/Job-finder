@@ -1,0 +1,33 @@
+# Evidencia de ciudad para copias de portales oficiales
+
+## Problema
+
+El enlace de una copia de bolsa a su vacante oficial puede elegirse por alias
+de empresa y título aunque ambas fuentes indiquen ciudades distintas. Una
+auditoría de producción encontró 515 copias ocultas; 38 tienen ubicaciones
+específicas diferentes, y algunas apuntan de Bogotá a Medellín o de Medellín
+a Barranquilla. Un enlace así oculta una oferta potencialmente distinta y
+redirige al candidato a otra ciudad.
+
+## Alcance
+
+- Mantener la prioridad oficial cuando empresa, título y ciudad coinciden.
+- Reconocer solo grafías equivalentes de Bogotá, sin inventar equivalencias
+  entre barrios, departamentos y municipios.
+- Restaurar copias recientes enlazadas antes a otra ciudad específica mediante
+  la regla existente de 48 horas y unicidad de fingerprint.
+- Conservar el comportamiento de ubicaciones amplias (Colombia/remoto) y
+  registrar los casos donde varias requisiciones oficiales comparten título
+  y ciudad para una revisión posterior.
+
+No se editan módulos, metadatos ni reglas SEO; tampoco Aplicar, fechas,
+fuentes, caché, esquema o configuración de Render.
+
+## Verificación y reversión
+
+La prueba de PostgreSQL aislado comprueba que otra ciudad no se oculta, una
+grafía equivalente sí se agrupa y una copia reciente mal enlazada se restaura
+sin tocar una copia correcta. TypeScript, lint dirigido, unitarias, build,
+integración y canario de solo lectura deben pasar. Si aparecen duplicados
+materiales o regresión de latencia, revertir el cambio de código y ejecutar
+el siguiente tick, que volverá a aplicar la regla anterior.
