@@ -41,6 +41,42 @@
       "status": "blocked",
       "evidenceUrl": "https://github.com/Yosmanovallos/Job-finder/actions/runs/40521001805",
       "reviewedAt": "2026-10-27"
+    },
+    {
+      "company": "POSTOBON S.A",
+      "status": "attribution_unverified",
+      "evidenceUrl": "https://www.magneto365.com/co/empresas/postobon/empleos",
+      "reviewedAt": "2026-10-27"
+    },
+    {
+      "company": "CAFAM",
+      "status": "no_public_listing",
+      "evidenceUrl": "https://www.cafam.com.co/conoce-cafam/sobre-cafam/trabaja-con-nosotros",
+      "reviewedAt": "2026-10-27"
+    },
+    {
+      "company": "Accenture LTDA",
+      "status": "blocked",
+      "evidenceUrl": "https://www.accenture.com/co-es/careers/jobsearch",
+      "reviewedAt": "2026-10-27"
+    },
+    {
+      "company": "Fundacion Valle del Lili",
+      "status": "computrabajo_hosted",
+      "evidenceUrl": "https://valledellili.org/suplantacion-identidad-corporativa/",
+      "reviewedAt": "2026-10-27"
+    },
+    {
+      "company": "Clínica Imbanaco",
+      "status": "third_party_only",
+      "evidenceUrl": "https://es.linkedin.com/posts/clinicaimbanaco_no-caigas-en-estafas-conoce-los-canales-activity-7404567394037317632-7jlD",
+      "reviewedAt": "2026-10-27"
+    },
+    {
+      "company": "INTELCIA",
+      "status": "official_no_colombia",
+      "evidenceUrl": "https://careers.intelcia.com/",
+      "reviewedAt": "2026-10-27"
     }
   ]
 }
