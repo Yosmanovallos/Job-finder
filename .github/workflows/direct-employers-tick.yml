@@ -16,7 +16,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "tick | dry-run | dry-run-one | tick-one | migrate-dry-run | migrate | seed-dry-run | seed | seed-one-dry-run | seed-one | domain-census | discover-dry-run | discover | coverage | computrabajo-coverage | computrabajo-backlog | frisby-canary | altipal-canary | db-size | cc-tenants | review-list | review-approve-dry-run | review-approve | cv-purge-dry-run | cv-purge"
+        description: "tick | dry-run | dry-run-one | tick-one | migrate-dry-run | migrate | seed-dry-run | seed | seed-one-dry-run | seed-one | domain-census | discover-dry-run | discover | coverage | computrabajo-coverage | computrabajo-backlog | frisby-canary | altipal-canary | identity-canary | db-size | cc-tenants | review-list | review-approve-dry-run | review-approve | cv-purge-dry-run | cv-purge"
         required: true
         default: "dry-run"
         type: choice
@@ -42,6 +42,7 @@ on:
           # Manual read-only live source check; no database access.
           - frisby-canary
           - altipal-canary
+          - identity-canary
           # Read-only size report (pg_database_size + biggest tables).
           - db-size
           # Read-only, no database: Workday / SmartRecruiters boards seen by
@@ -135,6 +136,7 @@ jobs:
             computrabajo-backlog) cmd="npx tsx scripts/direct-computrabajo-coverage.ts --all --allow-remote-db" ;;
             frisby-canary)  cmd="npx tsx scripts/canary-frisby.ts --allow-live-sources" ;;
             altipal-canary) cmd="npx tsx scripts/canary-altipal.ts --allow-live-sources" ;;
+            identity-canary) cmd="npx tsx scripts/audit-official-identity.ts --dry-run --allow-remote-db" ;;
             db-size)         cmd="npx tsx scripts/direct-db-size.ts --allow-remote-db" ;;
             cc-tenants)      cmd="npx tsx scripts/direct-cc-tenants.ts --max-boards 500 --deadline-min 17" ;;
             review-list)     cmd="npx tsx scripts/direct-discovery-review.ts list --decision needs_review --limit 100 --allow-remote-db" ;;

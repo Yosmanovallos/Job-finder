@@ -306,10 +306,9 @@ export async function getJobs(
   limit: number = DEFAULT_JOBS_LIMIT,
   offset: number = 0
 ) {
-  // DISTINCT ON (title, company, location) ensures the dashboard never shows
-  // visual duplicates, regardless of how many URL variants exist in the table.
-  // The subquery deduplicates, picking the most-recently-published row for
-  // each unique (title, company, location) group; the outer query re-sorts
+  // The shared identity keys collapse board URL variants. Official rows with
+  // different descriptions remain separate; exact official reposts collapse.
+  // The subquery picks the most-recently-published row for each group; the outer query re-sorts
   // chronologically so the dashboard's default order is preserved.
   const result = await pool.query(
     `SELECT * FROM (
@@ -1237,11 +1236,10 @@ export async function isJobExpiredInPlace(id: string): Promise<boolean> {
  * Single-row fetch for the job-detail routes (/empleos/:id, /api/jobs/:id):
  * these need the full body (description/requirements/technologies) for
  * exactly one job, never the whole corpus. `id` always comes from a link
- * this app itself generated (sitemap/list/category page), which only ever
- * points at the row DISTINCT ON already picked as canonical for its
- * (title, company, location) group — so a plain `WHERE id = $1` is the same
- * row getJobs()'s dedupe would have returned, without re-deduping 10k rows
- * to find it.
+ * this app itself generated (sitemap/list/category page). Board rows retain
+ * the older exact title/company/location canonical check. Every active direct
+ * posting keeps its stable detail URL: distinct official texts can appear as
+ * separate cards, and an exact repost still occupies only one listing card.
  */
 export async function getJobById(id: string) {
   const result = await pool.query(
@@ -1257,7 +1255,7 @@ export async function getJobById(id: string) {
             (candidate.published_at > NOW() - INTERVAL '48 hours') AS is_locked
      FROM jobs candidate
      WHERE candidate.id = $1 AND candidate.is_active = TRUE AND ${liveJobSql("candidate")}
-       AND NOT EXISTS (
+       AND (candidate.direct_job_id IS NOT NULL OR NOT EXISTS (
          SELECT 1
          FROM jobs newer
          WHERE newer.is_active = TRUE AND ${liveJobSql("newer")}
@@ -1266,7 +1264,7 @@ export async function getJobById(id: string) {
            AND lower(trim(COALESCE(newer.location, CASE newer.country WHEN 'VE' THEN 'venezuela' ELSE 'colombia' END))) =
                lower(trim(COALESCE(candidate.location, CASE candidate.country WHEN 'VE' THEN 'venezuela' ELSE 'colombia' END)))
            AND (newer.published_at, newer.id) > (candidate.published_at, candidate.id)
-       )
+       ))
      LIMIT 1`,
     [id]
   );

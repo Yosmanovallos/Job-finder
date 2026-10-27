@@ -225,6 +225,31 @@ async function run(): Promise<void> {
   );
   check(officialUpdates.rows[0].n === 0, "Cero URL_UPDATED de vacantes oficiales en todo el recorrido.", `URL_UPDATED oficiales: ${officialUpdates.rows[0].n}`);
 
+  // Same title and city are not enough to merge different official roles.
+  // An exact repost occupies one card; both stable IDs remain addressable.
+  await saveListing(source, [
+    posting({ externalId: "original", title: "Científico de Datos", applyUrl: "https://jobs.lever.co/proj-co/original" }),
+    posting({ externalId: "variant", title: "Científico de Datos", applyUrl: "https://jobs.lever.co/proj-co/variant", descriptionText: "Otra requisición de datos con funciones de investigación y análisis estadístico claramente distintas." }),
+    posting({ externalId: "repost", title: "Científico de Datos", applyUrl: "https://jobs.lever.co/proj-co/repost" })
+  ], false);
+  const variants = await pool.query<{ external_id: string; id: string }>(
+    `SELECT external_id, id FROM direct_jobs WHERE employer_source_id = $1 AND external_id IN ('original', 'variant', 'repost')`,
+    [source.id]
+  );
+  const originalId = variants.rows.find((entry) => entry.external_id === "original")?.id;
+  const variantId = variants.rows.find((entry) => entry.external_id === "variant")?.id;
+  const repostId = variants.rows.find((entry) => entry.external_id === "repost")?.id;
+  await syncProjections();
+  const officialPage = await getJobsPage({ filters: { company: "Proj Co", country: "CO" }, limit: 20, includeDetails: false });
+  const dataCards = officialPage.jobs.filter((job) => job.title === "Científico de Datos");
+  check(
+    Boolean(originalId && variantId && repostId) && dataCards.length === 2 && dataCards.some((job) => job.jobId === variantId) &&
+      dataCards.some((job) => job.jobId === originalId || job.jobId === repostId) &&
+      Boolean(await getJobById(originalId!)) && Boolean(await getJobById(variantId!)) && Boolean(await getJobById(repostId!)),
+    "Dos requisiciones oficiales con contenido distinto se ven; una republicación idéntica ocupa una tarjeta y conserva ambos IDs.",
+    `Identidad oficial inesperada: ${JSON.stringify(dataCards.map((job) => job.jobId))}`
+  );
+
   await pool.query(`DELETE FROM jobs WHERE company IN ('Proj Co LA', 'Otra Empresa SAS', 'Proj Co')`);
   await pool.query(`DELETE FROM employers WHERE slug = 'proj-co'`);
 }

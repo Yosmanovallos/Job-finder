@@ -4,7 +4,9 @@ import test from "node:test";
 import {
   companyIdentityBackfillBatchSql,
   companyIdentitySchemaSql,
-  vacancyIdentityColumnsSql
+  vacancyIdentityColumnsSql,
+  VACANCY_IDENTITY_KEYS,
+  vacancyIdentitySourceSql
 } from "../src/lib/company-identity.js";
 
 /**
@@ -36,6 +38,10 @@ test("read path reads the stored keys and only falls back per NULL row", () => {
   assert.match(select, /COALESCE\(title_key, /);
   assert.match(select, /COALESCE\(company_key, /);
   assert.match(select, /COALESCE\(location_key, /);
+  assert.match(select, /CASE WHEN direct_job_id IS NULL THEN ''/);
+  assert.match(select, /COALESCE\(md5\(NULLIF\(btrim\(description\), ''\)\), direct_job_id::text\)/);
+  assert.match(VACANCY_IDENTITY_KEYS, /identity_instance$/);
+  assert.match(vacancyIdentitySourceSql("is_active = TRUE"), /direct_job_id IS NULL AND identity_location/);
 });
 
 test("backfill batches are bounded", () => {
