@@ -161,7 +161,7 @@ export default function Dashboard() {
     (next: typeof filters) => {
       const turnedOnPersonal = (next.savedOnly && !filters.savedOnly) || (next.appliedOnly && !filters.appliedOnly);
       if (turnedOnPersonal && savedMode === "account") {
-        navigate("/cuenta#guardadas");
+        navigate(next.appliedOnly && !filters.appliedOnly ? "/cuenta#postuladas" : "/cuenta#guardadas");
         return;
       }
       setFilters(next);
