@@ -285,6 +285,12 @@ async function run(): Promise<void> {
     `UPDATE jobs SET is_active = FALSE, superseded_by = $1, last_seen_at = NOW() WHERE id = $2`,
     [cityOfficial, wrongCity]
   );
+  check(
+    (await getSupersedingTarget(wrongCity))?.target === null &&
+      (await getSupersedingTarget(bogotaAlias))?.target?.jobId === cityOfficial,
+    "Un enlace anterior a otra ciudad no redirige; la copia correcta sí conserva su destino oficial.",
+    "La consulta de un enlace equivocado aún entrega la vacante de otra ciudad."
+  );
   const cityReversion = await syncProjections();
   const wrongCityAfter = await row(wrongCity);
   check(
@@ -299,8 +305,9 @@ async function run(): Promise<void> {
   );
   const staleCityReversion = await syncProjections();
   check(
-    staleCityReversion.reverted === 0 && (await row(wrongCity)).is_active === false,
-    "Una copia antigua mal enlazada no reaparece sin señal reciente de la bolsa.",
+    staleCityReversion.reverted === 0 && (await row(wrongCity)).is_active === false &&
+      (await getSupersedingTarget(wrongCity))?.target === null,
+    "Una copia antigua mal enlazada no reaparece ni redirige a otra ciudad.",
     `Reversión antigua: ${JSON.stringify(staleCityReversion)}`
   );
 

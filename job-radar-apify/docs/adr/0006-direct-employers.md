@@ -345,7 +345,10 @@ solo Colombia o remoto. Las copias enlazadas antes a otra ciudad específica
 se restauran únicamente si la bolsa las vio en las últimas 48 horas y no
 chocan con un fingerprint activo; pasan por la verificación de vigencia
 existente. Las copias antiguas no se resucitan. No cambian los IDs oficiales,
-las fechas ni la consulta pública. Las 42 asignaciones entre múltiples
+las fechas ni la consulta pública del listado. Una URL de copia antigua
+enlazada a otra ciudad ya no redirige a la oficial equivocada: el detalle
+responde 410 hasta que una bolsa vuelva a verla y sea posible restaurarla.
+Las 42 asignaciones entre múltiples
 requisiciones siguen registradas para revisión: la evidencia disponible no
 permite elegir con certeza una vacante oficial concreta.
 

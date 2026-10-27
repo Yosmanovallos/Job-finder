@@ -16,6 +16,7 @@ import { liveJobSql } from "../lib/job-freshness.js";
 import { findExpiredUrlHashes } from "./expired-job-repository.js";
 import { StaleWhileRevalidateCache } from "../lib/stale-while-revalidate-cache.js";
 import { clipVarchar } from "../lib/varchar.js";
+import { copySpecificCityMismatchSql } from "../lib/official-copy-location.js";
 import {
   VACANCY_IDENTITY_KEYS,
   companyKeySql,
@@ -1239,6 +1240,7 @@ export async function getSupersedingTarget(
     `SELECT target.id, target.title, target.location
      FROM jobs copy
      LEFT JOIN jobs target ON target.id = copy.superseded_by AND target.is_active = TRUE AND ${liveJobSql("target")}
+       AND NOT ((copy.country = 'CO' OR copy.country IS NULL) AND ${copySpecificCityMismatchSql("copy", "target")})
      WHERE copy.id = $1 AND copy.superseded_by IS NOT NULL AND copy.is_active = FALSE
      LIMIT 1`,
     [id]

@@ -1,6 +1,7 @@
 /** Read-only audit of board copies currently linked to official vacancies. */
 import dotenv from "dotenv";
 import { assertDirectDatabaseAllowed } from "../src/direct/db-guard.js";
+import { copySpecificCityMismatchSql } from "../src/lib/official-copy-location.js";
 
 dotenv.config();
 if (!process.argv.includes("--dry-run")) throw new Error("copy-audit requiere --dry-run");
@@ -23,6 +24,7 @@ const groups = `WITH official_groups AS (
          c.description AS board_description, p.description AS official_description,
          c.url AS board_url, p.url AS official_url,
          c.location_key = p.location_key AS same_location,
+         ((c.country = 'CO' OR c.country IS NULL) AND ${copySpecificCityMismatchSql("c", "p")}) AS city_mismatch,
          g.official_ids, g.instances
   FROM jobs c
   JOIN jobs p ON p.id = c.superseded_by AND p.is_active = TRUE AND p.direct_job_id IS NOT NULL
@@ -44,11 +46,8 @@ try {
            COUNT(*) FILTER (WHERE NOT same_location
              AND board_location_key NOT IN ('colombia', 'remoto', 'remote')
              AND official_location_key NOT IN ('colombia', 'remoto', 'remote'))::int AS both_specific_mismatch,
-           COUNT(*) FILTER (WHERE last_seen_at > NOW() - INTERVAL '48 hours'
-             AND board_location_key NOT IN ('colombia', 'remoto', 'remote')
-             AND official_location_key NOT IN ('colombia', 'remoto', 'remote')
-             AND (CASE WHEN board_location_key IN ('bogotadc', 'capitaldistrict') THEN 'bogota' ELSE board_location_key END)
-                 <> (CASE WHEN official_location_key IN ('bogotadc', 'capitaldistrict') THEN 'bogota' ELSE official_location_key END))::int AS recent_city_mismatch,
+           COUNT(*) FILTER (WHERE city_mismatch AND last_seen_at > NOW() - INTERVAL '48 hours')::int AS recent_city_mismatch,
+           COUNT(*) FILTER (WHERE city_mismatch AND last_seen_at <= NOW() - INTERVAL '48 hours')::int AS stale_city_mismatch,
            COUNT(*) FILTER (WHERE board_description IS NOT NULL)::int AS board_has_description,
            COUNT(*) FILTER (WHERE board_description IS NOT NULL AND official_description IS NOT NULL
              AND btrim(board_description) = btrim(official_description))::int AS exact_description,

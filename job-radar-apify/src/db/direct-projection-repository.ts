@@ -3,6 +3,7 @@ import { pool } from "./client.js";
 import { mutateReadinessRelevantJobs, refreshGoogleReadiness } from "./job-readiness-repository.js";
 import { deleteClosedJobs } from "./scheduler-repository.js";
 import { liveDirectJobSql } from "../direct/ingest.js";
+import { BROAD_LOCATION_KEYS, copyMatchLocationSql, copySpecificCityMismatchSql } from "../lib/official-copy-location.js";
 
 /**
  * Official vacancies as rows of `jobs` (docs/adr/0006-direct-employers.md
@@ -33,14 +34,6 @@ const PROJECTION_HASH_SQL = `encode(sha256(convert_to('direct:' || d.id::text, '
 
 // Bounded like mutateReadinessRelevantJobs (500 per transaction).
 const BATCH = 500;
-
-const BROAD_LOCATION_KEYS = "('colombia', 'remoto', 'remote')";
-
-// Formatting-only equivalents in Colombian source locations. This never
-// equates a neighborhood, department or different city with a municipality.
-function copyMatchLocationSql(column: string): string {
-  return `(CASE WHEN ${column} IN ('bogotadc', 'capitaldistrict') THEN 'bogota' ELSE ${column} END)`;
-}
 
 /** A live official vacancy of an enabled board, joined to its employer. */
 const LIVE_PROJECTABLE = `
@@ -162,9 +155,7 @@ async function revertOrphanOrMismatchedCopies(): Promise<{ reverted: number; ski
            SELECT 1 FROM jobs p
            WHERE p.id = c.superseded_by AND p.is_active = TRUE AND p.direct_job_id IS NOT NULL
              AND (c.country = 'CO' OR c.country IS NULL)
-             AND c.location_key NOT IN ${BROAD_LOCATION_KEYS}
-             AND p.location_key NOT IN ${BROAD_LOCATION_KEYS}
-             AND ${copyMatchLocationSql("c.location_key")} <> ${copyMatchLocationSql("p.location_key")}
+             AND ${copySpecificCityMismatchSql("c", "p")}
          )
        )
        AND NOT EXISTS (
