@@ -1,6 +1,6 @@
-import React, { memo, useState } from "react";
+import React, { memo } from "react";
 import { Link } from "react-router-dom";
-import { Star, Check, ArrowRight } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { Job } from "../sources/types.js";
 import { getSourceColor } from "../lib/source-colors.js";
 import { getModalityLabel } from "../lib/job-filters.js";
@@ -13,6 +13,7 @@ import { cn } from "../lib/utils.js";
 import { ReputationEntryProps } from "./ReputationBadges.js";
 import { jobDateLabel } from "../lib/job-date-label.js";
 import { isAvailabilityUnverified } from "../lib/job-availability.js";
+import { JobMarkButtons } from "./JobMarkButtons.js";
 
 export interface JobCardProps {
   job: Job & {
@@ -63,18 +64,10 @@ export const JobCard = memo(function JobCard({
   onAppliedToggle,
   country
 }: JobCardProps) {
-  const [saved, setSaved] = useState(isSaved ?? job.isSaved ?? false);
-  const [applied, setApplied] = useState(isApplied ?? job.isApplied ?? false);
-
-  const handleSave = () => {
-    setSaved(!saved);
-    if (onSaveToggle) onSaveToggle(job.jobId);
-  };
-
-  const handleApplied = () => {
-    setApplied(!applied);
-    if (onAppliedToggle) onAppliedToggle(job.jobId);
-  };
+  // Controlled by the parent (the account's marks), so a change made on
+  // another page or after signing in shows up here too.
+  const saved = isSaved ?? job.isSaved ?? false;
+  const applied = isApplied ?? job.isApplied ?? false;
 
   const otherSources =
     job.alsoIn || (Array.isArray(job.sources) ? job.sources.filter((s) => s !== job.source) : []);
@@ -159,38 +152,21 @@ export const JobCard = memo(function JobCard({
         </div>
 
         {/* Actions */}
-        <div className="shrink-0 flex flex-row sm:flex-col items-center sm:items-end justify-between sm:justify-start gap-2 w-full sm:w-auto">
-          <Button asChild size="sm" className="order-2 sm:order-1 font-mono">
+        {/* Phone: the two marks, then "Ver vacante" full width on its own
+            row (three buttons in one row overflowed at 390px). */}
+        <div className="shrink-0 flex flex-row flex-wrap sm:flex-nowrap sm:flex-col items-center sm:items-end justify-between sm:justify-start gap-2 w-full sm:w-auto">
+          <Button asChild size="sm" className="order-2 sm:order-1 font-mono basis-full sm:basis-auto">
             <Link to={buildJobPath(job)}>
               Ver vacante <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           </Button>
-          <div className="flex items-center gap-1 order-1 sm:order-2">
-            <Button
-              variant="icon"
-              size="icon"
-              onClick={handleSave}
-              aria-label={saved ? "Quitar de guardados" : "Guardar"}
-              className={
-                saved ? "bg-gold-1/40 border-gold-2/50 text-gold-ink hover:bg-gold-1/40" : undefined
-              }
-            >
-              <Star className="h-4 w-4" fill={saved ? "currentColor" : "none"} />
-            </Button>
-            <Button
-              variant="icon"
-              size="icon"
-              onClick={handleApplied}
-              aria-label={applied ? "Marcar como no aplicada" : "Marcar aplicada"}
-              className={
-                applied
-                  ? "bg-primary/10 border-primary/40 text-primary hover:bg-primary/10"
-                  : undefined
-              }
-            >
-              <Check className="h-4 w-4" />
-            </Button>
-          </div>
+          <JobMarkButtons
+            className="order-1 sm:order-2"
+            saved={saved}
+            applied={applied}
+            onSave={() => onSaveToggle?.(job.jobId)}
+            onApplied={() => onAppliedToggle?.(job.jobId)}
+          />
         </div>
       </div>
     </div>

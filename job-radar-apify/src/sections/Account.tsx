@@ -156,7 +156,7 @@ export default function Account() {
               </p>
               <p className="mt-1.5 text-[#3d413e]">
                 {filter === "applied"
-                  ? "Toca ✓ en una vacante después de postularte para llevar la cuenta."
+                  ? "Toca «Me postulé» en una vacante cuando ya te hayas postulado."
                   : "Toca la estrella ☆ en cualquier vacante y aparecerá aquí."}
               </p>
               <Link to={dashboardPath} className="ink-card-sm ink-lift mt-4 inline-flex h-11 items-center rounded-xl bg-gold-2 px-5 font-bold text-foreground no-underline">

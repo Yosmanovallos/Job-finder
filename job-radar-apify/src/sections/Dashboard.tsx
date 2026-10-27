@@ -155,7 +155,7 @@ export default function Dashboard() {
   // /cuenta, so those two filters open it instead (handleFilterChange).
   const personalFilterActive = filters.savedOnly || filters.appliedOnly;
 
-  // Turning on "★ Guardadas" / "✓ Aplicadas" with an account opens the full
+  // Turning on "★ Guardadas" / "✓ Postuladas" with an account opens the full
   // list in /cuenta: on this page it could only filter the jobs loaded so far.
   const handleFilterChange = useCallback(
     (next: typeof filters) => {

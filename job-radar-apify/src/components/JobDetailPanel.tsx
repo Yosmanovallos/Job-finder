@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { Star, Check, ArrowUpRight, Search } from "lucide-react";
+import { ArrowUpRight, Search } from "lucide-react";
 import { Job } from "../sources/types.js";
 import { getSourceColor } from "../lib/source-colors.js";
 import { getModalityLabel } from "../lib/job-filters.js";
@@ -15,6 +15,7 @@ import { Badge } from "./ui/badge.js";
 import { ReputationBadges, ReputationEntryProps } from "./ReputationBadges.js";
 import { jobDateLabel } from "../lib/job-date-label.js";
 import { isAvailabilityUnverified } from "../lib/job-availability.js";
+import { JobMarkButtons } from "./JobMarkButtons.js";
 
 export interface JobDetailPanelProps {
   job:
@@ -187,35 +188,16 @@ export const JobDetailPanel: React.FC<JobDetailPanelProps> = ({
             </div>
           </div>
 
-          <div className="shrink-0 flex items-center gap-1">
-            <Button
-              variant="icon"
-              size="icon"
-              onClick={() => onSaveToggle?.(job.jobId)}
-              aria-label={job.isSaved ? "Quitar de guardados" : "Guardar"}
-              className={
-                job.isSaved
-                  ? "bg-gold-1/40 border-gold-2/50 text-gold-ink hover:bg-gold-1/40"
-                  : undefined
-              }
-            >
-              <Star className="h-4 w-4" fill={job.isSaved ? "currentColor" : "none"} />
-            </Button>
-            <Button
-              variant="icon"
-              size="icon"
-              onClick={() => onAppliedToggle?.(job.jobId)}
-              aria-label={job.isApplied ? "Marcar como no aplicada" : "Marcar aplicada"}
-              className={
-                job.isApplied
-                  ? "bg-primary/10 border-primary/40 text-primary hover:bg-primary/10"
-                  : undefined
-              }
-            >
-              <Check className="h-4 w-4" />
-            </Button>
-          </div>
         </div>
+
+        {/* Labeled, under the title instead of two bare icons next to it. */}
+        <JobMarkButtons
+          className="mb-4"
+          saved={!!job.isSaved}
+          applied={!!job.isApplied}
+          onSave={() => onSaveToggle?.(job.jobId)}
+          onApplied={() => onAppliedToggle?.(job.jobId)}
+        />
 
         <div className="flex flex-wrap items-center gap-1.5 mb-5">
           {modality && <Badge variant={MODALITY_VARIANT[modality]}>{modality}</Badge>}
