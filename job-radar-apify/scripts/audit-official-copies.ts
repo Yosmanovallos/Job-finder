@@ -18,6 +18,7 @@ const groups = `WITH official_groups AS (
   GROUP BY d.employer_id, p.title_key, p.location_key
 ), hidden AS (
   SELECT c.id, p.id AS projection_id, c.source, c.company, c.title, c.location, c.location_key AS board_location_key,
+         p.location AS official_location, p.location_key AS official_location_key,
          c.description AS board_description, p.description AS official_description,
          c.url AS board_url, p.url AS official_url,
          c.location_key = p.location_key AS same_location,
@@ -53,7 +54,8 @@ try {
   for (const row of bySource.rows) console.log(JSON.stringify({ kind: "hidden-source", ...row }));
 
   const examples = await client.query(`${groups}
-    SELECT id, projection_id, company, title, location, source, official_ids, instances, same_location,
+    SELECT id, projection_id, company, title, location, official_location,
+           board_location_key, official_location_key, source, official_ids, instances, same_location,
            (board_description IS NOT NULL AND official_description IS NOT NULL
              AND btrim(board_description) = btrim(official_description)) AS exact_description
     FROM hidden WHERE instances > 1 OR NOT same_location
