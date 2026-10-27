@@ -145,6 +145,32 @@ pages.
   the same 3 again. Expect the cold time of the old path (about 1-4 s) the
   first time and well under 0.4 s the second time. The Render log must show
   no `[company-page-cache]` warnings.
+- **Verified 2026-10-27** after PR #50 (`3212d1c`, live 17:21 UTC): cold
+  slugs `arroz-federal`, `as-transportes` and `aseos-la-perfeccion` took
+  1.14-1.18 s, then 0.21-0.24 s on both repeats. Their SSR pages took
+  0.25-0.31 s to first byte. The CLS of `/empresas/bancolombia` and
+  `/empresas/mercado-libre` was 0.002 and 0.018 on all 5 throttled loads
+  (before: 1.1 on 3 of 5). The `verify` CI check passed.
+
+### The auth client loads after the first render
+
+Since 2026-10-27, `@supabase/supabase-js` is its own chunk, loaded by
+`getSupabase()` in `src/auth/auth-provider.tsx` right after the first
+render. The client only uses `.auth`, but the full library (auth, storage,
+postgrest, realtime) was in the main chunk that every page waits for.
+
+- Main chunk: 148.2 KB → 98.1 KB gzip (515 → 316 KB raw). Supabase chunk:
+  50.6 KB gzip, not preloaded.
+- Same host, throttled phone (CPU 4x, 1.6 Mbps, 150 ms), median of 5,
+  uncompressed local preview: React mounts 0.8-1.2 s earlier and LCP comes
+  0.55-0.9 s earlier on `/`, `/dashboard` and `/empresas`. Production serves
+  compressed assets, so expect a smaller gain there.
+- `loading` stays true until the session resolves, as before.
+  `AuthCallback` and `ResetPassword` already wait for it. While it's true,
+  the header lays out the signed-out buttons invisibly, so nothing moves
+  when they appear.
+- If the chunk fails to load, the visitor stays signed out (`loading` ends)
+  instead of waiting forever.
 
 These files may evolve, but the user-visible latency, bounded memory behavior,
 single-flight refresh, startup safety and cost constraints must be preserved or

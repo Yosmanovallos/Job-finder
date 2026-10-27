@@ -227,8 +227,14 @@ export default function Header() {
           <CountrySwitcher country={country} pathname={location.pathname} variant="desktop" />
           {loading ? (
             // Avoid a flash of "logged out" while the session (incl. an OAuth
-            // redirect hash) is still being resolved on first paint.
-            <div className="h-11 w-24" />
+            // redirect hash) is still being resolved on first paint. The
+            // signed-out buttons are laid out but invisible, so the nav
+            // keeps its place when they appear (most visitors are signed
+            // out, and the auth client now loads after the first render).
+            <div aria-hidden="true" className="invisible flex items-center gap-2.5">
+              <span className={ghostButton}>Iniciar sesión</span>
+              <span className={ctaButton}>Ver vacantes</span>
+            </div>
           ) : isAuthenticated ? (
             <Link to="/cuenta" className={`${ghostButton} max-w-[220px] truncate font-mono text-xs`}>
               {accountLabel}

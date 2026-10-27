@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import type { Session } from "@supabase/supabase-js";
-import { supabase } from "../lib/supabase-client.js";
+import type { supabase as SupabaseClient } from "../lib/supabase-client.js";
 import { isSupabaseConfigError } from "../lib/auth-error-messages.js";
 import { trackEvent } from "../lib/analytics.js";
 import { trackAuthCallback, trackConfirmedAuth } from "../lib/auth-analytics.js";
@@ -51,6 +51,20 @@ export interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// supabase-js was ~40% of the main bundle (auth, storage, postgrest,
+// realtime: ~830 KB of source, 2026-10-27), and every visitor downloaded it
+// before any page could render, although the client only uses `.auth`. It
+// now loads as its own chunk right after the first render. `loading` stays
+// true until the session resolves, exactly as before: AuthCallback still
+// waits for it before redirecting, so the OAuth code/hash in the URL is
+// exchanged (detectSessionInUrl) when the client is created, and
+// ResetPassword keeps its spinner until PASSWORD_RECOVERY can fire.
+let supabaseClient: Promise<typeof SupabaseClient> | null = null;
+function getSupabase(): Promise<typeof SupabaseClient> {
+  supabaseClient ??= import("../lib/supabase-client.js").then((module) => module.supabase);
+  return supabaseClient;
+}
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [tier, setTier] = useState<"free" | "pro" | "pro_max">("free");
@@ -85,48 +99,69 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data, error }) => {
-      if (error) {
-        const misconfigured = isSupabaseConfigError(error.message);
-        setConfigError(misconfigured);
-        console.error(
-          misconfigured
-            ? "[Auth] Supabase rechazó la API key configurada — revisa VITE_SUPABASE_URL/VITE_SUPABASE_ANON_KEY en el entorno de despliegue."
-            : "[Auth] No se pudo resolver la sesión inicial:",
-          error.message
-        );
-      }
-      setSession(data.session);
-      if (data.session) fetchServerProfile(data.session.access_token);
-      setLoading(false);
-    });
+    let unsubscribe: (() => void) | null = null;
+    let cancelled = false;
+    const subscribe = (supabase: typeof SupabaseClient) => {
+      supabase.auth.getSession().then(({ data, error }) => {
+        if (error) {
+          const misconfigured = isSupabaseConfigError(error.message);
+          setConfigError(misconfigured);
+          console.error(
+            misconfigured
+              ? "[Auth] Supabase rechazó la API key configurada — revisa VITE_SUPABASE_URL/VITE_SUPABASE_ANON_KEY en el entorno de despliegue."
+              : "[Auth] No se pudo resolver la sesión inicial:",
+            error.message
+          );
+        }
+        setSession(data.session);
+        if (data.session) fetchServerProfile(data.session.access_token);
+        setLoading(false);
+      });
 
-    const { data: listener } = supabase.auth.onAuthStateChange((event, newSession) => {
-      if (event === "PASSWORD_RECOVERY") setPasswordRecovery(true);
-      trackAuthCallback(event, newSession?.user, window.location.pathname);
-      setSession(newSession);
-      // "INITIAL_SESSION" fires immediately on subscribe, duplicating the
-      // getSession().then() call above (2x /api/me on every page load,
-      // confirmed in server logs — real, measurable latency, not a guess).
-      // Skip it here; getSession() already covers the initial fetch.
-      if (newSession && event !== "INITIAL_SESSION") {
-        fetchServerProfile(newSession.access_token);
-      } else if (!newSession) {
-        setTier("free");
-        setSubscriptionEnd(undefined);
-        setDbName(undefined);
-        setPreferredRoles(null);
-        setProfileLoaded(false);
-      }
-    });
+      const { data: listener } = supabase.auth.onAuthStateChange((event, newSession) => {
+        if (event === "PASSWORD_RECOVERY") setPasswordRecovery(true);
+        trackAuthCallback(event, newSession?.user, window.location.pathname);
+        setSession(newSession);
+        // "INITIAL_SESSION" fires immediately on subscribe, duplicating the
+        // getSession().then() call above (2x /api/me on every page load,
+        // confirmed in server logs — real, measurable latency, not a guess).
+        // Skip it here; getSession() already covers the initial fetch.
+        if (newSession && event !== "INITIAL_SESSION") {
+          fetchServerProfile(newSession.access_token);
+        } else if (!newSession) {
+          setTier("free");
+          setSubscriptionEnd(undefined);
+          setDbName(undefined);
+          setPreferredRoles(null);
+          setProfileLoaded(false);
+        }
+      });
+      unsubscribe = () => listener.subscription.unsubscribe();
+    };
 
-    return () => listener.subscription.unsubscribe();
+    getSupabase()
+      .then((supabase) => {
+        if (cancelled) return;
+        subscribe(supabase);
+      })
+      .catch((error: unknown) => {
+        // The chunk failed to download (offline, or a deploy replaced it):
+        // the visitor stays signed out instead of waiting forever.
+        console.error("[Auth] No se pudo cargar el cliente de autenticación:", error);
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+      unsubscribe?.();
+    };
   }, []);
 
   const loginWithGoogle = async (returnTo?: string) => {
     const callbackUrl = new URL("/auth/callback", window.location.origin);
     if (returnTo) callbackUrl.searchParams.set("return_to", returnTo);
 
+    const supabase = await getSupabase();
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo: callbackUrl.toString() }
@@ -144,6 +179,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const loginWithEmail = async (email: string, password: string) => {
+    const supabase = await getSupabase();
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error && isSupabaseConfigError(error.message)) {
       setConfigError(true);
@@ -163,6 +199,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // user wanted after they click the confirmation link in their email.
     const callbackUrl = new URL("/auth/callback", window.location.origin);
     if (returnTo) callbackUrl.searchParams.set("return_to", returnTo);
+    const supabase = await getSupabase();
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -178,6 +215,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const sendPasswordReset = async (email: string) => {
+    const supabase = await getSupabase();
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/reset-password`
     });
@@ -192,6 +230,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const updatePassword = async (newPassword: string) => {
+    const supabase = await getSupabase();
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     if (error) {
       if (isSupabaseConfigError(error.message)) {
@@ -208,6 +247,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const resendConfirmation = async (email: string) => {
+    const supabase = await getSupabase();
     const { error } = await supabase.auth.resend({
       type: "signup",
       email,
@@ -221,6 +261,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = async () => {
+    const supabase = await getSupabase();
     await supabase.auth.signOut();
   };
 
