@@ -6,7 +6,7 @@ La consulta pública agrupa por título, empresa y ubicación. En Altipal se gua
 
 ## Alcance de esta fase
 
-Añadir una clave de instancia solo a la lectura canónica: una vacante oficial con descripción se agrupa con otra de la misma empresa, título y ubicación únicamente cuando comparten el texto; sin descripción, conserva su ID. Las filas de bolsas mantienen su agrupación actual. Las filas, IDs, enlaces, fechas, cierres, proyección materializada, caché y rutas SEO no se modifican.
+Añadir una clave de instancia solo a la lectura canónica: una vacante oficial con descripción se agrupa con otra de la misma empresa, título y ubicación únicamente cuando comparten el texto; sin descripción, conserva su ID. Las filas de bolsas mantienen su agrupación actual. La lectura de detalle acepta los IDs de proyecciones oficiales activas para que las nuevas tarjetas abran su vacante. Las filas, IDs, enlaces, fechas, cierres, proyección materializada, caché, sitemap y metadatos SEO no se modifican.
 
 ## Verificación y salida
 
