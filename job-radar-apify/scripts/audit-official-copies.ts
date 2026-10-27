@@ -17,7 +17,7 @@ const groups = `WITH official_groups AS (
   WHERE p.is_active = TRUE AND p.country = 'CO'
   GROUP BY d.employer_id, p.title_key, p.location_key
 ), hidden AS (
-  SELECT c.id, c.source, c.company, c.title, c.location,
+  SELECT c.id, p.id AS projection_id, c.source, c.company, c.title, c.location, c.location_key AS board_location_key,
          c.description AS board_description, p.description AS official_description,
          c.url AS board_url, p.url AS official_url,
          c.location_key = p.location_key AS same_location,
@@ -34,8 +34,11 @@ try {
   await client.query("SET LOCAL statement_timeout = '15000ms'");
   const hidden = await client.query(`${groups}
     SELECT COUNT(*)::int AS hidden,
+           COUNT(*) FILTER (WHERE instances > 1 OR NOT same_location)::int AS needs_review,
            COUNT(*) FILTER (WHERE instances > 1)::int AS ambiguous_target,
+           COUNT(*) FILTER (WHERE instances > 1 AND board_description IS NOT NULL)::int AS ambiguous_with_board_description,
            COUNT(*) FILTER (WHERE NOT same_location)::int AS different_location,
+           COUNT(*) FILTER (WHERE NOT same_location AND board_location_key NOT IN ('colombia', 'remoto', 'remote'))::int AS different_specific_location,
            COUNT(*) FILTER (WHERE board_description IS NOT NULL)::int AS board_has_description,
            COUNT(*) FILTER (WHERE board_description IS NOT NULL AND official_description IS NOT NULL
              AND btrim(board_description) = btrim(official_description))::int AS exact_description,
@@ -50,11 +53,11 @@ try {
   for (const row of bySource.rows) console.log(JSON.stringify({ kind: "hidden-source", ...row }));
 
   const examples = await client.query(`${groups}
-    SELECT company, title, location, source, official_ids, instances, same_location,
+    SELECT id, projection_id, company, title, location, source, official_ids, instances, same_location,
            (board_description IS NOT NULL AND official_description IS NOT NULL
              AND btrim(board_description) = btrim(official_description)) AS exact_description
     FROM hidden WHERE instances > 1 OR NOT same_location
-    ORDER BY company, title, location LIMIT 25`);
+    ORDER BY company, title, location LIMIT ${process.argv.includes("--all") ? 1000 : 25}`);
   for (const row of examples.rows) console.log(JSON.stringify({ kind: "review-sample", ...row }));
 
   const active = await client.query(`WITH official_groups AS (
