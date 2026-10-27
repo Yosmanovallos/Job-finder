@@ -1,3 +1,5 @@
+import { getHomeCityDiscovery } from "./home-city-discovery.js";
+
 export const SITE_ORIGIN = "https://buscotrabajo.co";
 export const CONTACT_EMAIL = "buscotrabajocolombia123@gmail.com";
 
@@ -34,6 +36,7 @@ const sharedHomeSections: PublicContent["sections"] = [
 ];
 
 export function getHomeContent(country: "CO" | "VE"): PublicContent {
+  const discovery = getHomeCityDiscovery(country);
   const countryName = country === "VE" ? "Venezuela" : "Colombia";
   const sources = country === "VE"
     ? "LinkedIn, Computrabajo, Torre, GetOnBoard y otros portales con cobertura real en Venezuela"
@@ -50,7 +53,10 @@ export function getHomeContent(country: "CO" | "VE"): PublicContent {
       `Si buscas trabajo en ${countryName}, BuscoTrabajo reúne resultados de ${sources}. Presenta información pública de ofertas laborales en un solo dashboard para reducir pestañas repetidas, duplicados y enlaces vencidos.`,
       "El servicio ayuda a descubrir y comparar oportunidades; la postulación siempre se realiza manualmente en el portal que publicó la vacante."
     ],
-    sections: sharedHomeSections
+    sections: [
+      { heading: discovery.heading, paragraphs: [discovery.description], links: discovery.links },
+      ...sharedHomeSections
+    ]
   };
 }
 

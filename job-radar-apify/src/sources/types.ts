@@ -37,7 +37,13 @@ export interface Job {
   applicantCountries?: string[];
   /** The source's own expiration date (JSON-LD validThrough). Never a retention date. */
   validThrough?: string;
-  [key: string]: any;
+  // Existing cache, deduplication and presentation metadata, not source facts.
+  runId?: string;
+  runName?: string;
+  sources?: string[];
+  alsoIn?: string[];
+  isLocked?: boolean;
+  salary?: string;
 }
 
 // Subset of Job's enrichment fields a detail-page fetch can fill in —

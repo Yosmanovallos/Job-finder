@@ -23,6 +23,22 @@ function visibleText(html: string): string {
   return html.replace(/<script[\s\S]*?<\/script>/g, " ").replace(/<style[\s\S]*?<\/style>/g, " ").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 }
 
+test("HCD-001 home HTML and Markdown expose the country pilot before JavaScript", () => {
+  for (const [country, expected, excluded] of [
+    ["CO", ["/empleos/bogota", "/empleos/cucuta"], ["/empleos/caracas"]],
+    ["VE", ["/empleos/caracas"], ["/empleos/bogota", "/empleos/cucuta"]]
+  ] as const) {
+    const content = getHomeContent(country);
+    const html = renderContentHtml(content);
+    const markdown = renderContentMarkdown(content);
+    for (const href of expected) {
+      assert.ok(html.includes(`href="${href}"`), `${country}: missing HTML link ${href}`);
+      assert.ok(markdown.includes(`](${href})`), `${country}: missing Markdown link ${href}`);
+    }
+    for (const href of excluded) assert.ok(!html.includes(`href="${href}"`));
+  }
+});
+
 test("home content is substantial and headings are sequential", () => {
   for (const country of ["CO", "VE"] as const) {
     const html = renderContentHtml(getHomeContent(country));

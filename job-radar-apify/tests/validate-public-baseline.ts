@@ -69,6 +69,25 @@ async function main(): Promise<void> {
         const response = await fetch(`${base}${route}`, { signal: AbortSignal.timeout(10000) });
         assert.equal(response.status, 200, route);
         const html = await response.text();
+        const homePilot = route === "/"
+          ? { heading: "Ciudades destacadas en Colombia", paths: ["/empleos/bogota", "/empleos/cucuta"], foreign: "/empleos/caracas" }
+          : route === "/ve"
+            ? { heading: "Ciudades destacadas en Venezuela", paths: ["/empleos/caracas"], foreign: "/empleos/cucuta" }
+            : null;
+        if (homePilot) {
+          for (const href of homePilot.paths) {
+            assert.ok(html.includes(`href="${href}"`), `HCD-001 ${route}: SSR link ${href}`);
+            const destination = await fetch(`${base}${href}`);
+            assert.equal(destination.status, 200, `HCD-003 destination ${href}`);
+            assert.ok((await destination.text()).includes(`rel="canonical" href="https://buscotrabajo.co${href}"`));
+          }
+          assert.ok(!html.includes(`href="${homePilot.foreign}"`), `HCD-003 ${route}: foreign city`);
+          const markdownResponse = await fetch(`${base}${route}`, { headers: { Accept: "text/markdown" } });
+          assert.equal(markdownResponse.status, 200);
+          assert.match(markdownResponse.headers.get("vary") || "", /Accept/i);
+          const markdown = await markdownResponse.text();
+          for (const href of homePilot.paths) assert.ok(markdown.includes(`](${href})`));
+        }
         const title = html.match(/<title>([\s\S]*?)<\/title>/)?.[1];
         const canonical = html.match(/<link[^>]*rel="canonical"[^>]*href="([^"]+)"/)?.[1];
         assert.ok(title && canonical, `[P0] ${route} no tiene metadatos SSR.`);
@@ -116,6 +135,24 @@ async function main(): Promise<void> {
             path: path.join(process.cwd(), `baseline-${index}-${viewport.width}.png`),
             fullPage: true
           });
+          if (homePilot) {
+            const discovery = page.getByRole("navigation", { name: homePilot.heading, exact: true });
+            await discovery.waitFor({ state: "visible" });
+            assert.deepEqual(await discovery.locator("a").evaluateAll((links) => links.map((link) => link.getAttribute("href"))), homePilot.paths);
+            // Optional stats cannot erase navigation. Keep this separate from
+            // the normal screenshots and exercise the mobile tab state too.
+            await page.route("**/api/home-stats*", (request) => request.fulfill({ status: 503, contentType: "application/json", body: "{}" }));
+            await page.reload({ waitUntil: "networkidle" });
+            if (viewport.width < 768) await page.getByRole("tab", { name: "Por cargo", exact: true }).click();
+            await page.getByRole("navigation", { name: homePilot.heading, exact: true }).waitFor({ state: "visible" });
+            for (const href of homePilot.paths) {
+              const link = page.getByRole("navigation", { name: homePilot.heading, exact: true }).locator(`a[href="${href}"]`);
+              assert.ok(await link.isVisible());
+              await link.click({ trial: true });
+            }
+            await page.getByRole("navigation", { name: homePilot.heading, exact: true }).evaluate((element) => element.scrollIntoView({ block: "center" }));
+            await page.getByRole("navigation", { name: homePilot.heading, exact: true }).screenshot({ path: path.join(process.cwd(), `home-discovery-${index}-${viewport.width}.png`) });
+          }
           await context.close();
         }
         snapshots.push({
