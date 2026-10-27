@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { CONTACT_EMAIL } from "../lib/agent-readiness.js";
 
 // Site-wide footer in the homepage's ink style (design canvas R3,
@@ -99,13 +99,9 @@ function LinkColumn({ title, links }: { title: string; links: FooterLink[] }) {
 }
 
 export default function Footer() {
-  const { pathname } = useLocation();
-  // The homepage's fixed phone bottom bar (HomeLanding.tsx) would cover the
-  // last footer row without this extra room.
-  const isHome = pathname === "/" || pathname === "/ve";
-
   return (
-    <footer id="footer" className={`border-t-2 border-foreground bg-[#fbfaf6] ${isHome ? "pb-16 md:pb-0" : ""}`}>
+    // pb-16: room for the fixed phone bottom bar (BottomNav.tsx), on every page.
+    <footer id="footer" className="border-t-2 border-foreground bg-[#fbfaf6] pb-16 md:pb-0">
       <div className="max-w-[1240px] mx-auto px-4 md:px-6 pt-[22px] md:pt-14 pb-6 md:pb-8 grid grid-cols-2 md:grid-cols-[repeat(auto-fit,minmax(190px,1fr))] gap-4 md:gap-8">
         <div className="col-span-2 md:col-span-1">
           <img src="/BT.png" alt="Buscotrabajo.co" className="h-[18px] md:h-[22px] w-auto" />

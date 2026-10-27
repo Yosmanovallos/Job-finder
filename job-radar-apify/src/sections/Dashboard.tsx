@@ -547,13 +547,16 @@ export default function Dashboard() {
         )}
 
         {applyContinueJob && (
-          <div className="flex items-center justify-between gap-4 mb-4 p-3 rounded-xl bg-primary/10 border border-primary/30 text-xs font-mono">
-            <span className="text-foreground">
+          // Phone: text on top (with the close button), full-width action
+          // below; a long unbroken title (e.g. "PREVENCIÓN_24H") wraps
+          // instead of pushing the page wider than the screen.
+          <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4 p-3 pr-9 sm:pr-3 rounded-xl bg-primary/10 border border-primary/30 text-xs font-mono">
+            <span className="min-w-0 text-foreground [overflow-wrap:anywhere]">
               ¡Cuenta lista! Continúa a{" "}
               <strong className="text-primary">{applyContinueJob.title}</strong>.
             </span>
-            <div className="flex items-center gap-2 shrink-0">
-              <Button asChild size="sm">
+            <div className="flex items-center gap-2 sm:shrink-0">
+              <Button asChild size="sm" className="w-full sm:w-auto">
                 <a
                   href={applyContinueJob.url}
                   target="_blank"
@@ -573,7 +576,7 @@ export default function Dashboard() {
                 type="button"
                 onClick={() => setApplyContinueJob(null)}
                 aria-label="Cerrar"
-                className="text-muted-foreground hover:text-foreground"
+                className="absolute top-2.5 right-2.5 sm:static text-muted-foreground hover:text-foreground"
               >
                 <X className="h-4 w-4" />
               </button>
