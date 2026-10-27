@@ -237,6 +237,26 @@ answers `BYPASS`):
   before the port opened (baseline warmup: 10,496 ms), then "Your service
   is live" with `/api/health` 200.
 
+### 2026-10-27 after deploying PR #48 (`bdc843a`, live 15:52 UTC)
+
+The official-vacancy identity query changed; the cache, warmup and Render
+plan stayed intact. Three unique URLs per country produced Cloudflare `MISS`
+before and after this deploy:
+
+| Measurement | Before | After |
+| --- | ---: | ---: |
+| `/dashboard` time to first byte | 363, 269, 249 ms | 298, 257, 276 ms |
+| `/ve/dashboard` time to first byte | 336, 241, 253 ms | 258, 261, 256 ms |
+
+Render's [deploy log](https://dashboard.render.com/web/srv-d9i11d7abvsc73a8db4g/deploys/dep-dbgch9jbc2fs73a676bg)
+shows `dashboard_cache_warmed` for CO/VE in 2,194 ms before the server
+listened, followed by `/api/health` 200 and Live. The sampled internal
+`/dashboard` requests took 14, 6 and 6 ms; `/ve/dashboard` took 8, 7 and
+8 ms. The public Altipal filter returned 44 cards with 44 unique IDs, no
+identical title/location/description groups, and two distinct official detail
+IDs returned 200. This measurement was captured while `bdc843a` was Live;
+later deploys may change the active revision.
+
 **CLS found while verifying.** With a throttled phone (4x CPU, slow 4G),
 the server-rendered `/dashboard` body (H1 and job list, before React
 mounts) shifted 24 px when the Google web fonts swapped in: CLS 0.416 on
