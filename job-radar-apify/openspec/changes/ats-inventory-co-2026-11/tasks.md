@@ -36,7 +36,14 @@
   - Backoff: `error`/`blocked` 1, 2, 4… hasta 14 días; `no_colombia` se revisa a los 30 días; `enabled`, `owned`, `agency` y `ambiguous` son finales. Las decisiones finales nunca se sobrescriben (guarda en SQL).
   - Conflictos (INV-012) → `ambiguous`: la clave ya tiene un tablero del mismo ATS (aunque esté apagado), varias empresas con la clave, empresa rechazada en revisión humana, slug de otra empresa, o dos tableros del mismo ATS con la misma empresa en la corrida. Un tablero que ya está en `employer_sources` → `owned`. La promoción va de a una, con `pg_advisory_xact_lock` por clave.
   - Reversión: no hay comando todavía; `enabled = false` por `discovery_origin = 'ats_inventory'` (diseño §8) queda pendiente.
-- [ ] Corrida `dry-run` y revisión de la muestra; después `execute`.
+- [x] Corrida `dry-run` en producción (solo lectura, desde la rama del PR) y revisión de la muestra:
+  - [Dry-run 40598652308](https://github.com/Yosmanovallos/Job-finder/actions/runs/40598652308) (`--limit 1500`): 1.500 filas en 40 s. La muestra mostró nombres de tablero de Greenhouse que son etiquetas ("Backblaze External Website"); se añadió la regla de etiqueta → `ambiguous`.
+  - [Dry-run 40598927265](https://github.com/Yosmanovallos/Job-finder/actions/runs/40598927265): la muestra mostró "Extenteam Client Roles" (tablero para clientes de una firma de personal); "client(s)" pasa a la regla de etiqueta.
+  - **[Dry-run 40601010034](https://github.com/Yosmanovallos/Job-finder/actions/runs/40601010034) con las reglas finales** (`--limit 5000 --deadline-min 15`, nada escrito): **3.387 de 4.220 pendientes sondeados**; el plazo dejó 833 para la próxima corrida (Workday es el lento: robots + pausas + detalle).
+    - Por estado: `no_colombia` 3.063 · `error` 234 · `blocked` 32 · `ambiguous` 22 · `enabled` 25 (tope) · 11 elegibles más sobre el tope, quedarían `pending`.
+    - Por ATS: Ashby 1.008 sin Colombia, 13 ambiguous (no declara nombre: Nubank, Kraken, Hostinger…), 29 error (casi todos 404); Greenhouse 1.293 / 12 enabled / 6 ambiguous / 17 error; SmartRecruiters 492 / 13 enabled / 1 ambiguous; Teamtailor 152 / 3 error; Workday 116 sin Colombia, 32 blocked (robots.txt), 181 error (detalles sin leer con 0 en Colombia, HTTP 500/422), 2 ambiguous (varias razones sociales); Magneto 2 error (listado incompleto); Lever 1 / 1 error.
+    - Se habilitarían: Greenhouse Acumen, Alarm.com, Alphalion, Aspenview Technology Partners, Atlas HXM, Brandtech+, Cobre, Encora, Exadel, Goods & Services, Power Digital, The Humane League; SmartRecruiters AbbVie, AccorCorpo, AECOM, Blend360, Dr Reddy's, Exit83, H&M Group, Inetum, Lifted (Upwork), Miratech, NBCUniversal, Red Bull, Sika. Sobre el tope: Syngenta, UPROSPECT, Veolia, Wise, Toppan Security, Airbus, Air Products, Alfa Laval, Amgen, AstraZeneca, Brenntag.
+- [ ] `execute` en producción: requiere aprobación del dueño (también lo activa el merge, en las corridas programadas del descubrimiento).
 - [ ] Reporte: filas por estado; 100 % clasificadas al terminar el inventario.
 
 ## I3 — sin duplicados y `Internacional`
