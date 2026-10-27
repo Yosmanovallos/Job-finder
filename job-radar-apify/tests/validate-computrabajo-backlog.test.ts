@@ -6,10 +6,13 @@ import { buildComputrabajoBacklog, parseOfficialReviews } from "../src/direct/di
 const reviews = parseOfficialReviews(JSON.parse(readFileSync(new URL("../data/computrabajo-official-reviews.json", import.meta.url), "utf8")));
 
 test("manual review ledger has distinct company keys and cited HTTPS evidence", () => {
-  assert.ok(reviews.size >= 7);
+  assert.ok(reviews.size >= 13);
   assert.equal(reviews.get("smurfitwestrock")?.status, "official_incomplete");
   assert.equal(reviews.get("nexabpo")?.status, "blocked");
   assert.equal(reviews.get("frisby")?.status, "blocked");
+  assert.equal(reviews.get("fundacionvalledellili")?.status, "computrabajo_hosted");
+  assert.equal(reviews.get("postobon")?.status, "attribution_unverified");
+  assert.equal(reviews.get("intelcia")?.status, "official_no_colombia");
   assert.throws(() => parseOfficialReviews({ reviews: [
     { company: "Grupo Éxito", status: "form_only", evidenceUrl: "https://example.com", reviewedAt: "2026-10-25" },
     { company: "GRUPO EXITO S.A.", status: "form_only", evidenceUrl: "https://example.com", reviewedAt: "2026-10-25" }

@@ -4,7 +4,10 @@ import type { ComputrabajoCoverageRow } from "../../db/direct-discovery-reposito
 
 const Review = z.object({
   company: z.string().min(1),
-  status: z.enum(["official_incomplete", "official_no_colombia", "form_only", "blocked", "computrabajo_hosted"]),
+  status: z.enum([
+    "official_incomplete", "official_no_colombia", "form_only", "blocked",
+    "computrabajo_hosted", "third_party_only", "no_public_listing", "attribution_unverified"
+  ]),
   evidenceUrl: z.string().url().startsWith("https://"),
   reviewedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
 }).strict();

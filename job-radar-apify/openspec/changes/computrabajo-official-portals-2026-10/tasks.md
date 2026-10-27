@@ -4,7 +4,7 @@
 - [x] Implementar el censo de solo lectura y su modo manual en Actions.
 - [x] Pasar lint de los archivos modificados, TypeScript, build, unitarias e integración aislada (CI; Docker local no disponible).
 - [x] Ejecutar el censo en producción y registrar empresas y vacantes pendientes.
-- [ ] Revisar las 11 empresas con dominio curado y separar portales propios de páginas alojadas por Computrabajo.
+- [x] Revisar las nueve empresas con dominio curado del censo del 27 de octubre y separar portales propios, páginas de Computrabajo y casos sin atribución verificada; cuatro están en el [lote del 25](../../../docs/source-catalog/computrabajo-official-batch-2026-10-25.md) y cinco en el [lote del 27](../../../docs/source-catalog/computrabajo-official-batch-2026-10-27.md). Ninguna revisión nueva habilita un tablero.
 - [x] Concentrar el descubrimiento programado en empresas de Computrabajo Colombia, conservando el modo manual de todas las fuentes; verificar en CI y con una [corrida acotada](https://github.com/Yosmanovallos/Job-finder/actions/runs/40235688825).
 - [x] Incorporar Cemex desde `jobs.cemex.com` tras canario completo de 5 vacantes colombianas; usar seed dirigido con revisión previa de conflictos y comprobar el [tick](https://github.com/Yosmanovallos/Job-finder/actions/runs/40239337651).
 - [x] Incorporar TP Colombia desde el listado oficial de `tp.com`: conector paginado, canario completo, [seed sin conflictos](https://github.com/Yosmanovallos/Job-finder/actions/runs/40257036353) y [tick de producción](https://github.com/Yosmanovallos/Job-finder/actions/runs/40257107820).
