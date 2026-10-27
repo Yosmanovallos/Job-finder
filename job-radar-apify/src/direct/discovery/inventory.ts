@@ -44,7 +44,9 @@ export interface InventoryRow extends CanonicalRef {
  * every source (ats-links.ts), so the same board never becomes two rows.
  */
 export function canonicalBoardRef(url: string): CanonicalRef | null {
-  const link = atsLinkFromUrl(url);
+  // A URL cut from prose keeps the sentence's punctuation ("…/yuno."): left
+  // in, it would become a second board or an unreadable Workday site.
+  const link = atsLinkFromUrl(url.trim().replace(/[.,;:!?]+$/, ""));
   if (!link) return null;
   const supported =
     (DIRECT_ATS_TYPES as readonly string[]).includes(link.atsType) &&

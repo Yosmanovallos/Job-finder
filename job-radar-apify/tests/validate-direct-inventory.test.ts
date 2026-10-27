@@ -61,6 +61,24 @@ test("canonical ref: the form each connector reads, or unsupported", () => {
   assert.equal(canonicalBoardRef("https://career4.successfactors.com/career?company=AcmeP")?.supported, false);
 });
 
+test("sentence punctuation after a URL is not part of the board", () => {
+  assert.equal(canonicalBoardRef("https://jobs.lever.co/yuno.")?.atsRef, "yuno");
+  assert.equal(canonicalBoardRef("https://jobs.lever.co/yuno,")?.atsRef, "yuno");
+  assert.equal(canonicalBoardRef("https://jobs.ashbyhq.com/addi!")?.atsRef, "addi");
+  assert.deepEqual(canonicalBoardRef("https://galderma.wd3.myworkdayjobs.com/External."), {
+    atsType: "workday",
+    atsRef: "galderma/wd3/External",
+    supported: true
+  });
+  assert.equal(
+    collectInventory([
+      { url: "https://jobs.lever.co/yuno.", source: "job_link" },
+      { url: "https://jobs.lever.co/yuno", source: "commoncrawl" }
+    ]).length,
+    1
+  );
+});
+
 test("adversarial input: lookalike hosts, schemes and junk yield nothing", () => {
   for (const url of [
     "https://greenhouse.io.evil.com/acme",

@@ -36,7 +36,7 @@ async function readOnly<T>(run: (query: typeof pool.query) => Promise<T>): Promi
   }
 }
 
-/** Distinct ATS URLs named by live job-board rows in Colombia or remote (url + description), at most `limit`. */
+/** Distinct ATS URLs named by live job-board rows in Colombia or remote (url + description), at most `limit`, in a stable order. */
 export async function jobLinkUrls(limit: number): Promise<string[]> {
   return readOnly(async (query) => {
     const result = await query<{ url: string }>(
@@ -44,6 +44,7 @@ export async function jobLinkUrls(limit: number): Promise<string[]> {
          FROM jobs,
               regexp_matches(COALESCE(url, '') || ' ' || COALESCE(left(description, 20000), ''), $1, 'gi') AS m
         WHERE is_active = TRUE AND ${liveJobSql()} AND direct_job_id IS NULL AND (country = 'CO' OR country IS NULL)
+        ORDER BY 1
         LIMIT $2`,
       [`(${ATS_URL_PATTERN})`, limit]
     );
