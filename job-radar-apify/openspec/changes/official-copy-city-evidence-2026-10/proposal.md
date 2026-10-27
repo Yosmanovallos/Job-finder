@@ -18,12 +18,15 @@ redirige al candidato a otra ciudad.
   la regla existente de 48 horas y unicidad de fingerprint.
 - Evitar que una URL de copia antigua siga redirigiendo a una vacante oficial
   de otra ciudad; el detalle responde 410 mientras no haya nueva señal de la bolsa.
+- El 410 informa que la oferta no está disponible, sin atribuirle un cierre
+  o una fecha límite que no están confirmados para esa copia.
 - Conservar el comportamiento de ubicaciones amplias (Colombia/remoto) y
   registrar los casos donde varias requisiciones oficiales comparten título
   y ciudad para una revisión posterior.
 
-No se editan módulos, metadatos ni reglas SEO; tampoco Aplicar, fechas,
-fuentes, caché, esquema o configuración de Render.
+No se editan metadatos ni reglas SEO; tampoco Aplicar, fechas, fuentes, caché,
+esquema o configuración de Render. Solo cambia el texto del 410 para no
+afirmar una causa sin evidencia.
 
 ## Verificación y reversión
 
