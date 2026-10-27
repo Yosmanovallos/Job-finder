@@ -577,31 +577,6 @@ function FinalCta({ country }: { country: string }) {
   );
 }
 
-function BottomNav({ country }: { country: string }) {
-  const prefix = country === "VE" ? "/ve" : "";
-  const item = `${T.small} flex flex-col items-center justify-center gap-0.5 font-bold no-underline`;
-  return (
-    <nav aria-label="Navegación inferior" className="md:hidden fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 h-16 border-t-2 border-foreground bg-white pb-[env(safe-area-inset-bottom)]">
-      <Link to={prefix || "/"} className={`${item} text-primary`}>
-        <svg aria-hidden="true" className="w-[22px] h-[22px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><path d="M3 11l9-7 9 7v9H3z" /></svg>
-        Inicio
-      </Link>
-      <Link to={`${prefix}/dashboard`} className={`${item} text-foreground`}>
-        <span className="w-11 h-[30px] rounded-[10px] border-2 border-foreground bg-gold-2 grid place-items-center"><SearchIcon className="w-[18px] h-[18px]" /></span>
-        Buscar
-      </Link>
-      <Link to={`${prefix}/empresas`} className={`${item} text-[#3d413e]`}>
-        <svg aria-hidden="true" className="w-[22px] h-[22px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-4h6v4" /></svg>
-        Empresas
-      </Link>
-      <Link to="/cuenta#guardadas" className={`${item} text-[#3d413e]`}>
-        <svg aria-hidden="true" className="w-[22px] h-[22px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M6 3h12v18l-6-4-6 4z" /></svg>
-        Guardadas
-      </Link>
-    </nav>
-  );
-}
-
 export default function HomeLanding({ country }: { country: string }) {
   const data = useHomeData(country);
   return (
@@ -618,7 +593,6 @@ export default function HomeLanding({ country }: { country: string }) {
       <Video />
       <Why data={data} />
       <FinalCta country={country} />
-      <BottomNav country={country} />
     </div>
   );
 }
