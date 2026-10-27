@@ -9,5 +9,6 @@
 - [x] Incorporar Cemex desde `jobs.cemex.com` tras canario completo de 5 vacantes colombianas; usar seed dirigido con revisión previa de conflictos y comprobar el [tick](https://github.com/Yosmanovallos/Job-finder/actions/runs/40239337651).
 - [x] Incorporar TP Colombia desde el listado oficial de `tp.com`: conector paginado, canario completo, [seed sin conflictos](https://github.com/Yosmanovallos/Job-finder/actions/runs/40257036353) y [tick de producción](https://github.com/Yosmanovallos/Job-finder/actions/runs/40257107820).
 - [x] Exportar el censo completo como JSONL desde un modo manual de solo lectura, con estado de revisión humana separado del sondeo ATS automatizado.
+- [ ] Incorporar Frisby desde su [portal corporativo](../../../docs/source-catalog/frisby.md): canario local completo (91/91), canario del runner, seed dirigido y tick de producción pendientes.
 - [ ] Habilitar NEXA BPO desde Workeando solo si el portal concede acceso desde el runner; el [403 comprobado](../../../docs/source-catalog/workeando-nexa.md) mantiene el tablero deshabilitado. La fuente solo atribuye ofertas que mencionan NEXA.
 - [ ] Revisar todas las empresas objetivo pendientes; conservar evidencia y clasificación de cada una. El [primer lote](../../../docs/source-catalog/computrabajo-official-batch-2026-10-25.md) documenta cinco casos, ninguno importable todavía.

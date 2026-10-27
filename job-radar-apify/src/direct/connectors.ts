@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { EIGHTFOLD_REF, listEightfold } from "./ats/eightfold.js";
+import { listFrisby } from "./ats/frisby.js";
 import { listGoogle } from "./ats/google.js";
 import { listMagneto, MAGNETO_REF } from "./ats/magneto.js";
 import { listPhenom, PHENOM_REF } from "./ats/phenom.js";
@@ -387,6 +388,12 @@ const CONNECTORS: Record<DirectAtsType, Connector> = {
     refPattern: /^nexa-bpo$/,
     portalUrl: () => "https://workeando.com/ofertas/",
     list: listWorkeando
+  },
+  // Static vacancies from Frisby's corporate careers page.
+  frisby: {
+    refPattern: /^colombia$/,
+    portalUrl: () => "https://frisby.info/gente-frisby/",
+    list: listFrisby
   }
 };
 
