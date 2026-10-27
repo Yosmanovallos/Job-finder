@@ -245,7 +245,7 @@ async function run(): Promise<void> {
   check(
     Boolean(originalId && variantId && repostId) && dataCards.length === 2 && dataCards.some((job) => job.jobId === variantId) &&
       dataCards.some((job) => job.jobId === originalId || job.jobId === repostId) &&
-      Boolean(await getJobById(originalId!)) && Boolean(await getJobById(repostId!)),
+      Boolean(await getJobById(originalId!)) && Boolean(await getJobById(variantId!)) && Boolean(await getJobById(repostId!)),
     "Dos requisiciones oficiales con contenido distinto se ven; una republicación idéntica ocupa una tarjeta y conserva ambos IDs.",
     `Identidad oficial inesperada: ${JSON.stringify(dataCards.map((job) => job.jobId))}`
   );
