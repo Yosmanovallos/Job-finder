@@ -12,10 +12,10 @@
 
 ## I1 — inventario (solo lectura sobre producción, escribe solo `ats_board_inventory`)
 
-- [ ] Pruebas que fallan primero: parsers de refs por ATS, normalización, adversariales (INV-001…INV-005).
-- [ ] Migración aditiva con `--dry-run`; RLS + `REVOKE`.
-- [ ] Ampliar `cc-refs.ts` a todos los ATS con conector; extraer refs de vacantes guardadas y del `site-probe`.
-- [ ] Modo `ats-inventory` (dry-run por defecto) en el workflow existente.
+- [x] Pruebas que fallan primero: normalizador único, refs canónicas, adversariales, idempotencia, "sin datos" de Common Crawl (`tests/validate-direct-inventory.test.ts`, INV-001…INV-006).
+- [x] Bloque aditivo `direct-inventory` en `migrate-direct-employers.ts` (con `--dry-run`); RLS + `REVOKE`; integración en Postgres desechable (`tests/validate-direct-inventory.ts`).
+- [x] Un solo normalizador para todas las fuentes; Common Crawl para los conectores con ref en la URL; refs de vacantes vigentes (filtradas en SQL) y de la evidencia del `site-probe`.
+- [x] Modos `ats-inventory-dry-run` y `ats-inventory` en `direct-employers-tick.yml`; el dry-run funciona sin la tabla.
 - [ ] Corrida en producción: tamaño del inventario por fuente y por ATS.
 
 ## I2 — sondeo y habilitación automática

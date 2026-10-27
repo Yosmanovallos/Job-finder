@@ -17,6 +17,14 @@ on:
       - "job-radar-apify/src/db/direct-discovery-repository.ts"
       - "job-radar-apify/src/direct/discovery/coverage.ts"
       - "job-radar-apify/tests/validate-direct-discovery.ts"
+      - "job-radar-apify/scripts/direct-ats-inventory.ts"
+      - "job-radar-apify/scripts/migrate-direct-employers.ts"
+      - "job-radar-apify/scripts/run-isolated-tests.ts"
+      - "job-radar-apify/src/db/schema.sql"
+      - "job-radar-apify/src/db/direct-inventory-repository.ts"
+      - "job-radar-apify/src/direct/discovery/**"
+      - "job-radar-apify/tests/validate-direct-inventory.test.ts"
+      - "job-radar-apify/tests/validate-direct-inventory.ts"
 
 permissions:
   contents: read

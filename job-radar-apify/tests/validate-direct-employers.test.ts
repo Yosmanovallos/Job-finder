@@ -381,7 +381,8 @@ test("the web server never imports the direct-employer module", () => {
         ![
           path.join(root, "db", "direct-repository.ts"),
           path.join(root, "db", "direct-discovery-repository.ts"),
-          path.join(root, "db", "direct-projection-repository.ts")
+          path.join(root, "db", "direct-projection-repository.ts"),
+          path.join(root, "db", "direct-inventory-repository.ts")
         ].includes(full)
       ) {
         if (/from ["'][^"']*(\/direct\/|direct-repository)/.test(readFileSync(full, "utf8"))) offenders.push(path.relative(root, full));

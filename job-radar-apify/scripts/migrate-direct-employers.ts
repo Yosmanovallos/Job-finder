@@ -2,9 +2,11 @@
  * Migration for official employer vacancies (docs/adr/0006-direct-employers.md).
  * Applies schema.sql's additive `direct-employers` block (four NEW tables),
  * `direct-discovery` block (employer_discovery, phase D3), both with RLS +
- * REVOKE, and `direct-projection` (phase D4, ADR 0006 §10): two NULLABLE
+ * REVOKE, `direct-projection` (phase D4, ADR 0006 §10): two NULLABLE
  * columns on `jobs` plus partial indexes that match no row yet — a
- * metadata-only change that holds the table lock for milliseconds.
+ * metadata-only change that holds the table lock for milliseconds — and
+ * `direct-inventory` (ADR 0006 §13, phase I1): one NEW table,
+ * ats_board_inventory, with RLS + REVOKE.
  *
  * Run once, explicitly:
  *   npx tsx scripts/migrate-direct-employers.ts --dry-run
@@ -19,8 +21,8 @@ import { assertDirectDatabaseAllowed } from "../src/direct/db-guard.js";
 
 dotenv.config();
 
-const TABLES = ["employers", "employer_aliases", "employer_sources", "direct_jobs", "employer_discovery"];
-const BLOCKS = ["direct-employers", "direct-discovery", "direct-projection"];
+const TABLES = ["employers", "employer_aliases", "employer_sources", "direct_jobs", "employer_discovery", "ats_board_inventory"];
+const BLOCKS = ["direct-employers", "direct-discovery", "direct-projection", "direct-inventory"];
 const JOB_COLUMNS = ["direct_job_id", "superseded_by"];
 
 async function main() {

@@ -4,6 +4,7 @@
  * either matches one known host pattern or yields nothing. The HTML is
  * untrusted data — only href/src attribute values are read, never text.
  */
+import { SMARTRECRUITERS_NOT_A_COMPANY, workdayRefFromUrl } from "./cc-refs.js";
 
 /** ATS types discovery can recognise; only some have a connector (src/direct/types.ts). */
 export const DETECTABLE_ATS_TYPES = [
@@ -57,14 +58,11 @@ export function atsLinkFromUrl(raw: string): AtsLink | null {
   }
   if (host === "jobs.lever.co" || host === "jobs.eu.lever.co") return found("lever", firstSegment(url)?.toLowerCase() ?? null);
   if (host === "jobs.ashbyhq.com") return found("ashby", firstSegment(url));
-  if (host === "jobs.smartrecruiters.com" || host === "careers.smartrecruiters.com") return found("smartrecruiters", firstSegment(url));
-  const workday = /^([a-z0-9-]+)\.(wd\d{1,3})\.myworkdayjobs\.com$/.exec(host);
-  if (workday) {
-    // /{locale}/{site} or /{site}; the locale ("es", "en-US") is optional.
-    const segments = url.pathname.split("/").filter(Boolean);
-    const site = /^[a-z]{2}(-[A-Za-z]{2})?$/.test(segments[0] ?? "") ? segments[1] : segments[0];
-    return found("workday", site && REF.test(site) ? `${workday[1]}/${workday[2]}/${site}` : null);
+  if (host === "jobs.smartrecruiters.com" || host === "careers.smartrecruiters.com") {
+    const id = firstSegment(url);
+    return found("smartrecruiters", id && !SMARTRECRUITERS_NOT_A_COMPANY.has(id) ? id : null);
   }
+  if (host.endsWith(".myworkdayjobs.com")) return found("workday", workdayRefFromUrl(url.toString()));
   if (/^career\d*\.successfactors\.(com|eu)$/.test(host)) {
     const company = url.searchParams.get("company");
     return found("successfactors", company && REF.test(company) ? company : null);

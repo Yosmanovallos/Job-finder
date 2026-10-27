@@ -882,6 +882,46 @@ CREATE INDEX IF NOT EXISTS idx_jobs_superseded_by ON jobs (superseded_by) WHERE 
 CREATE INDEX IF NOT EXISTS idx_jobs_superseded_fingerprint ON jobs (content_fingerprint) WHERE superseded_by IS NOT NULL;
 -- END direct-projection
 
+-- BEGIN direct-inventory
+-- Inventario de tableros ATS hallados desde el lado del ATS
+-- (openspec/changes/ats-inventory-co-2026-11, ADR 0006 §13, fase I1). Solo la
+-- referencia normalizada y su procedencia: ninguna URL, texto ni vacante.
+-- ref_key compara refs sin distinguir mayúsculas, así un mismo tablero visto
+-- por dos fuentes es una sola fila. Insert-only salvo `sources` (se añade una
+-- procedencia nueva); el estado y la evidencia los escribe el sondeo (I2).
+-- Lo aplica scripts/migrate-direct-employers.ts.
+CREATE TABLE IF NOT EXISTS ats_board_inventory (
+    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    ats_type            VARCHAR(30) NOT NULL CHECK (ats_type ~ '^[a-z0-9_]{2,30}$'),
+    ats_ref             VARCHAR(200) NOT NULL,
+    ref_key             VARCHAR(200) GENERATED ALWAYS AS (lower(ats_ref)) STORED,
+    first_source        VARCHAR(20) NOT NULL CHECK (first_source ~ '^[a-z_]{2,20}$'),
+    sources             TEXT[] NOT NULL DEFAULT '{}',
+    status              VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status ~ '^[a-z_]{2,20}$'),
+    status_reason       VARCHAR(300),
+    declared_name       VARCHAR(255),
+    colombia_count      INTEGER,
+    total_count         INTEGER,
+    probe_attempts      INTEGER NOT NULL DEFAULT 0,
+    last_probed_at      TIMESTAMPTZ,
+    next_probe_at       TIMESTAMPTZ,
+    employer_source_id  UUID REFERENCES employer_sources(id) ON DELETE SET NULL,
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (ats_type, ref_key)
+);
+CREATE INDEX IF NOT EXISTS idx_ats_board_inventory_due ON ats_board_inventory (status, next_probe_at);
+ALTER TABLE ats_board_inventory ENABLE ROW LEVEL SECURITY;
+DO $revoke$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon')
+     AND EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+    REVOKE ALL ON ats_board_inventory FROM anon, authenticated;
+  END IF;
+END
+$revoke$;
+-- END direct-inventory
+
 -- BEGIN saved-jobs
 -- Vacantes guardadas / postuladas por usuario ("Mi cuenta", 2026-10-27).
 -- Aditivo e idempotente; lo aplica scripts/migrate-saved-jobs.ts. Sin FK
