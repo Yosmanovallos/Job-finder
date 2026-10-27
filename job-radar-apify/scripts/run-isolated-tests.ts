@@ -69,7 +69,8 @@ const suites: Record<string, string[]> = {
     "validate-job-freshness.ts",
     "validate-direct-employers.ts",
     "validate-direct-discovery.ts",
-    "validate-direct-projection.ts"
+    "validate-direct-projection.ts",
+    "validate-saved-jobs.ts"
   ],
     direct: ["validate-direct-employers.test.ts", "validate-direct-discovery.test.ts", "validate-direct-d5.test.ts", "validate-direct-d5-workday.test.ts", "validate-direct-d5-phenom.test.ts", "validate-direct-d5-eightfold.test.ts", "validate-direct-d5-magneto.test.ts", "validate-direct-d5-google.test.ts", "validate-direct-tp.test.ts", "validate-direct-frisby.test.ts", "validate-direct-altipal.test.ts", "validate-direct-workeando.test.ts", "validate-computrabajo-backlog.test.ts", "validate-direct-employers.ts", "validate-direct-discovery.ts", "validate-direct-projection.ts"],
   "source-closure": ["validate-source-closure.test.ts", "validate-source-closure.ts"],
@@ -80,6 +81,7 @@ const suites: Record<string, string[]> = {
   seo: ["validate-seo-job-pages.ts"],
   companies: ["validate-company-identity.test.ts", "validate-companies-search.ts"],
   home: ["validate-home-stats.ts"],
+  "saved-jobs": ["validate-saved-jobs.ts"],
   baseline: ["validate-public-baseline.ts"],
   "agent-readiness": ["validate-agent-readiness.test.ts", "validate-agent-readiness.ts"],
   "job-seo": [

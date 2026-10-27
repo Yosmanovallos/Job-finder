@@ -108,8 +108,15 @@ export default function Login() {
       : mode === "signup"
         ? "Crea tu cuenta"
         : "Recupera tu contraseña";
+  // Sent here by a star/check on a job (src/lib/saved-jobs.tsx) or by
+  // "Guardadas": say why, the job is saved once they're in.
+  const savingIntent = searchParams.get("intent") === "save" || returnTo.startsWith("/cuenta");
   const subtitle =
-    mode === "forgot" ? "Te enviamos un enlace para elegir una nueva contraseña." : null;
+    mode === "forgot"
+      ? "Te enviamos un enlace para elegir una nueva contraseña."
+      : savingIntent
+        ? "Así guardamos tus vacantes y las ves desde cualquier dispositivo."
+        : null;
 
   const inputClass =
     "h-12 w-full rounded-xl border-2 border-foreground bg-[#fbfaf6] px-4 text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-4 focus:ring-gold-1/60";

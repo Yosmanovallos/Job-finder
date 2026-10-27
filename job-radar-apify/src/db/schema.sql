@@ -881,3 +881,31 @@ CREATE INDEX IF NOT EXISTS idx_jobs_superseded_by ON jobs (superseded_by) WHERE 
 -- copy branch of that lookup must not scan every hidden copy.
 CREATE INDEX IF NOT EXISTS idx_jobs_superseded_fingerprint ON jobs (content_fingerprint) WHERE superseded_by IS NOT NULL;
 -- END direct-projection
+
+-- BEGIN saved-jobs
+-- Vacantes guardadas / postuladas por usuario ("Mi cuenta", 2026-10-27).
+-- Aditivo e idempotente; lo aplica scripts/migrate-saved-jobs.ts. Sin FK
+-- hacia jobs: las vacantes vencidas se purgan, pero una guardada debe seguir
+-- apareciendo en "Mi cuenta" como "ya no disponible", así que guarda una
+-- copia mínima (título, empresa, ciudad, fuente) tomada de jobs por el
+-- servidor, nunca del cliente. Una fila = una vacante en "Mis vacantes";
+-- applied_at marca la postulación.
+CREATE TABLE IF NOT EXISTS user_saved_jobs (
+    user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    job_id      UUID NOT NULL,
+    title       VARCHAR(500) NOT NULL,
+    company     VARCHAR(255),
+    location    VARCHAR(255),
+    source      VARCHAR(100),
+    saved_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    applied_at  TIMESTAMPTZ,
+    PRIMARY KEY (user_id, job_id)
+);
+CREATE INDEX IF NOT EXISTS idx_user_saved_jobs_user_saved
+    ON user_saved_jobs (user_id, saved_at DESC);
+
+-- Mismo blindaje que el resto de tablas: solo el servidor (rol postgres)
+-- la lee y escribe; la anon key pública no ve nada.
+ALTER TABLE user_saved_jobs ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON user_saved_jobs FROM anon, authenticated;
+-- END saved-jobs

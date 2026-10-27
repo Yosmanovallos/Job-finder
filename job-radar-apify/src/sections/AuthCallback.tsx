@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../auth/auth-provider.js";
 import { RoleOnboardingModal } from "../components/RoleOnboardingModal.js";
 import { trackEvent } from "../lib/analytics.js";
+import { AuthShell, AuthSpinner, AuthText, AuthTitle, authPrimaryButtonClass } from "../components/AuthShell.js";
 
 // Dedicated landing spot for the Google OAuth redirect AND the email
 // confirmation link — supabase-js exchanges the code/hash for a session
@@ -42,36 +43,19 @@ export default function AuthCallback() {
 
   if (!loading && !isAuthenticated) {
     return (
-      <section
-        className="min-h-screen flex items-center justify-center px-4"
-        style={{ backgroundColor: "#fafafa" }}
-      >
-        <div className="w-full max-w-sm p-6 rounded-2xl border border-[#e6e8e4] bg-[#ffffff] text-center">
-          <h1 className="text-xl font-bold text-foreground mb-2 font-heading">
-            No se pudo iniciar sesión
-          </h1>
-          <p className="text-xs text-muted-foreground mb-6 font-mono">
-            {configError
-              ? "El servicio de acceso tuvo un problema de configuración en el servidor. Intenta de nuevo en unos minutos."
-              : "El enlace de autenticación no es válido o expiró. Intenta iniciar sesión de nuevo."}
-          </p>
-          <Link
-            to="/login"
-            className="block w-full px-4 py-3 rounded-lg bg-primary hover:bg-primary text-primary-foreground font-bold text-sm transition-all"
-          >
-            Volver a iniciar sesión
-          </Link>
-        </div>
-      </section>
+      <AuthShell>
+        <AuthTitle>No se pudo iniciar sesión</AuthTitle>
+        <AuthText>
+          {configError
+            ? "El servicio de acceso tuvo un problema de configuración en el servidor. Intenta de nuevo en unos minutos."
+            : "El enlace de autenticación no es válido o expiró. Intenta iniciar sesión de nuevo."}
+        </AuthText>
+        <Link to="/login" className={authPrimaryButtonClass}>
+          Volver a iniciar sesión
+        </Link>
+      </AuthShell>
     );
   }
 
-  return (
-    <section
-      className="min-h-screen flex items-center justify-center"
-      style={{ backgroundColor: "#fafafa" }}
-    >
-      <div className="w-6 h-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-    </section>
-  );
+  return <AuthSpinner />;
 }

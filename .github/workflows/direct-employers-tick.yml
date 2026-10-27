@@ -16,7 +16,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "tick | dry-run | dry-run-one | tick-one | migrate-dry-run | migrate | seed-dry-run | seed | seed-one-dry-run | seed-one | domain-census | discover-dry-run | discover | coverage | computrabajo-coverage | computrabajo-backlog | frisby-canary | altipal-canary | identity-canary | db-size | cc-tenants | review-list | review-approve-dry-run | review-approve | cv-purge-dry-run | cv-purge"
+        description: "tick | dry-run | dry-run-one | tick-one | migrate-dry-run | migrate | seed-dry-run | seed | seed-one-dry-run | seed-one | domain-census | discover-dry-run | discover | coverage | computrabajo-coverage | computrabajo-backlog | frisby-canary | altipal-canary | identity-canary | db-size | cc-tenants | review-list | review-approve-dry-run | review-approve | cv-purge-dry-run | cv-purge | saved-jobs-migrate-dry-run | saved-jobs-migrate"
         required: true
         default: "dry-run"
         type: choice
@@ -59,6 +59,11 @@ on:
           # Generator tables (scripts/purge-cv-data.ts, owner 2026-10-22).
           - cv-purge-dry-run
           - cv-purge
+          # Not direct-employer work either: creates the saved-jobs table of
+          # "Mi cuenta" (scripts/migrate-saved-jobs.ts, owner 2026-10-27). One
+          # new table, nothing existing altered; dry-run only reads.
+          - saved-jobs-migrate-dry-run
+          - saved-jobs-migrate
       company_key:
         description: "review-approve: company_key del candidato"
         required: false
@@ -148,6 +153,8 @@ jobs:
               [ "$MODE" = "review-approve-dry-run" ] && cmd="$cmd --dry-run" ;;
             cv-purge-dry-run) cmd="npx tsx scripts/purge-cv-data.ts --dry-run --allow-remote-db" ;;
             cv-purge)         cmd="npx tsx scripts/purge-cv-data.ts --execute --allow-remote-db" ;;
+            saved-jobs-migrate-dry-run) cmd="npx tsx scripts/migrate-saved-jobs.ts --dry-run --allow-remote-db" ;;
+            saved-jobs-migrate) cmd="npx tsx scripts/migrate-saved-jobs.ts --allow-remote-db" ;;
             *) echo "modo desconocido: $MODE"; exit 1 ;;
           esac
           echo "## Direct employers — $MODE" >> "$GITHUB_STEP_SUMMARY"
