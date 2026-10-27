@@ -228,9 +228,9 @@ async function run(): Promise<void> {
   // Same title and city are not enough to merge different official roles.
   // An exact repost occupies one card; both stable IDs remain addressable.
   await saveListing(source, [
-    posting({ externalId: "original", applyUrl: "https://jobs.lever.co/proj-co/original" }),
-    posting({ externalId: "variant", applyUrl: "https://jobs.lever.co/proj-co/variant", descriptionText: "Otra requisición de datos con funciones de investigación y análisis estadístico claramente distintas." }),
-    posting({ externalId: "repost", applyUrl: "https://jobs.lever.co/proj-co/repost" })
+    posting({ externalId: "original", title: "Científico de Datos", applyUrl: "https://jobs.lever.co/proj-co/original" }),
+    posting({ externalId: "variant", title: "Científico de Datos", applyUrl: "https://jobs.lever.co/proj-co/variant", descriptionText: "Otra requisición de datos con funciones de investigación y análisis estadístico claramente distintas." }),
+    posting({ externalId: "repost", title: "Científico de Datos", applyUrl: "https://jobs.lever.co/proj-co/repost" })
   ], false);
   const variants = await pool.query<{ external_id: string; id: string }>(
     `SELECT external_id, id FROM direct_jobs WHERE employer_source_id = $1 AND external_id IN ('original', 'variant', 'repost')`,
@@ -241,7 +241,7 @@ async function run(): Promise<void> {
   const repostId = variants.rows.find((entry) => entry.external_id === "repost")?.id;
   await syncProjections();
   const officialPage = await getJobsPage({ filters: { company: "Proj Co", country: "CO" }, limit: 20, includeDetails: false });
-  const dataCards = officialPage.jobs.filter((job) => job.title === "Analista de Datos");
+  const dataCards = officialPage.jobs.filter((job) => job.title === "Científico de Datos");
   check(
     Boolean(originalId && variantId && repostId) && dataCards.length === 2 && dataCards.some((job) => job.jobId === variantId) &&
       dataCards.some((job) => job.jobId === originalId || job.jobId === repostId) &&
