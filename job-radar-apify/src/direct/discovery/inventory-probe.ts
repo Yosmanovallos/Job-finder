@@ -90,7 +90,7 @@ export type Verdict =
   | ({ status: "eligible"; companyKey: string; declaredName: string; reason: string } & Omit<Counts, "declaredName">)
   | ({ status: "no_colombia" | "agency" | "ambiguous" | "blocked" | "error"; reason: string; notFound?: boolean } & Counts);
 
-const BOARD_LABEL = /\b(external|internal|website|careers?|jobs?|job board|hiring|openings|positions|vacantes|trabaja con nosotros)\b/;
+const BOARD_LABEL = /\b(external|internal|website|careers?|jobs?|job board|hiring|openings|positions|clients?|vacantes|trabaja con nosotros)\b/;
 
 /** The decision the board's own listing supports, before any database conflict. */
 export function judgeBoard(atsType: DirectAtsType, read: BoardRead, agencyKeys: ReadonlySet<string>): Verdict {
@@ -106,7 +106,7 @@ export function judgeBoard(atsType: DirectAtsType, read: BoardRead, agencyKeys: 
   if (read.declaredNames.length === 0) return { status: "ambiguous", reason: `${atsType} no declara el nombre de la empresa`, ...counts };
   const agency = read.declaredNames.find((name) => agencyKeys.has(companyKey(name)) || looksLikeAgency(name));
   if (agency) return { status: "agency", reason: "agencia de empleo: publica vacantes de sus clientes", ...counts, declaredName: agency };
-  // Greenhouse board names carry labels ("Backblaze External Website",
+  // Greenhouse board names carry labels ("Backblaze External Website", "Extenteam Client Roles",
   // measured in the 2026-10-27 dry run): such a name is not the employer's.
   const label = read.declaredNames.find((name) => BOARD_LABEL.test(foldName(name)));
   if (label) return { status: "ambiguous", reason: clip(`el nombre declarado parece una etiqueta del tablero: ${label}`), ...counts };

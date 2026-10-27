@@ -163,7 +163,7 @@ test("Greenhouse: the name is the board's own (/v1/boards/{token}), read only wh
 
 test("INV-010: short, generic, placeholder or several names are ambiguous; Magneto too", () => {
   const listed = (names: string[]): BoardRead => ({ kind: "listed", totalCount: 3, colombiaCount: 2, deferred: 0, declaredNames: names });
-  for (const names of [["SGS"], ["Grupo"], ["Confidencial"], ["Acme Colombia", "Otra Empresa SAS"], [], ["Backblaze External Website"], ["Acme Careers"], ["Acme Jobs"]]) {
+  for (const names of [["SGS"], ["Grupo"], ["Confidencial"], ["Acme Colombia", "Otra Empresa SAS"], [], ["Backblaze External Website"], ["Acme Careers"], ["Acme Jobs"], ["Extenteam Client Roles"]]) {
     assert.equal(judgeBoard("smartrecruiters", listed(names), AGENCIES).status, "ambiguous", names.join("|"));
   }
   // Two spellings of one company are one name.
