@@ -468,7 +468,7 @@ function SavedJobRow({
           type="button"
           onClick={onToggleApplied}
           aria-pressed={applied}
-          className={`inline-flex h-8 sm:w-[150px] items-center justify-center gap-1.5 rounded-full border-2 border-foreground px-3 text-xs font-bold ${applied ? "bg-primary text-white" : "bg-white text-foreground"}`}
+          className={`inline-flex h-8 sm:w-[168px] items-center justify-center gap-1.5 whitespace-nowrap rounded-full border-2 border-foreground px-3 text-xs font-bold ${applied ? "bg-primary text-white" : "bg-white text-foreground"}`}
         >
           <Check className="h-3.5 w-3.5" aria-hidden="true" />
           {applied ? "Postulada" : "Marcar postulada"}
