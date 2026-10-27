@@ -4,9 +4,9 @@
 
 El enlace de una copia de bolsa a su vacante oficial puede elegirse por alias
 de empresa y título aunque ambas fuentes indiquen ciudades distintas. Una
-auditoría de producción encontró 515 copias ocultas; 38 tienen ubicaciones
-específicas diferentes, y algunas apuntan de Bogotá a Medellín o de Medellín
-a Barranquilla. Un enlace así oculta una oferta potencialmente distinta y
+auditoría de producción encontró 527 copias ocultas; 35 enlaces entre ciudades
+específicas realmente distintas tras normalizar Bogotá. Hay enlaces de Bogotá
+a Medellín y de Medellín a Barranquilla. Un enlace así oculta una oferta potencialmente distinta y
 redirige al candidato a otra ciudad.
 
 ## Alcance

@@ -329,11 +329,13 @@ y sale del mapa.
 
 ### 12. Enmienda de copias entre ciudades (2026-10-27)
 
-Auditoría de solo lectura en producción: 515 copias de bolsas ocultas, 42
-enlazadas a un grupo con varias requisiciones oficiales distintas y 94 con
-una ubicación diferente de la oficial elegida. De estas, 38 declaran una
-ubicación específica en ambos lados; hay casos de Bogotá enlazados a
-Medellín y de Medellín a Barranquilla. Ninguna de las 515 comparte URL ni
+Auditoría de solo lectura en producción (2026-10-27): 527 copias de bolsas
+ocultas, 42 enlazadas a un grupo con varias requisiciones oficiales distintas
+y 95 con una ubicación diferente de la oficial elegida. De estas, 38 declaran
+una ubicación específica distinta en ambos lados: 35 siguen siendo distintas
+tras normalizar grafías equivalentes de Bogotá, 4 vistas en las últimas 48 h
+y 31 antiguas. Hay casos de Bogotá enlazados a
+Medellín y de Medellín a Barranquilla. Ninguna de las 527 comparte URL ni
 descripción exacta con su oficial, así que título y alias de empresa no
 prueban por sí solos que dos filas sean la misma requisición.
 
