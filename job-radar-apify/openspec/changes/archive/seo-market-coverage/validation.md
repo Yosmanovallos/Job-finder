@@ -23,3 +23,7 @@ No se solicitan compras como condición de avance ni se leen claves/.env.
 
 Las cifras GSC recientes terminan 26-Oct y las trimestrales 25-Oct. No miden
 el piloto publicado 27-Oct. No se cierra la meta de crecimiento ni la fase 4.
+
+Publicado en PR #69: https://github.com/Yosmanovallos/Job-finder/pull/69.
+El mapa de investigación se archiva al publicar; su siguiente propuesta de
+implementación permanece activa en market-discovery-expansion/proposal.md.

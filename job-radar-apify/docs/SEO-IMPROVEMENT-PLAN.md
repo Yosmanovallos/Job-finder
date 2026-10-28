@@ -1365,7 +1365,7 @@ No se atribuye mejora de ranking. Fase cerrada y archivada.
 Detalle: `../openspec/changes/archive/home-city-discovery/validation.md`.
 
 28-Oct — mapa de ampliación posterior al piloto:
-`../openspec/changes/seo-market-coverage/report.md`. Veinte oportunidades con
+`../openspec/changes/archive/seo-market-coverage/report.md` (PR #69). Veinte oportunidades con
 consultas/páginas de GSC y 21 observaciones públicas agregadas. Lote siguiente:
 Armenia, Neiva, Ibagué, Popayán e ingeniero civil VE. La fase documental no
 implementa páginas nuevas. Se documentan cargos sin categoría y el desajuste

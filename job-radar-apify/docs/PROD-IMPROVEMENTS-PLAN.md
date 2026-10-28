@@ -48,7 +48,7 @@ la medición anterior de lint (configuración de otro checkout): el único error
 real en Job queda resuelto sin supresiones y lint global pasa.
 Baseline diagnóstico: PR #64.
 
-Mapa de ampliación SEO, 2026-10-28: `openspec/changes/seo-market-coverage/`.
+Mapa de ampliación SEO, 2026-10-28: `openspec/changes/archive/seo-market-coverage/`, PR #69.
 Entrega documental de fase 3, veinte oportunidades con GSC e inventario real;
 siguiente lote: Armenia, Neiva, Ibagué, Popayán e ingeniero civil VE. No cambia
 aplicación ni amplía todavía el bloque del piloto. Acceso directo a GSC

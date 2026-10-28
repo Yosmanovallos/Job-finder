@@ -6,6 +6,6 @@
 - [x] Identificar alternativa a Wizard y comprobar acceso directo a Google.
 - [x] Documentar veinte oportunidades y lote de cinco páginas existentes.
 - [x] Verificar consistencia de artefactos, lint, tipos y unitarias requeridas.
-- [ ] Publicar entrega documental y registrar su referencia.
+- [x] Publicar entrega documental y registrar su referencia: PR #69.
 
 La implementación de páginas permanece pendiente de su siguiente fase.

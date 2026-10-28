@@ -25,7 +25,7 @@ Actualización operativa 28-Oct: piloto de enlaces Bogotá/Cúcuta/Caracas
 publicado y verificado, PR #66/#67. Lint global y typecheck pasan; los conteos
 de errores históricos del 24-Oct abajo no describen ya estos gates actuales.
 Mapa de ampliación (fase 3) documentado en
-`../openspec/changes/seo-market-coverage/report.md`: veinte oportunidades,
+`../openspec/changes/archive/seo-market-coverage/report.md` (PR #69): veinte oportunidades,
 inventario público y siguiente lote Armenia/Neiva/Ibagué/Popayán/ingeniero
 civil VE. Esta entrega documental no implementa la fase 4 ni prueba crecimiento.
 
