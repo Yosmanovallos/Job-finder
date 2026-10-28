@@ -67,6 +67,15 @@ Post-deploy: 17 rutas saludables y 15 páginas sin drift de metadata comprobada.
 Leyenda: ✅ done · 🔵 spec/draft · 🟡 en implementación · ⬜ pendiente ·
 🔴 bloqueada.
 
+Diagnóstico SEO y ciclo de vacantes, 2026-10-28:
+`openspec/changes/seo-lifecycle-diagnosis/` y
+`docs/SEO-SUSTAINABLE-STRATEGY-2026-10-28.md`. Entrega documental local:
+Cúcuta indexada pero exposición débil; crecimiento semanal orgánico desde
+base pequeña; cobertura histórica Soft 404 requiere revalidación. Confirmada
+regla de retiro por publicación >30 días. No se cambia ADR 0005 ni producción;
+medición de retiros y verificación fiable preceden cualquier retención nueva.
+Mantener diseño actual y ejecutar siguientes entregas en sesiones separadas.
+
 ## Hallazgos de base (verificados en `74f066b`)
 
 ### Verificación SEO de renderizado — 2026-10-24
