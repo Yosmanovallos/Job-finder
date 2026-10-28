@@ -45,7 +45,25 @@ jobs:
           node-version: "24.18.0"
           package-manager-cache: false
       - run: npm ci
+      # ATS side first (INV-025, ADR 0006 §13): pending inventory boards are
+      # probed and, under the INV-010…INV-012 rules, enabled (insert-only, at
+      # most 25 per run). Same schedule and timeout; the run's time is split.
+      - name: Probe ATS inventory boards
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          MODE: ${{ github.event_name == 'schedule' && 'execute' || inputs.mode }}
+        run: |
+          if [ "$MODE" = dry-run ]; then
+            npx tsx scripts/direct-ats-probe.ts --allow-remote-db --limit 500 --deadline-min 6
+          elif [ "$MODE" = execute ]; then
+            npx tsx scripts/direct-ats-probe.ts --execute --allow-remote-db --limit 500 --max-enable 25 --deadline-min 6
+          else
+            echo "Unsupported discovery mode" >&2
+            exit 1
+          fi
       - name: Discover employer boards
+        # Runs even when the inventory probe failed: the two paths are independent.
+        if: ${{ !cancelled() }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           MODE: ${{ github.event_name == 'schedule' && 'execute' || inputs.mode }}
@@ -60,9 +78,9 @@ jobs:
             exit 1
           fi
           if [ "$MODE" = dry-run ]; then
-            npx tsx scripts/discover-direct-employers.ts --dry-run --allow-remote-db --limit 100 --min-count 1 --deadline-min 12 $focus_arg
+            npx tsx scripts/discover-direct-employers.ts --dry-run --allow-remote-db --limit 100 --min-count 1 --deadline-min 9 $focus_arg
           elif [ "$MODE" = execute ]; then
-            npx tsx scripts/discover-direct-employers.ts --allow-remote-db --limit 1000 --min-count 1 --max-enables 10 --deadline-min 12 $focus_arg
+            npx tsx scripts/discover-direct-employers.ts --allow-remote-db --limit 1000 --min-count 1 --max-enables 10 --deadline-min 9 $focus_arg
           else
             echo "Unsupported discovery mode" >&2
             exit 1
