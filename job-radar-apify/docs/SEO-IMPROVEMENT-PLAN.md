@@ -1364,6 +1364,13 @@ HTML/Markdown y navegación real CO/VE confirmados; sin drift de metadatos.
 No se atribuye mejora de ranking. Fase cerrada y archivada.
 Detalle: `../openspec/changes/archive/home-city-discovery/validation.md`.
 
+28-Oct — mapa de ampliación posterior al piloto:
+`../openspec/changes/seo-market-coverage/report.md`. Veinte oportunidades con
+consultas/páginas de GSC y 21 observaciones públicas agregadas. Lote siguiente:
+Armenia, Neiva, Ibagué, Popayán e ingeniero civil VE. La fase documental no
+implementa páginas nuevas. Se documentan cargos sin categoría y el desajuste
+de remoto VE/CO; no se corrigen silenciosamente junto al mapa.
+
 No hay una fase "10" ya definida — cualquier trabajo más allá de esto
 (backlinks, contenido adicional, un tercer país) es exploratorio y
 necesita su propio diagnóstico antes de entrar a esta tabla, mismo

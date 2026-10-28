@@ -1,0 +1,63 @@
+{
+  "preparedAt": "2026-10-28",
+  "timezone": "America/Bogota",
+  "property": "sc-domain:buscotrabajo.co",
+  "searchType": "web",
+  "queryWindow": {"start":"2026-07-26","end":"2026-10-25","observedOn":"2026-10-27","scope":"global; first 500 of 832 visible queries; not market search volume"},
+  "pageWindow": {"start":"2026-09-29","end":"2026-10-26","observedOn":"2026-10-28","scope":"global; country of searcher is not destination country"},
+  "propertyTotals": {"clicks":54,"impressionsDisplay":"2,2 mil (rounded)","ctrPercent":2.5,"position":10.1},
+  "countryRows": [
+    {"country":"Colombia","clicks":35,"impressions":1388,"position":7.7},
+    {"country":"Venezuela","clicks":10,"impressions":396,"position":12.5}
+  ],
+  "opportunities": [
+    {"id":"M01","query":"empleo armenia","clicks":1,"impressions":16,"position":15.1,"intent":"city","target":"/empleos/armenia","priority":"next_batch","mapping":"exact query mapped to category"},
+    {"id":"M02","query":"trabajo en neiva","clicks":0,"impressions":24,"position":17.9,"intent":"city","target":"/empleos/neiva","priority":"next_batch","mapping":"exact query mapped to category"},
+    {"id":"M03","query":"trabajo ibague","clicks":0,"impressions":7,"position":9,"intent":"city","target":"/empleos/ibague","priority":"next_batch","mapping":"candidate; recent page metrics independently observed"},
+    {"id":"M04","query":"empleos popayan","clicks":0,"impressions":9,"position":27.9,"intent":"city","target":"/empleos/popayan","priority":"next_batch","mapping":"candidate; recent page metrics independently observed"},
+    {"id":"M05","query":"empleo ingeniero civil venezuela","clicks":0,"impressions":7,"position":8.7,"intent":"role_country","target":"/ve/empleos/ingeniero-civil","priority":"next_batch","mapping":"candidate; recent page metrics independently observed"},
+    {"id":"M06","query":"trabajos en santa marta","clicks":0,"impressions":19,"position":28.5,"intent":"city","target":"/empleos/santa-marta","priority":"reserve","mapping":"exact query mapped to category; only 2 recent page impressions"},
+    {"id":"M07","query":"empleos en valledupar","clicks":0,"impressions":11,"position":31.2,"intent":"city","target":"/empleos/valledupar","priority":"reserve","mapping":"candidate; recent page metrics independently observed"},
+    {"id":"M08","query":"empleos manizales","clicks":0,"impressions":13,"position":5.3,"intent":"city","target":"/empleos/manizales","priority":"inspect_indexing","mapping":"prior baseline maps query to job detail; category position not inferred"},
+    {"id":"M09","query":"empleos palmira hoy","clicks":1,"impressions":3,"position":31.7,"intent":"city_freshness","target":"/empleos/palmira","priority":"reserve","mapping":"candidate; no promise all jobs were published today"},
+    {"id":"M10","query":"empleo valencia carabobo","clicks":0,"impressions":7,"position":4.7,"intent":"city","target":"/empleos/valencia","priority":"reserve","mapping":"exact query maps to a job detail, not category"},
+    {"id":"M11","query":"trabajo en maracay","clicks":0,"impressions":5,"position":38.8,"intent":"city","target":"/empleos/maracay","priority":"reserve","mapping":"candidate; recent page metrics independently observed"},
+    {"id":"M12","query":"empleo puerto ordaz","clicks":2,"impressions":9,"position":4.6,"intent":"city","target":"/empleos/ciudad-guayana","priority":"validate_geography","mapping":"candidate only; prior baseline maps query to job detail; no equivalence asserted"},
+    {"id":"M13","query":"trabajo community manager","clicks":1,"impressions":5,"position":2,"intent":"role","target":"/empleos/community-manager","priority":"reserve","mapping":"exact query maps to a job detail, not category"},
+    {"id":"M14","query":"empleo en marketing digital y diseño web","clicks":0,"impressions":12,"position":32.8,"intent":"role","target":"/empleos/especialista-en-marketing-digital","priority":"validate_matching","mapping":"candidate; verify role relevance before promoting broad inventory"},
+    {"id":"M15","query":"trabajos remotos","clicks":0,"impressions":16,"position":3,"intent":"modality","target":"/empleos/remoto","priority":"validate_country","mapping":"exact query maps to a job detail; VE alias currently serves CO metadata"},
+    {"id":"M16","query":"remote business analyst jobs","clicks":1,"impressions":4,"position":3,"intent":"role_modality","target":"/empleos/business-analyst","priority":"validate_eligibility","mapping":"candidate; category is not exclusively remote; country eligibility not inferred"},
+    {"id":"M17","query":"trabajo topografo","clicks":3,"impressions":8,"position":6.8,"intent":"role","target":null,"priority":"taxonomy_research","mapping":"exact query maps to a job detail; absent from current category taxonomy"},
+    {"id":"M18","query":"ingeniero electronico empleo","clicks":1,"impressions":7,"position":6.6,"intent":"role","target":null,"priority":"taxonomy_research","mapping":"exact query maps to a job detail; absent from current category taxonomy"},
+    {"id":"M19","query":"trabajo redactor","clicks":1,"impressions":7,"position":3.9,"intent":"role","target":null,"priority":"taxonomy_research","mapping":"exact query maps to a job detail; absent from current category taxonomy"},
+    {"id":"M20","query":"busco trabajo","clicks":0,"impressions":7,"position":19,"intent":"national","target":"/","priority":"national_long_term","mapping":"query owner not established by this map; not a measured ranking for the homepage"}
+  ],
+  "recentPages": [
+    {"path":"/empleos/armenia","clicks":1,"impressions":64,"ctrPercent":1.6,"position":9.0},
+    {"path":"/empleos/neiva","clicks":0,"impressions":48,"ctrPercent":0,"position":9.1},
+    {"path":"/empleos/ibague","clicks":2,"impressions":58,"ctrPercent":3.4,"position":10.7},
+    {"path":"/empleos/popayan","clicks":0,"impressions":20,"ctrPercent":0,"position":11.0},
+    {"path":"/ve/empleos/ingeniero-civil","clicks":1,"impressions":42,"ctrPercent":2.4,"position":10.0},
+    {"path":"/empleos/santa-marta","clicks":0,"impressions":2,"ctrPercent":0,"position":21.5},
+    {"path":"/empleos/valledupar","clicks":0,"impressions":19,"ctrPercent":0,"position":11.6},
+    {"path":"/empleos/palmira","clicks":1,"impressions":5,"ctrPercent":20,"position":16.2},
+    {"path":"/empleos/valencia","clicks":0,"impressions":33,"ctrPercent":0,"position":31.8},
+    {"path":"/empleos/maracay","clicks":1,"impressions":27,"ctrPercent":3.7,"position":27.3},
+    {"path":"/empleos/community-manager","clicks":0,"impressions":5,"ctrPercent":0,"position":4.4},
+    {"path":"/empleos/especialista-en-marketing-digital","clicks":0,"impressions":15,"ctrPercent":0,"position":33.2},
+    {"path":"/empleos/cucuta","clicks":1,"impressions":23,"ctrPercent":4.3,"position":32.5},
+    {"path":"/empleos/caracas","clicks":0,"impressions":133,"ctrPercent":0,"position":29.4}
+  ],
+  "exactQueryPageExamples": [
+    {"query":"trabajo topografo","path":"/empleos/d1b4d560-a38e-4d60-b27a-d967c456246e/tecnologo-en-topografia-con-disponibilidad-para-viajar-bogota-d-c-capital-distri","pageClicks":3,"pageImpressions":14,"pagePosition":5.9},
+    {"query":"empleo armenia","path":"/empleos/armenia","pageClicks":1,"pageImpressions":16,"pagePosition":15.1},
+    {"query":"trabajo en neiva","path":"/empleos/neiva","pageClicks":0,"pageImpressions":24,"pagePosition":17.9},
+    {"query":"trabajos en santa marta","path":"/empleos/santa-marta","pageClicks":0,"pageImpressions":19,"pagePosition":28.5},
+    {"query":"trabajo community manager","path":"/empleos/b817687e-4898-4011-a920-5f0a3be523b9/community-manager-copywriter-bogota-d-c-capital-district-colombia","pageClicks":1,"pageImpressions":5,"pagePosition":2.0},
+    {"query":"ingeniero electronico empleo","path":"/empleos/16c2ed6f-f1ee-4fde-8bf3-7c9c87f9b3a7/lider-de-dispositivos-electronicos-ingeniero-electronico-colombia","pageClicks":2,"pageImpressions":9,"pagePosition":6.7},
+    {"query":"trabajo redactor","path":"/empleos/83dcfc68-e01b-4fc3-93de-ab48f84550cd/redactor-creativo-de-influencer-marketing-bogota-capital-district-colombia","pageClicks":1,"pageImpressions":8,"pagePosition":3.5},
+    {"query":"empleo valencia carabobo","path":"/empleos/2e13846e-890b-43cd-aa1a-7d0e3ac5e5bb/ingeniero-civil-valencia-carabobo-state-venezuela","pageClicks":0,"pageImpressions":7,"pagePosition":4.7},
+    {"query":"trabajos remotos","path":"/empleos/3dcf203b-e270-4e95-9d38-13cd5843415b/asistente-de-beneficios-trabajo-remoto-colombia","pageClicks":0,"pageImpressions":16,"pagePosition":3.0}
+  ],
+  "notes": ["Property and page aggregations can differ; do not force equality or sum them.","UTM variants were observed for community-manager and remote details; paths above omit their tracking parameters for readability, not as evidence of canonicalization.","No market-wide keyword volume, full cannibalization score, GA4 conversion value, current URL inspection or causal uplift was obtained."]
+}
