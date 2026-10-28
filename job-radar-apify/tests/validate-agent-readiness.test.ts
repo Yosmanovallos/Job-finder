@@ -39,6 +39,26 @@ test("HCD-001 home HTML and Markdown expose the country pilot before JavaScript"
   }
 });
 
+test("MDE-001/002 country discovery adds the five mapped destinations and keeps the pilot", () => {
+  for (const [country, expected] of [
+    ["CO", ["/empleos/bogota", "/empleos/cucuta", "/empleos/armenia", "/empleos/neiva", "/empleos/ibague", "/empleos/popayan"]],
+    ["VE", ["/empleos/caracas", "/ve/empleos/ingeniero-civil"]]
+  ] as const) {
+    const content = getHomeContent(country);
+    const discovery = content.sections[0];
+    assert.deepEqual(discovery?.links?.map((link) => link.href), expected);
+    assert.equal(new Set(discovery?.links?.map((link) => link.href)).size, expected.length);
+    for (const href of expected) {
+      assert.ok(renderContentHtml(content).includes(`href="${href}"`));
+      assert.ok(renderContentMarkdown(content).includes(`](${href})`));
+    }
+    if (country === "VE") {
+      assert.match(discovery.heading, /ciudades y cargos/i);
+      assert.equal(discovery.links?.[1]?.label, "Empleos de ingeniero civil en Venezuela");
+    }
+  }
+});
+
 test("home content is substantial and headings are sequential", () => {
   for (const country of ["CO", "VE"] as const) {
     const html = renderContentHtml(getHomeContent(country));

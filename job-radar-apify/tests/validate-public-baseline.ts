@@ -46,6 +46,13 @@ async function main(): Promise<void> {
     assert.equal(response.status, 200);
     const data = (await response.json()) as { jobs: SeoJob[] };
     assert.ok(data.jobs.length > 0, "[P0] Faltan las vacantes sintéticas del baseline.");
+    const expandedCategories = new Map([
+      ["/empleos/armenia", "CO"],
+      ["/empleos/neiva", "CO"],
+      ["/empleos/ibague", "CO"],
+      ["/empleos/popayan", "CO"],
+      ["/ve/empleos/ingeniero-civil", "VE"]
+    ]);
     const routes = [
       "/",
       "/ve",
@@ -53,6 +60,7 @@ async function main(): Promise<void> {
       "/ve/dashboard",
       "/empleos/bogota",
       "/ve/empleos/project-manager",
+      ...expandedCategories.keys(),
       "/empresas",
       "/ve/empresas",
       "/docs",
@@ -61,7 +69,7 @@ async function main(): Promise<void> {
       "/privacy",
       buildJobPath(data.jobs[0])
     ];
-    const categoryRoutes = new Set(["/empleos/bogota", "/ve/empleos/project-manager"]);
+    const categoryRoutes = new Set(["/empleos/bogota", "/ve/empleos/project-manager", ...expandedCategories.keys()]);
     const snapshots: object[] = [];
     const browser = await chromium.launch({ headless: true });
     try {
@@ -70,16 +78,24 @@ async function main(): Promise<void> {
         assert.equal(response.status, 200, route);
         const html = await response.text();
         const homePilot = route === "/"
-          ? { heading: "Ciudades destacadas en Colombia", paths: ["/empleos/bogota", "/empleos/cucuta"], foreign: "/empleos/caracas" }
+          ? { heading: "Ciudades destacadas en Colombia", paths: ["/empleos/bogota", "/empleos/cucuta", "/empleos/armenia", "/empleos/neiva", "/empleos/ibague", "/empleos/popayan"], foreign: "/empleos/caracas" }
           : route === "/ve"
-            ? { heading: "Ciudades destacadas en Venezuela", paths: ["/empleos/caracas"], foreign: "/empleos/cucuta" }
+            ? { heading: "Ciudades y cargos destacados en Venezuela", paths: ["/empleos/caracas", "/ve/empleos/ingeniero-civil"], foreign: "/empleos/cucuta" }
             : null;
         if (homePilot) {
           for (const href of homePilot.paths) {
             assert.ok(html.includes(`href="${href}"`), `HCD-001 ${route}: SSR link ${href}`);
             const destination = await fetch(`${base}${href}`);
             assert.equal(destination.status, 200, `HCD-003 destination ${href}`);
-            assert.ok((await destination.text()).includes(`rel="canonical" href="https://buscotrabajo.co${href}"`));
+            const destinationHtml = await destination.text();
+            assert.ok(destinationHtml.includes(`rel="canonical" href="https://buscotrabajo.co${href}"`));
+            if (expandedCategories.has(href)) {
+              const raw = destinationHtml.match(/window\.__SSR_CATEGORY__=([\s\S]*?);<\/script>/)?.[1];
+              assert.ok(raw, `MDE-004 snapshot ${href}`);
+              const snapshot = JSON.parse(raw) as { country: string; total: number };
+              assert.equal(snapshot.country, expandedCategories.get(href), `MDE-004 country ${href}`);
+              assert.ok(snapshot.total > 0, `MDE-004 inventory ${href}`);
+            }
           }
           assert.ok(!html.includes(`href="${homePilot.foreign}"`), `HCD-003 ${route}: foreign city`);
           const markdownResponse = await fetch(`${base}${route}`, { headers: { Accept: "text/markdown" } });
