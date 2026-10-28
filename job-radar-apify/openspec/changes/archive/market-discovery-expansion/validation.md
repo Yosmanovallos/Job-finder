@@ -41,5 +41,36 @@ Evidencia local en OS temp:
 Después de estas ejecuciones se incorporó origin/main e678a09 por fast-forward:
 solo cambios ATS ajenos a helper, UI, fixture y pruebas de esta entrega. Lint y
 tipos se comprueban otra vez; CI debe validar el head combinado antes de merge.
-Verificación posterior de producción pendiente. No se atribuye mejora de ranking,
-tráfico o conversión a los enlaces antes de disponer de observación suficiente.
+## Publicación y verificación de producción
+
+PR #71 fusionado: dafec40fa2840a654a30f0f87c804cae51e7aaec.
+CI manual [40777158535](https://github.com/Yosmanovallos/Job-finder/actions/runs/40777158535)
+pasa sobre head 04c2c6c exacto, antes de merge: job-render, unit, job-seo,
+baseline e integración. Se disparó manualmente porque los paths automáticos
+del workflow no incluyen este helper; no se cambió el workflow.
+
+Render confirmó dafec40 como Last successfully deployed commit, servicio Starter
+existente. Main incorporó además el cambio de autenticación del PR #72 mientras
+corría CI; no pertenece a esta entrega. Comprobaciones públicas posteriores:
+
+- 17 rutas: home CO/VE, cinco destinos nuevos, controles de ciudades/cargo,
+  dashboards y login 200; /api/health 200 y /api/me 401 sin sesión.
+- Cinco destinos conservan país, inventario positivo y canonical propio.
+- Ocho enlaces esperados presentes en HTML y Markdown; Vary Accept,
+  Accept-Encoding preservado. DOM real CO muestra seis enlaces; VE muestra
+  Caracas e ingeniero civil con contexto de ciudades y cargos.
+- Navegación real desde el bloque a Ibagué y cargo VE confirmada por URL/H1.
+- En 15 páginas, comparación previa/posterior sin cambios en title, H1,
+  canonical, robots, hreflang y tipos de schema. No se afirma comparar todo
+  el contenido dinámico de esquemas o descripciones con conteos cambiantes.
+- Dashboard con URL única/Cloudflare MISS: CO 247 ms, VE 225 ms. No se
+  modificaron consultas, caché o warmup ni se subió el plan de Render.
+
+Snapshots públicos en OS temp market-expansion-before.json,
+market-expansion-after.json y market-expansion-comparison.json. Contraste local
+de estas capturas pasa; fixture/build sintéticos no fueron publicados.
+
+Fase implementada y verificada; se archiva al registrar cierre. No se atribuye
+mejora de ranking, tráfico o conversión a los enlaces antes de observación
+suficiente. Revisar 7/14/28 días desde 28-Oct (4/11/25-Nov); monitor existente
+conservado, sin crear otro. Rollback: revertir el merge #71, sin migraciones.

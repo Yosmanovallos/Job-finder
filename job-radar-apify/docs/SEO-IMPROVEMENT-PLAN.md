@@ -1372,11 +1372,13 @@ implementa páginas nuevas. Se documentan cargos sin categoría y el desajuste
 de remoto VE/CO; no se corrigen silenciosamente junto al mapa.
 
 28-Oct — fase 4, ampliación de navegación:
-`../openspec/changes/market-discovery-expansion/`. Cinco destinos existentes
+`../openspec/changes/archive/market-discovery-expansion/`. Cinco destinos existentes
 añadidos al helper común HTML/Markdown/React, manteniendo Bogotá/Cúcuta/Caracas.
 Contexto VE ampliado a ciudades y cargos. Lint y tipos pasan; baseline aislado
 18 rutas pasa y capturas 390/1440 px revisadas. Integración aislada pasa.
-Despliegue pendiente. Sin cambios al dashboard, consultas, canonicals o títulos/H1.
+Publicado y verificado: PR #71, dafec40. CI completo pasa; 17 rutas comprobadas,
+ocho enlaces HTML/Markdown/DOM y 15 páginas sin drift de metadata principal.
+Sin cambios al dashboard, consultas, canonicals o títulos/H1. Fase archivada.
 
 No hay una fase "10" ya definida — cualquier trabajo más allá de esto
 (backlinks, contenido adicional, un tercer país) es exploratorio y

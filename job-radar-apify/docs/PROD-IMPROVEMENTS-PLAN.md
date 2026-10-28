@@ -56,12 +56,13 @@ comprobado sin Wizard; Windsor.ai sugerido, conexión no confirmada. No se
 declara crecimiento ni indexación por publicar el mapa.
 
 Ampliación de descubrimiento, 2026-10-28:
-`openspec/changes/market-discovery-expansion/`. Implementa enlaces a Armenia,
+`openspec/changes/archive/market-discovery-expansion/`. Implementa enlaces a Armenia,
 Neiva, Ibagué, Popayán e ingeniero civil VE, conservando el piloto. Inspección
 almacenada previa: cinco URLs indexadas con canonical propio aceptado por
 Google. Helper estático compartido, sin consultas/rutas/metadata principal
-nuevas. Estado: validación local, aún sin despliegue. Baseline ampliado a
-18 rutas; cinco destinos con inventario sintético aislado.
+nuevas. Estado: desplegado y verificado, PR #71, dafec40. Baseline ampliado a
+18 rutas, cinco destinos con inventario sintético aislado; CI completo pasa.
+Post-deploy: 17 rutas saludables y 15 páginas sin drift de metadata comprobada.
 
 Leyenda: ✅ done · 🔵 spec/draft · 🟡 en implementación · ⬜ pendiente ·
 🔴 bloqueada.
