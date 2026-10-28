@@ -10,6 +10,7 @@ import {
   DUE_STATUSES,
   INVENTORY_DISCOVERY_ORIGIN,
   INVENTORY_PROBE_RULE,
+  NAME_DECLARING_ATS,
   type Eligible,
   type EnablementContext,
   type InventoryBoard,
@@ -137,7 +138,7 @@ export async function insertInventory(rows: InventoryRow[], ownedKeys: ReadonlyS
 
 // ---------- phase I2: probe and automatic enablement ----------
 
-/** Boards a probe should read now: pending first, then due retries, oldest probe first. */
+/** Boards a probe should read now: pending first, then due retries; boards linked from evidence, then ATSs that declare a name, then the oldest probe. */
 export async function pickDueInventory(limit: number): Promise<InventoryBoard[]> {
   return readOnly(async (query) => {
     const result = await query<{ id: string; ats_type: string; ats_ref: string; probe_attempts: number }>(
@@ -147,9 +148,10 @@ export async function pickDueInventory(limit: number): Promise<InventoryBoard[]>
           AND (status = 'pending' OR next_probe_at IS NULL OR next_probe_at <= NOW())
         ORDER BY (status = 'pending') DESC,
                  (sources && ARRAY['job_link', 'site_probe']) DESC,
+                 (ats_type = ANY($4::text[])) DESC,
                  last_probed_at NULLS FIRST, ats_type, ref_key
         LIMIT $3`,
-      [[...DUE_STATUSES], [...DIRECT_ATS_TYPES], limit]
+      [[...DUE_STATUSES], [...DIRECT_ATS_TYPES], limit, [...NAME_DECLARING_ATS]]
     );
     return result.rows.map((row) => ({ id: row.id, atsType: row.ats_type as DirectAtsType, atsRef: row.ats_ref, probeAttempts: row.probe_attempts }));
   });
@@ -225,7 +227,12 @@ export async function recordInventoryProbe(board: InventoryBoard, outcome: Recor
  * names one, which then gains the board. Every conflict rolls back and comes
  * back for the caller to record; nothing existing is renamed or reassigned.
  */
-export async function promoteInventoryBoard(board: InventoryBoard, verdict: Eligible): Promise<PromotionOutcome> {
+export async function promoteInventoryBoard(
+  board: InventoryBoard,
+  verdict: Eligible,
+  /** States the row may be in; a human approval also accepts `ambiguous`. */
+  fromStatuses: readonly string[] = DUE_STATUSES
+): Promise<PromotionOutcome> {
   const client: PoolClient = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -283,12 +290,111 @@ export async function promoteInventoryBoard(board: InventoryBoard, verdict: Elig
         verdict.colombiaCount,
         verdict.totalCount,
         source.rows[0].id,
-        [...DUE_STATUSES]
+        [...fromStatuses]
       ]
     );
     if (!marked.rowCount) return await conflict("ambiguous", "la fila del inventario cambió durante el sondeo");
     await client.query("COMMIT");
     return { kind: "enabled" };
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+// ---------- human review and rollback ----------
+
+export interface InventoryReviewRow extends InventoryBoard {
+  status: string;
+  reason: string | null;
+  declaredName: string | null;
+  colombiaCount: number | null;
+  totalCount: number | null;
+  lastProbedAt: string | null;
+}
+
+function reviewRow(row: Record<string, unknown>): InventoryReviewRow {
+  return {
+    id: row.id as string,
+    atsType: row.ats_type as DirectAtsType,
+    atsRef: row.ats_ref as string,
+    probeAttempts: row.probe_attempts as number,
+    status: row.status as string,
+    reason: (row.status_reason as string | null) ?? null,
+    declaredName: (row.declared_name as string | null) ?? null,
+    colombiaCount: (row.colombia_count as number | null) ?? null,
+    totalCount: (row.total_count as number | null) ?? null,
+    lastProbedAt: row.last_probed_at ? new Date(row.last_probed_at as string).toISOString() : null
+  };
+}
+
+const REVIEW_COLUMNS = `id, ats_type, ats_ref, probe_attempts, status, status_reason, declared_name, colombia_count, total_count, last_probed_at`;
+
+/** Inventory rows waiting for a person, most Colombian postings first. Read-only. */
+export async function listInventoryForReview(statuses: string[], limit: number): Promise<InventoryReviewRow[]> {
+  return readOnly(async (query) => {
+    const result = await query(
+      `SELECT ${REVIEW_COLUMNS} FROM ats_board_inventory
+        WHERE status = ANY($1::text[])
+        ORDER BY colombia_count DESC NULLS LAST, ats_type, ref_key
+        LIMIT $2`,
+      [statuses, limit]
+    );
+    return result.rows.map(reviewRow);
+  });
+}
+
+/** One inventory row by board (ref compared case-insensitively). Read-only. */
+export async function getInventoryBoard(atsType: string, atsRef: string): Promise<InventoryReviewRow | null> {
+  return readOnly(async (query) => {
+    const result = await query(`SELECT ${REVIEW_COLUMNS} FROM ats_board_inventory WHERE ats_type = $1 AND ref_key = lower($2)`, [atsType, atsRef]);
+    return result.rows[0] ? reviewRow(result.rows[0]) : null;
+  });
+}
+
+export interface RevertResult {
+  /** "ats_type:ats_ref" of every board switched off (or that would be, in a dry run). */
+  boards: string[];
+}
+
+/**
+ * Rollback (design §8): boards this inventory enabled are switched off in
+ * employer_sources and their rows become `ambiguous` with the reason, so no
+ * probe enables them again. Nothing is deleted: employers, aliases and
+ * direct_jobs stay; the projection retires the rows of a disabled board and
+ * restores recent copies, as for any board switched off. `board` null = every
+ * board the inventory enabled.
+ */
+export async function revertInventoryBoards(board: { atsType: string; atsRef: string } | null, note: string, dryRun: boolean): Promise<RevertResult> {
+  const filter = board ? `AND ats_type = $1 AND ref_key = lower($2)` : "";
+  const params = board ? [board.atsType, board.atsRef] : [];
+  if (dryRun) {
+    return readOnly(async (query) => {
+      const rows = await query<{ ats_type: string; ats_ref: string }>(
+        `SELECT ats_type, ats_ref FROM ats_board_inventory WHERE status = 'enabled' ${filter} ORDER BY ats_type, ref_key`,
+        params
+      );
+      return { boards: rows.rows.map((row) => `${row.ats_type}:${row.ats_ref}`) };
+    });
+  }
+  const client: PoolClient = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const rows = await client.query<{ id: string; ats_type: string; ats_ref: string; employer_source_id: string | null }>(
+      `SELECT id, ats_type, ats_ref, employer_source_id FROM ats_board_inventory WHERE status = 'enabled' ${filter} ORDER BY ats_type, ref_key FOR UPDATE`,
+      params
+    );
+    const sourceIds = rows.rows.map((row) => row.employer_source_id).filter((id): id is string => id !== null);
+    await client.query(`UPDATE employer_sources SET enabled = FALSE WHERE id = ANY($1::uuid[]) AND enabled`, [sourceIds]);
+    await client.query(
+      `UPDATE ats_board_inventory SET status = 'ambiguous', status_reason = $2::text, next_probe_at = NULL, updated_at = NOW()
+        WHERE id = ANY($1::uuid[])`,
+      [rows.rows.map((row) => row.id), `${INVENTORY_PROBE_RULE}: revertido en revisión humana: ${note}`.slice(0, 300)]
+    );
+    await client.query("COMMIT");
+    return { boards: rows.rows.map((row) => `${row.ats_type}:${row.ats_ref}`) };
   } catch (error) {
     await client.query("ROLLBACK").catch(() => undefined);
     throw error;

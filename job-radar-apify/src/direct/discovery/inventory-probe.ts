@@ -23,7 +23,14 @@ export const INVENTORY_DISCOVERY_ORIGIN = "ats_inventory";
 /** Inventory states a probe may (re)visit; every other state is final. */
 export const DUE_STATUSES = ["pending", "error", "blocked", "no_colombia"] as const;
 
-export type ProbeStatus = "enabled" | "no_colombia" | "agency" | "ambiguous" | "blocked" | "error" | "owned";
+/**
+ * ATSs whose listing can declare the employer's name, so a probe may enable
+ * them. Read first: the first two scheduled runs (2026-10-28) spent their
+ * whole budget on Ashby boards, which can never be enabled automatically.
+ */
+export const NAME_DECLARING_ATS = ["greenhouse", "smartrecruiters", "teamtailor", "workday"] as const;
+
+export type ProbeStatus ="enabled" | "no_colombia" | "agency" | "ambiguous" | "blocked" | "error" | "owned";
 
 // Workday names the employer and the country only in a posting's detail:
 // a few detail reads per board are enough to find one Colombian posting.
@@ -159,6 +166,31 @@ export function conflictOf(context: EnablementContext, key: string, claimedInRun
   }
   if (claimedInRun) return { status: "ambiguous", reason: "otro tablero de este ATS declara la misma empresa en esta corrida" };
   return null;
+}
+
+/**
+ * A human approval of an `ambiguous` board (an ATS that declares no name,
+ * Kraken or Nubank on Ashby). The person states the employer's name; the
+ * board is listed again now and must still be complete with ≥ 1 live
+ * Colombian posting. Agency, generic and placeholder names are still refused:
+ * the review settles identity, not those rules.
+ */
+export function reviewVerdict(name: string, read: BoardRead, agencyKeys: ReadonlySet<string>): Eligible | { status: "refused"; reason: string } {
+  const declaredName = name.trim().replace(/\s+/g, " ");
+  if (read.kind === "failed") return { status: "refused", reason: `el tablero no se pudo listar completo ahora: ${read.reason}` };
+  if (read.colombiaCount === 0) return { status: "refused", reason: "el tablero no tiene hoy vacantes vigentes en Colombia" };
+  const key = companyKey(declaredName);
+  if (declaredName.length < 2 || declaredName.length > 120) return { status: "refused", reason: "nombre vacío o demasiado largo" };
+  if (agencyKeys.has(key) || looksLikeAgency(declaredName)) return { status: "refused", reason: "el nombre es de una agencia de empleo" };
+  if (isPlaceholderKey(key) || isWeakKey(key)) return { status: "refused", reason: "nombre corto, genérico o de relleno" };
+  return {
+    status: "eligible",
+    companyKey: key,
+    declaredName,
+    colombiaCount: read.colombiaCount,
+    totalCount: read.totalCount,
+    reason: `aprobado en revisión humana como "${declaredName}"; ${read.colombiaCount} vacantes vigentes en Colombia`
+  };
 }
 
 /** Days until a board is probed again; null = final (enabled, owned, or a decision for a human). */

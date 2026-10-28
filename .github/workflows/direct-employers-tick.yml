@@ -16,7 +16,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "tick | dry-run | dry-run-one | tick-one | migrate-dry-run | migrate | seed-dry-run | seed | seed-one-dry-run | seed-one | domain-census | discover-dry-run | discover | coverage | computrabajo-coverage | computrabajo-backlog | frisby-canary | altipal-canary | identity-canary | copy-audit | copy-audit-all | db-size | cc-tenants | ats-inventory-dry-run | ats-inventory | ats-probe-dry-run | ats-probe | review-list | review-approve-dry-run | review-approve | cv-purge-dry-run | cv-purge | saved-jobs-migrate-dry-run | saved-jobs-migrate"
+        description: "tick | dry-run | dry-run-one | tick-one | migrate-dry-run | migrate | seed-dry-run | seed | seed-one-dry-run | seed-one | domain-census | discover-dry-run | discover | coverage | computrabajo-coverage | computrabajo-backlog | frisby-canary | altipal-canary | identity-canary | copy-audit | copy-audit-all | db-size | cc-tenants | ats-inventory-dry-run | ats-inventory | ats-probe-dry-run | ats-probe | inventory-review-list | inventory-approve-dry-run | inventory-approve | inventory-revert-dry-run | inventory-revert | review-list | review-approve-dry-run | review-approve | cv-purge-dry-run | cv-purge | saved-jobs-migrate-dry-run | saved-jobs-migrate"
         required: true
         default: "dry-run"
         type: choice
@@ -58,6 +58,15 @@ on:
           # reads the database (READ ONLY transactions).
           - ats-probe-dry-run
           - ats-probe
+          # Human review of the inventory (scripts/direct-ats-inventory-review.ts):
+          # list reads; approve enables ONE ambiguous board under the name in
+          # employer_name, after listing it again; revert switches off a board
+          # the inventory enabled (or `all`). Need board and note below.
+          - inventory-review-list
+          - inventory-approve-dry-run
+          - inventory-approve
+          - inventory-revert-dry-run
+          - inventory-revert
           # Human review of discovery (scripts/direct-discovery-review.ts):
           # list reads; approve promotes ONE board the evidence shows, after
           # re-listing it (insert-only). Needs company_key and board below.
@@ -79,7 +88,15 @@ on:
         required: false
         type: string
       board:
-        description: "review-approve: ats_type:ats_ref (p. ej. lever:despegar)"
+        description: "review-approve / inventory-approve / inventory-revert: ats_type:ats_ref (p. ej. lever:despegar); inventory-revert acepta all"
+        required: false
+        type: string
+      employer_name:
+        description: "inventory-approve: nombre de la empresa (decisión humana)"
+        required: false
+        type: string
+      note:
+        description: "inventory-approve / inventory-revert: motivo"
         required: false
         type: string
       seed_slug:
@@ -121,6 +138,9 @@ jobs:
           MODE: ${{ github.event_name == 'schedule' && 'tick' || inputs.mode }}
           COMPANY_KEY: ${{ inputs.company_key }}
           BOARD: ${{ inputs.board }}
+          # Read by the review script from the environment, never interpolated.
+          REVIEW_NAME: ${{ inputs.employer_name }}
+          REVIEW_NOTE: ${{ inputs.note }}
           SEED_SLUG: ${{ inputs.seed_slug }}
         run: |
           cd job-radar-apify
@@ -160,6 +180,17 @@ jobs:
             ats-inventory)   cmd="npx tsx scripts/direct-ats-inventory.ts --execute --allow-remote-db --deadline-min 15" ;;
             ats-probe-dry-run) cmd="npx tsx scripts/direct-ats-probe.ts --allow-remote-db --limit 5000 --deadline-min 15" ;;
             ats-probe)       cmd="npx tsx scripts/direct-ats-probe.ts --execute --allow-remote-db --limit 1500 --max-enable 25 --deadline-min 15" ;;
+            inventory-review-list) cmd="npx tsx scripts/direct-ats-inventory-review.ts list --status ambiguous --limit 200 --allow-remote-db" ;;
+            inventory-approve-dry-run|inventory-approve|inventory-revert-dry-run|inventory-revert)
+              if [[ "$MODE" == inventory-revert* && "$BOARD" == all ]]; then target=all
+              else
+                [[ "$BOARD" =~ ^[a-z]+:[A-Za-z0-9._@/-]{1,200}$ ]] || { echo "board inválido"; exit 1; }
+                target="$BOARD"
+              fi
+              action=approve
+              [[ "$MODE" == inventory-revert* ]] && action=revert
+              cmd="npx tsx scripts/direct-ats-inventory-review.ts $action $target --allow-remote-db"
+              [[ "$MODE" == *-dry-run ]] && cmd="$cmd --dry-run" ;;
             review-list)     cmd="npx tsx scripts/direct-discovery-review.ts list --decision needs_review --limit 100 --allow-remote-db" ;;
             review-approve-dry-run|review-approve)
               # Inputs arrive through env, never interpolated into the script.

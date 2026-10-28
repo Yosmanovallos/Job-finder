@@ -3,17 +3,20 @@ import { readFile } from "node:fs/promises";
 import { pool } from "../src/db/client.js";
 import {
   enablementContext,
+  getInventoryBoard,
   inventoryStatusCounts,
+  listInventoryForReview,
   ownedBoardKeys,
   pickDueInventory,
   promoteInventoryBoard,
   readOnly,
-  recordInventoryProbe
+  recordInventoryProbe,
+  revertInventoryBoards
 } from "../src/db/direct-inventory-repository.js";
 import { upsertEmployer } from "../src/db/direct-repository.js";
 import { saveJobs } from "../src/db/job-repository.js";
 import { inventoryKey } from "../src/direct/discovery/inventory.js";
-import { runInventoryProbe, type InventoryBoard, type ProbeRunDeps } from "../src/direct/discovery/inventory-probe.js";
+import { readBoard, reviewVerdict, runInventoryProbe, type InventoryBoard, type ProbeRunDeps } from "../src/direct/discovery/inventory-probe.js";
 import type { HttpGet } from "../src/direct/types.js";
 
 /**
@@ -56,7 +59,11 @@ const BOARDS: Record<string, { status: number; body: string }> = {
   [tt("prbrejected")]: { status: 200, body: feed("Prbrejected Corp", ["Colombia"]) },
   [tt("prbblocked")]: { status: 403, body: "" },
   [tt("prbowned")]: { status: 200, body: feed("Prbowned Inc", ["Colombia"]) },
-  [tt("prbzeta")]: { status: 200, body: feed("Prbzeta Labs", ["Colombia"]) }
+  [tt("prbzeta")]: { status: 200, body: feed("Prbzeta Labs", ["Colombia"]) },
+  "https://api.ashbyhq.com/posting-api/job-board/prbnoname": {
+    status: 200,
+    body: JSON.stringify({ jobs: [{ id: "a1", title: "Backend", jobUrl: "https://jobs.ashbyhq.com/prbnoname/a1", location: "Bogotá, Colombia", publishedAt: new Date(Date.now() - 86_400_000).toISOString() }] })
+  }
 };
 const calls: string[] = [];
 const http: HttpGet = async (url) => {
@@ -208,6 +215,57 @@ async function run(): Promise<void> {
   const zeta = await statusOf("prbzeta");
   check(capped.deferred === 1 && zeta?.status === "pending" && zeta.probed === false, "Sobre el tope --max-enable el tablero queda pendiente, sin escribir.", `prbzeta: ${JSON.stringify(zeta)} / ${JSON.stringify(capped)}`);
 
+  // Order: a board whose ATS declares a name goes before one that never can.
+  await pool.query(
+    `INSERT INTO ats_board_inventory (ats_type, ats_ref, first_source, sources) VALUES ('ashby', 'aaprbfirst', 'commoncrawl', ARRAY['commoncrawl']), ('teamtailor', 'zzprblast', 'commoncrawl', ARRAY['commoncrawl'])`
+  );
+  const ordered = (await pickDueInventory(100)).map((row) => row.atsRef).filter((ref) => ["aaprbfirst", "zzprblast"].includes(ref));
+  check(ordered.join(",") === "zzprblast,aaprbfirst", "Los ATS que declaran nombre se sondean antes que Ashby.", `Orden: ${ordered.join(",")}`);
+  await pool.query(`DELETE FROM ats_board_inventory WHERE ats_ref IN ('aaprbfirst', 'zzprblast')`);
+
+  // Human review: an Ashby board (no declared name) approved under the name a person states.
+  await pool.query(
+    `INSERT INTO ats_board_inventory (ats_type, ats_ref, first_source, sources, status, status_reason, colombia_count, total_count)
+     VALUES ('ashby', 'prbnoname', 'commoncrawl', ARRAY['commoncrawl'], 'ambiguous', 'ashby no declara el nombre de la empresa', 1, 1)`
+  );
+  const review = await listInventoryForReview(["ambiguous"], 50);
+  check(review.some((row) => row.atsRef === "prbnoname" && row.colombiaCount === 1), "La lista de revisión muestra los ambiguous con su evidencia.", `Lista: ${JSON.stringify(review.map((row) => row.atsRef))}`);
+  const noName = (await getInventoryBoard("ashby", "PRBNONAME"))!;
+  const human = reviewVerdict("Prbnoname Payments", await readBoard(noName, http, new Date()), agencyKeys);
+  const approved = human.status === "eligible" ? await promoteInventoryBoard(noName, human, ["ambiguous"]) : null;
+  const approvedRow = await getInventoryBoard("ashby", "prbnoname");
+  const approvedEmployer = await pool.query(`SELECT display_name, discovery_origin FROM employers WHERE company_key = 'prbnonamepayments'`);
+  check(
+    approved?.kind === "enabled" && approvedRow?.status === "enabled" && approvedEmployer.rows[0]?.display_name === "Prbnoname Payments" && approvedEmployer.rows[0]?.discovery_origin === "ats_inventory",
+    "Aprobación humana: el ambiguous queda habilitado con el nombre dado (insert-only).",
+    `Aprobación: ${JSON.stringify({ approved, approvedRow, employer: approvedEmployer.rows })}`
+  );
+  const automatic = human.status === "eligible" ? await promoteInventoryBoard(noName, human) : null;
+  check(automatic?.kind === "conflict", "La vía automática nunca toca un tablero ya habilitado.", `Automática: ${JSON.stringify(automatic)}`);
+
+  // Rollback: dry run lists, execute switches the inventory's boards off; nothing deleted.
+  const employersBeforeRevert = await fingerprint("employers");
+  const enabledBoards = (await pool.query(`SELECT COUNT(*)::int AS n FROM ats_board_inventory WHERE status = 'enabled'`)).rows[0].n;
+  const preview = await revertInventoryBoards(null, "prueba", true);
+  const stillEnabled = (await pool.query(`SELECT COUNT(*)::int AS n FROM employer_sources s JOIN ats_board_inventory i ON i.employer_source_id = s.id WHERE i.status = 'enabled' AND s.enabled`)).rows[0].n;
+  check(preview.boards.length === enabledBoards && stillEnabled === enabledBoards, `Reversión dry-run: listaría ${preview.boards.length} tableros sin escribir.`, `Dry-run: ${JSON.stringify(preview)} / ${stillEnabled}`);
+  const one = await revertInventoryBoards({ atsType: "ashby", atsRef: "PRBNONAME" }, "nombre equivocado", false);
+  const oneRow = await getInventoryBoard("ashby", "prbnoname");
+  const oneSource = await pool.query(`SELECT enabled FROM employer_sources WHERE ats_type = 'ashby' AND ats_ref = 'prbnoname'`);
+  check(
+    one.boards.join() === "ashby:prbnoname" && oneRow?.status === "ambiguous" && /revertido.*nombre equivocado/.test(oneRow.reason ?? "") && oneSource.rows[0]?.enabled === false,
+    "Reversión de un tablero: apagado, fila ambiguous con el motivo.",
+    `Reversión: ${JSON.stringify({ one, oneRow, source: oneSource.rows })}`
+  );
+  const all = await revertInventoryBoards(null, "lote equivocado", false);
+  const left = (await pool.query(`SELECT COUNT(*)::int AS n FROM employer_sources s JOIN ats_board_inventory i ON i.employer_source_id = s.id WHERE s.enabled AND i.status <> 'owned'`)).rows[0].n;
+  check(all.boards.length === enabledBoards - 1 && left === 0, `Reversión total: ${all.boards.length} tableros apagados.`, `Total: ${JSON.stringify(all)} / encendidos ${left}`);
+  check((await fingerprint("employers")) === employersBeforeRevert, "La reversión no borra ni cambia empresas.", "La reversión cambió employers.");
+  const again2 = await revertInventoryBoards(null, "otra vez", false);
+  check(again2.boards.length === 0, "Revertir de nuevo no cambia nada.", `Segunda reversión: ${JSON.stringify(again2)}`);
+  const reapproved = human.status === "eligible" ? await promoteInventoryBoard(noName, human, ["ambiguous"]) : null;
+  check(reapproved?.kind === "conflict" && reapproved.status === "owned", "Un tablero revertido no se reactiva por aprobación: queda su employer_source apagado.", `Re-aprobación: ${JSON.stringify(reapproved)}`);
+
   check((await fingerprint("jobs")) === jobsBefore, "La tabla jobs quedó intacta.", "Se modificó jobs.");
   check((await fingerprint("employer_discovery")) === discoveryBefore, "employer_discovery quedó intacta.", "Se modificó employer_discovery.");
   const preexisting = await pool.query(
@@ -216,11 +274,11 @@ async function run(): Promise<void> {
   );
   check(preexisting.rows[0].n === 3, "Los tableros existentes no cambiaron (insert-only).", "Se modificó un tablero existente.");
   const counts = await inventoryStatusCounts();
-  check(counts.enabled === 2 && counts.unsupported_ats === 1, `Conteo por estado: ${JSON.stringify(counts)}.`, `Conteo inesperado: ${JSON.stringify(counts)}`);
+  check(!counts.enabled && counts.unsupported_ats === 1, `Conteo por estado tras revertir: ${JSON.stringify(counts)}.`, `Conteo inesperado: ${JSON.stringify(counts)}`);
 
   await pool.query(`DELETE FROM ats_board_inventory`);
   await pool.query(`DELETE FROM employer_discovery WHERE company_key = 'prbrejected'`);
-  await pool.query(`DELETE FROM employers WHERE slug LIKE 'prb%'`);
+  await pool.query(`DELETE FROM employers WHERE slug LIKE 'prb%' OR discovery_origin = 'ats_inventory'`);
   await pool.query(`DELETE FROM jobs WHERE company = 'Prbacme'`);
 }
 
