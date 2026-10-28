@@ -2,9 +2,12 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../auth/auth-provider.js";
 import { translateAuthError } from "../lib/auth-error-messages.js";
+import { suggestEmailCorrection } from "../lib/email-typo.js";
 import { GoogleIcon } from "../components/ui/google-icon.js";
 
-const RESEND_COOLDOWN_S = 30;
+// Supabase Auth refuses a second email to the same address within 60s
+// ("Minimum interval per user" in Auth > Rate Limits) and answers 429.
+const RESEND_COOLDOWN_S = 60;
 
 export default function Login() {
   const {
@@ -81,6 +84,8 @@ export default function Login() {
 
       if (mode === "signup") {
         setSignupSent(true);
+        // The signup itself just sent the first email.
+        setResendCooldown(RESEND_COOLDOWN_S);
       } else {
         navigate(returnTo);
       }
@@ -101,6 +106,8 @@ export default function Login() {
     const result = await resendConfirmation(email);
     if (result.error) setError(translateAuthError(result.error));
   };
+
+  const emailSuggestion = mode === "signup" ? suggestEmailCorrection(email) : null;
 
   const title =
     mode === "login"
@@ -207,6 +214,24 @@ export default function Login() {
               <p className="font-bold text-primary">
                 Revisa tu correo para confirmar la cuenta antes de iniciar sesión.
               </p>
+              <p className="text-sm text-[#3d413e]">
+                Lo enviamos a <strong className="break-all text-foreground">{email}</strong>.{" "}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSignupSent(false);
+                    setError(null);
+                  }}
+                  className="font-semibold text-primary underline"
+                >
+                  ¿Está mal escrito? Corrígelo
+                </button>
+              </p>
+              {error && (
+                <p role="alert" className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                  {error}
+                </p>
+              )}
               <button
                 onClick={handleResend}
                 disabled={resendCooldown > 0}
@@ -236,8 +261,22 @@ export default function Login() {
                   placeholder="tucorreo@ejemplo.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  aria-describedby={emailSuggestion ? "signup-email-suggestion" : undefined}
                   className={inputClass}
                 />
+                {emailSuggestion && (
+                  <p id="signup-email-suggestion" className="mt-1.5 text-sm text-[#3d413e]">
+                    ¿Quisiste decir{" "}
+                    <button
+                      type="button"
+                      onClick={() => setEmail(emailSuggestion)}
+                      className="break-all font-semibold text-primary underline"
+                    >
+                      {emailSuggestion}
+                    </button>
+                    ?
+                  </p>
+                )}
               </div>
               {mode !== "forgot" && (
                 <div>
