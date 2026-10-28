@@ -29,6 +29,13 @@ Mapa de ampliación (fase 3) documentado en
 inventario público y siguiente lote Armenia/Neiva/Ibagué/Popayán/ingeniero
 civil VE. Esta entrega documental no implementa la fase 4 ni prueba crecimiento.
 
+Fase 4 en ejecución, 28-Oct: `../openspec/changes/market-discovery-expansion/`.
+Enlaces a las cinco categorías seleccionadas, sin modificar sus títulos,
+contenido de vacantes, filtros o canonicals. Los resúmenes existentes ya
+consumen datos reales y se conservan. Inspecciones previas: las cinco están
+indexadas y Google acepta su canonical propio. Seguimiento de resultados
+posterior al despliegue; no confundir implementación con crecimiento.
+
 - Corrección del disparo y deduplicación de `sign_up`, PR #14, `bb8a01d`.
   Falta la aceptación con tráfico real posterior al despliegue.
 - Corrección de vacantes vigentes que Google renderizaba como ausentes,

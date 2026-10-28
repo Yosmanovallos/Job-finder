@@ -1371,6 +1371,13 @@ Armenia, Neiva, Ibagué, Popayán e ingeniero civil VE. La fase documental no
 implementa páginas nuevas. Se documentan cargos sin categoría y el desajuste
 de remoto VE/CO; no se corrigen silenciosamente junto al mapa.
 
+28-Oct — fase 4, ampliación de navegación:
+`../openspec/changes/market-discovery-expansion/`. Cinco destinos existentes
+añadidos al helper común HTML/Markdown/React, manteniendo Bogotá/Cúcuta/Caracas.
+Contexto VE ampliado a ciudades y cargos. Lint y tipos pasan; baseline aislado
+18 rutas pasa y capturas 390/1440 px revisadas. Integración aislada pasa.
+Despliegue pendiente. Sin cambios al dashboard, consultas, canonicals o títulos/H1.
+
 No hay una fase "10" ya definida — cualquier trabajo más allá de esto
 (backlinks, contenido adicional, un tercer país) es exploratorio y
 necesita su propio diagnóstico antes de entrar a esta tabla, mismo

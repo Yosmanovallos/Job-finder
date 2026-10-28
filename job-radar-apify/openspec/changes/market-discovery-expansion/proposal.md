@@ -1,8 +1,9 @@
-# Borrador de la siguiente entrega — ampliación de descubrimiento
+# Ampliación de descubrimiento — lote siguiente
 
-Estado: propuesta, sin implementación. Deriva del mapa seo-market-coverage
-del 28-Oct. Esta carpeta contiene solo el borrador permitido para la fase
-siguiente; no adelanta su design/spec/tasks ni cambia la aplicación.
+Estado: en implementación, 2026-10-28. Deriva del mapa seo-market-coverage
+del PR #69. Base inicial bbc93c8, actualizada a origin/main e678a09 antes de publicar.
+Solo esta fase: ampliar descubrimiento
+de cinco páginas existentes, preservando el piloto y sus metadatos.
 
 Ampliar enlaces útiles desde el inicio a categorías existentes: Armenia,
 Neiva, Ibagué y Popayán para Colombia; ingeniero civil para Venezuela. Mantener

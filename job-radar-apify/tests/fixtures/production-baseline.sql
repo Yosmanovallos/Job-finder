@@ -79,3 +79,20 @@ SELECT md5('p0-baseline-' || i)::uuid, md5('p0-url-' || i),
        'Descripción sintética para verificar el entorno aislado, sin datos de candidatos.',
        '["Requisito sintético"]'::jsonb, '["TypeScript"]'::jsonb
 FROM generate_series(1, 120) AS i;
+
+-- Explicitly synthetic destinations for the bounded discovery expansion.
+INSERT INTO jobs (id, url_hash, title, company, location, country, url, source, sources,
+                  published_at, description, requirements)
+SELECT md5('mde-baseline-' || slug)::uuid, md5('mde-url-' || slug), title,
+       'Empresa Sintetica MDE ' || slug, location, country,
+       'https://example.invalid/jobs/mde-' || slug, 'LinkedIn', '["LinkedIn"]'::jsonb,
+       NOW() - INTERVAL '3 days',
+       'Vacante sintética para validar navegación aislada. No es una oferta real.',
+       '["Requisito sintético MDE"]'::jsonb
+FROM (VALUES
+  ('armenia', 'Analista sintético MDE Armenia', 'Armenia, Colombia', 'CO'),
+  ('neiva', 'Analista sintético MDE Neiva', 'Neiva, Colombia', 'CO'),
+  ('ibague', 'Analista sintético MDE Ibagué', 'Ibagué, Colombia', 'CO'),
+  ('popayan', 'Analista sintético MDE Popayán', 'Popayán, Colombia', 'CO'),
+  ('civil-ve', 'Ingeniero Civil sintético MDE', 'Caracas, Venezuela', 'VE')
+) AS fixture(slug, title, location, country);
