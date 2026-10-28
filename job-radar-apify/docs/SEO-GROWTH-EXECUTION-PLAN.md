@@ -29,7 +29,8 @@ Mapa de ampliación (fase 3) documentado en
 inventario público y siguiente lote Armenia/Neiva/Ibagué/Popayán/ingeniero
 civil VE. Esta entrega documental no implementa la fase 4 ni prueba crecimiento.
 
-Fase 4 en ejecución, 28-Oct: `../openspec/changes/market-discovery-expansion/`.
+Fase 4 publicada y verificada, 28-Oct, PR #71 (dafec40):
+`../openspec/changes/archive/market-discovery-expansion/`.
 Enlaces a las cinco categorías seleccionadas, sin modificar sus títulos,
 contenido de vacantes, filtros o canonicals. Los resúmenes existentes ya
 consumen datos reales y se conservan. Inspecciones previas: las cinco están
@@ -148,10 +149,11 @@ CV/Resume Studio/BYOK, auto-apply ni envíos de candidaturas automáticos.
 
 ## Primera acción concreta
 
-Siguiente entrega: fase 4 sobre el lote de cinco páginas del mapa del 28-Oct,
-con inspección almacenada previa, enlaces útiles por país, contenido basado en
-datos reales y gates de publicación. El piloto del 27-Oct conserva seguimiento
-7/14/28 días. Aceptación de analytics y embudo real siguen pendientes; no se
+Fase 4 del lote de cinco páginas completada con inspecciones, enlaces y gates.
+Siguiente entrega técnica: resolver la separación de remoto VE/CO con pruebas
+de filtro, canonical y SSR/DOM antes de ampliar ese destino. Los pilotos del
+27/28-Oct conservan seguimiento 7/14/28 días. Aceptación de analytics y embudo
+real siguen pendientes; no se
 declaran resueltos por disponer del mapa SEO. Remoto VE, taxonomía de cargos
 nuevos y equivalencia Puerto Ordaz/Ciudad Guayana requieren sus propias pruebas.
 

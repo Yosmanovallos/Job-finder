@@ -6,5 +6,5 @@
 - [x] Reproducir enlaces nuevos ausentes en prueba de contenido.
 - [x] Ampliar helper y contexto VE; añadir fixture sintético y cobertura.
 - [x] Pasar lint/tipos/unitarias y baseline/integración aislados; revisar capturas.
-- [ ] Publicar PR, pasar CI y desplegar con autorización vigente.
-- [ ] Verificar HTTP/DOM y drift de producción; registrar y archivar fase.
+- [x] Publicar PR #71, pasar CI 40777158535 y desplegar con autorización vigente.
+- [x] Verificar HTTP/DOM y drift de producción: dafec40 activo; registrar y archivar fase.
