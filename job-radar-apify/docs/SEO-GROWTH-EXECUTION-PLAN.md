@@ -21,6 +21,14 @@ ciclo operativo de ejecución/medición, no un cambio silencioso de esa meta.
 
 ## Qué ya está resuelto
 
+Actualización operativa 28-Oct: piloto de enlaces Bogotá/Cúcuta/Caracas
+publicado y verificado, PR #66/#67. Lint global y typecheck pasan; los conteos
+de errores históricos del 24-Oct abajo no describen ya estos gates actuales.
+Mapa de ampliación (fase 3) documentado en
+`../openspec/changes/archive/seo-market-coverage/report.md` (PR #69): veinte oportunidades,
+inventario público y siguiente lote Armenia/Neiva/Ibagué/Popayán/ingeniero
+civil VE. Esta entrega documental no implementa la fase 4 ni prueba crecimiento.
+
 - Corrección del disparo y deduplicación de `sign_up`, PR #14, `bb8a01d`.
   Falta la aceptación con tráfico real posterior al despliegue.
 - Corrección de vacantes vigentes que Google renderizaba como ausentes,
@@ -133,10 +141,12 @@ CV/Resume Studio/BYOK, auto-apply ni envíos de candidaturas automáticos.
 
 ## Primera acción concreta
 
-Cerrar los gates de la fase actual sin cambiar el comportamiento SEO ya
-validado. En la siguiente sesión independiente, levantar la base real de
-medición y comprobar aceptación de analytics. El primer lote de páginas se
-elige con esos datos, no con una lista de keywords supuesta.
+Siguiente entrega: fase 4 sobre el lote de cinco páginas del mapa del 28-Oct,
+con inspección almacenada previa, enlaces útiles por país, contenido basado en
+datos reales y gates de publicación. El piloto del 27-Oct conserva seguimiento
+7/14/28 días. Aceptación de analytics y embudo real siguen pendientes; no se
+declaran resueltos por disponer del mapa SEO. Remoto VE, taxonomía de cargos
+nuevos y equivalencia Puerto Ordaz/Ciudad Guayana requieren sus propias pruebas.
 
 Referencias: `JOB-RENDER-SEO-VERIFICATION.md`, `ANALYTICS-FUNNEL.md`,
 `PROD-IMPROVEMENTS-PLAN.md`, `SEO-IMPROVEMENT-PLAN.md` y OpenSpec de ambas

@@ -1,0 +1,341 @@
+{
+  "observedAt": "2026-10-28T21:40:49.864Z",
+  "source": "Anonymous public SSR; visible inventory, not Google eligibility; at most 60 sample jobs; employer labels not verified unique companies; no production credentials.",
+  "rows": [
+    {
+      "path": "/empleos/armenia",
+      "status": 200,
+      "ms": 404,
+      "cache": "EXPIRED",
+      "canonical": "https://buscotrabajo.co/empleos/armenia",
+      "robots": "no explicit noindex",
+      "h1": "Empleos en Armenia: trabajo y ofertas de empleo",
+      "country": "CO",
+      "totalVisible": 136,
+      "sampleSize": 60,
+      "sampleCountries": [
+        "CO"
+      ],
+      "sampleEmployerLabels": 45
+    },
+    {
+      "path": "/empleos/neiva",
+      "status": 200,
+      "ms": 331,
+      "cache": "EXPIRED",
+      "canonical": "https://buscotrabajo.co/empleos/neiva",
+      "robots": "no explicit noindex",
+      "h1": "Empleos en Neiva: trabajo y ofertas de empleo",
+      "country": "CO",
+      "totalVisible": 130,
+      "sampleSize": 60,
+      "sampleCountries": [
+        "CO"
+      ],
+      "sampleEmployerLabels": 43
+    },
+    {
+      "path": "/empleos/santa-marta",
+      "status": 200,
+      "ms": 203,
+      "cache": "EXPIRED",
+      "canonical": "https://buscotrabajo.co/empleos/santa-marta",
+      "robots": "no explicit noindex",
+      "h1": "Empleos en Santa Marta: trabajo y ofertas de empleo",
+      "country": "CO",
+      "totalVisible": 121,
+      "sampleSize": 60,
+      "sampleCountries": [
+        "CO"
+      ],
+      "sampleEmployerLabels": 38
+    },
+    {
+      "path": "/empleos/valledupar",
+      "status": 200,
+      "ms": 226,
+      "cache": "EXPIRED",
+      "canonical": "https://buscotrabajo.co/empleos/valledupar",
+      "robots": "no explicit noindex",
+      "h1": "Empleos en Valledupar: trabajo y ofertas de empleo",
+      "country": "CO",
+      "totalVisible": 84,
+      "sampleSize": 60,
+      "sampleCountries": [
+        "CO"
+      ],
+      "sampleEmployerLabels": 38
+    },
+    {
+      "path": "/empleos/manizales",
+      "status": 200,
+      "ms": 219,
+      "cache": "EXPIRED",
+      "canonical": "https://buscotrabajo.co/empleos/manizales",
+      "robots": "no explicit noindex",
+      "h1": "Empleos en Manizales: trabajo y ofertas de empleo",
+      "country": "CO",
+      "totalVisible": 248,
+      "sampleSize": 60,
+      "sampleCountries": [
+        "CO"
+      ],
+      "sampleEmployerLabels": 37
+    },
+    {
+      "path": "/empleos/popayan",
+      "status": 200,
+      "ms": 227,
+      "cache": "EXPIRED",
+      "canonical": "https://buscotrabajo.co/empleos/popayan",
+      "robots": "no explicit noindex",
+      "h1": "Empleos en Popayán: trabajo y ofertas de empleo",
+      "country": "CO",
+      "totalVisible": 69,
+      "sampleSize": 60,
+      "sampleCountries": [
+        "CO"
+      ],
+      "sampleEmployerLabels": 35
+    },
+    {
+      "path": "/empleos/palmira",
+      "status": 200,
+      "ms": 203,
+      "cache": "EXPIRED",
+      "canonical": "https://buscotrabajo.co/empleos/palmira",
+      "robots": "no explicit noindex",
+      "h1": "Empleos en Palmira: trabajo y ofertas de empleo",
+      "country": "CO",
+      "totalVisible": 138,
+      "sampleSize": 60,
+      "sampleCountries": [
+        "CO"
+      ],
+      "sampleEmployerLabels": 33
+    },
+    {
+      "path": "/empleos/ibague",
+      "status": 200,
+      "ms": 231,
+      "cache": "EXPIRED",
+      "canonical": "https://buscotrabajo.co/empleos/ibague",
+      "robots": "no explicit noindex",
+      "h1": "Empleos en Ibagué: trabajo y ofertas de empleo",
+      "country": "CO",
+      "totalVisible": 204,
+      "sampleSize": 60,
+      "sampleCountries": [
+        "CO"
+      ],
+      "sampleEmployerLabels": 45
+    },
+    {
+      "path": "/empleos/valencia",
+      "status": 200,
+      "ms": 9322,
+      "cache": "EXPIRED",
+      "canonical": "https://buscotrabajo.co/empleos/valencia",
+      "robots": "no explicit noindex",
+      "h1": "Empleos en Valencia: trabajo y ofertas de empleo",
+      "country": "VE",
+      "totalVisible": 239,
+      "sampleSize": 60,
+      "sampleCountries": [
+        "VE"
+      ],
+      "sampleEmployerLabels": 36
+    },
+    {
+      "path": "/empleos/maracay",
+      "status": 200,
+      "ms": 9221,
+      "cache": "EXPIRED",
+      "canonical": "https://buscotrabajo.co/empleos/maracay",
+      "robots": "no explicit noindex",
+      "h1": "Empleos en Maracay: trabajo y ofertas de empleo",
+      "country": "VE",
+      "totalVisible": 31,
+      "sampleSize": 31,
+      "sampleCountries": [
+        "VE"
+      ],
+      "sampleEmployerLabels": 24
+    },
+    {
+      "path": "/empleos/ciudad-guayana",
+      "status": 200,
+      "ms": 1278,
+      "cache": "EXPIRED",
+      "canonical": "https://buscotrabajo.co/empleos/ciudad-guayana",
+      "robots": "no explicit noindex",
+      "h1": "Empleos en Ciudad Guayana: trabajo y ofertas de empleo",
+      "country": "VE",
+      "totalVisible": 4,
+      "sampleSize": 4,
+      "sampleCountries": [
+        "VE"
+      ],
+      "sampleEmployerLabels": 4
+    },
+    {
+      "path": "/empleos/community-manager",
+      "status": 200,
+      "ms": 1388,
+      "cache": "EXPIRED",
+      "canonical": "https://buscotrabajo.co/empleos/community-manager",
+      "robots": "no explicit noindex",
+      "h1": "Trabajo de Community Manager en Colombia",
+      "country": "CO",
+      "totalVisible": 106,
+      "sampleSize": 60,
+      "sampleCountries": [
+        "CO",
+        null
+      ],
+      "sampleEmployerLabels": 54
+    },
+    {
+      "path": "/empleos/ingeniero-civil",
+      "status": 200,
+      "ms": 1426,
+      "cache": "EXPIRED",
+      "canonical": "https://buscotrabajo.co/empleos/ingeniero-civil",
+      "robots": "no explicit noindex",
+      "h1": "Trabajo de Ingeniero Civil en Colombia",
+      "country": "CO",
+      "totalVisible": 127,
+      "sampleSize": 60,
+      "sampleCountries": [
+        "CO",
+        null
+      ],
+      "sampleEmployerLabels": 41
+    },
+    {
+      "path": "/empleos/especialista-en-marketing-digital",
+      "status": 200,
+      "ms": 2021,
+      "cache": "EXPIRED",
+      "canonical": "https://buscotrabajo.co/empleos/especialista-en-marketing-digital",
+      "robots": "no explicit noindex",
+      "h1": "Trabajo de Especialista en Marketing Digital en Colombia",
+      "country": "CO",
+      "totalVisible": 1965,
+      "sampleSize": 60,
+      "sampleCountries": [
+        "CO",
+        null
+      ],
+      "sampleEmployerLabels": 54
+    },
+    {
+      "path": "/empleos/business-analyst",
+      "status": 200,
+      "ms": 1746,
+      "cache": "EXPIRED",
+      "canonical": "https://buscotrabajo.co/empleos/business-analyst",
+      "robots": "no explicit noindex",
+      "h1": "Trabajo de Business Analyst en Colombia",
+      "country": "CO",
+      "totalVisible": 696,
+      "sampleSize": 60,
+      "sampleCountries": [
+        "CO",
+        null
+      ],
+      "sampleEmployerLabels": 45
+    },
+    {
+      "path": "/empleos/remoto",
+      "status": 200,
+      "ms": 1534,
+      "cache": "EXPIRED",
+      "canonical": "https://buscotrabajo.co/empleos/remoto",
+      "robots": "no explicit noindex",
+      "h1": "Trabajos remotos en Colombia: empleos y ofertas de empleo",
+      "country": "CO",
+      "totalVisible": 761,
+      "sampleSize": 60,
+      "sampleCountries": [
+        null,
+        "CO"
+      ],
+      "sampleEmployerLabels": 33
+    },
+    {
+      "path": "/ve/empleos/remoto",
+      "status": 200,
+      "ms": 737,
+      "cache": "MISS",
+      "canonical": "https://buscotrabajo.co/empleos/remoto",
+      "robots": "no explicit noindex",
+      "h1": "Trabajos remotos en Colombia: empleos y ofertas de empleo",
+      "country": "CO",
+      "totalVisible": 761,
+      "sampleSize": 60,
+      "sampleCountries": [
+        null,
+        "CO"
+      ],
+      "sampleEmployerLabels": 33
+    },
+    {
+      "path": "/empleos/bogota",
+      "status": 200,
+      "ms": 1298,
+      "cache": "EXPIRED",
+      "canonical": "https://buscotrabajo.co/empleos/bogota",
+      "robots": "no explicit noindex",
+      "h1": "Empleos en Bogotá: trabajo y ofertas de empleo",
+      "country": "CO",
+      "totalVisible": 11007,
+      "sampleSize": 60,
+      "sampleCountries": [
+        "CO"
+      ],
+      "sampleEmployerLabels": 51
+    },
+    {
+      "path": "/empleos/cucuta",
+      "status": 200,
+      "ms": 1198,
+      "cache": "EXPIRED",
+      "canonical": "https://buscotrabajo.co/empleos/cucuta",
+      "robots": "no explicit noindex",
+      "h1": "Empleos en Cúcuta: trabajo y ofertas de empleo",
+      "country": "CO",
+      "totalVisible": 208,
+      "sampleSize": 60,
+      "sampleCountries": [
+        "CO"
+      ],
+      "sampleEmployerLabels": 31
+    },
+    {
+      "path": "/empleos/caracas",
+      "status": 200,
+      "ms": 209,
+      "cache": "EXPIRED",
+      "canonical": "https://buscotrabajo.co/empleos/caracas",
+      "robots": "no explicit noindex",
+      "h1": "Empleos en Caracas: trabajo y ofertas de empleo",
+      "country": "VE",
+      "totalVisible": 949,
+      "sampleSize": 60,
+      "sampleCountries": [
+        "VE"
+      ],
+      "sampleEmployerLabels": 49
+    },
+    {
+      "observedAt": "2026-10-28T21:41:41.159Z",
+      "path": "/ve/empleos/ingeniero-civil",
+      "status": 200,
+      "country": "VE",
+      "totalVisible": 28,
+      "sampleSize": 28,
+      "canonical": "https://buscotrabajo.co/ve/empleos/ingeniero-civil"
+    }
+  ]
+}
