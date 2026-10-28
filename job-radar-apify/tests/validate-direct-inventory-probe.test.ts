@@ -6,6 +6,7 @@ import {
   judgeBoard,
   nextProbeDays,
   readBoard,
+  reviewVerdict,
   runInventoryProbe,
   type BoardRead,
   type EnablementContext,
@@ -284,4 +285,17 @@ test("a probe that throws is an error, recorded with backoff", async () => {
   await runInventoryProbe([board("teamtailor", "acme")], deps);
   assert.equal(recorded[0].outcome.status, "error");
   assert.equal(recorded[0].outcome.nextProbeDays, 1);
+});
+
+test("human review: the person names the employer; the board must still list Colombia, and agency/generic names stay refused", () => {
+  const listed: BoardRead = { kind: "listed", totalCount: 86, colombiaCount: 16, deferred: 0, declaredNames: [] };
+  const approved = reviewVerdict("  Kraken   Digital Asset Exchange ", listed, AGENCIES);
+  assert.equal(approved.status, "eligible");
+  assert.equal(approved.status === "eligible" && approved.declaredName, "Kraken Digital Asset Exchange");
+  assert.equal(approved.status === "eligible" && approved.companyKey, "krakendigitalassetexchange");
+  assert.equal(reviewVerdict("Kraken", { ...listed, colombiaCount: 0 }, AGENCIES).status, "refused");
+  assert.equal(reviewVerdict("Kraken", { kind: "failed", status: "blocked", reason: "HTTP 403", notFound: false }, AGENCIES).status, "refused");
+  for (const name of ["Adecco", "Servicios Temporales SAS", "Grupo", "SGS", "Confidencial", ""]) {
+    assert.equal(reviewVerdict(name, listed, AGENCIES).status, "refused", name);
+  }
 });

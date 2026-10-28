@@ -19,6 +19,7 @@ on:
       - "job-radar-apify/tests/validate-direct-discovery.ts"
       - "job-radar-apify/scripts/direct-ats-inventory.ts"
       - "job-radar-apify/scripts/direct-ats-probe.ts"
+      - "job-radar-apify/scripts/direct-ats-inventory-review.ts"
       - "job-radar-apify/data/direct-discovery-agencies.json"
       - "job-radar-apify/scripts/migrate-direct-employers.ts"
       - "job-radar-apify/scripts/run-isolated-tests.ts"
