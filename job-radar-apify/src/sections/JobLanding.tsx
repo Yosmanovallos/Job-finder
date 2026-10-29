@@ -5,7 +5,8 @@ import { PaywallCard } from "../components/PaywallCard.js";
 import { ApplyGateModal } from "../components/ApplyGateModal.js";
 import { useAuth } from "../auth/auth-provider.js";
 import { usePageMeta } from "../lib/use-page-meta.js";
-import { buildJobMeta } from "../lib/job-seo.js";
+import { buildCategoryPath, buildJobMeta } from "../lib/job-seo.js";
+import { cityHubHeading, readJobLinks, resolveJobCityHub } from "../lib/job-internal-links.js";
 import { Button } from "../components/ui/button.js";
 import { ArrowLeft } from "lucide-react";
 import { isVePrefixed } from "../lib/country-context.js";
@@ -111,6 +112,14 @@ export default function JobLanding() {
       : null
   );
 
+  // The same city hub and related links the server put in the raw HTML, so
+  // the rendered DOM Googlebot reads keeps them. Related links exist only
+  // for the SSR snapshot; a client-side navigation still links its hub.
+  const cityHub = job ? resolveJobCityHub(job) : null;
+  const cityHubPath = cityHub ? buildCategoryPath(cityHub) : null;
+  const related = readJobLinks(id, window.__SSR_JOB_LINKS__);
+  const back = origin ?? (cityHub && cityHubPath ? { path: cityHubPath, label: cityHubHeading(cityHub) } : null);
+
   // Same page shell as the company and category pages: ink breadcrumb on a
   // soft-green band, then the dashboard's ink detail card.
   return (
@@ -119,13 +128,13 @@ export default function JobLanding() {
         <div className="max-w-[880px] mx-auto px-4 md:px-6 pt-6 pb-4 md:pt-10 md:pb-6">
           <nav aria-label="Ruta" className="flex flex-wrap items-center gap-2 text-sm font-semibold">
             <Link
-              to={origin?.path ?? dashboardPath}
+              to={back?.path ?? dashboardPath}
               className="ink-card-sm ink-lift inline-flex items-center gap-1.5 rounded-full bg-white px-3.5 py-1.5 text-foreground no-underline max-w-full"
             >
               <ArrowLeft className="h-4 w-4 shrink-0" aria-hidden="true" />
-              <span className="truncate">{origin ? origin.label : "Ver todas las vacantes"}</span>
+              <span className="truncate">{back ? back.label : "Ver todas las vacantes"}</span>
             </Link>
-            {origin ? (
+            {back ? (
               <Link to={dashboardPath} className="rounded-full px-3 py-1.5 text-[#3d413e] hover:text-foreground">
                 Ver todas las vacantes
               </Link>
@@ -187,6 +196,29 @@ export default function JobLanding() {
               variant="ink"
             />
           ))}
+
+        {(state === "found" || state === "error") && job && cityHub && cityHubPath && related.length > 0 && (
+          <section data-related-jobs aria-labelledby="related-jobs-heading" className="ink-card mt-8 rounded-3xl bg-white p-6 md:p-8">
+            <h2 id="related-jobs-heading" className="font-heading font-bold text-xl md:text-2xl">
+              Más empleos en {cityHub.label}
+            </h2>
+            <ul className="mt-4 divide-y divide-foreground/10">
+              {related.map((link) => (
+                <li key={link.path} className="py-3">
+                  <Link to={link.path} className="font-semibold text-foreground hover:underline">
+                    {link.title}
+                  </Link>
+                  <p className="text-sm text-[#3d413e]">
+                    {link.company} · {link.location}
+                  </p>
+                </li>
+              ))}
+            </ul>
+            <Link to={cityHubPath} className="mt-4 inline-block font-semibold text-foreground underline">
+              Ver todos los empleos en {cityHub.label}
+            </Link>
+          </section>
+        )}
       </div>
 
       {applyGateJob && <ApplyGateModal job={applyGateJob} onClose={() => setApplyGateJob(null)} />}

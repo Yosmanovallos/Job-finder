@@ -468,6 +468,24 @@ try {
   assert.doesNotMatch(JSON.stringify(evil.jobPosting ?? {}), /<script|<img/i, "source text is escaped in JSON-LD");
   console.log("✅ [xss] hostile source text is escaped in the visible body and in JSON-LD.");
 
+  // --- 14b. Link graph: job page ↔ city hub (docs/SEO-JOB-LINK-GRAPH-2026-10-29.md) ---
+  const pereiraA = await saveOne(job({ title: "Auxiliar Contable", company: "Pereira Uno", location: "Pereira, Risaralda, Colombia", description: RICH, requirements: RICH_REQ }));
+  const pereiraB = await saveOne(job({ title: "Asesor Comercial", company: "Pereira Dos", location: "Pereira, Risaralda", description: RICH, requirements: RICH_REQ }));
+  const cold = await page(pereiraA);
+  const coldBody = cold.html.split("<div id=\"app\">")[1] ?? "";
+  assert.match(coldBody, /<nav aria-label="Ruta" data-job-breadcrumb><a href="\/">Inicio<\/a> › <a href="\/empleos\/pereira">Empleos en Pereira<\/a>/, "raw HTML links the job to its city hub");
+  assert.match(cold.html, /"@type":"BreadcrumbList"/, "BreadcrumbList is emitted");
+  assert.ok(cold.jobPosting, "the JobPosting is unchanged by the link block");
+  // The hub and the job page share one cache entry: once the hub is cached,
+  // the job page links its siblings without querying Postgres itself.
+  assert.equal((await fetch(`${BASE}/empleos/pereira`)).status, 200);
+  const warm = await page(pereiraA);
+  const pathB = buildJobPath({ jobId: pereiraB, title: "Asesor Comercial", location: "Pereira, Risaralda" });
+  assert.ok(warm.html.includes(`<section data-related-jobs>`), "related section rendered");
+  assert.ok(warm.html.includes(`href="${pathB}"`), "a sibling from the same hub is linked");
+  assert.ok(!(warm.html.split("data-related-jobs")[1] ?? "").includes(pereiraA), "a job never links itself as related");
+  console.log("✅ [links] job page links its city hub (cold) and its hub siblings (warm, shared cache).");
+
   // --- 15. Source expiration (validThrough) --------------------------------------
   const expiringId = await saveOne(
     job({ title: "Ingeniero Civil", source: "Magneto", description: RICH, requirements: RICH_REQ, validThrough: new Date(Date.now() + 86_400_000).toISOString() })

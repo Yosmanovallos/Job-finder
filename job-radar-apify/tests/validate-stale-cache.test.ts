@@ -114,3 +114,31 @@ test("blocks again after the stale window and propagates loader failures", async
     /database unavailable/
   );
 });
+
+test("peek never waits: cold misses warm in the background, stale hits refresh once", async () => {
+  let now = 0;
+  let loads = 0;
+  const cache = new StaleWhileRevalidateCache<string, Value>({
+    freshForMs: 10,
+    staleForMs: 20,
+    maxEntries: 2,
+    now: () => now,
+    clone: (value) => ({ ...value, items: [...value.items] })
+  });
+  const loader = async () => ({ version: ++loads, items: ["job"] });
+
+  assert.equal(cache.peek("city", loader), undefined);
+  assert.equal(cache.peek("city", loader), undefined, "a pending load is not started twice");
+  await nextTurn();
+  assert.equal(loads, 1);
+  assert.equal(cache.peek("city", loader)?.version, 1);
+
+  now = 15;
+  assert.equal(cache.peek("city", loader)?.version, 1, "stale value is served immediately");
+  await nextTurn();
+  assert.equal(loads, 2);
+  assert.equal(cache.peek("city", loader)?.version, 2);
+
+  now = 100;
+  assert.equal(cache.peek("city", loader), undefined, "an expired value is never served");
+});

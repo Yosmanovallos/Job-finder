@@ -7,6 +7,8 @@ export interface SsrJobPayload {
 declare global {
   interface Window {
     __SSR_JOB__?: SsrJobPayload;
+    /** Related job links of the SSR job page (job-internal-links.ts); validated by readJobLinks. */
+    __SSR_JOB_LINKS__?: unknown;
   }
 }
 
