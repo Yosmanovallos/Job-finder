@@ -311,6 +311,14 @@ async function run(): Promise<void> {
     `Reversión antigua: ${JSON.stringify(staleCityReversion)}`
   );
 
+  // Even a later source date cannot renew the archived original's 30-day clock.
+  await pool.query(`UPDATE archived_jobs SET snapshot = jsonb_set(snapshot, '{published_at}',
+    to_jsonb((NOW() - INTERVAL '45 days')::text)) WHERE job_id = $1`, [p2]);
+  await syncProjections();
+  await syncProjections();
+  check((await row(p2)) === undefined,
+    "Archivo oficial mayor de 30 días nunca revive aunque cambie la fecha de fuente.", "Proyección renovó vacante vencida.");
+
   await pool.query(`DELETE FROM jobs WHERE company IN ('Proj Co LA', 'Otra Empresa SAS', 'Proj Co')`);
   await pool.query(`DELETE FROM employers WHERE slug = 'proj-co'`);
 }

@@ -7,7 +7,7 @@
  *   - the source's own expiration date (`valid_through`), when it states one,
  *     has not passed.
  *
- * Every public read path filters with liveJobSql(), purgeOldJobs() deletes
+ * Every public read path filters with liveJobSql(), purgeOldJobs() archives
  * what fails it, and validateJobs() refuses to ingest it — one rule in three
  * places, never three hand-written copies.
  *

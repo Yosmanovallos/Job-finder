@@ -646,6 +646,32 @@ CREATE INDEX IF NOT EXISTS idx_expired_job_urls_expired_at ON expired_job_urls (
 ALTER TABLE expired_job_urls ENABLE ROW LEVEL SECURITY;
 -- END job-freshness
 
+-- BEGIN job-archive
+-- Private job facts only, never candidates/applications. No FK to the live
+-- corpus: rows move here atomically when they leave jobs. Retain 180 days.
+CREATE TABLE IF NOT EXISTS archived_jobs (
+    job_id UUID PRIMARY KEY,
+    url_hash TEXT NOT NULL,
+    archived_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    reason TEXT NOT NULL CHECK (reason IN ('age_limit', 'source_deadline', 'unseen', 'source_closed')),
+    snapshot JSONB NOT NULL CHECK (jsonb_typeof(snapshot) = 'object')
+);
+CREATE INDEX IF NOT EXISTS idx_archived_jobs_hash ON archived_jobs (url_hash);
+CREATE INDEX IF NOT EXISTS idx_archived_jobs_date ON archived_jobs (archived_at, job_id);
+ALTER TABLE archived_jobs ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON archived_jobs FROM PUBLIC;
+DO $archive_revoke$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+    REVOKE ALL ON archived_jobs FROM anon;
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+    REVOKE ALL ON archived_jobs FROM authenticated;
+  END IF;
+END
+$archive_revoke$;
+-- END job-archive
+
 -- BEGIN company-identity
 -- Claves de identidad de empresa/vacante (src/lib/company-identity.ts,
 -- 2026-10-05). Aditivo e idempotente; lo aplica

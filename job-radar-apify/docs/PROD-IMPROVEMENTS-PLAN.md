@@ -67,6 +67,43 @@ Post-deploy: 17 rutas saludables y 15 páginas sin drift de metadata comprobada.
 Leyenda: ✅ done · 🔵 spec/draft · 🟡 en implementación · ⬜ pendiente ·
 🔴 bloqueada.
 
+Diagnóstico SEO y ciclo de vacantes, 2026-10-28:
+`openspec/changes/seo-lifecycle-diagnosis/` y
+`docs/SEO-SUSTAINABLE-STRATEGY-2026-10-28.md`. Entrega documental local:
+Cúcuta indexada pero exposición débil; crecimiento semanal orgánico desde
+base pequeña; cobertura histórica Soft 404 requiere revalidación. Confirmada
+regla de retiro por publicación >30 días. No se cambia ADR 0005 ni producción;
+medición de retiros y verificación fiable preceden cualquier retención nueva.
+Mantener diseño actual y ejecutar siguientes entregas en sesiones separadas.
+
+Verificación P0 y alertas SEO, 2026-10-28/29:
+`docs/SEO-SOFT404-RECHECK-2026-10-28.md`,
+`docs/SEO-ALERTS-TRIAGE-2026-10-29.md` y
+`openspec/changes/job-render-seo/validation-2026-10-29.md`.
+Cinco ejemplos activos pasan inspección en vivo y los gates actuales pasan.
+Google aceptó nueva validación Soft 404 el 28-Oct; 2.678 pendientes el 29-Oct.
+18 avisos técnicos leídos, separando advertencias opcionales de exclusiones
+e historial. Sin cambios de aplicación ni retención. Recuperación global,
+retest de la URL del incidente original y otros gates originales pendientes;
+no se archiva ni se declara completa la reparación global por una muestra.
+
+Contraste «Rastreada: actualmente sin indexar», 2026-10-29:
+`openspec/changes/crawled-index-audit/` y
+`docs/SEO-CRAWLED-AUDIT-2026-10-29.md`. Diez URLs públicas saludables y en el
+sitemap; las cinco contrastadas individualmente ya están indexadas aunque
+siguen en ejemplos del informe antiguo. No hay defecto reproducido que
+justifique nuevo código; no se reenvía validación masiva ni se altera diseño.
+No extrapolar la muestra a 9.745 ni confundir indexación con ranking genérico.
+
+Impacto de retención, 2026-10-29:
+`openspec/changes/job-retention-impact/`,
+`docs/JOB-RETENTION-IMPACT-2026-10-29.md` y ADR 0007 propuesto. Medición real
+de producción READ ONLY: 2.129/7.906 candidatos SEO alcanzan 30 días en siete
+días; 915 tienen plazo registrado posterior al corte, sin verificar apertura.
+Histórico expired no permite atribuir todos los retiros a edad. Política
+objetivo: excepción con open comprobado <24 h, identidad estable y retiros
+por cierre/plazo real. No se implementa ni se desactiva ADR 0005 todavía.
+
 ## Hallazgos de base (verificados en `74f066b`)
 
 ### Verificación SEO de renderizado — 2026-10-24

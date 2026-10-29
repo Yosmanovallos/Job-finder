@@ -1,0 +1,405 @@
+{
+  "summary": {
+    "stored_rows": 35422,
+    "active_flag_rows": 34778,
+    "age_threshold_in_7d": 7143,
+    "active_in_age_window": 34631,
+    "age_7d_deadline_unknown": 4559,
+    "active_never_source_checked": 34762,
+    "age_7d_source_deadline_after_cap": 1165
+  },
+  "timezone": "America/Bogota",
+  "observed_at": "2026-10-29T12:17:49.012593+00:00",
+  "current_start": "2026-10-22T00:00:00",
+  "previous_start": "2026-10-15T00:00:00",
+  "by_source_country": [
+    {
+      "rows": 15308,
+      "source": "LinkedIn",
+      "country": "CO",
+      "has_check_cursor": 0,
+      "age_7d_seen_in_48h": 108,
+      "age_threshold_in_7d": 3389,
+      "active_in_age_window": 14642,
+      "age_7d_deadline_unknown": 2377,
+      "age_7d_source_deadline_after_cap": 148
+    },
+    {
+      "rows": 5435,
+      "source": "Computrabajo",
+      "country": "CO",
+      "has_check_cursor": 0,
+      "age_7d_seen_in_48h": 72,
+      "age_threshold_in_7d": 856,
+      "active_in_age_window": 5414,
+      "age_7d_deadline_unknown": 529,
+      "age_7d_source_deadline_after_cap": 316
+    },
+    {
+      "rows": 3132,
+      "source": "Workana",
+      "country": "unknown_or_shared_remote",
+      "has_check_cursor": 0,
+      "age_7d_seen_in_48h": 0,
+      "age_threshold_in_7d": 712,
+      "active_in_age_window": 3118,
+      "age_7d_deadline_unknown": 712,
+      "age_7d_source_deadline_after_cap": 0
+    },
+    {
+      "rows": 2706,
+      "source": "Magneto",
+      "country": "CO",
+      "has_check_cursor": 0,
+      "age_7d_seen_in_48h": 6,
+      "age_threshold_in_7d": 349,
+      "active_in_age_window": 2705,
+      "age_7d_deadline_unknown": 1,
+      "age_7d_source_deadline_after_cap": 261
+    },
+    {
+      "rows": 2587,
+      "source": "LinkedIn",
+      "country": "VE",
+      "has_check_cursor": 0,
+      "age_7d_seen_in_48h": 15,
+      "age_threshold_in_7d": 580,
+      "active_in_age_window": 2580,
+      "age_7d_deadline_unknown": 142,
+      "age_7d_source_deadline_after_cap": 83
+    },
+    {
+      "rows": 1920,
+      "source": "Glassdoor",
+      "country": "CO",
+      "has_check_cursor": 0,
+      "age_7d_seen_in_48h": 2,
+      "age_threshold_in_7d": 395,
+      "active_in_age_window": 1862,
+      "age_7d_deadline_unknown": 395,
+      "age_7d_source_deadline_after_cap": 0
+    },
+    {
+      "rows": 1118,
+      "source": "Portal oficial",
+      "country": "CO",
+      "has_check_cursor": 0,
+      "age_7d_seen_in_48h": 228,
+      "age_threshold_in_7d": 228,
+      "active_in_age_window": 1115,
+      "age_7d_deadline_unknown": 183,
+      "age_7d_source_deadline_after_cap": 36
+    },
+    {
+      "rows": 1064,
+      "source": "Elempleo",
+      "country": "CO",
+      "has_check_cursor": 0,
+      "age_7d_seen_in_48h": 0,
+      "age_threshold_in_7d": 218,
+      "active_in_age_window": 1064,
+      "age_7d_deadline_unknown": 0,
+      "age_7d_source_deadline_after_cap": 200
+    },
+    {
+      "rows": 618,
+      "source": "Computrabajo",
+      "country": "VE",
+      "has_check_cursor": 0,
+      "age_7d_seen_in_48h": 5,
+      "age_threshold_in_7d": 128,
+      "active_in_age_window": 614,
+      "age_7d_deadline_unknown": 58,
+      "age_7d_source_deadline_after_cap": 69
+    },
+    {
+      "rows": 412,
+      "source": "WeRemoto",
+      "country": "unknown_or_shared_remote",
+      "has_check_cursor": 0,
+      "age_7d_seen_in_48h": 3,
+      "age_threshold_in_7d": 102,
+      "active_in_age_window": 402,
+      "age_7d_deadline_unknown": 0,
+      "age_7d_source_deadline_after_cap": 36
+    },
+    {
+      "rows": 407,
+      "source": "Indeed",
+      "country": "CO",
+      "has_check_cursor": 0,
+      "age_7d_seen_in_48h": 1,
+      "age_threshold_in_7d": 50,
+      "active_in_age_window": 404,
+      "age_7d_deadline_unknown": 50,
+      "age_7d_source_deadline_after_cap": 0
+    },
+    {
+      "rows": 219,
+      "source": "Glassdoor",
+      "country": "VE",
+      "has_check_cursor": 0,
+      "age_7d_seen_in_48h": 0,
+      "age_threshold_in_7d": 49,
+      "active_in_age_window": 219,
+      "age_7d_deadline_unknown": 49,
+      "age_7d_source_deadline_after_cap": 0
+    },
+    {
+      "rows": 183,
+      "source": "Magneto",
+      "country": "unknown_or_shared_remote",
+      "has_check_cursor": 0,
+      "age_7d_seen_in_48h": 0,
+      "age_threshold_in_7d": 22,
+      "active_in_age_window": 183,
+      "age_7d_deadline_unknown": 0,
+      "age_7d_source_deadline_after_cap": 15
+    },
+    {
+      "rows": 147,
+      "source": "GetOnBoard",
+      "country": "unknown_or_shared_remote",
+      "has_check_cursor": 0,
+      "age_7d_seen_in_48h": 0,
+      "age_threshold_in_7d": 37,
+      "active_in_age_window": 145,
+      "age_7d_deadline_unknown": 37,
+      "age_7d_source_deadline_after_cap": 0
+    },
+    {
+      "rows": 69,
+      "source": "Indeed",
+      "country": "VE",
+      "has_check_cursor": 0,
+      "age_7d_seen_in_48h": 0,
+      "age_threshold_in_7d": 10,
+      "active_in_age_window": 69,
+      "age_7d_deadline_unknown": 10,
+      "age_7d_source_deadline_after_cap": 0
+    },
+    {
+      "rows": 65,
+      "source": "RemoteOK",
+      "country": "unknown_or_shared_remote",
+      "has_check_cursor": 0,
+      "age_7d_seen_in_48h": 0,
+      "age_threshold_in_7d": 5,
+      "active_in_age_window": 65,
+      "age_7d_deadline_unknown": 5,
+      "age_7d_source_deadline_after_cap": 0
+    },
+    {
+      "rows": 14,
+      "source": "GetOnBoard",
+      "country": "CO",
+      "has_check_cursor": 0,
+      "age_7d_seen_in_48h": 0,
+      "age_threshold_in_7d": 3,
+      "active_in_age_window": 14,
+      "age_7d_deadline_unknown": 3,
+      "age_7d_source_deadline_after_cap": 0
+    },
+    {
+      "rows": 14,
+      "source": "Torre",
+      "country": "unknown_or_shared_remote",
+      "has_check_cursor": 14,
+      "age_7d_seen_in_48h": 0,
+      "age_threshold_in_7d": 7,
+      "active_in_age_window": 12,
+      "age_7d_deadline_unknown": 5,
+      "age_7d_source_deadline_after_cap": 1
+    },
+    {
+      "rows": 2,
+      "source": "Remotive",
+      "country": "unknown_or_shared_remote",
+      "has_check_cursor": 0,
+      "age_7d_seen_in_48h": 0,
+      "age_threshold_in_7d": 1,
+      "active_in_age_window": 2,
+      "age_7d_deadline_unknown": 1,
+      "age_7d_source_deadline_after_cap": 0
+    },
+    {
+      "rows": 2,
+      "source": "Torre",
+      "country": "CO",
+      "has_check_cursor": 2,
+      "age_7d_seen_in_48h": 0,
+      "age_threshold_in_7d": 2,
+      "active_in_age_window": 2,
+      "age_7d_deadline_unknown": 2,
+      "age_7d_source_deadline_after_cap": 0
+    }
+  ],
+  "current_end_exclusive": "2026-10-29T00:00:00",
+  "current_purge_classes": [
+    {
+      "rows": 1,
+      "active_flag_rows": 1,
+      "current_purge_class": "age_and_unseen"
+    },
+    {
+      "rows": 82,
+      "active_flag_rows": 82,
+      "current_purge_class": "age_only_recently_seen"
+    },
+    {
+      "rows": 35275,
+      "active_flag_rows": 34631,
+      "current_purge_class": "not_due"
+    },
+    {
+      "rows": 64,
+      "active_flag_rows": 64,
+      "current_purge_class": "source_deadline"
+    }
+  ],
+  "retained_hashes_daily": [
+    {
+      "day": "2026-10-15",
+      "reason": "expired",
+      "retained_unique_hashes": 1810
+    },
+    {
+      "day": "2026-10-15",
+      "reason": "source_closed",
+      "retained_unique_hashes": 2
+    },
+    {
+      "day": "2026-10-16",
+      "reason": "expired",
+      "retained_unique_hashes": 1469
+    },
+    {
+      "day": "2026-10-16",
+      "reason": "source_closed",
+      "retained_unique_hashes": 1
+    },
+    {
+      "day": "2026-10-17",
+      "reason": "expired",
+      "retained_unique_hashes": 1458
+    },
+    {
+      "day": "2026-10-18",
+      "reason": "expired",
+      "retained_unique_hashes": 1410
+    },
+    {
+      "day": "2026-10-19",
+      "reason": "expired",
+      "retained_unique_hashes": 581
+    },
+    {
+      "day": "2026-10-20",
+      "reason": "expired",
+      "retained_unique_hashes": 346
+    },
+    {
+      "day": "2026-10-21",
+      "reason": "expired",
+      "retained_unique_hashes": 1420
+    },
+    {
+      "day": "2026-10-21",
+      "reason": "source_closed",
+      "retained_unique_hashes": 49
+    },
+    {
+      "day": "2026-10-22",
+      "reason": "expired",
+      "retained_unique_hashes": 1419
+    },
+    {
+      "day": "2026-10-22",
+      "reason": "source_closed",
+      "retained_unique_hashes": 50
+    },
+    {
+      "day": "2026-10-23",
+      "reason": "expired",
+      "retained_unique_hashes": 1497
+    },
+    {
+      "day": "2026-10-23",
+      "reason": "source_closed",
+      "retained_unique_hashes": 55
+    },
+    {
+      "day": "2026-10-24",
+      "reason": "expired",
+      "retained_unique_hashes": 1313
+    },
+    {
+      "day": "2026-10-24",
+      "reason": "source_closed",
+      "retained_unique_hashes": 54
+    },
+    {
+      "day": "2026-10-25",
+      "reason": "expired",
+      "retained_unique_hashes": 1411
+    },
+    {
+      "day": "2026-10-25",
+      "reason": "source_closed",
+      "retained_unique_hashes": 32
+    },
+    {
+      "day": "2026-10-26",
+      "reason": "expired",
+      "retained_unique_hashes": 625
+    },
+    {
+      "day": "2026-10-26",
+      "reason": "source_closed",
+      "retained_unique_hashes": 14
+    },
+    {
+      "day": "2026-10-27",
+      "reason": "expired",
+      "retained_unique_hashes": 381
+    },
+    {
+      "day": "2026-10-27",
+      "reason": "source_closed",
+      "retained_unique_hashes": 48
+    },
+    {
+      "day": "2026-10-28",
+      "reason": "expired",
+      "retained_unique_hashes": 1099
+    },
+    {
+      "day": "2026-10-28",
+      "reason": "source_closed",
+      "retained_unique_hashes": 53
+    }
+  ],
+  "transaction_read_only": "on",
+  "retained_hashes_by_period_reason": [
+    {
+      "period": "current_7_complete_days",
+      "reason": "expired",
+      "retained_unique_hashes": 7745
+    },
+    {
+      "period": "current_7_complete_days",
+      "reason": "source_closed",
+      "retained_unique_hashes": 306
+    },
+    {
+      "period": "previous_7_complete_days",
+      "reason": "expired",
+      "retained_unique_hashes": 8494
+    },
+    {
+      "period": "previous_7_complete_days",
+      "reason": "source_closed",
+      "retained_unique_hashes": 52
+    }
+  ]
+}
