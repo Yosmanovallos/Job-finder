@@ -238,6 +238,29 @@ Se corrieron los 12 canarios, solo lectura y sin escribir nada. "Vigentes" son l
 - **9 de 12 tableros funcionan** y 8 tienen vacantes vigentes en Colombia. Habilitarlos es una escritura en producción y requiere aprobación aparte.
 - Para NTT DATA, Mota-Engil y Alignerr hay que buscar la ref correcta (o revisar el conector, en Mota-Engil) y correr un canario nuevo, también con aprobación.
 
+### Habilitación y primer tick (2026-10-29)
+
+- **Las 9 que funcionaron se cargaron en producción** (PR #76, una corrida `seed-one` por empresa, todas con aprobación del dueño). La base pasó de 119 a 128 tableros. Exadel ya existía como empresa y solo se le sumó el tablero.
+- **Primer tick programado** (corrida 40880002414): entraron 92 vacantes de Colombia de estas empresas:
+
+  | Empresa | Nuevas |
+  |---|---:|
+  | Mastercard | 24 |
+  | BCD Travel | 15 |
+  | Marsh | 14 |
+  | Thermo Fisher | 14 |
+  | Air Liquide | 8 |
+  | Edgewell | 6 |
+  | Kaseya | 6 |
+  | Exadel | 4 |
+  | Cloudbeds | 1 |
+
+  En Phenom el tick lee como máximo 25 detalles por corrida (`DETAIL_BUDGET`); el resto llega en los ticks siguientes.
+- **Exadel quedó duplicada.** El inventario automático ya había habilitado `greenhouse:externaljobboards`, que repite las vacantes de `exadelinc` (y algunas dentro de sí mismo). Se apagó con `inventory-revert` (corrida 40884859531, aprobada por el dueño). Queda marcado `ambiguous` y no se borra nada.
+- **Mota-Engil:** el conector SuccessFactors fallaba por dos razones. Primero, el sitio escribe "Showing 11 to 10 of 351": el segundo número es la cantidad de filas, no la última. Segundo, sus tiles no traen ubicación. Ambas se arreglaron en el PR #80, con páginas reales como fixtures. El canario aprobado leyó el tablero completo con 19 vacantes de Colombia. Se cargó en producción en el PR #81 (corrida 40892338604) y la base quedó con 129 tableros. La ciudad queda en `null` porque el conector todavía no lee `addressLocality`.
+- **Alignerr: descartada.** Su tablero de Greenhouse ya no existe (404 en la API y en la página), y además eran trabajos freelance de entrenamiento de IA.
+- **NTT DATA: descartada por ahora.** `careers-inc.nttdata.com` es el sitio de NTT DATA Services de EE. UU. y no tiene vacantes en Colombia. No se encontró un portal oficial de NTT DATA Colombia, cuyas ofertas aparecen sobre todo en elempleo.
+
 ## Datos
 
 - Export completo: corrida [40790351929](https://github.com/Yosmanovallos/Job-finder/actions/runs/40790351929) (`scripts/direct-directory-export.ts`, solo lectura).
