@@ -136,6 +136,32 @@ En la muestra, la mayoría de los casos a y b también se clasificó con resulta
 5. **Revisar una por una las 880 empresas de 5–19 vacantes.** Es el estrato con más empresas estimadas con portal (~310) y con la incertidumbre más alta.
 6. **No perseguir la cola de una vacante.** Según la muestra, casi ninguna tiene portal, así que esas vacantes seguirán llegando por las bolsas.
 
+## Avance: revisión una por una de las 880 empresas con 5 a 19 vacantes (en curso)
+
+Pedido del dueño del 2026-10-28. La revisión va en orden de mayor a menor número de vacantes. Los resultados quedan línea por línea en las notas de la sesión y se sumarán aquí al terminar.
+
+- **Antes de buscar en la web se separaron 195 empresas:**
+  - 30 ya cubiertas.
+  - 19 ya revisadas en la muestra.
+  - 105 nombres anónimos (iniciales o persona), clasificados por el nombre.
+  - 41 agencias o temporales que lo dicen en el nombre.
+- **Revisadas una por una hasta ahora: 209 empresas, las que tienen de 9 a 19 vacantes.** De ellas:
+
+  | Resultado | Empresas |
+  |---|---:|
+  | Página oficial con listado | 59 (28 %) |
+  | ATS o portal corporativo | 36 |
+  | Sitio propio | 15 |
+  | Portal en una bolsa | 8 |
+  | Solo bolsas | 90 |
+  | No determinables | 41 |
+  | Agencias o staffing | 18 |
+  | Solo formulario | 1 |
+
+  La verificación es la misma que en el resto del estudio: 58 de las 59 se clasificaron por búsqueda o prensa y 1 se confirmó en su sitio.
+- **Faltan 476 empresas con 5 a 9 vacantes.** La búsqueda se detuvo por el límite de 200 búsquedas web por turno.
+- **La proporción va en línea con la muestra:** 28 % frente a 35 % estimado para el estrato.
+
 ## Datos
 
 - Export completo: corrida [40790351929](https://github.com/Yosmanovallos/Job-finder/actions/runs/40790351929) (`scripts/direct-directory-export.ts`, solo lectura).
