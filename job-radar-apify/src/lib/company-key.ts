@@ -35,8 +35,9 @@ export function companyKey(name: string | null): string {
 
 // Exact keys of undisclosed-employer placeholders. Substrings stay limited
 // to "confidencial"/"confidential": "confiden" alone would also catch real
-// employers such as "Confidence Group".
-const PLACEHOLDER_KEYS = ["", "anonima", "anonimo", "empresaanonima", "empresaanonimo", "reservado", "reservada", "empresareservada", "nodisponible", "noespecificado", "reserved", "anonymous", "undisclosed"];
+// employers such as "Confidence Group". "empleosmagneto" is Magneto posting
+// its own talent-bank vacancies, not a hiring company.
+const PLACEHOLDER_KEYS = ["", "anonima", "anonimo", "empresaanonima", "empresaanonimo", "reservado", "reservada", "empresareservada", "nodisponible", "noespecificado", "reserved", "anonymous", "undisclosed", "empleosmagneto"];
 
 /** Same set as isPlaceholderCompanyKeySql(). */
 export function isPlaceholderKey(key: string): boolean {
