@@ -20,6 +20,7 @@ const suites: Record<string, string[]> = {
     "validate-analytics.test.ts",
     "validate-test-safety.test.ts",
     "validate-stale-cache.test.ts",
+    "validate-job-internal-links.test.ts",
     "validate-dashboard-filters.ts",
     "validate-role-matching.ts",
     "validate-run-telemetry.test.ts",

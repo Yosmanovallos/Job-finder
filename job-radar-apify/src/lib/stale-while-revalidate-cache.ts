@@ -56,6 +56,23 @@ export class StaleWhileRevalidateCache<Key, Value> {
     return this.options.clone(await this.startRefresh(key, loader));
   }
 
+  /**
+   * Non-blocking read: the cached value while it is fresh or stale, otherwise
+   * undefined. A missing or stale key starts (at most) one background load,
+   * so a caller that must never wait on the loader still warms the cache.
+   */
+  peek(key: Key, loader: () => Promise<Value>): Value | undefined {
+    const cached = this.entries.get(key);
+    const now = this.now();
+    if (cached && cached.freshUntil > now) return this.options.clone(cached.value);
+    if (!this.pending.has(key)) {
+      const refresh = this.startRefresh(key, loader);
+      void refresh.catch((error) => this.options.onBackgroundRefreshError?.(error));
+    }
+    if (cached && cached.staleUntil > now) return this.options.clone(cached.value);
+    return undefined;
+  }
+
   private startRefresh(key: Key, loader: () => Promise<Value>): Promise<Value> {
     const existing = this.pending.get(key);
     if (existing) return existing;

@@ -6,6 +6,7 @@ import { brotliCompress, constants as zlibConstants, gzip } from "node:zlib";
 import dotenv from "dotenv";
 import {
   getJobsPage,
+  peekJobsPage,
   getJobById,
   getHomeJobCounts,
   getHomeCompanies,
@@ -80,6 +81,15 @@ import {
   buildCompaniesItemList,
   SITE_URL
 } from "./lib/job-seo.js";
+import {
+  CITY_HUB_PAGE_LIMIT,
+  buildJobBreadcrumbList,
+  cityHubFilters,
+  pickRelatedJobs,
+  renderJobBreadcrumbHtml,
+  renderRelatedJobsHtml,
+  resolveJobCityHub
+} from "./lib/job-internal-links.js";
 import { verifySession } from "./auth/verify-session.js";
 import { startPaymentCheckout } from "./payments/checkout.js";
 import { handleWompiWebhook } from "./payments/webhook.js";
@@ -1202,14 +1212,15 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       // ResolvedCategory's comment.
       const filterParams: JobFilterParams =
         category.kind === "ciudad"
-          ? { cities: [category.label], country: category.country }
+          ? cityHubFilters(category)
           : { roles: [category.label], country: category.country };
       // isPubliclyDescribable filters out any locked job the same way
       // buildJobsSitemapXml/the job-detail branch already do — a category
       // page must never list a job it can't also link a working page for.
+      // Job pages peek this same cache entry for their related links.
       const matched = await getJobsPage({
         filters: filterParams,
-        limit: 60,
+        limit: CITY_HUB_PAGE_LIMIT,
         offset: 0,
         includeDetails: false
       });
@@ -1455,9 +1466,25 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     // API read, so the four consumers can never disagree.
     const googleReady = isGoogleEligiblePage(visible);
     const jobPosting = googleReady ? buildJobPosting(visible) : null;
+    // Link the page back into its city hub (docs/SEO-JOB-LINK-GRAPH-2026-10-29.md).
+    // Related jobs come only from the hub's already-cached first page: a cold
+    // cache yields none now and warms in the background, never adding a
+    // Postgres round trip to this response.
+    const cityHub = resolveJobCityHub(visible);
+    const hubPage = cityHub
+      ? peekJobsPage({ filters: cityHubFilters(cityHub), limit: CITY_HUB_PAGE_LIMIT, includeDetails: false })
+      : undefined;
+    const related = hubPage
+      ? pickRelatedJobs(visible.jobId, maskLockedFields(hubPage.jobs, "free").filter(isPubliclyDescribable))
+      : [];
     indexHtml = indexHtml.replace(
       '<div id="app"></div>',
-      `<div id="app">${buildJobPageBody(visible)}</div>`
+      `<div id="app">${renderJobBreadcrumbHtml(visible, cityHub)}${buildJobPageBody(visible)}${renderRelatedJobsHtml(cityHub, related)}</div>`
+    );
+    indexHtml = indexHtml.replace(
+      "</head>",
+      `  <script>window.__SSR_JOB_LINKS__=${escapeJsonForScriptTag({ jobId: visible.jobId, related })};</script>\n` +
+        `  <script type="application/ld+json">${escapeJsonForScriptTag(buildJobBreadcrumbList(visible, cityHub))}</script>\n</head>`
     );
     // Google blocks /api/jobs under robots.txt. Without this snapshot React
     // discarded a real SSR job and rendered a false "no longer available".

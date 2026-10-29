@@ -781,6 +781,16 @@ export async function getJobsPage(options: JobsPageOptions = {}): Promise<JobsPa
   return { jobs: page.jobs.slice(offset - block, offset - block + limit), total: page.total };
 }
 
+/**
+ * The first page getJobsPage() would return, but only if it is already
+ * cached; never waits on Postgres. A cold key is loaded in the background so
+ * the next request finds it. Same cache key as getJobsPage(offset 0).
+ */
+export function peekJobsPage(options: Omit<JobsPageOptions, "offset">): JobsPage | undefined {
+  const firstPage: JobsPageOptions = { ...options, offset: 0 };
+  return jobsPageCache.peek(jobsPageCacheKey(firstPage), () => queryJobsPage(firstPage));
+}
+
 // Infinite scroll asks for 24 jobs at a time, and every new offset used to
 // be its own cold run of the canonical projection (~1 s in production, 6 s
 // under load). Pages after the first now come from blocks of 96 rows that
