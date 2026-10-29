@@ -17,9 +17,11 @@ const PLACEHOLDERS = [
   "Reserved",
   "Anonymous",
   "Undisclosed",
+  "Empleos Magneto",
+  "EMPLEOS MAGNETO",
   null
 ];
-const REAL_EMPLOYERS = ["Confidence Group", "Confianza Seguros", "Reserva del Mar", "Accenture", "Anonymous Content Studio"];
+const REAL_EMPLOYERS = ["Confidence Group", "Confianza Seguros", "Reserva del Mar", "Accenture", "Anonymous Content Studio", "Magneto Global Services"];
 
 test("undisclosed employers are placeholders in every spelling", () => {
   for (const name of PLACEHOLDERS) assert.equal(isPlaceholderEmployer(name), true, String(name));
