@@ -874,7 +874,10 @@ async function queryJobsPage(options: JobsPageOptions): Promise<JobsPage> {
       technologies: Array.isArray(row.technologies) ? row.technologies : [],
       employmentType: row.employment_type ?? undefined,
       applicantCount: row.applicant_count ?? undefined,
-      salary: buildSalaryLabel(row)
+      salary: buildSalaryLabel(row),
+      // Already selected above; city hubs summarize them (job-seo.ts
+      // buildSalaryRange). Same rule as buildSalaryLabel: no currency, no number.
+      ...publishedSalaryNumbers(row)
     };
   });
 
@@ -1355,6 +1358,18 @@ export async function getJobById(id: string) {
  * the number. Returns undefined (never a placeholder) when nothing real
  * is available.
  */
+function publishedSalaryNumbers(row: {
+  salary_min?: string | number | null;
+  salary_max?: string | number | null;
+  salary_currency?: string | null;
+}): { salaryMin?: number; salaryMax?: number; salaryCurrency?: string } {
+  if (!row.salary_currency) return {};
+  const min = row.salary_min != null && Number(row.salary_min) > 0 ? Number(row.salary_min) : undefined;
+  const max = row.salary_max != null && Number(row.salary_max) > 0 ? Number(row.salary_max) : undefined;
+  if (min === undefined && max === undefined) return {};
+  return { salaryMin: min, salaryMax: max, salaryCurrency: row.salary_currency };
+}
+
 function buildSalaryLabel(row: {
   salary_raw?: string | null;
   salary_min?: string | number | null;
@@ -1412,6 +1427,9 @@ export function maskLockedFields<T extends object>(jobs: T[], tier: Subscription
       technologies: [],
       employmentType: null,
       salary: null,
+      salaryMin: null,
+      salaryMax: null,
+      salaryCurrency: null,
       applicantCount: null
     };
   });

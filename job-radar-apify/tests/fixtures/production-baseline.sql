@@ -96,3 +96,22 @@ FROM (VALUES
   ('popayan', 'Analista sintético MDE Popayán', 'Popayán, Colombia', 'CO'),
   ('civil-ve', 'Ingeniero Civil sintético MDE', 'Caracas, Venezuela', 'VE')
 ) AS fixture(slug, title, location, country);
+
+-- Explicitly synthetic Santa Marta hub for the city statistics (SEO city hub
+-- stats): repeated catalog role titles and numeric salaries with a currency,
+-- plus one free-text salary that must never enter the range.
+INSERT INTO jobs (id, url_hash, title, company, location, country, url, source, sources,
+                  published_at, description, requirements, salary_min, salary_max,
+                  salary_currency, salary_raw)
+SELECT md5('stats-baseline-' || i)::uuid, md5('stats-url-' || i),
+       CASE WHEN i <= 3 THEN 'Asesor comercial sintético ' ELSE 'Auxiliar administrativo sintético ' END || i,
+       'Empresa Sintetica Stats ' || (i % 2), 'Santa Marta, Colombia', 'CO',
+       'https://example.invalid/jobs/stats-' || i, 'LinkedIn', '["LinkedIn"]'::jsonb,
+       NOW() - INTERVAL '10 days' - i * INTERVAL '1 hour',
+       'Vacante sintética para validar las cifras del hub. No es una oferta real.',
+       '["Requisito sintético"]'::jsonb,
+       CASE WHEN i <= 3 THEN 1500000 + i * 100000 END,
+       CASE WHEN i <= 3 THEN 2500000 + i * 100000 END,
+       CASE WHEN i <= 3 THEN 'COP' END,
+       CASE WHEN i = 4 THEN 'A convenir' END
+FROM generate_series(1, 5) AS i;

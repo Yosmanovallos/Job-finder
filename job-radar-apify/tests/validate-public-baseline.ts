@@ -51,6 +51,7 @@ async function main(): Promise<void> {
       ["/empleos/neiva", "CO"],
       ["/empleos/ibague", "CO"],
       ["/empleos/popayan", "CO"],
+      ["/empleos/santa-marta", "CO"],
       ["/ve/empleos/ingeniero-civil", "VE"]
     ]);
     const routes = [
@@ -78,9 +79,9 @@ async function main(): Promise<void> {
         assert.equal(response.status, 200, route);
         const html = await response.text();
         const homePilot = route === "/"
-          ? { heading: "Ciudades destacadas en Colombia", paths: ["/empleos/bogota", "/empleos/cucuta", "/empleos/armenia", "/empleos/neiva", "/empleos/ibague", "/empleos/popayan"], foreign: "/empleos/caracas" }
+          ? { heading: "Ciudades destacadas en Colombia", paths: ["/empleos/bogota", "/empleos/santa-marta", "/empleos/neiva", "/empleos/armenia", "/empleos/ibague", "/empleos/valledupar", "/empleos/popayan", "/empleos/villavicencio", "/empleos/palmira", "/empleos/cucuta"], foreign: "/empleos/caracas" }
           : route === "/ve"
-            ? { heading: "Ciudades y cargos destacados en Venezuela", paths: ["/empleos/caracas", "/ve/empleos/ingeniero-civil"], foreign: "/empleos/cucuta" }
+            ? { heading: "Ciudades y cargos destacados en Venezuela", paths: ["/empleos/caracas", "/empleos/maracay", "/empleos/valencia", "/ve/empleos/ingeniero-civil"], foreign: "/empleos/cucuta" }
             : null;
         if (homePilot) {
           for (const href of homePilot.paths) {
@@ -121,6 +122,28 @@ async function main(): Promise<void> {
               html.includes("Publicadas en 7 días"),
             `[P0] ${route} no tiene las estadísticas verificables esperadas en SSR.`
           );
+          // An empty hub (0 jobs) has nothing to describe and no stats section.
+          const hasJobs = !html.includes("No hay vacantes en esta categoría por ahora.");
+          assert.ok(
+            !hasJobs ||
+              html.includes("data-category-stats") &&
+              html.includes("cifras de las ofertas activas") &&
+              html.includes("en los últimos 30 días;"),
+            `[P0] ${route} no tiene las cifras del hub en el HTML inicial.`
+          );
+        }
+        if (route === "/empleos/santa-marta") {
+          // Synthetic fixture: 3 "Asesor comercial" rows with COP salaries,
+          // 2 "Auxiliar administrativo" rows, one free-text salary.
+          for (const expected of [
+            "Empresas que más contratan",
+            "Empresa Sintetica Stats 1: 3 ofertas",
+            'href="/empleos/asesor-comercial"',
+            "Salario publicado por la fuente en 3 de las 5 ofertas de la muestra: entre COP 1.600.000 y COP 2.800.000.",
+            "5 vacantes activas publicadas en los últimos 30 días; 0 son de los últimos 7 días."
+          ]) {
+            assert.ok(html.includes(expected), `[P0] /empleos/santa-marta: falta "${expected}" en SSR.`);
+          }
         }
         await writeFile(path.join(process.cwd(), `baseline-${index}.html`), html);
         const pageErrors: string[] = [];
@@ -146,11 +169,24 @@ async function main(): Promise<void> {
                 overviewText.includes("Publicadas en 7 días"),
               `[P0] ${route} perdió el resumen enriquecido después de cargar React.`
             );
+            const stats = page.locator("[data-category-stats]");
+            const emptyHub = html.includes("No hay vacantes en esta categoría por ahora.");
+            assert.ok(
+              emptyHub || (await stats.textContent())?.includes("cifras de las ofertas activas"),
+              `[P0] ${route} perdió las cifras del hub después de cargar React.`
+            );
           }
           await page.screenshot({
             path: path.join(process.cwd(), `baseline-${index}-${viewport.width}.png`),
             fullPage: true
           });
+          if (route === "/empleos/santa-marta") {
+            // The full-page capture leaves below-the-fold reveal animations
+            // unplayed; center the stats block so its own capture is legible.
+            const stats = page.locator("[data-category-stats]");
+            await stats.evaluate((element) => element.scrollIntoView({ block: "center" }));
+            await stats.screenshot({ path: path.join(process.cwd(), `city-stats-${index}-${viewport.width}.png`) });
+          }
           if (homePilot) {
             const discovery = page.getByRole("navigation", { name: homePilot.heading, exact: true });
             await discovery.waitFor({ state: "visible" });
