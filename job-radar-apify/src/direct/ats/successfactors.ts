@@ -89,7 +89,7 @@ export function parseSearchPage(html: string): { from: number; to: number; total
     if (!label) return null;
     const number = (value: string) => Number(value.replace(/[.,]/g, ""));
     const from = number(label[1] ?? label[4]);
-    const to = number(label[2] ?? label[5]);
+    const shown = number(label[2] ?? label[5]);
     const total = number(label[3] ?? label[6]);
     const rows: SearchRow[] = [];
     for (const chunk of html.split(/<li class="job-tile\b/).slice(1)) {
@@ -113,7 +113,12 @@ export function parseSearchPage(html: string): { from: number; to: number; total
         department: field("department")
       });
     }
-    if (![from, to, total].every(Number.isInteger) || rows.length !== (total === 0 ? 0 : to - from + 1)) return null;
+    if (![from, shown, total].every(Number.isInteger)) return null;
+    // Some templates print the page's row count where the last row belongs
+    // ("Showing 11 to 10 of 351", Mota-Engil). Either reading must match the
+    // tiles actually rendered; `to` is always returned as the last row.
+    const to = total === 0 ? 0 : rows.length === shown - from + 1 ? shown : rows.length === shown && shown < from ? from + shown - 1 : -1;
+    if (to < 0 || (total === 0 && rows.length !== 0) || to > total) return null;
     return { from, to, total, rows };
   }
   const rows: SearchRow[] = [];
@@ -173,6 +178,12 @@ async function readSearch(origin: string, sitePath: string, colombiaOnly: boolea
     const parsed = parseSearchPage(response.body);
     if (!parsed) return { error: `forma inesperada en la página ${page + 1}` };
     if (page === 0 && !colombiaOnly && parsed.total > MAX_FULL_LISTING) return readSearch(origin, sitePath, true, http);
+    // Tiles without any location (Mota-Engil: 351 worldwide) would cost one
+    // posting page per row to find the Colombian ones; the site's own
+    // Colombia search narrows them first.
+    if (page === 0 && !colombiaOnly && parsed.rows.length > 0 && parsed.rows.every((row) => row.location === null)) {
+      return readSearch(origin, sitePath, true, http);
+    }
     if (page > 0 && parsed.total !== total) return { error: "el total cambió entre páginas: listado inconsistente" };
     total = parsed.total;
     rows.push(...parsed.rows);

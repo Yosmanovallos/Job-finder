@@ -118,6 +118,57 @@ test("SuccessFactors: tile listing counts jobs and rejects an unknown tile forma
   assert.deepEqual(parseSearchPage('<span id="tile-search-results-label">Showing 0 to 0 of 0 Jobs</span><ul id="job-tile-list"></ul>'), { from: 0, to: 0, total: 0, rows: [] });
 });
 
+/** Tile page whose label prints the row count where the last row belongs, as careers.mota-engil.com does (2026-10-29). */
+function countLabelTiles(from: number, ids: string[], total: number, label = `Showing ${from} to ${ids.length} of ${total} Jobs`): string {
+  const tiles = ids
+    .map((id) => `<li class="job-tile job-id-${id}" data-url="/job/Cartagena-Obra/${id}/">
+      <a class="jobTitle-link fontcolor" href="/job/Cartagena-Obra/${id}/">Ingeniero ${id}</a>
+      <div id="job-${id}-desktop-section-location-value">Cartagena, CO</div></li>`)
+    .join("");
+  return `<span id="tile-search-results-label">${label}</span><ul id="job-tile-list">${tiles}</ul>`;
+}
+
+test("SuccessFactors: a tile label with the page's row count instead of the last row", async () => {
+  const page2 = parseSearchPage(countLabelTiles(3, ["1449122633", "1449131133"], 5));
+  assert.deepEqual([page2?.from, page2?.to, page2?.total], [3, 4, 5], "'Showing 3 to 2 of 5' = rows 3–4");
+  assert.deepEqual([parseSearchPage(countLabelTiles(1, ["11111", "22222"], 5))?.to], [2], "page 1 reads the same either way");
+  assert.equal(parseSearchPage(countLabelTiles(3, ["1449122633"], 5, "Showing 3 to 2 of 5 Jobs")), null, "neither reading matches 1 tile");
+  assert.equal(parseSearchPage(countLabelTiles(5, ["11111", "22222"], 5, "Showing 5 to 2 of 5 Jobs")), null, "rows past the total");
+
+  const MOTA = "https://careers.mota-engil.com";
+  const search = (start: number) => `${MOTA}/search/?q=&sortColumn=referencedate&sortDirection=desc&startrow=${start}`;
+  const http = fakeHttp({
+    [`${MOTA}/robots.txt`]: { status: 404, body: "" },
+    [search(0)]: { status: 200, body: countLabelTiles(1, ["10001", "10002"], 5) },
+    [search(2)]: { status: 200, body: countLabelTiles(3, ["10003", "10004"], 5) },
+    [search(4)]: { status: 200, body: countLabelTiles(5, ["10005"], 5) }
+  });
+  const listing = await listBoard({ atsType: SF, atsRef: "careers.mota-engil.com" }, http, {});
+  assert.equal(listing.kind, "complete");
+  if (listing.kind !== "complete") return;
+  assert.equal(listing.boardTotal, 5);
+  assert.equal(listing.deferred, 5, "every row read; no detail budget");
+  assert.deepEqual(http.calls.filter((url) => url.includes("/search/")), [search(0), search(2), search(4)], "next page starts after the last row");
+});
+
+test("SuccessFactors: tiles without any location are read through the site's Colombia search", async () => {
+  const MOTA = "https://careers.mota-engil.com";
+  const search = (start: number, colombia = false) =>
+    `${MOTA}/search/?q=&sortColumn=referencedate&sortDirection=desc&startrow=${start}${colombia ? "&locationsearch=Colombia" : ""}`;
+  const noLocation = (html: string) => html.replace(/<div id="job-\d+-desktop-section-location-value">[^<]*<\/div>/g, "");
+  const http = fakeHttp({
+    [`${MOTA}/robots.txt`]: { status: 404, body: "" },
+    [search(0)]: { status: 200, body: noLocation(countLabelTiles(1, ["10001", "10002"], 351)) },
+    [search(0, true)]: { status: 200, body: noLocation(countLabelTiles(1, ["1449122633", "1449131133"], 3)) },
+    [search(2, true)]: { status: 200, body: noLocation(countLabelTiles(3, ["1435875733"], 3)) }
+  });
+  const listing = await listBoard({ atsType: SF, atsRef: "careers.mota-engil.com" }, http, {});
+  assert.equal(listing.kind, "complete");
+  if (listing.kind !== "complete") return;
+  assert.equal(listing.boardTotal, 3, "the Colombia search, not the 351 worldwide");
+  assert.deepEqual(http.calls.filter((url) => url.includes("/search/")), [search(0), search(0, true), search(2, true)]);
+});
+
 test("SuccessFactors: posting microdata — classic and new templates", () => {
   const classic = parsePostingPage(fixture(SF, "bancolombia-job-1438237700.trimmed.html"));
   assert.equal(classic?.publishedAt, "2026-10-08T00:00:00.000Z");
