@@ -79,9 +79,9 @@ async function main(): Promise<void> {
         assert.equal(response.status, 200, route);
         const html = await response.text();
         const homePilot = route === "/"
-          ? { heading: "Ciudades destacadas en Colombia", paths: ["/empleos/bogota", "/empleos/santa-marta", "/empleos/neiva", "/empleos/armenia", "/empleos/ibague", "/empleos/valledupar", "/empleos/popayan", "/empleos/villavicencio", "/empleos/palmira", "/empleos/cucuta"], foreign: "/empleos/caracas" }
+          ? { heading: "Ciudades y cargos destacados en Colombia", paths: ["/empleos/bogota", "/empleos/santa-marta", "/empleos/neiva", "/empleos/armenia", "/empleos/ibague", "/empleos/valledupar", "/empleos/popayan", "/empleos/villavicencio", "/empleos/palmira", "/empleos/cucuta", "/empleos/ingeniero-civil", "/empleos/analista-juridico", "/empleos/ingeniero-industrial", "/empleos/community-manager", "/empleos/analista-de-logistica", "/empleos/especialista-en-marketing-digital"], foreign: "/empleos/caracas" }
           : route === "/ve"
-            ? { heading: "Ciudades y cargos destacados en Venezuela", paths: ["/empleos/caracas", "/empleos/maracay", "/empleos/valencia", "/ve/empleos/ingeniero-civil"], foreign: "/empleos/cucuta" }
+            ? { heading: "Ciudades y cargos destacados en Venezuela", paths: ["/empleos/caracas", "/empleos/maracay", "/empleos/valencia", "/empleos/maracaibo", "/ve/empleos/ingeniero-civil", "/ve/empleos/analista-juridico", "/ve/empleos/ingeniero-ambiental", "/ve/empleos/analista-de-logistica", "/ve/empleos/desarrollador-frontend", "/ve/empleos/ingeniero-industrial"], foreign: "/empleos/cucuta" }
             : null;
         if (homePilot) {
           for (const href of homePilot.paths) {

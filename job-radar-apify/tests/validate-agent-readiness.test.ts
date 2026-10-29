@@ -41,8 +41,8 @@ test("HCD-001 home HTML and Markdown expose the country pilot before JavaScript"
 
 test("MDE-001/002 country discovery adds the five mapped destinations and keeps the pilot", () => {
   for (const [country, expected] of [
-    ["CO", ["/empleos/bogota", "/empleos/santa-marta", "/empleos/neiva", "/empleos/armenia", "/empleos/ibague", "/empleos/valledupar", "/empleos/popayan", "/empleos/villavicencio", "/empleos/palmira", "/empleos/cucuta"]],
-    ["VE", ["/empleos/caracas", "/empleos/maracay", "/empleos/valencia", "/ve/empleos/ingeniero-civil"]]
+    ["CO", ["/empleos/bogota", "/empleos/santa-marta", "/empleos/neiva", "/empleos/armenia", "/empleos/ibague", "/empleos/valledupar", "/empleos/popayan", "/empleos/villavicencio", "/empleos/palmira", "/empleos/cucuta", "/empleos/ingeniero-civil", "/empleos/analista-juridico", "/empleos/ingeniero-industrial", "/empleos/community-manager", "/empleos/analista-de-logistica", "/empleos/especialista-en-marketing-digital"]],
+    ["VE", ["/empleos/caracas", "/empleos/maracay", "/empleos/valencia", "/empleos/maracaibo", "/ve/empleos/ingeniero-civil", "/ve/empleos/analista-juridico", "/ve/empleos/ingeniero-ambiental", "/ve/empleos/analista-de-logistica", "/ve/empleos/desarrollador-frontend", "/ve/empleos/ingeniero-industrial"]]
   ] as const) {
     const content = getHomeContent(country);
     const discovery = content.sections[0];
@@ -52,9 +52,9 @@ test("MDE-001/002 country discovery adds the five mapped destinations and keeps 
       assert.ok(renderContentHtml(content).includes(`href="${href}"`));
       assert.ok(renderContentMarkdown(content).includes(`](${href})`));
     }
+    assert.match(discovery.heading, /ciudades y cargos/i);
     if (country === "VE") {
-      assert.match(discovery.heading, /ciudades y cargos/i);
-      assert.equal(discovery.links?.[3]?.label, "Empleos de ingeniero civil en Venezuela");
+      assert.equal(discovery.links?.[4]?.label, "Empleos de ingeniero civil en Venezuela");
     }
   }
 });
