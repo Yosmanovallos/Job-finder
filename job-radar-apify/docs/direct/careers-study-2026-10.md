@@ -181,24 +181,23 @@ Pedido del dueño del 2026-10-28. La revisión va en orden de mayor a menor núm
 
 ## Canarios propuestos (esperan aprobación del dueño)
 
-Son empresas del estudio que usan una plataforma con conector existente. Cada canario es `npx tsx scripts/direct-canary.ts <tipo> <ref>`: lee el tablero en vivo y no escribe nada. Si la ref está mal, el conector responde con error y no pasa nada más. Ninguno se ha corrido.
+Son empresas del estudio que usan una plataforma con conector existente. Cada canario es `npx tsx scripts/direct-canary.ts <tipo> <ref>`: lee el tablero en vivo y no escribe nada. Si la ref está mal, el conector responde con error y no pasa nada más. Todas las refs pasan el patrón del conector (comprobado sin red). Ninguno se ha corrido.
 
 **Lote A: ref vista en una URL de los resultados**
 
 | Empresa | Vacantes en bolsas | Tipo | Ref |
 |---|---:|---|---|
-| Marsh | 52 (+5 de Marsh Risk) | phenom | `careers.marsh.com/global/en` |
+| Marsh | 52 (+5 de Marsh Risk) | phenom | `careers.marsh.com/global/en`; si falla, `careers.marshmclennan.com/global/en` |
 | Mastercard | 43 | phenom | `careers.mastercard.com/us/en` |
 | NTT DATA | 32 | successfactors | `careers-inc.nttdata.com` |
 | Thermo Fisher | 21 | phenom | `jobs.thermofisher.com/global/en` |
 | Alignerr | 16 | greenhouse | `alignerr` |
 | BCD Travel | 11 | successfactors | `jobs.bcdtravel.com` |
 | Kaseya | 8 | greenhouse | `kaseya` |
-| Mota-Engil | 8 | successfactors | `careers.mota-engil.com` |
+| Mota-Engil | 8 | successfactors | `careers.mota-engil.com` (SuccessFactors deducido por la forma de la URL) |
 | Air Liquide | 6 | workday | `airliquidehr/wd3/AirLiquideExternalCareer` |
 | Cloudbeds | 6 | greenhouse | `cloudbedsthirdpartyboard` |
-| Edgewell | 6 | successfactors | `careers.edgewell.com` |
-| Axon | 5 | greenhouse | `axon` |
+| Edgewell | 6 | successfactors | `careers.edgewell.com` (SuccessFactors deducido por la forma de la URL) |
 | Exadel | 5 | greenhouse | `exadelinc` |
 
 **Lote B: ref deducida o citada por un tercero (más probable que falle)**
@@ -208,13 +207,14 @@ Son empresas del estudio que usan una plataforma con conector existente. Cada ca
 | Stanley Black & Decker | (grandes) | workday | `sbdinc/wd1/<sitio>`: falta el nombre del sitio |
 | Autodesk | 5 | workday | `autodesk/wd1/Ext` (de memoria, sin fuente) |
 | Enertis Applus | 5 | teamtailor | `applusgroup` (región sin confirmar) |
+| Axon Training (Argentina) | 5 | greenhouse | `axon`: identidad sin confirmar; ese tablero puede ser Axon Enterprise, otra empresa |
 
 **Quedan fuera:**
 
 - Pharmbills: su tablero está en Greenhouse UE y el conector solo lee `boards-api.greenhouse.io`.
 - VML, Aon, IQVIA y Essity: la plataforma no se confirmó. IQVIA parece Radancy, no Workday.
 - Encora, Power Digital Marketing, AECOM, Kraken y Nu: ya están en el inventario I2, y las cubre el sondeo programado o la revisión humana pendiente.
-- AMERICAS GBS (SGS): SGS ya está en el seed con SmartRecruiters `SGS` habilitado. Es un alias que falta, no un tablero nuevo.
+- AMERICAS GBS: posible alias de SGS, por confirmar. SGS ya está en el seed con SmartRecruiters `SGS` habilitado.
 
 ## Datos
 
