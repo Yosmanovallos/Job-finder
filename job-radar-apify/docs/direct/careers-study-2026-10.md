@@ -136,30 +136,32 @@ En la muestra, la mayoría de los casos a y b también se clasificó con resulta
 5. **Revisar una por una las 880 empresas de 5–19 vacantes.** Es el estrato con más empresas estimadas con portal (~310) y con la incertidumbre más alta.
 6. **No perseguir la cola de una vacante.** Según la muestra, casi ninguna tiene portal, así que esas vacantes seguirán llegando por las bolsas.
 
-## Avance: revisión una por una de las 880 empresas con 5 a 19 vacantes (en curso)
+## Revisión una por una de las 880 empresas con 5 a 19 vacantes (completa)
 
-Pedido del dueño del 2026-10-28. La revisión va en orden de mayor a menor número de vacantes. Los resultados quedan línea por línea en las notas de la sesión y se sumarán aquí al terminar.
+Pedido del dueño del 2026-10-28. La revisión va en orden de mayor a menor número de vacantes. Los resultados quedan línea por línea en las notas de la sesión; aquí están sumados.
 
 - **Antes de buscar en la web se separaron 195 empresas:**
   - 30 ya cubiertas.
   - 19 ya revisadas en la muestra.
   - 105 nombres anónimos (iniciales o persona), clasificados por el nombre.
   - 41 agencias o temporales que lo dicen en el nombre.
-- **Revisadas una por una hasta ahora: 522 de las 685 que quedaban.** Están completas todas las de 10 a 19 vacantes (197) y van 325 de las 488 con 5 a 9.
+- **Revisadas una por una: las 685 que quedaban** (197 con 10 a 19 vacantes y 488 con 5 a 9). Resultado: **157 tienen página oficial con listado (23 %)**. Sumadas las 30 ya cubiertas, son al menos 187 de las 880.
 
-  | Resultado | 10 a 19 vacantes | 5 a 9 (parcial) | Total |
+  | Resultado | 10 a 19 vacantes | 5 a 9 | Total |
   |---|---:|---:|---:|
-  | **Página oficial con listado** | **55 (28 %)** | **72 (22 %)** | **127 (24 %)** |
-  | ATS o portal corporativo | 35 | 49 | 84 |
-  | Sitio propio | 12 | 12 | 24 |
-  | Portal en una bolsa | 8 | 11 | 19 |
-  | Solo bolsas | 87 | 87 | 174 |
-  | No determinables | 37 | 131 | 168 |
-  | Agencias o staffing | 17 | 34 | 51 |
+  | **Página oficial con listado** | **55 (28 %)** | **102 (21 %)** | **157 (23 %)** |
+  | ATS o portal corporativo | 35 | 66 | 101 |
+  | Sitio propio | 12 | 16 | 28 |
+  | Portal en una bolsa | 8 | 20 | 28 |
+  | Solo bolsas | 87 | 122 | 209 |
+  | No determinables | 37 | 211 | 248 |
+  | Agencias o staffing | 17 | 52 | 69 |
   | Solo formulario | 1 | 1 | 2 |
 
+- **Cuarta tanda (163 empresas, 2026-10-29).** También todo por búsqueda o prensa (Primavera, por el nombre). Salen 30 páginas oficiales más: 17 portales corporativos, 4 sitios propios y 9 portales en una bolsa (sobre todo Magneto; TCL, por ejemplo, según prensa). Entre las ATS aparecen iCIMS (StoneX, Crawford, Liberty Latin America), Avature (Siemens Energy), Teamtailor (Enertis Applus), SmartRecruiters (SGS, `americasgbs`), Gupy (Decathlon) y Greenhouse (Axon, Exadel).
+- **Criterio desigual con los portales conocidos:** en esta tanda, multinacionales con portal global conocido que no apareció en los resultados (Rockwell, PMI, TikTok, GM, Canonical, dentsu, Unisys, Würth, XM) quedaron como "no determinable". En tandas anteriores algunas así se contaron como ATS. Por eso el 21 % de las de 5 a 9 es un piso, no un valor exacto.
 - **Tercera tanda (159 empresas, 2026-10-28/29).** Tiene el mismo nivel de verificación que la segunda: todo por búsqueda o prensa. De sus 22 portales corporativos, unos 14 salieron con su URL en los resultados, entre ellos BNP Paribas (56 a 82 ofertas en Bogotá), TMF Group (Avature), BD, Henkel, HubSpot, VML, Capgemini y Minor Hotels. Los demás son portales conocidos, citados por prensa o vistos solo en réplicas.
-- **Ruido en el directorio:** Hy-Vee es una cadena de EE. UU. sin presencia en Colombia; probablemente viene de una confusión con Columbia (EE. UU.). Conviene revisar de dónde salen esas vacantes.
+- **Ruido en el directorio:** Hy-Vee (EE. UU.) y Otomoto (Polonia) no tienen presencia en Colombia; lo de Hy-Vee probablemente viene de una confusión con Columbia (EE. UU.). Conviene revisar de dónde salen esas vacantes.
 - **Grupo Aval tiene un portal común (Talento Aval)** que agrupa vacantes de AV Villas, Porvenir, Banco de Bogotá, Occidente y Popular.
 - **La verificación es más débil en la segunda tanda (152 empresas, 2026-10-28).**
   - Casi todas se clasificaron solo por búsqueda o prensa; ninguna se abrió en su sitio.
@@ -167,14 +169,15 @@ Pedido del dueño del 2026-10-28. La revisión va en orden de mayor a menor núm
   - Los 7 "portal en una bolsa" son páginas de Magneto o Pandapé. Salvo Gavinco (subdominio propio en Pandapé), no se confirmó que el sitio de la empresa enlace a ellas, que es la condición para usar el conector de Magneto.
   - Entre las de 5 a 9 sube la parte "no determinable" (65 de 166): son nombres ambiguos o empresas pequeñas sin rastro en la web.
 - **Candidatas para conectores que ya existen** (no se probó nada):
-  - Greenhouse: Kaseya (vacantes en Medellín), Pharmbills (tablero UE, vacante en Bogotá) y Cloudbeds (tablero de terceros). VML tiene IDs de vacante con forma de Greenhouse, sin confirmar.
+  - Greenhouse: Kaseya (vacantes en Medellín), Pharmbills (tablero UE, vacante en Bogotá), Cloudbeds (tablero de terceros), Axon (`axontrainingargentina`) y Exadel. VML tiene IDs de vacante con forma de Greenhouse, sin confirmar.
   - SuccessFactors: Mota-Engil Colombia y Edgewell Personal Care (Bogotá).
   - Workday: Air Liquide (citado) y Autodesk (requisiciones 26WD…), sin ver el portal.
+  - SmartRecruiters: SGS (`americasgbs`); el conector está deshabilitado por defecto (ADR 0002).
+  - Teamtailor: Enertis Applus.
   - Ashby: el tablero `nubank` ya está en el inventario I2 como `ambiguous` y espera aprobación humana.
   - Frisby ya tiene conector propio (`scripts/canary-frisby.ts`), pero su clave del directorio no figura como cubierta; conviene revisar el alias.
-- **Plataformas sin conector que vuelven a salir:** Gupy (Stefanini), Jobvite (GIGA IT), Radancy (Amgen, BD), DirectEmployers (Convatec, GE HealthCare, WSP, Zimmer Biomet), Avature (TMF Group) y JazzHR (Massive Bio).
-- **Faltan 163 empresas con 5 a 9 vacantes.** La búsqueda se detuvo otra vez cerca del límite de 200 búsquedas web por turno.
-- **La proporción baja un poco frente a la muestra:** 24 % frente a 35 % estimado para el estrato. Entre las de 5 a 9 crece la parte "no determinable" (131 de 325).
+- **Plataformas sin conector que vuelven a salir:** Gupy (Stefanini), Jobvite (GIGA IT), Radancy (Amgen, BD), DirectEmployers (Convatec, GE HealthCare, WSP, Zimmer Biomet), Avature (TMF Group, Siemens Energy), JazzHR (Massive Bio, MAS Global) e iCIMS (StoneX, Crawford, Liberty Latin America).
+- **La proporción queda por debajo de la muestra:** 23 % frente a 35 % estimado para el estrato (7 de 20 en la muestra). Entre las de 5 a 9 crece mucho la parte "no determinable" (211 de 488): son nombres ambiguos o empresas pequeñas sin rastro en la web. Algunas podrían tener página sin que la búsqueda la mostrara.
 
 ## Datos
 
