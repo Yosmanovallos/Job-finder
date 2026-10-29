@@ -24,6 +24,14 @@ mejoras de SEO/UX/seguridad/observabilidad.
 
 ## Estado del roadmap
 
+Entrega acotada 2026-10-29: archivo privado de vacantes retiradas, PR #77,
+`3ae484f` en main. Conserva el máximo público de 30 días y el diseño; migración
+aditiva aplicada con RLS y sin grants públicos. Lint, tipos, unitarias,
+19 suites de integración, baseline 18 rutas y ambos checks GitHub PASS.
+Salud pública posterior PASS; queda observar el primer lote del tick normal,
+sin afirmar que ya existen archivos de producción. ADR 0008 y evidencia en
+`openspec/changes/private-job-archive/validation.md`.
+
 | Fase | Contenido | Estado | Commit | OpenSpec |
 |---|---|---|---|---|
 | P0 | Aislamiento de tests, PostgreSQL desechable, baseline | ✅ Done | `a73a85e` | `openspec/changes/archive/p0-test-isolation/` |

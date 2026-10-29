@@ -4,4 +4,5 @@
 - [x] Migración, archivo atómico y guardas.
 - [x] Pruebas aisladas de ciclo de vida y privacidad.
 - [x] Lint, tipos, unitarias, integración, baseline.
-- [ ] Migración y despliegue verificados en producción.
+- [x] Migración aplicada, main integrado y controles públicos posteriores PASS.
+- [ ] Observación operativa: confirmar primer lote archivado por el tick normal (sin forzar vacantes).
