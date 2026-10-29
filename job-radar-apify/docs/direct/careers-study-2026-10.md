@@ -216,6 +216,28 @@ Son empresas del estudio que usan una plataforma con conector existente. Cada ca
 - Encora, Power Digital Marketing, AECOM, Kraken y Nu: ya están en el inventario I2, y las cubre el sondeo programado o la revisión humana pendiente.
 - AMERICAS GBS: posible alias de SGS, por confirmar. SGS ya está en el seed con SmartRecruiters `SGS` habilitado.
 
+### Resultado del lote A (corrido el 2026-10-29 con aprobación del dueño)
+
+Se corrieron los 12 canarios, solo lectura y sin escribir nada. "Vigentes" son las de Colombia con menos de 30 días entre las leídas. En Phenom y Workday solo se leen 5 detalles por corrida y el resto queda diferido, así que esa cifra es una muestra.
+
+| Empresa | Resultado | Tablero | Colombia (leídas) | Vigentes |
+|---|---|---:|---:|---:|
+| BCD Travel | funciona | 169 | 6 | 5 |
+| Kaseya | funciona | 96 | 7 | 6 |
+| Edgewell | funciona | 84 | 5 | 5 |
+| Air Liquide | funciona | 8 (Colombia) | 5 de 5 | 5 |
+| Mastercard | funciona | 37 (Colombia) | 5 de 5 | 4 |
+| Exadel | funciona | 37 | 6 | 4 |
+| Thermo Fisher | funciona | 35 (Colombia) | 5 de 5 | 1 |
+| Cloudbeds | funciona | 77 | 2 | 1 |
+| Marsh | funciona, pero las 5 leídas tienen más de 30 días | 77 (Colombia) | 5 de 5 | 0 |
+| NTT DATA | tablero vacío: el host solo no basta; falta el segmento del sitio | 0 | – | – |
+| Mota-Engil | error: "forma inesperada en la página 2" | – | – | – |
+| Alignerr | 404: el tablero `alignerr` no existe en Greenhouse | – | – | – |
+
+- **9 de 12 tableros funcionan** y 8 tienen vacantes vigentes en Colombia. Habilitarlos es una escritura en producción y requiere aprobación aparte.
+- Para NTT DATA, Mota-Engil y Alignerr hay que buscar la ref correcta (o revisar el conector, en Mota-Engil) y correr un canario nuevo, también con aprobación.
+
 ## Datos
 
 - Export completo: corrida [40790351929](https://github.com/Yosmanovallos/Job-finder/actions/runs/40790351929) (`scripts/direct-directory-export.ts`, solo lectura).
