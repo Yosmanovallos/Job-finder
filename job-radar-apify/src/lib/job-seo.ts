@@ -1,5 +1,5 @@
 import type { Job } from "../sources/types.js";
-import { getModalityLabel, CITY_OPTIONS } from "./job-filters.js";
+import { getModalityLabel, roleTitleMatcher, CITY_OPTIONS } from "./job-filters.js";
 import { DEFAULT_ROLES_200 } from "../queue/scheduler.js";
 import { getCountryConfig, DEFAULT_COUNTRY } from "../countries/index.js";
 import { isGoogleReadyNow, resolveGoogleLocation } from "./google-job-readiness.js";
@@ -577,9 +577,39 @@ export interface CategoryInsights {
   sources: string[];
   modalities: Array<{ label: string; count: number }>;
   freshLast7Days: number;
+  /**
+   * True when every row of a capped sample is under 7 days old: the sample is
+   * the newest rows, so the real 7-day count is at least freshLast7Days but
+   * may be higher. Render it as "60+", never as an exact 60.
+   */
+  freshLast7DaysIsLowerBound: boolean;
+  /** freshLast7Days as display text ("12" or "60+"). */
+  freshLast7DaysLabel: string;
+  /**
+   * Every live job is at most MAX_JOB_AGE_DAYS (30) old (liveJobSql), so the
+   * uncapped total IS the number of active jobs published in the last 30 days.
+   */
+  activeLast30Days: number;
+  /** Top employers of the sample with their real counts (placeholders excluded). */
+  companyRanking: Array<{ label: string; count: number }>;
+  /**
+   * City hubs only: catalog roles (DEFAULT_ROLES_200) matched by at least two
+   * sample titles, with the same matcher the role page's SQL uses, linked to
+   * that role's page in the city's country.
+   */
+  topRoles: Array<{ label: string; count: number; href: string }>;
+  /**
+   * Range of the salaries the sources published as numbers with a currency,
+   * in the most common currency only; null below SALARY_RANGE_MIN_JOBS.
+   * Free-text salaries are never parsed.
+   */
+  salaryRange: { currency: string; min: number; max: number; jobCount: number } | null;
   latestPublishedLabel: string | null;
   intro: string;
 }
+
+const SALARY_RANGE_MIN_JOBS = 3;
+const TOP_ROLES_LIMIT = 5;
 
 export interface CategoryInternalLink {
   href: string;
@@ -622,7 +652,13 @@ export function buildCategoryMeta(category: ResolvedCategory, totalCount: number
     // useful without forcing Google to relearn a new title every scrape.
     title: `${heading} | BuscoTrabajo`,
     heading,
-    description: `Encuentra ${countLabel} de ${target}. Compara ofertas de empleo actuales y visita la fuente original para aplicar.`,
+    // City descriptions open with the "busco trabajo en <ciudad>" intent and
+    // keep "vacantes y ofertas de empleo" next to the live count; they stay
+    // under ~160 characters for the longest city name.
+    description:
+      kind === "ciudad" && !isRemoteBucket(category)
+        ? `¿Buscas trabajo en ${label}? ${totalCount === 1 ? "1 vacante activa" : `${countLabel} y ofertas de empleo activas`}. Compara las empresas y cargos que más contratan y aplica en la fuente original.`
+        : `Encuentra ${countLabel} de ${target}. Compara ofertas de empleo actuales y visita la fuente original para aplicar.`,
     canonicalUrl: buildCategoryUrl(category)
   };
 }
@@ -639,11 +675,78 @@ function incrementCount(
   else map.set(key, { label, count: 1 });
 }
 
-function rankedLabels(map: Map<string, { label: string; count: number }>, limit: number): string[] {
+function ranked(
+  map: Map<string, { label: string; count: number }>,
+  limit: number
+): Array<{ label: string; count: number }> {
   return [...map.values()]
     .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, "es"))
     .slice(0, limit)
-    .map((entry) => entry.label);
+    .map((entry) => ({ ...entry }));
+}
+
+function rankedLabels(map: Map<string, { label: string; count: number }>, limit: number): string[] {
+  return ranked(map, limit).map((entry) => entry.label);
+}
+
+function positiveNumber(value: unknown): number | null {
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+// Same rules as buildSalaryLabel(): a number only counts with a published
+// currency, and 0 is the "not specified" sentinel, never a real bound.
+function buildSalaryRange(jobs: SeoJob[]): CategoryInsights["salaryRange"] {
+  const byCurrency = new Map<string, { min: number; max: number; jobCount: number }>();
+  for (const job of jobs) {
+    const currency = typeof job.salaryCurrency === "string" ? job.salaryCurrency.trim().toUpperCase() : "";
+    if (!currency) continue;
+    const min = positiveNumber(job.salaryMin);
+    const max = positiveNumber(job.salaryMax);
+    const low = min ?? max;
+    const high = max ?? min;
+    if (low === null || high === null) continue;
+    const current = byCurrency.get(currency);
+    if (current) {
+      current.min = Math.min(current.min, low, high);
+      current.max = Math.max(current.max, low, high);
+      current.jobCount += 1;
+    } else {
+      byCurrency.set(currency, { min: Math.min(low, high), max: Math.max(low, high), jobCount: 1 });
+    }
+  }
+  const [best] = [...byCurrency.entries()].sort(
+    ([a, x], [b, y]) => y.jobCount - x.jobCount || a.localeCompare(b)
+  );
+  if (!best || best[1].jobCount < SALARY_RANGE_MIN_JOBS) return null;
+  return { currency: best[0], ...best[1] };
+}
+
+/** "COP 1.500.000" — the range's own currency code, never a converted value. */
+export function formatSalaryAmount(currency: string, amount: number): string {
+  return `${currency} ${new Intl.NumberFormat("es-CO", { maximumFractionDigits: 0 }).format(amount)}`;
+}
+
+// One match plan per catalog role, built on first use and shared by every
+// hub render, so a 60-row page costs 200 x 60 regex tests and nothing more.
+let roleMatchers: Array<{ role: string; matches: (title: string | null | undefined) => boolean }> | null = null;
+
+function buildTopRoles(category: ResolvedCategory, jobs: SeoJob[]): CategoryInsights["topRoles"] {
+  if (category.kind !== "ciudad" || jobs.length === 0) return [];
+  roleMatchers ??= DEFAULT_ROLES_200.map((role) => ({ role, matches: roleTitleMatcher(role) }));
+  const counts: Array<{ label: string; count: number }> = [];
+  for (const { role, matches } of roleMatchers) {
+    let count = 0;
+    for (const job of jobs) if (matches(job.title)) count += 1;
+    if (count >= 2) counts.push({ label: role, count });
+  }
+  return counts
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, "es"))
+    .slice(0, TOP_ROLES_LIMIT)
+    .map((entry) => ({
+      ...entry,
+      href: buildCategoryPath({ kind: "rol", label: entry.label, country: category.country })
+    }));
 }
 
 /**
@@ -725,6 +828,11 @@ export function buildCategoryInsights(
           timeZone: "America/Bogota"
         });
 
+  // The sample is the newest rows (published_at DESC, no preferred roles on
+  // hub pages), so an all-fresh capped sample only proves a lower bound.
+  const freshLast7DaysIsLowerBound =
+    visibleCount > 0 && visibleCount < totalCount && freshLast7Days === visibleCount;
+
   return {
     visibleCount,
     companyCount: companies.size,
@@ -732,8 +840,74 @@ export function buildCategoryInsights(
     sources: rankedLabels(sources, 8),
     modalities,
     freshLast7Days,
+    freshLast7DaysIsLowerBound,
+    freshLast7DaysLabel: freshLast7DaysIsLowerBound ? `${freshLast7Days}+` : String(freshLast7Days),
+    activeLast30Days: totalCount,
+    companyRanking: ranked(companies, 5),
+    topRoles: buildTopRoles(category, jobs),
+    salaryRange: buildSalaryRange(jobs),
     latestPublishedLabel,
     intro
+  };
+}
+
+export interface CategoryStatsCopy {
+  heading: string;
+  summary: string;
+  basis: string;
+  companiesHeading: string;
+  companies: string[];
+  rolesHeading: string;
+  roles: Array<{ href: string; label: string }>;
+  salary: string | null;
+}
+
+/**
+ * Text of the "cifras" section, shared by SSR and the hydrated page so both
+ * render the same words. Null when the page has no jobs to describe.
+ */
+export function buildCategoryStatsCopy(
+  category: ResolvedCategory,
+  insights: CategoryInsights
+): CategoryStatsCopy | null {
+  if (insights.visibleCount === 0) return null;
+  const countryName = getCountryConfig(category.country).name;
+  const place = isRemoteBucket(category)
+    ? `Trabajos remotos en ${countryName}`
+    : category.kind === "ciudad"
+      ? `Trabajos en ${category.label}`
+      : `${category.label} en ${countryName}`;
+  const active = insights.activeLast30Days;
+  const fresh = insights.freshLast7DaysIsLowerBound
+    ? `al menos ${insights.freshLast7Days}`
+    : String(insights.freshLast7Days);
+  const visible = insights.visibleCount;
+  const salary = insights.salaryRange
+    ? `Salario publicado por la fuente en ${insights.salaryRange.jobCount} de ${visible === 1 ? "la oferta" : `las ${visible} ofertas`} de la muestra: ${
+        insights.salaryRange.min === insights.salaryRange.max
+          ? formatSalaryAmount(insights.salaryRange.currency, insights.salaryRange.min)
+          : `entre ${formatSalaryAmount(insights.salaryRange.currency, insights.salaryRange.min)} y ${formatSalaryAmount(insights.salaryRange.currency, insights.salaryRange.max)}`
+      }.`
+    : null;
+  return {
+    heading: `${place}: cifras de las ofertas activas`,
+    summary: `${active === 1 ? "1 vacante activa publicada" : `${active} vacantes activas publicadas`} en los últimos 30 días; ${fresh} ${insights.freshLast7Days === 1 && !insights.freshLast7DaysIsLowerBound ? "es de" : "son de"} los últimos 7 días.`,
+    basis:
+      visible < active
+        ? `Empresas, cargos y salarios se calculan con las ${visible} ofertas más recientes de esta página.`
+        : "Empresas, cargos y salarios se calculan con todas las ofertas de esta página.",
+    companiesHeading: "Empresas que más contratan",
+    companies: insights.companyRanking.map(
+      (item) => `${item.label}: ${item.count === 1 ? "1 oferta" : `${item.count} ofertas`}`
+    ),
+    rolesHeading: category.kind === "ciudad" && !isRemoteBucket(category)
+      ? `Cargos más pedidos en ${category.label}`
+      : "Cargos más pedidos",
+    roles: insights.topRoles.map((role) => ({
+      href: role.href,
+      label: `${role.label} (${role.count})`
+    })),
+    salary
   };
 }
 

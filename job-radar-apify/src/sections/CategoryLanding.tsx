@@ -10,6 +10,7 @@ import {
   buildCategoryInternalLinks,
   buildRelatedCityLinks,
   buildCategorySectionHeadings,
+  buildCategoryStatsCopy,
   type CategoryInsights
 } from "../lib/job-seo.js";
 import { isVePrefixed } from "../lib/country-context.js";
@@ -131,6 +132,7 @@ export default function CategoryLanding() {
   const internalLinks = category ? buildCategoryInternalLinks(category) : [];
   const relatedCityLinks = category ? buildRelatedCityLinks(category) : [];
   const sectionHeadings = category ? buildCategorySectionHeadings(category) : null;
+  const statsCopy = category && insights ? buildCategoryStatsCopy(category, insights) : null;
   usePageMeta({
     title: meta?.title ?? "Cargando vacantes... | BuscoTrabajo",
     description: meta?.description ?? "Cargando vacantes de esta categoría."
@@ -231,16 +233,11 @@ export default function CategoryLanding() {
                   </div>
                   <div className="rounded-xl md:rounded-2xl border-2 border-foreground bg-white p-2.5 md:p-4">
                     <dt className="font-mono text-[10px] md:text-xs leading-tight font-semibold uppercase tracking-wide text-muted-foreground">Publicadas en 7 días</dt>
-                    <dd className="mt-1.5 md:mt-1 font-heading font-bold text-[26px] md:text-[34px] leading-none tracking-[-0.03em]">{insights.freshLast7Days}</dd>
+                    <dd className="mt-1.5 md:mt-1 font-heading font-bold text-[26px] md:text-[34px] leading-none tracking-[-0.03em]">{insights.freshLast7DaysLabel}</dd>
                   </div>
                 </dl>
 
                 <div className="mt-5 space-y-2 text-sm leading-relaxed text-[#3d413e]">
-                  {insights.topCompanies.length > 0 && (
-                    <p>
-                      <strong className="text-foreground">Empresas visibles:</strong> {insights.topCompanies.join(", ")}.
-                    </p>
-                  )}
                   {insights.sources.length > 0 && (
                     <p>
                       <strong className="text-foreground">Fuentes:</strong> {insights.sources.join(", ")}.
@@ -273,6 +270,54 @@ export default function CategoryLanding() {
                   </nav>
                 )}
               </div>
+            </section>
+          )}
+
+          {statsCopy && (
+            <section
+              data-category-stats
+              aria-label={statsCopy.heading}
+              className="sr-host max-w-[1240px] w-full mx-auto px-4 md:px-6 pt-8 md:pt-12"
+            >
+              <h2 className="sr font-heading font-bold text-[24px] md:text-[36px] leading-tight tracking-[-0.03em] mb-2 md:mb-3">
+                {statsCopy.heading}
+              </h2>
+              <p className="sr text-sm md:text-base leading-relaxed text-[#3d413e] max-w-[900px]">{statsCopy.summary}</p>
+              {(statsCopy.companies.length > 0 || statsCopy.roles.length > 0) && (
+                <div className="sr mt-4 md:mt-5 grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
+                  {statsCopy.companies.length > 0 && (
+                    <div className="ink-card-sm rounded-2xl bg-white p-5">
+                      <h3 className="font-heading font-bold text-lg leading-tight">{statsCopy.companiesHeading}</h3>
+                      <ul className="mt-3 space-y-1.5 text-sm leading-relaxed text-[#3d413e]">
+                        {statsCopy.companies.map((item) => (
+                          <li key={item}>{item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {statsCopy.roles.length > 0 && (
+                    <div className="ink-card-sm rounded-2xl bg-green-soft p-5">
+                      <h3 className="font-heading font-bold text-lg leading-tight">{statsCopy.rolesHeading}</h3>
+                      <ul className="mt-3 flex flex-wrap gap-2">
+                        {statsCopy.roles.map((role) => (
+                          <li key={role.href}>
+                            <Link
+                              to={role.href}
+                              className="ink-card-sm ink-lift inline-flex rounded-full bg-white px-3.5 py-1.5 text-sm font-bold text-foreground no-underline"
+                            >
+                              {role.label}
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+              {statsCopy.salary && (
+                <p className="sr mt-4 ink-card-sm rounded-2xl bg-[#fdf1d3] p-4 text-sm leading-relaxed text-[#3d413e]">{statsCopy.salary}</p>
+              )}
+              <p className="sr mt-3 text-xs leading-relaxed text-muted-foreground">{statsCopy.basis}</p>
             </section>
           )}
 

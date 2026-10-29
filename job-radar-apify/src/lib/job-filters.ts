@@ -89,10 +89,20 @@ function titleContainsWord(title: string, word: string): boolean {
 }
 
 export function jobMatchesRole(role: string, job: { title?: string | null }): boolean {
-  const title = (job.title || "").toLowerCase();
+  return roleTitleMatcher(role)(job.title);
+}
+
+/**
+ * jobMatchesRole() with the role's match plan built once, for callers that
+ * test one role against many titles (city hub statistics).
+ */
+export function roleTitleMatcher(role: string): (title: string | null | undefined) => boolean {
   const match = getRoleMatchWords(role);
-  if (match.mode === "any") return match.words.some((word) => titleContainsWord(title, word));
-  return match.words.every((word) => titleContainsWord(title, word));
+  return (rawTitle) => {
+    const title = (rawTitle || "").toLowerCase();
+    if (match.mode === "any") return match.words.some((word) => titleContainsWord(title, word));
+    return match.words.every((word) => titleContainsWord(title, word));
+  };
 }
 
 /** Canonical role-match plan shared by the in-memory and SQL matchers. */

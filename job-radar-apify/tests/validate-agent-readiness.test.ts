@@ -41,8 +41,8 @@ test("HCD-001 home HTML and Markdown expose the country pilot before JavaScript"
 
 test("MDE-001/002 country discovery adds the five mapped destinations and keeps the pilot", () => {
   for (const [country, expected] of [
-    ["CO", ["/empleos/bogota", "/empleos/cucuta", "/empleos/armenia", "/empleos/neiva", "/empleos/ibague", "/empleos/popayan"]],
-    ["VE", ["/empleos/caracas", "/ve/empleos/ingeniero-civil"]]
+    ["CO", ["/empleos/bogota", "/empleos/santa-marta", "/empleos/neiva", "/empleos/armenia", "/empleos/ibague", "/empleos/valledupar", "/empleos/popayan", "/empleos/villavicencio", "/empleos/palmira", "/empleos/cucuta"]],
+    ["VE", ["/empleos/caracas", "/empleos/maracay", "/empleos/valencia", "/ve/empleos/ingeniero-civil"]]
   ] as const) {
     const content = getHomeContent(country);
     const discovery = content.sections[0];
@@ -54,7 +54,7 @@ test("MDE-001/002 country discovery adds the five mapped destinations and keeps 
     }
     if (country === "VE") {
       assert.match(discovery.heading, /ciudades y cargos/i);
-      assert.equal(discovery.links?.[1]?.label, "Empleos de ingeniero civil en Venezuela");
+      assert.equal(discovery.links?.[3]?.label, "Empleos de ingeniero civil en Venezuela");
     }
   }
 });

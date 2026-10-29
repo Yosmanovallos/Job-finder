@@ -67,6 +67,7 @@ import {
   RETIRED_ROLE_SLUGS,
   buildCategoryMeta,
   buildCategoryInsights,
+  buildCategoryStatsCopy,
   buildCategoryInternalLinks,
   buildRelatedCityLinks,
   buildCategorySectionHeadings,
@@ -1264,20 +1265,32 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
   <dl>
     <div><dt>Empresas en la muestra</dt><dd>${insights.companyCount}</dd></div>
     <div><dt>Fuentes verificables</dt><dd>${insights.sources.length}</dd></div>
-    <div><dt>Publicadas en 7 días</dt><dd>${insights.freshLast7Days}</dd></div>
+    <div><dt>Publicadas en 7 días</dt><dd>${escapeHtml(insights.freshLast7DaysLabel)}</dd></div>
   </dl>
-  ${insights.topCompanies.length > 0 ? `<p><strong>Empresas visibles:</strong> ${escapeHtml(insights.topCompanies.join(", "))}.</p>` : ""}
   ${insights.sources.length > 0 ? `<p><strong>Fuentes:</strong> ${escapeHtml(insights.sources.join(", "))}.</p>` : ""}
   ${insights.modalities.length > 0 ? `<p><strong>Modalidades:</strong> ${escapeHtml(insights.modalities.map((item) => `${item.label} (${item.count})`).join(", "))}.</p>` : ""}
   ${insights.latestPublishedLabel ? `<p><strong>Última publicación visible:</strong> ${escapeHtml(insights.latestPublishedLabel)}.</p>` : ""}
   <nav aria-label="Explorar más empleos">${internalLinks.map((link) => `<a href="${escapeHtml(link.href)}">${escapeHtml(link.label)}</a>`).join(" · ")}</nav>
 </section>`;
+      // Hub statistics from the same cached page (no extra query): every
+      // number comes from `total` and the rows rendered below.
+      const statsCopy = buildCategoryStatsCopy(category, insights);
+      const statsHtml = statsCopy
+        ? `<section data-category-stats aria-label="${escapeHtml(statsCopy.heading)}">
+  <h2>${escapeHtml(statsCopy.heading)}</h2>
+  <p>${escapeHtml(statsCopy.summary)}</p>
+  ${statsCopy.companies.length > 0 ? `<h3>${escapeHtml(statsCopy.companiesHeading)}</h3><ul>${statsCopy.companies.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>` : ""}
+  ${statsCopy.roles.length > 0 ? `<h3>${escapeHtml(statsCopy.rolesHeading)}</h3><ul>${statsCopy.roles.map((role) => `<li><a href="${escapeHtml(role.href)}">${escapeHtml(role.label)}</a></li>`).join("")}</ul>` : ""}
+  ${statsCopy.salary ? `<p>${escapeHtml(statsCopy.salary)}</p>` : ""}
+  <p>${escapeHtml(statsCopy.basis)}</p>
+</section>\n`
+        : "";
       const jobsHeading = page.length > 0 ? `<h2>${escapeHtml(sectionHeadings.jobs)}</h2>\n` : "";
       const relatedCitiesHtml =
         relatedCityLinks.length > 0
           ? `\n<section data-related-cities aria-label="${escapeHtml(sectionHeadings.relatedCities)}"><h2>${escapeHtml(sectionHeadings.relatedCities)}</h2><ul>${relatedCityLinks.map((link) => `<li><a href="${escapeHtml(link.href)}">${escapeHtml(link.label)}</a></li>`).join("")}</ul></section>`
           : "";
-      const ssrSnippet = `<h1>${escapeHtml(meta.heading)}</h1>\n${emptyNotice}${overviewHtml}${jobsHeading}<nav aria-label="Vacantes"><ul>\n${items}\n</ul></nav>${relatedCitiesHtml}`;
+      const ssrSnippet = `<h1>${escapeHtml(meta.heading)}</h1>\n${emptyNotice}${overviewHtml}${statsHtml}${jobsHeading}<nav aria-label="Vacantes"><ul>\n${items}\n</ul></nav>${relatedCitiesHtml}`;
       indexHtml = indexHtml.replace('<div id="app"></div>', `<div id="app">${ssrSnippet}</div>`);
 
       // Same fix /dashboard already had (Fase 1, §5.4) applied here too —
