@@ -145,22 +145,31 @@ Pedido del dueño del 2026-10-28. La revisión va en orden de mayor a menor núm
   - 19 ya revisadas en la muestra.
   - 105 nombres anónimos (iniciales o persona), clasificados por el nombre.
   - 41 agencias o temporales que lo dicen en el nombre.
-- **Revisadas una por una hasta ahora: 209 empresas, las que tienen de 9 a 19 vacantes.** De ellas:
+- **Revisadas una por una hasta ahora: 363 de las 685 que quedaban.** Están completas todas las de 10 a 19 vacantes (197) y van 166 de las 488 con 5 a 9.
 
-  | Resultado | Empresas |
-  |---|---:|
-  | Página oficial con listado | 59 (28 %) |
-  | ATS o portal corporativo | 36 |
-  | Sitio propio | 15 |
-  | Portal en una bolsa | 8 |
-  | Solo bolsas | 90 |
-  | No determinables | 41 |
-  | Agencias o staffing | 18 |
-  | Solo formulario | 1 |
+  | Resultado | 10 a 19 vacantes | 5 a 9 (parcial) | Total |
+  |---|---:|---:|---:|
+  | **Página oficial con listado** | **55 (28 %)** | **40 (24 %)** | **95 (26 %)** |
+  | ATS o portal corporativo | 35 | 27 | 62 |
+  | Sitio propio | 12 | 6 | 18 |
+  | Portal en una bolsa | 8 | 7 | 15 |
+  | Solo bolsas | 87 | 44 | 131 |
+  | No determinables | 37 | 65 | 102 |
+  | Agencias o staffing | 17 | 16 | 33 |
+  | Solo formulario | 1 | 1 | 2 |
 
-  La verificación es la misma que en el resto del estudio: 58 de las 59 se clasificaron por búsqueda o prensa y 1 se confirmó en su sitio.
-- **Faltan 476 empresas con 5 a 9 vacantes.** La búsqueda se detuvo por el límite de 200 búsquedas web por turno.
-- **La proporción va en línea con la muestra:** 28 % frente a 35 % estimado para el estrato.
+- **La verificación es más débil en la segunda tanda (152 empresas, 2026-10-28).**
+  - Casi todas se clasificaron solo por búsqueda o prensa; ninguna se abrió en su sitio.
+  - De sus 25 portales corporativos, 12 aparecieron con su URL en los resultados (por ejemplo Boston Scientific, Amgen, WTW, Intellias, Ingram Micro, Dev.Pro). Los otros 13 son portales globales conocidos, citados por prensa o vistos solo en réplicas como DirectEmployers.
+  - Los 7 "portal en una bolsa" son páginas de Magneto o Pandapé. Salvo Gavinco (subdominio propio en Pandapé), no se confirmó que el sitio de la empresa enlace a ellas, que es la condición para usar el conector de Magneto.
+  - Entre las de 5 a 9 sube la parte "no determinable" (65 de 166): son nombres ambiguos o empresas pequeñas sin rastro en la web.
+- **Candidatas para conectores que ya existen** (no se probó nada):
+  - Greenhouse: Kaseya (vacantes en Medellín) y Pharmbills (tablero UE, vacante en Bogotá).
+  - SuccessFactors: Mota-Engil Colombia.
+  - Frisby ya tiene conector propio (`scripts/canary-frisby.ts`), pero su clave del directorio no figura como cubierta; conviene revisar el alias.
+- **Plataformas sin conector que vuelven a salir:** Gupy (Stefanini), Jobvite (GIGA IT), Radancy (Amgen), DirectEmployers (Convatec, GE HealthCare).
+- **Faltan 322 empresas con 5 a 9 vacantes.** La búsqueda se detuvo otra vez por el límite de 200 búsquedas web por turno.
+- **La proporción sigue cerca de la muestra:** 26 % frente a 35 % estimado para el estrato.
 
 ## Datos
 
