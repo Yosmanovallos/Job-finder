@@ -16,7 +16,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "tick | dry-run | dry-run-one | tick-one | migrate-dry-run | migrate | seed-dry-run | seed | seed-one-dry-run | seed-one | domain-census | discover-dry-run | discover | coverage | computrabajo-coverage | computrabajo-backlog | frisby-canary | altipal-canary | identity-canary | copy-audit | copy-audit-all | db-size | cc-tenants | ats-inventory-dry-run | ats-inventory | ats-probe-dry-run | ats-probe | inventory-review-list | inventory-approve-dry-run | inventory-approve | inventory-revert-dry-run | inventory-revert | review-list | review-approve-dry-run | review-approve | cv-purge-dry-run | cv-purge | saved-jobs-migrate-dry-run | saved-jobs-migrate"
+        description: "tick | dry-run | dry-run-one | tick-one | migrate-dry-run | migrate | seed-dry-run | seed | seed-one-dry-run | seed-one | domain-census | discover-dry-run | discover | coverage | computrabajo-coverage | computrabajo-backlog | directory-export | frisby-canary | altipal-canary | identity-canary | copy-audit | copy-audit-all | db-size | cc-tenants | ats-inventory-dry-run | ats-inventory | ats-probe-dry-run | ats-probe | inventory-review-list | inventory-approve-dry-run | inventory-approve | inventory-revert-dry-run | inventory-revert | review-list | review-approve-dry-run | review-approve | cv-purge-dry-run | cv-purge | saved-jobs-migrate-dry-run | saved-jobs-migrate"
         required: true
         default: "dry-run"
         type: choice
@@ -39,6 +39,7 @@ on:
           - coverage
           - computrabajo-coverage
           - computrabajo-backlog
+          - directory-export
           # Manual read-only live source check; no database access.
           - frisby-canary
           - altipal-canary
@@ -169,6 +170,7 @@ jobs:
             coverage)        cmd="npx tsx scripts/direct-coverage.ts --allow-remote-db" ;;
             computrabajo-coverage) cmd="npx tsx scripts/direct-computrabajo-coverage.ts --allow-remote-db" ;;
             computrabajo-backlog) cmd="npx tsx scripts/direct-computrabajo-coverage.ts --all --allow-remote-db" ;;
+            directory-export) cmd="npx tsx scripts/direct-directory-export.ts --allow-remote-db" ;;
             frisby-canary)  cmd="npx tsx scripts/canary-frisby.ts --allow-live-sources" ;;
             altipal-canary) cmd="npx tsx scripts/canary-altipal.ts --allow-live-sources" ;;
             identity-canary) cmd="npx tsx scripts/audit-official-identity.ts --dry-run --allow-remote-db" ;;
@@ -205,7 +207,7 @@ jobs:
             *) echo "modo desconocido: $MODE"; exit 1 ;;
           esac
           echo "## Direct employers — $MODE" >> "$GITHUB_STEP_SUMMARY"
-          if [ "$MODE" = "computrabajo-backlog" ]; then
+          if [ "$MODE" = "computrabajo-backlog" ] || [ "$MODE" = "directory-export" ]; then
             echo 'Listado completo en el log de esta corrida (JSONL); ninguna escritura en la base de datos.' >> "$GITHUB_STEP_SUMMARY"
             $cmd
             exit 0
