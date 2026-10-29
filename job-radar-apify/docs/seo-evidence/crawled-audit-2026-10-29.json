@@ -1,0 +1,316 @@
+{
+  "observedDate": "2026-10-29",
+  "productionCodeBase": "a964fce",
+  "gscProperty": "sc-domain:buscotrabajo.co",
+  "gscReportUpdated": "2026-10-22",
+  "reportedGroupCount": 9745,
+  "sampleSelection": "First 10 displayed examples: 7 crawled 2026-10-24, 3 crawled 2026-10-23; first 5 individually inspected. Directed, not representative.",
+  "currentSitemapUrlCount": 7950,
+  "samples": [
+    {
+      "url": "https://buscotrabajo.co/empleos/b5f3eeb4-5b7d-4bfb-bcba-20c1ddd6b1bc/despachador-yumbo-valle-del-cauca-colombia",
+      "http": 200,
+      "canonical": "https://buscotrabajo.co/empleos/b5f3eeb4-5b7d-4bfb-bcba-20c1ddd6b1bc/despachador-yumbo-valle-del-cauca-colombia",
+      "robots": null,
+      "headerRobots": null,
+      "jobPostingCount": 1,
+      "ssrPayload": true,
+      "h1": [
+        "Despachador"
+      ],
+      "datePosted": "2026-10-22T23:57:18.009Z",
+      "validThrough": "2026-11-21T23:46:58.000Z",
+      "descriptionWords": 247,
+      "descriptionSha256": "417a4e31e37b39c4ea3a23c820be5830f610eaedcba757556002d2289e032bbb",
+      "employer": "Transportes Humadea SAS",
+      "location": {
+        "@type": "Place",
+        "address": {
+          "@type": "PostalAddress",
+          "addressLocality": "Yumbo",
+          "addressCountry": "CO",
+          "addressRegion": "Valle del Cauca"
+        }
+      },
+      "inCurrentSitemap": true,
+      "gscInspection": {
+        "id": "b5f3eeb4-5b7d-4bfb-bcba-20c1ddd6b1bc",
+        "indexed": true,
+        "jobPosting": 1,
+        "lastCrawl": "2026-10-26 09:47:32",
+        "canonical": "self"
+      }
+    },
+    {
+      "url": "https://buscotrabajo.co/empleos/416a800f-c35c-4a98-9174-993e09097ba3/asistente-contable-caracas-federal-district-venezuela",
+      "http": 200,
+      "canonical": "https://buscotrabajo.co/empleos/416a800f-c35c-4a98-9174-993e09097ba3/asistente-contable-caracas-federal-district-venezuela",
+      "robots": null,
+      "headerRobots": null,
+      "jobPostingCount": 1,
+      "ssrPayload": true,
+      "h1": [
+        "- Asistente Contable -"
+      ],
+      "datePosted": "2026-10-22T12:44:04.498Z",
+      "validThrough": "2026-11-21T12:33:29.000Z",
+      "descriptionWords": 164,
+      "descriptionSha256": "364a15ca49a39182d4d60c6086d4b6ee039c6ed6d7af2728f6d12ad67445d110",
+      "employer": "Candal Advisors",
+      "location": {
+        "@type": "Place",
+        "address": {
+          "@type": "PostalAddress",
+          "addressLocality": "Caracas",
+          "addressCountry": "VE",
+          "addressRegion": "Federal District"
+        }
+      },
+      "inCurrentSitemap": true,
+      "gscInspection": {
+        "id": "416a800f-c35c-4a98-9174-993e09097ba3",
+        "indexed": true,
+        "jobPosting": 1,
+        "lastCrawl": "26 oct 2026, 6:36:37",
+        "canonical": "self"
+      }
+    },
+    {
+      "url": "https://buscotrabajo.co/empleos/68047f01-9941-4bbf-90a5-a68cf5da6ab0/analyst-clin-sales-surg-medellin-colombia",
+      "http": 200,
+      "canonical": "https://buscotrabajo.co/empleos/68047f01-9941-4bbf-90a5-a68cf5da6ab0/analyst-clin-sales-surg-medellin-colombia",
+      "robots": null,
+      "headerRobots": null,
+      "jobPostingCount": 1,
+      "ssrPayload": true,
+      "h1": [
+        "Analyst Clin Sales  Surg"
+      ],
+      "datePosted": "2026-10-22T00:00:00.000Z",
+      "validThrough": "2026-10-30T00:00:00.000Z",
+      "descriptionWords": 316,
+      "descriptionSha256": "191b793712ff9682a27759b25fb888f70bec5c61d4c0236a884612dc2bb761c3",
+      "employer": "Johnson & Johnson",
+      "location": {
+        "@type": "Place",
+        "address": {
+          "@type": "PostalAddress",
+          "addressLocality": "Medellín",
+          "addressCountry": "CO"
+        }
+      },
+      "inCurrentSitemap": true,
+      "gscInspection": {
+        "id": "68047f01-9941-4bbf-90a5-a68cf5da6ab0",
+        "indexed": true,
+        "jobPosting": 1,
+        "lastCrawl": null,
+        "canonical": null
+      }
+    },
+    {
+      "url": "https://buscotrabajo.co/empleos/1000af57-2176-4c40-a349-d64d81d39fdc/business-development-executive-seguros-de-vida-bogota",
+      "http": 200,
+      "canonical": "https://buscotrabajo.co/empleos/1000af57-2176-4c40-a349-d64d81d39fdc/business-development-executive-seguros-de-vida-bogota",
+      "robots": null,
+      "headerRobots": null,
+      "jobPostingCount": 1,
+      "ssrPayload": true,
+      "h1": [
+        "Business development executive - seguros de vida"
+      ],
+      "datePosted": "2026-10-22T01:08:17.846Z",
+      "validThrough": "2026-12-20T00:00:00.000Z",
+      "descriptionWords": 80,
+      "descriptionSha256": "b0328952fc234a70502ea15574d8630ee50eb5ed8f42ab2d44cf5f7f70e7a255",
+      "employer": "Empresa confidencial",
+      "location": {
+        "@type": "Place",
+        "address": {
+          "@type": "PostalAddress",
+          "addressLocality": "Bogotá",
+          "addressCountry": "CO"
+        }
+      },
+      "inCurrentSitemap": true,
+      "gscInspection": {
+        "id": "1000af57-2176-4c40-a349-d64d81d39fdc",
+        "indexed": true,
+        "jobPosting": 1,
+        "lastCrawl": "2026-10-26 03:09:42",
+        "canonical": "self"
+      }
+    },
+    {
+      "url": "https://buscotrabajo.co/empleos/a3193f22-b68c-4137-9626-2def374937d4/consultor-comercial-externo-senior-kam-hunter-b2b-bogota",
+      "http": 200,
+      "canonical": "https://buscotrabajo.co/empleos/a3193f22-b68c-4137-9626-2def374937d4/consultor-comercial-externo-senior-kam-hunter-b2b-bogota",
+      "robots": null,
+      "headerRobots": null,
+      "jobPostingCount": 1,
+      "ssrPayload": true,
+      "h1": [
+        "Consultor comercial externo senior - kam hunter b2b"
+      ],
+      "datePosted": "2026-10-22T01:04:11.160Z",
+      "validThrough": "2026-12-20T00:00:00.000Z",
+      "descriptionWords": 283,
+      "descriptionSha256": "d2352602ffe514134b90d8173340df0de7ddaa9529c74eb65620affb7dfa4dd8",
+      "employer": "AMERICAN KPO",
+      "location": null,
+      "inCurrentSitemap": true,
+      "gscInspection": {
+        "id": "a3193f22-b68c-4137-9626-2def374937d4",
+        "indexed": true,
+        "jobPosting": 1,
+        "lastCrawl": "2026-10-26 03:32:31",
+        "canonical": "self"
+      },
+      "jobLocationType": "TELECOMMUTE",
+      "applicantLocationRequirements": [
+        {
+          "@type": "Country",
+          "name": "Colombia"
+        }
+      ]
+    },
+    {
+      "url": "https://buscotrabajo.co/empleos/a56146ff-7204-4d38-866b-dc288d63e161/auxiliar-de-cumplidos-bogota-d-c-capital-district-colombia",
+      "http": 200,
+      "canonical": "https://buscotrabajo.co/empleos/a56146ff-7204-4d38-866b-dc288d63e161/auxiliar-de-cumplidos-bogota-d-c-capital-district-colombia",
+      "robots": null,
+      "headerRobots": null,
+      "jobPostingCount": 1,
+      "ssrPayload": true,
+      "h1": [
+        "Auxiliar de Cumplidos"
+      ],
+      "datePosted": "2026-10-21T13:23:12.448Z",
+      "validThrough": "2026-11-20T13:08:33.000Z",
+      "descriptionWords": 116,
+      "descriptionSha256": "0097b42bfdbf362fae55c575993572c24290d3bfa747cae1cdfe017107ad1e69",
+      "employer": "Tkarga S.A.S.",
+      "location": {
+        "@type": "Place",
+        "address": {
+          "@type": "PostalAddress",
+          "addressLocality": "Bogota",
+          "addressCountry": "CO",
+          "addressRegion": "Capital District"
+        }
+      },
+      "inCurrentSitemap": true,
+      "gscInspection": null
+    },
+    {
+      "url": "https://buscotrabajo.co/empleos/e22a8ca3-254f-4e5a-9145-49fb7e077baa/customer-success-associate-operations-focused-caracas-federal-district-venezuela",
+      "http": 200,
+      "canonical": "https://buscotrabajo.co/empleos/e22a8ca3-254f-4e5a-9145-49fb7e077baa/customer-success-associate-operations-focused-caracas-federal-district-venezuela",
+      "robots": null,
+      "headerRobots": null,
+      "jobPostingCount": 1,
+      "ssrPayload": true,
+      "h1": [
+        "Customer Success Associate — Operations-Focused"
+      ],
+      "datePosted": "2026-10-22T15:44:45.476Z",
+      "validThrough": "2027-04-20T15:07:35.000Z",
+      "descriptionWords": 445,
+      "descriptionSha256": "fc3697bc5098c54854278cc7c062390d8bda1a71112eb6be3533860a36daee25",
+      "employer": "dentalrobot®, AI RCM, Voice and Workflow Orchestration  for Dental Support Organizations",
+      "location": {
+        "@type": "Place",
+        "address": {
+          "@type": "PostalAddress",
+          "addressLocality": "Caracas",
+          "addressCountry": "VE",
+          "addressRegion": "Federal District"
+        }
+      },
+      "inCurrentSitemap": true,
+      "gscInspection": null
+    },
+    {
+      "url": "https://buscotrabajo.co/empleos/13e8158b-7a19-4e9d-b44b-53f96ae716bd/promotor-estacion-de-servicio-fundacion-fundacion",
+      "http": 200,
+      "canonical": "https://buscotrabajo.co/empleos/13e8158b-7a19-4e9d-b44b-53f96ae716bd/promotor-estacion-de-servicio-fundacion-fundacion",
+      "robots": null,
+      "headerRobots": null,
+      "jobPostingCount": 1,
+      "ssrPayload": true,
+      "h1": [
+        "Promotor Estación de Servicio Fundacion"
+      ],
+      "datePosted": "2026-10-13T00:00:00.000Z",
+      "validThrough": "2026-10-31T00:00:00.000Z",
+      "descriptionWords": 188,
+      "descriptionSha256": "e539c3f4c8e2e91724a3bcb4b232a9e6d8782a8de8795d77b3622744fd07f5ae",
+      "employer": "EDS",
+      "location": {
+        "@type": "Place",
+        "address": {
+          "@type": "PostalAddress",
+          "addressLocality": "Fundación",
+          "addressCountry": "CO"
+        }
+      },
+      "inCurrentSitemap": true,
+      "gscInspection": null
+    },
+    {
+      "url": "https://buscotrabajo.co/empleos/1490d604-0ed6-4c39-b92f-34607f46e8cd/lider-de-presupuesto-de-obra-arquitectura-e-ingenieria-civil-medellin-antioquia",
+      "http": 200,
+      "canonical": "https://buscotrabajo.co/empleos/1490d604-0ed6-4c39-b92f-34607f46e8cd/lider-de-presupuesto-de-obra-arquitectura-e-ingenieria-civil-medellin-antioquia",
+      "robots": null,
+      "headerRobots": null,
+      "jobPostingCount": 1,
+      "ssrPayload": true,
+      "h1": [
+        "Líder de Presupuesto de Obra – Arquitectura e Ingeniería Civil."
+      ],
+      "datePosted": "2026-10-22T16:42:59.479Z",
+      "validThrough": "2026-12-21T00:00:00.000Z",
+      "descriptionWords": 558,
+      "descriptionSha256": "72d0b45b45afc4be8f8f195c97215393705e1c4ba47aec03d65f951c84bb272a",
+      "employer": "Empleamos Temporales SAS",
+      "location": {
+        "@type": "Place",
+        "address": {
+          "@type": "PostalAddress",
+          "addressLocality": "Medellín",
+          "addressCountry": "CO",
+          "addressRegion": "Antioquia"
+        }
+      },
+      "inCurrentSitemap": true,
+      "gscInspection": null
+    },
+    {
+      "url": "https://buscotrabajo.co/empleos/57892132-b32a-4477-81ea-3c9988189257/asesor-servicio-al-cliente-barranquilla",
+      "http": 200,
+      "canonical": "https://buscotrabajo.co/empleos/57892132-b32a-4477-81ea-3c9988189257/asesor-servicio-al-cliente-barranquilla",
+      "robots": null,
+      "headerRobots": null,
+      "jobPostingCount": 1,
+      "ssrPayload": true,
+      "h1": [
+        "Asesor servicio al cliente"
+      ],
+      "datePosted": "2026-10-20T01:07:43.532Z",
+      "validThrough": "2026-12-18T00:00:00.000Z",
+      "descriptionWords": 149,
+      "descriptionSha256": "458668fb5e1ec63f30a61513bc531edfeb2f92a028ceb14afbce7d345964a668",
+      "employer": "GRUPO ARENAS S.A.S",
+      "location": {
+        "@type": "Place",
+        "address": {
+          "@type": "PostalAddress",
+          "addressLocality": "Barranquilla",
+          "addressCountry": "CO"
+        }
+      },
+      "inCurrentSitemap": true,
+      "gscInspection": null
+    }
+  ]
+}

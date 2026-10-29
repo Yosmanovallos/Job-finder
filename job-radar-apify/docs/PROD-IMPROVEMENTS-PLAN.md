@@ -87,6 +87,14 @@ e historial. Sin cambios de aplicación ni retención. Recuperación global,
 retest de la URL del incidente original y otros gates originales pendientes;
 no se archiva ni se declara completa la reparación global por una muestra.
 
+Contraste «Rastreada: actualmente sin indexar», 2026-10-29:
+`openspec/changes/crawled-index-audit/` y
+`docs/SEO-CRAWLED-AUDIT-2026-10-29.md`. Diez URLs públicas saludables y en el
+sitemap; las cinco contrastadas individualmente ya están indexadas aunque
+siguen en ejemplos del informe antiguo. No hay defecto reproducido que
+justifique nuevo código; no se reenvía validación masiva ni se altera diseño.
+No extrapolar la muestra a 9.745 ni confundir indexación con ranking genérico.
+
 ## Hallazgos de base (verificados en `74f066b`)
 
 ### Verificación SEO de renderizado — 2026-10-24
