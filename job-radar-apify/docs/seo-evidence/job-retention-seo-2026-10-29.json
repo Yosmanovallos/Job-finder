@@ -1,0 +1,93 @@
+{
+  "summary": {
+    "age_7d_seen_in_48h": 204,
+    "age_threshold_in_7d": 2129,
+    "age_7d_deadline_unknown": 102,
+    "seo_eligible_canonical_rows": 7906,
+    "age_7d_source_deadline_after_cap": 915
+  },
+  "observed_at": "2026-10-29T12:21:38.70646+00:00",
+  "by_source_country": [
+    {
+      "source": "LinkedIn",
+      "country": "CO",
+      "age_threshold_in_7d": 849,
+      "age_7d_deadline_unknown": 0,
+      "seo_eligible_canonical_rows": 3205,
+      "age_7d_source_deadline_after_cap": 109
+    },
+    {
+      "source": "LinkedIn",
+      "country": "VE",
+      "age_threshold_in_7d": 327,
+      "age_7d_deadline_unknown": 0,
+      "seo_eligible_canonical_rows": 1248,
+      "age_7d_source_deadline_after_cap": 67
+    },
+    {
+      "source": "Elempleo",
+      "country": "CO",
+      "age_threshold_in_7d": 215,
+      "age_7d_deadline_unknown": 0,
+      "seo_eligible_canonical_rows": 1039,
+      "age_7d_source_deadline_after_cap": 197
+    },
+    {
+      "source": "Magneto",
+      "country": "CO",
+      "age_threshold_in_7d": 171,
+      "age_7d_deadline_unknown": 0,
+      "seo_eligible_canonical_rows": 738,
+      "age_7d_source_deadline_after_cap": 119
+    },
+    {
+      "source": "Portal oficial",
+      "country": "CO",
+      "age_threshold_in_7d": 139,
+      "age_7d_deadline_unknown": 101,
+      "seo_eligible_canonical_rows": 672,
+      "age_7d_source_deadline_after_cap": 30
+    },
+    {
+      "source": "Computrabajo",
+      "country": "CO",
+      "age_threshold_in_7d": 327,
+      "age_7d_deadline_unknown": 0,
+      "seo_eligible_canonical_rows": 520,
+      "age_7d_source_deadline_after_cap": 316
+    },
+    {
+      "source": "Computrabajo",
+      "country": "VE",
+      "age_threshold_in_7d": 69,
+      "age_7d_deadline_unknown": 0,
+      "seo_eligible_canonical_rows": 322,
+      "age_7d_source_deadline_after_cap": 68
+    },
+    {
+      "source": "WeRemoto",
+      "country": "unknown_or_shared_remote",
+      "age_threshold_in_7d": 31,
+      "age_7d_deadline_unknown": 0,
+      "seo_eligible_canonical_rows": 159,
+      "age_7d_source_deadline_after_cap": 9
+    },
+    {
+      "source": "RemoteOK",
+      "country": "unknown_or_shared_remote",
+      "age_threshold_in_7d": 0,
+      "age_7d_deadline_unknown": 0,
+      "seo_eligible_canonical_rows": 2,
+      "age_7d_source_deadline_after_cap": 0
+    },
+    {
+      "source": "Remotive",
+      "country": "unknown_or_shared_remote",
+      "age_threshold_in_7d": 1,
+      "age_7d_deadline_unknown": 1,
+      "seo_eligible_canonical_rows": 1,
+      "age_7d_source_deadline_after_cap": 0
+    }
+  ],
+  "transaction_read_only": "on"
+}

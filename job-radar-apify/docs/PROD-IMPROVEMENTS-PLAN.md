@@ -95,6 +95,15 @@ siguen en ejemplos del informe antiguo. No hay defecto reproducido que
 justifique nuevo código; no se reenvía validación masiva ni se altera diseño.
 No extrapolar la muestra a 9.745 ni confundir indexación con ranking genérico.
 
+Impacto de retención, 2026-10-29:
+`openspec/changes/job-retention-impact/`,
+`docs/JOB-RETENTION-IMPACT-2026-10-29.md` y ADR 0007 propuesto. Medición real
+de producción READ ONLY: 2.129/7.906 candidatos SEO alcanzan 30 días en siete
+días; 915 tienen plazo registrado posterior al corte, sin verificar apertura.
+Histórico expired no permite atribuir todos los retiros a edad. Política
+objetivo: excepción con open comprobado <24 h, identidad estable y retiros
+por cierre/plazo real. No se implementa ni se desactiva ADR 0005 todavía.
+
 ## Hallazgos de base (verificados en `74f066b`)
 
 ### Verificación SEO de renderizado — 2026-10-24
