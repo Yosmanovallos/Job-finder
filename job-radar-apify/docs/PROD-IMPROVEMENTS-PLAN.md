@@ -28,9 +28,12 @@ Entrega acotada 2026-10-29: archivo privado de vacantes retiradas, PR #77,
 `3ae484f` en main. Conserva el máximo público de 30 días y el diseño; migración
 aditiva aplicada con RLS y sin grants públicos. Lint, tipos, unitarias,
 19 suites de integración, baseline 18 rutas y ambos checks GitHub PASS.
-Salud pública posterior PASS; queda observar el primer lote del tick normal,
-sin afirmar que ya existen archivos de producción. ADR 0008 y evidencia en
-`openspec/changes/private-job-archive/validation.md`.
+Salud pública posterior PASS; primer lote confirmado el 29-Oct 08:31 Bogotá:
+22 vacantes archivadas, RLS activo, sin grants públicos; muestra pública
+410/noindex y APIs 404. Fase cerrada. ADR 0008 y evidencia en
+`openspec/changes/archive/private-job-archive/validation.md`. Quedan como
+trabajo posterior la latencia variable de categorías y errores de formato en
+Altipal/Mondelez; no se modificaron componentes, caché ni adaptadores aquí.
 
 | Fase | Contenido | Estado | Commit | OpenSpec |
 |---|---|---|---|---|

@@ -1,0 +1,18 @@
+{
+  "by_reason": {
+    "source_closed": 22
+  },
+  "observed_at": "2026-10-29T13:31:00.195885+00:00",
+  "rls_enabled": true,
+  "archive_bytes": 188416,
+  "archive_count": 22,
+  "public_grants": 0,
+  "database_bytes": 440355987,
+  "last_archived_at": "2026-10-29T13:19:37.838237+00:00",
+  "first_archived_at": "2026-10-29T13:19:37.838237+00:00",
+  "missing_original_date": 0,
+  "transaction_read_only": "on",
+  "expired_hashes_missing": 0,
+  "snapshot_identity_mismatches": 0,
+  "live_rows_with_archived_original_over_30d": 0
+}
