@@ -76,6 +76,17 @@ regla de retiro por publicación >30 días. No se cambia ADR 0005 ni producción
 medición de retiros y verificación fiable preceden cualquier retención nueva.
 Mantener diseño actual y ejecutar siguientes entregas en sesiones separadas.
 
+Verificación P0 y alertas SEO, 2026-10-28/29:
+`docs/SEO-SOFT404-RECHECK-2026-10-28.md`,
+`docs/SEO-ALERTS-TRIAGE-2026-10-29.md` y
+`openspec/changes/job-render-seo/validation-2026-10-29.md`.
+Cinco ejemplos activos pasan inspección en vivo y los gates actuales pasan.
+Google aceptó nueva validación Soft 404 el 28-Oct; 2.678 pendientes el 29-Oct.
+18 avisos técnicos leídos, separando advertencias opcionales de exclusiones
+e historial. Sin cambios de aplicación ni retención. Recuperación global,
+retest de la URL del incidente original y otros gates originales pendientes;
+no se archiva ni se declara completa la reparación global por una muestra.
+
 ## Hallazgos de base (verificados en `74f066b`)
 
 ### Verificación SEO de renderizado — 2026-10-24

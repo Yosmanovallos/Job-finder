@@ -1,5 +1,13 @@
 # Job rendering SEO — 2026-10-24
 
+**Continuation 2026-10-28/29:** current-code lint/types, 10 render tests,
+19 integration suites and 18-route baseline pass; five Google live examples
+are indexable. New Soft 404 validation accepted 28-Oct, still initiated on
+29-Oct. This supersedes the historical local gate failures below, but does
+not certify all URLs recovered. See `SEO-SOFT404-RECHECK-2026-10-28.md`,
+`SEO-ALERTS-TRIAGE-2026-10-29.md` and the change's
+`validation-2026-10-29.md` for evidence and remaining original checklist.
+
 Scope: `openspec/changes/job-render-seo/`, production base `bb8a01d`.
 
 ## Evidence and correction
