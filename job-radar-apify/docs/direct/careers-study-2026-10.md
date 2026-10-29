@@ -179,6 +179,43 @@ Pedido del dueño del 2026-10-28. La revisión va en orden de mayor a menor núm
 - **Plataformas sin conector que vuelven a salir:** Gupy (Stefanini), Jobvite (GIGA IT), Radancy (Amgen, BD), DirectEmployers (Convatec, GE HealthCare, WSP, Zimmer Biomet), Avature (TMF Group, Siemens Energy), JazzHR (Massive Bio, MAS Global) e iCIMS (StoneX, Crawford, Liberty Latin America).
 - **La proporción queda por debajo de la muestra:** 23 % frente a 35 % estimado para el estrato (7 de 20 en la muestra). Entre las de 5 a 9 crece mucho la parte "no determinable" (211 de 488): son nombres ambiguos o empresas pequeñas sin rastro en la web. Algunas podrían tener página sin que la búsqueda la mostrara.
 
+## Canarios propuestos (esperan aprobación del dueño)
+
+Son empresas del estudio que usan una plataforma con conector existente. Cada canario es `npx tsx scripts/direct-canary.ts <tipo> <ref>`: lee el tablero en vivo y no escribe nada. Si la ref está mal, el conector responde con error y no pasa nada más. Ninguno se ha corrido.
+
+**Lote A: ref vista en una URL de los resultados**
+
+| Empresa | Vacantes en bolsas | Tipo | Ref |
+|---|---:|---|---|
+| Marsh | 52 (+5 de Marsh Risk) | phenom | `careers.marsh.com/global/en` |
+| Mastercard | 43 | phenom | `careers.mastercard.com/us/en` |
+| NTT DATA | 32 | successfactors | `careers-inc.nttdata.com` |
+| Thermo Fisher | 21 | phenom | `jobs.thermofisher.com/global/en` |
+| Alignerr | 16 | greenhouse | `alignerr` |
+| BCD Travel | 11 | successfactors | `jobs.bcdtravel.com` |
+| Kaseya | 8 | greenhouse | `kaseya` |
+| Mota-Engil | 8 | successfactors | `careers.mota-engil.com` |
+| Air Liquide | 6 | workday | `airliquidehr/wd3/AirLiquideExternalCareer` |
+| Cloudbeds | 6 | greenhouse | `cloudbedsthirdpartyboard` |
+| Edgewell | 6 | successfactors | `careers.edgewell.com` |
+| Axon | 5 | greenhouse | `axon` |
+| Exadel | 5 | greenhouse | `exadelinc` |
+
+**Lote B: ref deducida o citada por un tercero (más probable que falle)**
+
+| Empresa | Vacantes en bolsas | Tipo | Ref |
+|---|---:|---|---|
+| Stanley Black & Decker | (grandes) | workday | `sbdinc/wd1/<sitio>`: falta el nombre del sitio |
+| Autodesk | 5 | workday | `autodesk/wd1/Ext` (de memoria, sin fuente) |
+| Enertis Applus | 5 | teamtailor | `applusgroup` (región sin confirmar) |
+
+**Quedan fuera:**
+
+- Pharmbills: su tablero está en Greenhouse UE y el conector solo lee `boards-api.greenhouse.io`.
+- VML, Aon, IQVIA y Essity: la plataforma no se confirmó. IQVIA parece Radancy, no Workday.
+- Encora, Power Digital Marketing, AECOM, Kraken y Nu: ya están en el inventario I2, y las cubre el sondeo programado o la revisión humana pendiente.
+- AMERICAS GBS (SGS): SGS ya está en el seed con SmartRecruiters `SGS` habilitado. Es un alias que falta, no un tablero nuevo.
+
 ## Datos
 
 - Export completo: corrida [40790351929](https://github.com/Yosmanovallos/Job-finder/actions/runs/40790351929) (`scripts/direct-directory-export.ts`, solo lectura).
