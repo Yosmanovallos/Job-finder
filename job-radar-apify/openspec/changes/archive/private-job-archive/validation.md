@@ -69,3 +69,51 @@ El navegador confirmó el resultado de migración antes de fallar la captura.
 Después se detuvo el control de Windows al no poder verificar la URL de la
 ventana. No se usó otra vía para eludir ese bloqueo; los controles posteriores
 son HTTP público/CLI de GitHub. No hay captura de Supabase guardada.
+
+## Cierre operativo — 29-Oct, 08:31 Bogotá
+
+El control DOM de la sesión autenticada de Supabase vuelve a funcionar en
+la nueva interacción, sin usar controles nativos de Windows. Consulta
+`docs/sql/job-archive-operational-audit.sql`, transacción REPEATABLE READ
+READ ONLY, statement_timeout 20 s, lock_timeout 2 s, ROLLBACK final. Se
+comparó el SQL completo del editor con el archivo antes de ejecutar.
+Resultado guardado en `docs/seo-evidence/job-archive-operational-2026-10-29.json`:
+
+- 22 vacantes archivadas; primer lote 08:19:37 Bogotá.
+- Motivo registrado por el pipeline: source_closed (22); no se reinterpreta
+  ese motivo como una auditoría nueva del estado de cada empleador.
+- 0 discrepancias entre ID/hash original y la instantánea; 0 fechas originales
+  ausentes; 0 hashes expirados faltantes.
+- 0 filas públicas vigentes con publicación original archivada >30 días.
+- RLS activo; 0 grants a PUBLIC/anon/authenticated.
+- Archivo, incluidos índices: 188.416 bytes; base completa: 440.355.987 bytes.
+- `transaction_read_only=on`; sin modificar vacantes, fechas ni estado de fuentes.
+
+Correlación: [Direct Employers Tick 40880002414](https://github.com/Yosmanovallos/Job-finder/actions/runs/40880002414)
+terminó success desde `2c7512209690db94e26a838d1a23e101e5f8b6f2` y reportó
+22 proyecciones retiradas. No se disparó manualmente un scrape para generar
+esta evidencia. El otro tick general 40881594983 seguía en curso; no se
+presenta como terminado ni se atribuyen sus futuros retiros a este lote.
+
+Muestra recién archivada, ID público `10348e51-68bf-4e10-b89a-2e7dd88a8504`:
+página 410/noindex/sin JobPosting; `/api/jobs/:id` y `/api/v1/jobs/:id` 404.
+No se extrajeron cuerpos de ofertas ni información de candidatos.
+
+Revisión pública de las 08:29–08:33 Bogotá: salud, dashboard, páginas locales
+y sitemaps 200. API CO/VE: 24 ofertas por país, 0 mayores de 30 días en esa
+muestra. Dashboard edge MISS 406 ms. Sitemap de ofertas: 7.959 URLs (conteo
+puntual, varía con ingesta). Dos retiradas históricas mantienen 410/noindex.
+
+**Señales pendientes, sin cambios de código en esta fase:**
+
+- Primera lectura simultánea de Bogotá/Cúcuta/alias Caracas: 9.997–10.384 ms,
+  frente a ~2 s en el control anterior. Revisión secuencial posterior con URL
+  distinta: Bogotá 334 ms, Cúcuta 304 ms. No se atribuye causa sin medición:
+  hay que separar MISS del borde, caché del proceso, consultas y carga de
+  ingesta. No declarar una mejora permanente por la segunda lectura caliente.
+- El tick oficial terminó, pero Altipal y Mondelez registraron errores de
+  formato. Investigar como trabajo posterior, sin ejecutar canarios nuevos ni
+  cambiar el ciclo de vida o el diseño para ocultarlos.
+
+Se cierra la fase de archivo privado. No prueba mejora de posiciones, tráfico
+ni cumplimiento del objetivo de crecimiento; requiere medición SEO posterior.

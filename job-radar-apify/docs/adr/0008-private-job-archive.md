@@ -1,6 +1,8 @@
 # ADR 0008 — Archivo privado, máximo público de 30 días
 
-Fecha: 2026-10-29. Estado: aceptado para implementación; despliegue sujeto a gates.
+Fecha: 2026-10-29. Estado: aceptado, implementado; primer lote de producción
+verificado (22 vacantes) el 29-Oct a las 08:31 Bogotá. Evidencia en el cambio
+OpenSpec archivado `private-job-archive`.
 
 La instrucción del usuario conserva un máximo estricto de 30 días. ADR 0007
 queda rechazado; no se implementa su excepción. ADR 0005 mantiene su regla de
