@@ -325,6 +325,9 @@ async function main(): Promise<void> {
       // gets the same post-migration schema. Its own suite re-applies it to
       // prove idempotency.
       const schema = await readFile(path.join(root, "src/db/schema.sql"), "utf8");
+      const archiveBlock = /-- BEGIN job-archive\r?\n([\s\S]*?)-- END job-archive/.exec(schema)?.[1];
+      if (!archiveBlock) throw new Error("[P0] Missing job-archive schema block.");
+      await pool.query(archiveBlock);
       const seoBlock = /-- BEGIN job-seo-v2\r?\n([\s\S]*?)-- END job-seo-v2/.exec(schema)?.[1];
       if (!seoBlock) throw new Error("[P0] schema.sql no contiene el bloque job-seo-v2.");
       await pool.query(seoBlock);

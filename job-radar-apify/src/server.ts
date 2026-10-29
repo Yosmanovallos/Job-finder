@@ -32,6 +32,7 @@ import {
   SAVED_JOBS_LIMIT
 } from "./db/saved-jobs-repository.js";
 import { wasJobPurged } from "./db/indexing-repository.js";
+import { wasJobArchived } from "./db/job-archive-repository.js";
 import {
   getReputationForCompanies,
   resolveCompanyBySlug
@@ -1404,7 +1405,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
         res.end();
         return;
       }
-      if (id && (superseded || (await wasJobPurged(id)) || (await isJobExpiredInPlace(id)))) {
+      if (id && (superseded || (await wasJobArchived(id)) || (await wasJobPurged(id)) || (await isJobExpiredInPlace(id)))) {
         res.writeHead(410, { "Content-Type": "text/html; charset=utf-8" });
         res.end(
           '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Vacante ya no disponible | BuscoTrabajo</title><meta name="robots" content="noindex"></head><body><h1>Esta vacante ya no está disponible</h1><p>Consulta otras ofertas activas.</p><p><a href="/dashboard">Ver vacantes activas</a></p></body></html>'

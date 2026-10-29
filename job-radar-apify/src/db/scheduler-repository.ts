@@ -5,6 +5,7 @@ import { apiNotifiedUrls, DELETE_NOT_API_NOTIFIED, enqueueIndexingNotifications,
 import { pruneExpiredUrlHashes, recordExpiredUrlHashes } from "./expired-job-repository.js";
 import { liveJobSql, MAX_JOB_AGE_DAYS } from "../lib/job-freshness.js";
 import { orderDueGlobalSources } from "../queue/source-cadence.js";
+import { pruneJobArchive } from "./job-archive-repository.js";
 
 /**
  * Idempotent upsert of the known role list into `search_roles` — safe to
@@ -127,65 +128,43 @@ export async function markGlobalSourceRun(sourceName: string): Promise<void> {
 }
 
 /**
- * Cron C — keeps the corpus bounded to jobs actually still live.
- *
- * Filters on `last_seen_at`, not `created_at` (SEO Fase 9 fix, see
- * docs/SEO-PLAN.md §9.2). `created_at` is stamped once and never updated —
- * a job still being re-scraped every 15 minutes for months looked identical
- * to one posted 30 days ago and never seen since. `last_seen_at` is bumped
- * by the ON CONFLICT hooks in saveJobs() every time a job is rediscovered,
- * so this now only deletes jobs that have genuinely stopped appearing in
- * scraping results for 30 days — a real expiration signal instead of a
- * fixed age cutoff that churned every long-lived posting's URL forever.
+ * Cron C: atomically moves retired jobs into the private archive (ADR 0008).
+ * Public reads already enforce the same 30-day/deadline rule, independent
+ * of tick timing. Re-seeing a source never renews the original publication.
+ * Keep batches bounded; archive failure rolls back the live-row removal.
  */
-// RETURNING the deleted rows (not a separate SELECT-then-DELETE) so this
-// stays atomic — a two-step version could lose rows to a concurrent insert/
-// delete between the two statements. Once a row is gone, its title/location
-// can never be recomputed for the URL these jobs' pages lived at, so this is
-// the only point that can ever notify Google those pages are now dead (SEO
-// Fase 3 — see indexing-repository.ts). `is_active` is NOT part of this: it
-// is set by the one-off scripts/migrate-dedupe.ts cleanup and by the official
-// vacancy tick, which hides a job-board copy while its official version is
-// live (ADR 0006 §10.6, `superseded_by`) — never as an expiration signal: a
-// hard DELETE is the expiration signal in this codebase. Since 2026-10-04 there are two: this age purge
-// and deleteClosedJobs() below (the source itself says the posting closed).
-//
-// Also since 2026-10-04 (bug: postings older than a month were still live):
-// "not re-seen for 30 days" alone let a posting the source keeps listing live
-// forever, because re-seeing it bumps last_seen_at. This now also deletes
-// every row that fails liveJobSql() — published more than MAX_JOB_AGE_DAYS
-// ago, or past the source's own validThrough — the same rule every public
-// read already filters on. Each deleted URL goes to expired_job_urls so
-// saveJobs() does not bring it back as "new" on the next tick.
-//
-// Bounded per call (AGENTS.md #12): the first run after this rule shipped
-// faces every posting that was kept alive only by being re-seen. Those rows
-// are already hidden from every read by liveJobSql(), so deleting them over a
-// few ticks costs users nothing, while one unbounded DELETE + tombstones +
-// enqueues could eat the tick's deadline. Oldest first.
 export const PURGE_BATCH_LIMIT = 2_000;
 
-export async function purgeOldJobs(limit: number = PURGE_BATCH_LIMIT): Promise<number> {
-  const result = await pool.query(
-    `DELETE FROM jobs
-     WHERE id IN (
-       SELECT id FROM jobs
+export async function purgeOldJobs(limit: number = PURGE_BATCH_LIMIT, dryRun = false): Promise<number> {
+  const boundedLimit = Math.max(1, Math.min(Math.trunc(limit) || 1, 20_000));
+  const candidates = `SELECT id FROM jobs
        WHERE last_seen_at < NOW() - INTERVAL '${MAX_JOB_AGE_DAYS} days' OR NOT ${liveJobSql()}
-       ORDER BY published_at ASC, id ASC
-       LIMIT $1
-     )
-     RETURNING id, url_hash, title, company, location, url, source, published_at`,
-    [Math.max(1, Math.min(limit, 20_000))]
+       ORDER BY published_at ASC, id ASC LIMIT $1`;
+  if (dryRun) return (await pool.query(candidates, [boundedLimit])).rowCount ?? 0;
+  const result = await pool.query(
+    `WITH retired AS (
+       DELETE FROM jobs WHERE id IN (${candidates}) RETURNING *
+     ), archived AS (
+       INSERT INTO archived_jobs (job_id, url_hash, reason, snapshot)
+       SELECT id, url_hash,
+              CASE WHEN valid_through <= NOW() THEN 'source_deadline'
+                   WHEN published_at < NOW() - INTERVAL '${MAX_JOB_AGE_DAYS} days' THEN 'age_limit'
+                   ELSE 'unseen' END,
+              to_jsonb(retired) FROM retired
+       ON CONFLICT (job_id) DO NOTHING
+     ) SELECT id, url_hash, title, company, location, url, source, published_at FROM retired`,
+    [boundedLimit]
   );
   await recordRemovedJobs(result.rows, "purgeOldJobs");
   await rememberExpired(result.rows, "expired", "purgeOldJobs");
   await pruneExpiredUrlHashes().catch((err) => console.warn("⚠️ [purgeOldJobs] Poda de expired_job_urls omitida:", err?.message || err));
+  await pruneJobArchive().catch(() => console.warn("[purgeOldJobs] Archive maintenance deferred."));
   return result.rowCount ?? 0;
 }
 
 // After the tombstones, never before: the DELETE is already committed, so a
-// failure here must not cost the 410 path. Worst case the URL can come back
-// once and is purged again on the following tick.
+// failure here must not cost the 410 path or hash guard: the private archive
+// already contains both identities.
 async function rememberExpired(rows: { url_hash: string }[], reason: string, caller: string): Promise<void> {
   try {
     await recordExpiredUrlHashes(rows.map((row) => row.url_hash), reason);
@@ -195,18 +174,26 @@ async function rememberExpired(rows: { url_hash: string }[], reason: string, cal
 }
 
 /**
- * Hard-deletes jobs the SOURCE confirmed closed (see src/queue/source-closure.ts),
+ * Archives jobs the SOURCE confirmed closed (see src/queue/source-closure.ts),
  * through exactly the same tombstone/URL_DELETED path as the age purge, so a
  * closed posting's page answers 410 and leaves the sitemap the same way an
  * expired one does. `is_active = TRUE` in the WHERE keeps a concurrent dedupe
  * cleanup from being double-processed.
  */
-export async function deleteClosedJobs(jobIds: string[]): Promise<number> {
+export async function deleteClosedJobs(jobIds: string[], dryRun = false): Promise<number> {
   if (jobIds.length === 0) return 0;
+  // Bound the public entry point too; existing callers already batch below this cap.
+  const ids = [...new Set(jobIds)].slice(0, PURGE_BATCH_LIMIT);
+  if (dryRun) return (await pool.query(`SELECT id FROM jobs WHERE id = ANY($1::uuid[]) AND is_active = TRUE`, [ids])).rowCount ?? 0;
   const result = await pool.query(
-    `DELETE FROM jobs WHERE id = ANY($1::uuid[]) AND is_active = TRUE
-     RETURNING id, url_hash, title, company, location, url, source, published_at`,
-    [jobIds]
+    `WITH retired AS (
+       DELETE FROM jobs WHERE id = ANY($1::uuid[]) AND is_active = TRUE RETURNING *
+     ), archived AS (
+       INSERT INTO archived_jobs (job_id, url_hash, reason, snapshot)
+       SELECT id, url_hash, 'source_closed', to_jsonb(retired) FROM retired
+       ON CONFLICT (job_id) DO NOTHING
+     ) SELECT id, url_hash, title, company, location, url, source, published_at FROM retired`,
+    [ids]
   );
   await recordRemovedJobs(result.rows, "deleteClosedJobs");
   await rememberExpired(result.rows, "source_closed", "deleteClosedJobs");

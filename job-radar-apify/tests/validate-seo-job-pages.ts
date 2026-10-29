@@ -1271,6 +1271,18 @@ async function runHttpTests() {
       `Un jobId nunca visto respondió ${neverExistedRes.status} en vez de 404.`
     );
 
+    // Archive alone must identify the retired page, even without indexing_queue.
+    const archivedId = crypto.randomUUID();
+    await pool.query(`INSERT INTO archived_jobs (job_id, url_hash, reason, snapshot) VALUES ($1::uuid, $2::text, 'age_limit', '{}')`, [archivedId, archivedId]);
+    try {
+      const archivedRes = await fetch(`${BASE_URL}/empleos/${archivedId}/x`);
+      const html = await archivedRes.text();
+      check(archivedRes.status === 410 && html.includes('content="noindex"') && !html.includes('application/ld+json') && !html.includes('outbound_apply'),
+        "Archivo sin cola responde 410/noindex sin JobPosting ni postulación.", "Archivo sin cola no respondió honestamente.");
+      const apiRes = await fetch(`${BASE_URL}/api/jobs/${archivedId}`);
+      check(apiRes.status === 404, "API no expone archivo privado.", `API archivo: ${apiRes.status}`);
+    } finally { await pool.query(`DELETE FROM archived_jobs WHERE job_id = $1`, [archivedId]); }
+
     // Un jobId que sí existió y fue purgado (misma fila URL_DELETED que
     // purgeOldJobs() ya encola) debe responder 410, no 404 genérico.
     const purgedJobId = crypto.randomUUID();

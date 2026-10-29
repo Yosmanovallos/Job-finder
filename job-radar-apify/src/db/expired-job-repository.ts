@@ -1,13 +1,14 @@
 import { pool } from "./client.js";
+import { findArchivedUrlHashes } from "./job-archive-repository.js";
 
 /**
  * `expired_job_urls` (schema.sql block `job-freshness`, applied by
  * scripts/migrate-job-freshness.ts): url_hashes of jobs deleted because they
  * expired, so saveJobs() never re-inserts them as if they were new.
  *
- * Every function degrades to a no-op while the table does not exist yet, so
- * the tick keeps working before the migration runs — it just cannot block
- * re-insertion until then.
+ * The legacy hash table is optional before its migration. The private
+ * archive (ADR 0008) is required before deploying this version; its guard
+ * remains effective even when the legacy hash write failed.
  */
 
 /** How long an expired URL stays blocked. Far beyond any posting's real life. */
@@ -46,16 +47,17 @@ export async function recordExpiredUrlHashes(urlHashes: string[], reason: string
 export async function findExpiredUrlHashes(urlHashes: string[]): Promise<Set<string>> {
   const unique = [...new Set(urlHashes.filter(Boolean))];
   if (unique.length === 0) return new Set();
+  const archived = await findArchivedUrlHashes(unique);
   try {
     const result = await pool.query<{ url_hash: string }>(
       `SELECT url_hash FROM expired_job_urls WHERE url_hash = ANY($1::text[])`,
       [unique]
     );
-    return new Set(result.rows.map((row) => row.url_hash));
+    return new Set([...archived, ...result.rows.map((row) => row.url_hash)]);
   } catch (error) {
     if (!isMissingTable(error)) throw error;
     warnMissingTableOnce();
-    return new Set();
+    return archived;
   }
 }
 

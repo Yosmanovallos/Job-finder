@@ -1,6 +1,8 @@
 # ADR 0007 — Retención basada en disponibilidad comprobada
 
-Fecha: 2026-10-29. **Estado: propuesto; no implementado ni desplegado.**
+Fecha: 2026-10-29. **Estado: rechazado por instrucción posterior del usuario; no implementado ni desplegado.**
+La regla aceptada es el máximo estricto de 30 días y archivo privado de ADR 0008.
+El resto se conserva únicamente como historial de la propuesta descartada.
 Al aceptarse con sus gates, sustituirá la parte de ADR 0005 que equipara
 antigüedad >30 días a indisponibilidad. No cambia hoy la decisión vigente.
 Evidencia: ../JOB-RETENTION-IMPACT-2026-10-29.md y sus SQL/JSON agregados.

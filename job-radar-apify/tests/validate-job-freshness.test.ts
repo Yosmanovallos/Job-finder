@@ -17,6 +17,11 @@ test("the age limit is one month", () => {
   assert.equal(MAX_JOB_AGE_DAYS, 30);
 });
 
+test("30-day boundary is shared: exactly 30 is allowed, one millisecond older is stale", () => {
+  assert.equal(jobStaleReason(daysAgo(30), null, NOW), null);
+  assert.match(jobStaleReason(new Date(NOW.getTime() - 30 * 86_400_000 - 1), null, NOW) ?? "", /30 días/);
+});
+
 test("jobStaleReason: older than 30 days or past validThrough is stale, everything else is live", () => {
   assert.equal(jobStaleReason(daysAgo(29), null, NOW), null);
   assert.match(jobStaleReason(daysAgo(31), null, NOW) ?? "", /30 días/);

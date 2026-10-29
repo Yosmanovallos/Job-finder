@@ -4,6 +4,7 @@ import { mutateReadinessRelevantJobs, refreshGoogleReadiness } from "./job-readi
 import { deleteClosedJobs } from "./scheduler-repository.js";
 import { liveDirectJobSql } from "../direct/ingest.js";
 import { BROAD_LOCATION_KEYS, copyMatchLocationSql, copySpecificCityMismatchSql } from "../lib/official-copy-location.js";
+import { MAX_JOB_AGE_DAYS } from "../lib/job-freshness.js";
 
 /**
  * Official vacancies as rows of `jobs` (docs/adr/0006-direct-employers.md
@@ -40,7 +41,11 @@ const LIVE_PROJECTABLE = `
   FROM direct_jobs d
   JOIN employer_sources s ON s.id = d.employer_source_id AND s.enabled
   JOIN employers e ON e.id = d.employer_id
-  WHERE ${liveDirectJobSql("d")}`;
+  WHERE ${liveDirectJobSql("d")}
+    AND NOT EXISTS (
+      SELECT 1 FROM archived_jobs a WHERE a.job_id = d.id
+        AND (a.snapshot->>'published_at')::timestamptz < NOW() - INTERVAL '${MAX_JOB_AGE_DAYS} days'
+    )`;
 
 export interface ProjectionResult {
   inserted: number;
@@ -71,7 +76,9 @@ async function upsertProjections(): Promise<{ inserted: number; updated: number;
             -- The ATS stated no date (Google): say so instead of letting
             -- "first seen" read like a posting date ("hace menos de 1 h").
             CASE WHEN d.published_at IS NULL THEN 'Fecha no indicada' END,
-            COALESCE(d.published_at, d.first_seen_at), NOW(), TRUE, 'CO',
+            LEAST(COALESCE(d.published_at, d.first_seen_at),
+              (SELECT (a.snapshot->>'published_at')::timestamptz FROM archived_jobs a WHERE a.job_id = d.id)),
+            NOW(), TRUE, 'CO',
             d.description_text, d.employment_type,
             CASE WHEN d.description_text IS NOT NULL THEN 'full' END,
             CASE WHEN d.description_text IS NOT NULL THEN 'listing' END,

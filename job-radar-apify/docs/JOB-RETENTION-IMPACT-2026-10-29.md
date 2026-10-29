@@ -110,10 +110,11 @@ postulación. valid_through futuro tampoco prueba apertura actual. Para
 portales oficiales, la pertenencia a una API/feed de vacantes publicadas
 puede ser evidencia fuerte solo si el contrato de esa fuente lo garantiza.
 
-## Política propuesta
+## Política propuesta originalmente (descartada)
 
-El ADR 0007 detalla la decisión objetivo; está **propuesto y no desplegado**.
-ADR 0005 y el límite actual siguen vigentes hasta que pase la implementación.
+El usuario confirmó después un máximo estricto de 30 días. **ADR 0007 fue
+rechazado**; la decisión vigente es ADR 0008 (archivo privado). Se conserva
+esta propuesta como historial; no habilitar la excepción descrita abajo.
 
 1. Conservar una oferta >30 días únicamente con resultado afirmativo de
    apertura, fuente/método soportado y comprobación de menos de 24 horas.
