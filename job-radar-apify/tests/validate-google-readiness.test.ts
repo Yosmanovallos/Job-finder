@@ -10,6 +10,7 @@ import { evaluateGoogleJobReadiness, isGoogleReadyNow, type ReadinessInput } fro
 import { assessDescription } from "../src/lib/job-description-quality.js";
 import {
   buildJobPageBody,
+  buildJobPagePayload,
   buildJobPosting,
   buildJobsSitemapXml,
   escapeJsonForScriptTag,
@@ -18,6 +19,7 @@ import {
   type SeoJob
 } from "../src/lib/job-seo.js";
 import { extractJobPostingDetail } from "../src/lib/job-posting-jsonld.js";
+import { buildLocationLabel } from "../src/countries/index.js";
 
 /** The JobPosting properties these tests read. */
 interface PostingShape {
@@ -275,6 +277,41 @@ test("JobPosting (hybrid): jobLocation, never TELECOMMUTE", () => {
   assert.equal(posting.jobLocationType, undefined);
   assert.equal(posting.jobLocation!.address.addressLocality, "Medellín");
   assert.equal(posting.jobLocation!.address.addressRegion, "Antioquia");
+});
+
+test("addressRegion (ADR 0009): CO city without region gets its DIVIPOLA department, visible too", () => {
+  const regionOf = (overrides: Partial<ReadinessInput>) =>
+    (buildJobPosting(asStoredPage(base(overrides))) as PostingShape | null)?.jobLocation?.address.addressRegion;
+
+  const medellin = asStoredPage(base({ location: "Medellín" }));
+  const posting = buildJobPosting(medellin) as PostingShape;
+  assert.equal(posting.jobLocation!.address.addressLocality, "Medellín");
+  assert.equal(posting.jobLocation!.address.addressRegion, "Antioquia");
+  assert.ok(buildJobPageBody(medellin).includes("<li>Ubicación: Medellín, Antioquia</li>"), "derived region is visible");
+
+  // The hydrated page reads the same label from the SSR payload.
+  const payloadJob = buildJobPagePayload(medellin).job;
+  assert.equal(payloadJob.locationLabel, "Medellín, Antioquia");
+  assert.equal(buildLocationLabel(payloadJob, "CO"), "Medellín, Antioquia");
+  assert.equal(buildLocationLabel({ location: "Medellín" }, "CO"), "Medellín", "jobs without a payload label are unchanged");
+
+  // The three Search Console examples of 2026-10-30.
+  assert.equal(regionOf({ location: "Espinal" }), "Tolima");
+  assert.equal(regionOf({ location: "Cúcuta Metropolitan Area" }), "Norte de Santander");
+  assert.equal(regionOf({ location: "Puerto Colombia" }), undefined, "also a Guainía municipality in DIVIPOLA");
+  assert.equal(regionOf({ location: "medellin" }), "Antioquia");
+  const bogota = asStoredPage(base({ location: "Bogotá" }));
+  assert.equal((buildJobPosting(bogota) as PostingShape).jobLocation!.address.addressRegion, "Bogotá, D.C.");
+  assert.ok(buildJobPageBody(bogota).includes("<li>Ubicación: Bogotá, D.C.</li>"));
+
+  // Ambiguous municipality names, other countries and stated regions are untouched.
+  assert.equal(regionOf({ location: "Armenia" }), undefined);
+  assert.equal(regionOf({ location: "Rionegro" }), undefined);
+  assert.equal(regionOf({ location: "Valencia", country: "VE" }), undefined);
+  assert.equal(regionOf({ location: "Medellín", country: "VE" }), undefined);
+  assert.equal(regionOf({ location: "Bello, Valle de Aburrá" }), "Valle de Aburrá");
+  const stated = asStoredPage(base({ location: "Medellín, Antioquia" }));
+  assert.ok(buildJobPageBody(stated).includes("<li>Ubicación: Medellín, Antioquia</li>"), "stated region not duplicated");
 });
 
 test("validThrough: omitted when unknown, source value when stated, and expiry flips readiness on read", () => {
