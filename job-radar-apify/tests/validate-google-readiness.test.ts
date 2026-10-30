@@ -312,6 +312,15 @@ test("addressRegion (ADR 0009): CO city without region gets its DIVIPOLA departm
   assert.equal(regionOf({ location: "Bello, Valle de Aburrá" }), "Valle de Aburrá");
   const stated = asStoredPage(base({ location: "Medellín, Antioquia" }));
   assert.ok(buildJobPageBody(stated).includes("<li>Ubicación: Medellín, Antioquia</li>"), "stated region not duplicated");
+
+  // Seen in production 30-Oct: the department goes before the country, not after it.
+  const withCountry = asStoredPage(base({ location: "Medellín, Colombia" }));
+  assert.equal((buildJobPosting(withCountry) as PostingShape).jobLocation!.address.addressRegion, "Antioquia");
+  assert.ok(buildJobPageBody(withCountry).includes("<li>Ubicación: Medellín, Antioquia, Colombia</li>"));
+  const bogotaCountry = asStoredPage(base({ location: "Bogotá, Colombia" }));
+  assert.ok(buildJobPageBody(bogotaCountry).includes("<li>Ubicación: Bogotá, D.C., Colombia</li>"));
+  const hybrid = asStoredPage(base({ location: "Híbrido - Cali, Colombia", remoteType: "hybrid" }));
+  assert.ok(buildJobPageBody(hybrid).includes("<li>Ubicación: Híbrido - Cali, Valle del Cauca, Colombia</li>"));
 });
 
 test("validThrough: omitted when unknown, source value when stated, and expiry flips readiness on read", () => {
