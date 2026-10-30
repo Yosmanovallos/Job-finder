@@ -14,6 +14,7 @@
  */
 import { assessDescription, type DescriptionReason, type DescriptionSignals } from "./job-description-quality.js";
 import { toCountryCode, toCountryCodes } from "./country-codes.js";
+import { coDepartmentFor } from "./co-departments.js";
 import { getGoogleJobSourcePolicy } from "./google-job-source-policy.js";
 import { jobStaleReason, liveJobSql } from "./job-freshness.js";
 
@@ -91,7 +92,8 @@ function isHttpUrl(value: string | null | undefined): boolean {
  *    eligible countries — Google requires at least one;
  *  - remote-looking text without that evidence is ambiguous, never guessed;
  *  - physical: locality/region split from the source's own location text,
- *    country from the listing market, rejected if the text names another country.
+ *    country from the listing market, rejected if the text names another country;
+ *    a CO city without a stated region gets its DIVIPOLA department (ADR 0009).
  */
 export function resolveGoogleLocation(
   input: Pick<ReadinessInput, "location" | "country" | "remoteType" | "applicantCountries">
@@ -121,8 +123,11 @@ export function resolveGoogleLocation(
   const country = listed ?? named;
   if (!country || places.length === 0) return { location: null, reason: "MISSING_LOCATION" };
   const locality = places[0];
-  const region = places.length > 1 ? places[places.length - 1] : null;
-  return { location: { kind: "physical", locality, region: region !== locality ? region : null, country }, reason: null };
+  const stated = places.length > 1 ? places[places.length - 1] : null;
+  // ADR 0009: a CO city with no source region gets its department from the
+  // closed DIVIPOLA table; a source-stated region always wins.
+  const region = stated && stated !== locality ? stated : country === "CO" ? coDepartmentFor(locality) : null;
+  return { location: { kind: "physical", locality, region, country }, reason: null };
 }
 
 export function evaluateGoogleJobReadiness(input: ReadinessInput, now: Date = new Date()): ReadinessResult {

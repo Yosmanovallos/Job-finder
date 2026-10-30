@@ -169,9 +169,13 @@ export function resolveJobCountry(
 // would be exactly the kind of unsupported inference AGENTS.md §5 forbids
 // — "Remoto" with nothing else is the honest answer, not a bug.
 export function buildLocationLabel(
-  job: { location?: string | null; country?: string | null },
+  job: { location?: string | null; country?: string | null; locationLabel?: string | null },
   contextCountry?: string | null
 ): string {
+  // The job page payload carries the server's label (ADR 0009 department
+  // included), so the hydrated page shows exactly what the SSR body showed.
+  const label = (job.locationLabel || "").trim();
+  if (label) return label;
   const loc = (job.location || "").trim();
   if (loc) return loc;
   return getCountryConfig(job.country || contextCountry).name;
