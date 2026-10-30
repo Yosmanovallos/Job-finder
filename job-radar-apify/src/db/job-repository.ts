@@ -2,7 +2,7 @@ import crypto from "crypto";
 import dotenv from "dotenv";
 import { pool } from "./client.js";
 import type { Job } from "../sources/types.js";
-import { normalizeJobUrl } from "../sources/types.js";
+import { normalizeJobUrl, resolveOutboundUrl } from "../sources/types.js";
 import { getCountryConfig } from "../countries/index.js";
 import { saveRunToCache } from "../cache-manager.js";
 import { validateJobs } from "./job-validator.js";
@@ -334,7 +334,7 @@ export async function getJobs(
       title: row.title,
       company: row.company,
       location: row.location,
-      url: row.url,
+      url: resolveOutboundUrl(row.url),
       dateText: row.date_text,
       source: row.source,
       sources,
@@ -391,7 +391,7 @@ export async function getJobsLight(
       title: row.title,
       company: row.company,
       location: row.location,
-      url: row.url,
+      url: resolveOutboundUrl(row.url),
       dateText: row.date_text,
       source: row.source,
       sources,
@@ -525,7 +525,7 @@ export async function streamCanonicalSitemapJobs(options: SitemapStreamOptions):
           title: row.title,
           company: row.company,
           location: row.location,
-          url: row.url,
+          url: row.url ? resolveOutboundUrl(row.url) : row.url,
           publishedAt: row.published_at,
           isLocked: row.is_locked,
           contentUpdatedAt: row.content_updated_at
@@ -860,7 +860,7 @@ async function queryJobsPage(options: JobsPageOptions): Promise<JobsPage> {
       title: row.title,
       company: row.company,
       location: row.location,
-      url: row.url,
+      url: resolveOutboundUrl(row.url),
       dateText: row.date_text,
       source: row.source,
       sources,
@@ -1320,7 +1320,7 @@ export async function getJobById(id: string) {
     title: row.title,
     company: row.company,
     location: row.location,
-    url: row.url,
+    url: resolveOutboundUrl(row.url),
     dateText: row.date_text,
     source: row.source,
     sources,
