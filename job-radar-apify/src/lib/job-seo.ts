@@ -206,7 +206,22 @@ export function buildJobPageBody(job: SeoJob): string {
   const fallbackLocation = getCountryConfig(job.country).name;
   const facts: string[] = [];
   if (job.company) facts.push(`<li>Empresa: ${escapeHtml(job.company)}</li>`);
-  facts.push(`<li>Ubicación: ${escapeHtml(job.location || fallbackLocation)}</li>`);
+  // Rule E parity: a department added to JobPosting from the DIVIPOLA table
+  // (ADR 0009) is shown here too, from the same resolved location.
+  const { location: resolved } = resolveGoogleLocation(job);
+  const addedRegion =
+    resolved?.kind === "physical" && resolved.region && !(job.location || "").includes(resolved.region)
+      ? resolved.region
+      : null;
+  // "Bogotá" + "Bogotá, D.C." reads as just "Bogotá, D.C.".
+  const locationText = !job.location
+    ? fallbackLocation
+    : !addedRegion
+      ? job.location
+      : addedRegion.startsWith(job.location)
+        ? addedRegion
+        : `${job.location}, ${addedRegion}`;
+  facts.push(`<li>Ubicación: ${escapeHtml(locationText)}</li>`);
   const modality = remoteLabel(job);
   if (modality) facts.push(`<li>Modalidad: ${escapeHtml(modality)}</li>`);
   const eligible = (job.remoteType === "fully_remote" ? job.applicantCountries || [] : [])

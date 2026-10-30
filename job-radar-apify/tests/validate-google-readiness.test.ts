@@ -277,6 +277,32 @@ test("JobPosting (hybrid): jobLocation, never TELECOMMUTE", () => {
   assert.equal(posting.jobLocation!.address.addressRegion, "Antioquia");
 });
 
+test("addressRegion (ADR 0009): CO city without region gets its DIVIPOLA department, visible too", () => {
+  const regionOf = (overrides: Partial<ReadinessInput>) =>
+    (buildJobPosting(asStoredPage(base(overrides))) as PostingShape | null)?.jobLocation?.address.addressRegion;
+
+  const medellin = asStoredPage(base({ location: "Medellín" }));
+  const posting = buildJobPosting(medellin) as PostingShape;
+  assert.equal(posting.jobLocation!.address.addressLocality, "Medellín");
+  assert.equal(posting.jobLocation!.address.addressRegion, "Antioquia");
+  assert.ok(buildJobPageBody(medellin).includes("<li>Ubicación: Medellín, Antioquia</li>"), "derived region is visible");
+
+  assert.equal(regionOf({ location: "Cúcuta Metropolitan Area" }), "Norte de Santander");
+  assert.equal(regionOf({ location: "medellin" }), "Antioquia");
+  const bogota = asStoredPage(base({ location: "Bogotá" }));
+  assert.equal((buildJobPosting(bogota) as PostingShape).jobLocation!.address.addressRegion, "Bogotá, D.C.");
+  assert.ok(buildJobPageBody(bogota).includes("<li>Ubicación: Bogotá, D.C.</li>"));
+
+  // Ambiguous municipality names, other countries and stated regions are untouched.
+  assert.equal(regionOf({ location: "Armenia" }), undefined);
+  assert.equal(regionOf({ location: "Rionegro" }), undefined);
+  assert.equal(regionOf({ location: "Valencia", country: "VE" }), undefined);
+  assert.equal(regionOf({ location: "Medellín", country: "VE" }), undefined);
+  assert.equal(regionOf({ location: "Bello, Valle de Aburrá" }), "Valle de Aburrá");
+  const stated = asStoredPage(base({ location: "Medellín, Antioquia" }));
+  assert.ok(buildJobPageBody(stated).includes("<li>Ubicación: Medellín, Antioquia</li>"), "stated region not duplicated");
+});
+
 test("validThrough: omitted when unknown, source value when stated, and expiry flips readiness on read", () => {
   const unknown = buildJobPosting(asStoredPage(base())) as PostingShape;
   assert.equal(unknown.validThrough, undefined);
