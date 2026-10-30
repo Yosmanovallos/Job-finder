@@ -4251,5 +4251,180 @@
    "relatedWords": 0,
    "placeholderEmployer": false
   }
- ]
+ ],
+ "indexableCompanyTotals": {
+  "method": "public /api/jobs?company=<name>[&cities=<first segment of location>]&limit=1 for each indexable row with a real employer; concurrency 2",
+  "rows": [
+   {
+    "id": "d723c902",
+    "companyTotal": 63,
+    "sameCityTotal": 55
+   },
+   {
+    "id": "c4904ee2",
+    "companyTotal": 11,
+    "sameCityTotal": 10
+   },
+   {
+    "id": "0713600f",
+    "companyTotal": 7,
+    "sameCityTotal": 6
+   },
+   {
+    "id": "2cc10940",
+    "companyTotal": 63,
+    "sameCityTotal": 31
+   },
+   {
+    "id": "231c73f1",
+    "companyTotal": 5,
+    "sameCityTotal": 4
+   },
+   {
+    "id": "c084bb30",
+    "companyTotal": 17,
+    "sameCityTotal": 13
+   },
+   {
+    "id": "23d52587",
+    "companyTotal": 5,
+    "sameCityTotal": 5
+   },
+   {
+    "id": "d171f325",
+    "companyTotal": 84,
+    "sameCityTotal": 57
+   },
+   {
+    "id": "c354899e",
+    "companyTotal": 63,
+    "sameCityTotal": 31
+   },
+   {
+    "id": "aac3f7de",
+    "companyTotal": 21,
+    "sameCityTotal": 9
+   },
+   {
+    "id": "4dbb2dee",
+    "companyTotal": 20,
+    "sameCityTotal": 1
+   },
+   {
+    "id": "7c71a2e0",
+    "companyTotal": 63,
+    "sameCityTotal": 55
+   },
+   {
+    "id": "5dd8a206",
+    "companyTotal": 4,
+    "sameCityTotal": 4
+   },
+   {
+    "id": "8ab95065",
+    "companyTotal": 55,
+    "sameCityTotal": 1
+   },
+   {
+    "id": "20d40744",
+    "companyTotal": 1,
+    "sameCityTotal": 1
+   },
+   {
+    "id": "fa10d8a6",
+    "companyTotal": 57,
+    "sameCityTotal": 2
+   },
+   {
+    "id": "8415b377",
+    "companyTotal": 6,
+    "sameCityTotal": 3
+   },
+   {
+    "id": "2771c76c",
+    "companyTotal": 66,
+    "sameCityTotal": 37
+   },
+   {
+    "id": "912e24a7",
+    "companyTotal": 1,
+    "sameCityTotal": 1
+   },
+   {
+    "id": "c4b4e696",
+    "companyTotal": 2,
+    "sameCityTotal": 2
+   },
+   {
+    "id": "17c3a0d8",
+    "companyTotal": 10,
+    "sameCityTotal": 3
+   },
+   {
+    "id": "3ff891e7",
+    "companyTotal": 1,
+    "sameCityTotal": 1
+   },
+   {
+    "id": "8ad0e713",
+    "companyTotal": 27,
+    "sameCityTotal": 16
+   },
+   {
+    "id": "5eb3383e",
+    "companyTotal": 4,
+    "sameCityTotal": 4
+   },
+   {
+    "id": "3f2c8de5",
+    "companyTotal": 3,
+    "sameCityTotal": 3
+   },
+   {
+    "id": "d42e08ea",
+    "companyTotal": 6,
+    "sameCityTotal": 2
+   },
+   {
+    "id": "37e51a5d",
+    "companyTotal": 6,
+    "sameCityTotal": 2
+   },
+   {
+    "id": "6391af81",
+    "companyTotal": 7,
+    "sameCityTotal": 2
+   },
+   {
+    "id": "04b663d5",
+    "companyTotal": 87,
+    "sameCityTotal": 87
+   },
+   {
+    "id": "fc979306",
+    "companyTotal": 2,
+    "sameCityTotal": 1
+   },
+   {
+    "id": "d3ee4ac1",
+    "companyTotal": 1,
+    "sameCityTotal": 1
+   },
+   {
+    "id": "e8161e24",
+    "companyTotal": 1,
+    "sameCityTotal": 1
+   },
+   {
+    "id": "0b01d0cf",
+    "companyTotal": 54,
+    "sameCityTotal": 3
+   },
+   {
+    "id": "8bfc8b91",
+    "companyTotal": 1,
+    "sameCityTotal": 1
+   }
+  ]
+ }
 }

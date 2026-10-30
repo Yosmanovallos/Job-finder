@@ -38,6 +38,8 @@ segunda pasada).
 | Reputación (Merco, GPTW, Computrabajo) | `company_reputation` vía alias curado | **No** (solo en `__SSR_JOB__`) | Sí (`ReputationBadges`) | 9 % (3/35 indexables) | Sí en LinkedIn y Elempleo. En Computrabajo su propia calificación ya aparece |
 | Otras vacantes de la empresa | Proyección canónica (`queryCompanyJobsPage`) | No | No (solo el enlace a la empresa en el nombre) | 69/80 empresas con 2 o más; mediana 10 | **Sí**: incluye las vacantes publicadas en todos los portales |
 | Total de vacantes activas de la empresa | Igual | No | No | Igual | Sí |
+| Vacantes de la misma empresa **en la misma ciudad** | Igual, con el filtro de ciudad | No | No | 25 de 34 indexables con 2 o más (mediana 3); en 12 de 34 coincide con el total de la empresa | Sí. Se usa para ordenar B1 (misma ciudad primero), no como bloque aparte |
+| Fecha de observación propia (`last_seen_at`, `content_updated_at`) | `jobs`; `content_updated_at` ya está en el SELECT de `getJobById`, `last_seen_at` sería una columna más en la misma consulta | No | No | 100 % | **Excluido.** `last_seen_at` solo significa «siguió en el listado de la fuente», no «sigue aceptando postulaciones». job-trust-2026-10 prohíbe presentarlo como disponibilidad (Computrabajo: vigencia no verificada), y una fecha visible que cambia a diario es churn sin cambio real de contenido. Se vuelve a evaluar con el ADR de ciclo de vida (P1 de `SEO-SUSTAINABLE-STRATEGY`) |
 | Empleador oficial (`source = "Portal oficial"`) | `direct_jobs` → `jobs.direct_job_id` | Solo «Fuente: Portal oficial» | Igual | 7 % | Parcial: la página del empleador no se presenta como tal frente a un agregador |
 | Portal de empleo oficial (lista curada) | `src/data/official-careers-links.ts` (estático) | No (solo en `/empresas/:slug`) | No | 1/200 | Sí, pero casi sin cobertura |
 | `alsoIn` / `sources` | `jobs.sources` de la fila ganadora | No | Sí, «También en», si existe | **0/200** | Sería el dato más exclusivo, pero no existe en la fila canónica |
@@ -54,6 +56,12 @@ enlace a `/empresas/:slug` cuya etiqueta lleva el total real («Ver las N
 vacantes de {empresa}»). Todo sale de la misma instantánea, así que el total
 y los enlaces son coherentes. Cuando la empresa no tiene otras vacantes, el
 bloque no se renderiza.
+
+**Orden.** Primero las vacantes de la misma ciudad que la actual y después
+el resto. Dentro de cada grupo se aplica el desplazamiento estable por hash
+del id. Cobertura en las 34 indexables de empleadores reales: 28 tienen 2 o
+más vacantes de la empresa (mediana 7) y 25 tienen 2 o más en la misma ciudad
+(mediana 3).
 
 **Exclusiones.** Empleadores placeholder (`isPlaceholderEmployer`: «Confidencial»,
 «Confidential Careers»), por el mismo motivo que la fase 11 y el bug de
@@ -138,6 +146,8 @@ Computrabajo (aviso legal) no aumenta, porque el dato ya se publica en
 Hoy no existe: `alsoIn` vale 0 en las 200 filas canónicas. `getJobById` solo
 devuelve la fila ganadora del `DISTINCT ON (título, empresa, ubicación)`, y
 las copias de otros portales son filas perdedoras, no entradas de `sources`.
+`jobs.sources` solo crece cuando llega otra vez el mismo `url_hash`
+(`src/db/job-repository.ts`, upsert), y eso nunca ocurre entre portales distintos.
 
 Antes de diseñarlo hace falta una medición de solo lectura: cuántos grupos de
 identidad activos tienen más de una fuente distinta, y con qué fuentes. Según
@@ -171,12 +181,22 @@ Se repite el script de esta propuesta sobre una muestra fija: las 35
 indexables de `job-page-diff-2026-10-30.json` que sigan vivas, más 35 nuevas
 indexables del día del despliegue.
 
-- Base de hoy: la descripción es la mediana del 70 % del texto de `#app`, y
-  hay 54 palabras propias fuera de la descripción y del bloque de ciudad.
-- Objetivo: con la caché caliente, B1 presente en al menos el 80 % de las
-  vacantes indexables de empleadores reales con 2 o más vacantes, y la
-  mediana de la descripción por debajo del 55 % del texto de `#app`.
-- Esto mide la forma de la página, no si Google la indexa.
+Los objetivos cuentan **datos que la fuente no muestra** y enlaces, no
+palabras. Los títulos de B1 son texto de otras vacantes (y de sus fuentes), así
+que contarlos como «texto propio» premiaría justo el relleno que §6.4 prohíbe.
+
+| Métrica | Base (hoy) | Objetivo con caché caliente |
+|---|---:|---:|
+| Vacantes indexables de empleador real con 2 o más vacantes que muestran B1 | 0 de 28 | ≥ 80 % |
+| Datos por página que la fuente no muestra (total de la empresa, total en la ciudad si se muestra, entradas de reputación, marca oficial), mediana | 0 | ≥ 1 |
+| Enlaces internos a vacantes en el HTML crudo, mediana | Los del bloque de ciudad (hasta 6) | + hasta 6 de B1 |
+
+Solo descriptivo, no es un objetivo: la proporción de descripción en `#app`.
+Hoy es una mediana del 70 %. Simulado con 6 títulos de B1 en las filas que
+aplican, baja a un 66 %. Un umbral sobre esa cifra no es alcanzable sin
+relleno, y no se fija.
+
+Esto mide la forma de la página, no si Google la indexa.
 
 ### 6.3 Search Console (observación, no atribuible)
 
@@ -204,11 +224,21 @@ de enlaces (`SEO-JOB-LINK-GRAPH-2026-10-29.md`).
 
 ### 6.4 Regla de decisión el 26-Nov
 
-- Si la indexación del brazo con B1 es igual o peor que la del control, y
-  X3 empeoró: revertir B1 (B2 y B3 se quedan, porque son paridad).
-- Si es mejor o neutra y X1-X6 están en verde: mantener, y abrir la
-  medición de §5.
-- Nunca: rellenar más texto para subir la proporción, ni ampliar la
+Hay un control después del despliegue: el TTFB MISS en frío de las mismas 5
+vacantes de X3, medido a +1 y a +14 días. Si sube más de un 10 % sobre la
+línea base y se atribuye a la caché de B1 (logs de carga en segundo plano,
+consultas en Postgres), B1 se revierte sin esperar al 26-Nov.
+
+- **Sin brazo de control** (opción por defecto): B1, B2 y B3 se mantienen
+  mientras X1-X6 y el control de TTFB sigan en verde. Se anota que los
+  totales de GSC no confirman ni refutan el efecto. Se abre la medición
+  de §5.
+- **Con brazo de control**: si la indexación del brazo con B1 es peor que la
+  del control en las dos inspecciones (+14 y +28 días), se revierte B1 y B2
+  y B3 se quedan, porque son paridad. Si es igual o mejor, B1 se extiende a
+  todas las vacantes. Con 20 URLs por brazo, una diferencia de una o dos URLs
+  se trata como empate.
+- Nunca: rellenar más texto para subir una proporción, ni ampliar la
   retención de 30 días como «arreglo» de indexación.
 
 ## 7. Rollback

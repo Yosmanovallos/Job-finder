@@ -48,9 +48,12 @@ página original. El bloque de ciudad (unas 85-90 palabras) sí es nuestro,
 pero son títulos de otras vacantes y se repite entre las vacantes hermanas de
 la misma ciudad.
 
-Volumen de la empresa: de 80 empresas reales de la muestra, 69 tienen 2 o
-más vacantes activas en BuscoTrabajo (mediana 10, p90 80) y 11 tienen solo
-una. Son totales de la proyección canónica pública (`/api/jobs?company=`).
+Volumen de la empresa, en las páginas a las que apunta este cambio: de las 34
+indexables de empleadores reales, 28 tienen 2 o más vacantes activas de la
+misma empresa (mediana 7) y 25 tienen 2 o más en la misma ciudad (mediana 3).
+En toda la muestra, 69 de 80 empresas tienen 2 o más (mediana 10, p90 80).
+Son totales de la proyección canónica pública (`/api/jobs?company=` y
+`&cities=`).
 
 ## Qué cambia
 
@@ -58,8 +61,8 @@ Se añaden bloques que salen de datos reales que la página original no tiene,
 ordenados por cobertura y costo. El detalle está en `design.md`.
 
 1. **Otras vacantes de la misma empresa** (todos los portales) con enlace a
-   `/empresas/:slug`. Es el bloque de más cobertura: 69 de 80 empresas tienen
-   más de una vacante activa. Ningún portal individual puede mostrar las
+   `/empresas/:slug`, con las de la misma ciudad primero. Es el bloque de más
+   cobertura: 28 de las 34 indexables de empleadores reales. Ningún portal individual puede mostrar las
    vacantes que la empresa publicó en otros portales.
 2. **Reputación de la empresa en el HTML inicial.** Ya se consulta para
    visitantes anónimos, pero hoy solo viaja en la carga de hidratación. Cubre
@@ -76,7 +79,9 @@ portales). Es el dato más exclusivo, pero hoy no existe: `alsoIn` vale 0 en
 tienen más de una fuente y decidir entre una consulta por grupo o una columna
 precalculada (migración aditiva, con aprobación).
 
-Excluido: tecnologías (salen de la propia descripción), número de postulantes
+Excluido: fecha de observación propia (`last_seen_at` no prueba
+disponibilidad, job-trust-2026-10), tecnologías (salen de la propia
+descripción), número de postulantes
 (0,5 %, y además ya está en la fuente), estadísticas de salario o FAQs (riesgo
 de inferir lo que la fuente no dijo) y el hub de cargo (el emparejamiento por
 rol es difuso; `SEO-JOB-LINK-GRAPH-2026-10-29.md` lo dejó fuera a propósito).
@@ -91,8 +96,8 @@ merece su propia entrega, porque cambia el `<head>` y requiere `seo-drift`.
 
 ## Resultado esperado y límites
 
-En una muestra fija de URLs indexables, la proporción de texto de `#app` que
-no está en la página original sube sin tocar la descripción, sin consultas
+En una muestra fija de URLs indexables, cada página muestra al menos un dato
+real que la fuente no tiene y más enlaces internos, sin tocar la descripción, sin consultas
 nuevas en el camino caliente y sin regresión de TTFB. Esto no garantiza
 indexación ni posición. Los totales de GSC no permiten atribuir el efecto a
 este cambio, porque el grafo de enlaces (desplegado) y #88/#89 se miden en las

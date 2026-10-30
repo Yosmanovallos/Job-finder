@@ -9,7 +9,8 @@ el JobPosting, robots, canonical y sitemap no cambian.
 - JPD-002: una vacante de un empleador real con al menos una vacante activa
   más muestra en el HTML crudo hasta 6 enlaces internos a esas vacantes,
   nunca a sí misma, y un enlace a `/empresas/:slug` cuya etiqueta lleva el
-  total de la misma instantánea. Escenario: empresa con 14 vacantes → 6
+  total de la misma instantánea. Las vacantes de la misma ciudad van
+  primero. Escenario: empresa con 14 vacantes → 6
   enlaces + «Ver las 14 vacantes de {empresa}».
 - JPD-003: un empleador placeholder («Confidencial», «Confidential Careers»)
   o una empresa sin otras vacantes no muestra el bloque de JPD-002.
