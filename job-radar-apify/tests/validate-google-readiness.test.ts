@@ -10,6 +10,7 @@ import { evaluateGoogleJobReadiness, isGoogleReadyNow, type ReadinessInput } fro
 import { assessDescription } from "../src/lib/job-description-quality.js";
 import {
   buildJobPageBody,
+  buildJobPagePayload,
   buildJobPosting,
   buildJobsSitemapXml,
   escapeJsonForScriptTag,
@@ -18,6 +19,7 @@ import {
   type SeoJob
 } from "../src/lib/job-seo.js";
 import { extractJobPostingDetail } from "../src/lib/job-posting-jsonld.js";
+import { buildLocationLabel } from "../src/countries/index.js";
 
 /** The JobPosting properties these tests read. */
 interface PostingShape {
@@ -287,7 +289,16 @@ test("addressRegion (ADR 0009): CO city without region gets its DIVIPOLA departm
   assert.equal(posting.jobLocation!.address.addressRegion, "Antioquia");
   assert.ok(buildJobPageBody(medellin).includes("<li>Ubicación: Medellín, Antioquia</li>"), "derived region is visible");
 
+  // The hydrated page reads the same label from the SSR payload.
+  const payloadJob = buildJobPagePayload(medellin).job;
+  assert.equal(payloadJob.locationLabel, "Medellín, Antioquia");
+  assert.equal(buildLocationLabel(payloadJob, "CO"), "Medellín, Antioquia");
+  assert.equal(buildLocationLabel({ location: "Medellín" }, "CO"), "Medellín", "jobs without a payload label are unchanged");
+
+  // The three Search Console examples of 2026-10-30.
+  assert.equal(regionOf({ location: "Espinal" }), "Tolima");
   assert.equal(regionOf({ location: "Cúcuta Metropolitan Area" }), "Norte de Santander");
+  assert.equal(regionOf({ location: "Puerto Colombia" }), undefined, "also a Guainía municipality in DIVIPOLA");
   assert.equal(regionOf({ location: "medellin" }), "Antioquia");
   const bogota = asStoredPage(base({ location: "Bogotá" }));
   assert.equal((buildJobPosting(bogota) as PostingShape).jobLocation!.address.addressRegion, "Bogotá, D.C.");

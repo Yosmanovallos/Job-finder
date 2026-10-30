@@ -24,6 +24,8 @@ export type SeoJob = Job & {
   seoReady?: boolean;
   isActive?: boolean;
   contentUpdatedAt?: string | Date | null;
+  /** Visible location from buildJobLocationLabel (job page payload only). */
+  locationLabel?: string;
 };
 
 export interface SitemapJobInput {
@@ -202,26 +204,27 @@ function remoteLabel(job: SeoJob): string | null {
  * Rendered for every user-visible job, Google-ready or not — readiness only
  * decides robots/JobPosting, never what a visitor can read or where they apply.
  */
-export function buildJobPageBody(job: SeoJob): string {
-  const fallbackLocation = getCountryConfig(job.country).name;
-  const facts: string[] = [];
-  if (job.company) facts.push(`<li>Empresa: ${escapeHtml(job.company)}</li>`);
-  // Rule E parity: a department added to JobPosting from the DIVIPOLA table
-  // (ADR 0009) is shown here too, from the same resolved location.
+/**
+ * The visible location of a job page. Rule E parity: a department added to
+ * JobPosting from the DIVIPOLA table (ADR 0009) is shown too, from the same
+ * resolved location — in the SSR body and, via the payload, after hydration.
+ */
+export function buildJobLocationLabel(job: SeoJob): string {
+  if (!job.location) return getCountryConfig(job.country).name;
   const { location: resolved } = resolveGoogleLocation(job);
   const addedRegion =
-    resolved?.kind === "physical" && resolved.region && !(job.location || "").includes(resolved.region)
+    resolved?.kind === "physical" && resolved.region && !job.location.includes(resolved.region)
       ? resolved.region
       : null;
+  if (!addedRegion) return job.location;
   // "Bogotá" + "Bogotá, D.C." reads as just "Bogotá, D.C.".
-  const locationText = !job.location
-    ? fallbackLocation
-    : !addedRegion
-      ? job.location
-      : addedRegion.startsWith(job.location)
-        ? addedRegion
-        : `${job.location}, ${addedRegion}`;
-  facts.push(`<li>Ubicación: ${escapeHtml(locationText)}</li>`);
+  return addedRegion.startsWith(job.location) ? addedRegion : `${job.location}, ${addedRegion}`;
+}
+
+export function buildJobPageBody(job: SeoJob): string {
+  const facts: string[] = [];
+  if (job.company) facts.push(`<li>Empresa: ${escapeHtml(job.company)}</li>`);
+  facts.push(`<li>Ubicación: ${escapeHtml(buildJobLocationLabel(job))}</li>`);
   const modality = remoteLabel(job);
   if (modality) facts.push(`<li>Modalidad: ${escapeHtml(modality)}</li>`);
   const eligible = (job.remoteType === "fully_remote" ? job.applicantCountries || [] : [])
@@ -252,7 +255,8 @@ export function buildJobPageBody(job: SeoJob): string {
 export function buildJobPagePayload(job: SeoJob): { job: SeoJob } {
   return { job: {
     jobId: job.jobId, title: job.title, company: job.company,
-    location: job.location, url: job.url, dateText: job.dateText, source: job.source,
+    location: job.location, locationLabel: buildJobLocationLabel(job),
+    url: job.url, dateText: job.dateText, source: job.source,
     publishedAt: job.publishedAt, country: job.country,
     description: job.description, requirements: job.requirements,
     technologies: job.technologies, employmentType: job.employmentType,

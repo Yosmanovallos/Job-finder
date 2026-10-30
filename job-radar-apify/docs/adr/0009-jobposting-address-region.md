@@ -21,15 +21,25 @@ eso este cambio necesita un ADR.
   Si la fuente la trae, siempre gana la de la fuente.
 - La tabla es cerrada y está en `src/lib/co-departments.ts`: capitales de
   departamento y municipios grandes cuyo nombre es **único** en DIVIPOLA.
+  La tabla se verificó el 30-Oct contra
+  <https://www.datos.gov.co/resource/gdxc-w37w.json> (1.122 municipios):
+  cada nombre oficial existe, cae en el departamento asignado y es único.
   Los nombres que se repiten en más de un departamento (Armenia, Florencia,
-  Rionegro, Barbosa, Mosquera, La Unión, Candelaria, San Andrés…) no reciben
-  región: se omite antes que adivinar.
+  Rionegro, Barbosa, Mosquera, La Unión, Candelaria, San Andrés, Puerto
+  Colombia) no reciben región: se omite antes que adivinar. Los nombres
+  cortos Cali, Cúcuta, Cartagena, Buga, Tumaco y El Espinal no son oficiales,
+  pero ninguno es el nombre de otro municipio.
 - La búsqueda normaliza mayúsculas y tildes, y quita el sufijo "Metropolitan
   Area" / "Área Metropolitana". `addressLocality` se queda con el texto de la
   fuente tal cual.
 - Bogotá es distrito capital, no parte de Cundinamarca: región "Bogotá, D.C.".
 - Paridad visible (regla E): la región derivada también se muestra en
-  "Ubicación" del cuerpo SSR, con el mismo `resolveGoogleLocation`.
+  "Ubicación" del cuerpo SSR (`buildJobLocationLabel`, con el mismo
+  `resolveGoogleLocation`). El payload `__SSR_JOB__` lleva `locationLabel`,
+  así que la página hidratada (`JobDetailPanel` vía `buildLocationLabel`)
+  muestra el mismo texto. Un usuario con sesión, que recibe la vacante por la
+  API y no por el payload, sigue viendo solo la ciudad. Googlebot no inicia
+  sesión.
 - `streetAddress`, `postalCode` y `baseSalary` siguen sin emitirse.
 
 ## Consecuencias
