@@ -16,7 +16,7 @@ import {
 } from "../src/sources/source-policy.js";
 import { circuitEffectOf, type CircuitEffect } from "../src/engine/circuit-policy.js";
 import { FetchRateLimitedError, retryAfterMsFrom } from "../src/engine/rate-limit.js";
-import type { Job } from "../src/sources/types.js";
+import { normalizeJobUrl, resolveOutboundUrl, type Job } from "../src/sources/types.js";
 
 /**
  * P4 unit checks (openspec/changes/p4-source-contract).
@@ -290,4 +290,15 @@ test("SRC-008: received > 0 with valid > 0 is a success that keeps the shortfall
   assert.equal(result.outcome, "success");
   assert.equal(result.counters.received, 10);
   assert.equal(result.counters.valid, 7);
+});
+
+test("Computrabajo apply links: unwrapped for people, same identity as the old wrapped rows", () => {
+  const real =
+    "https://www.computrabajo.com.co/ofertas-de-trabajo/oferta-de-trabajo-de-lider-de-presupuesto-en-medellin-F325291FFAAD5EC361373E686DCF3405";
+  const wrapped = `https://www.google.com/url?q=${encodeURIComponent(real)}`;
+  // Old rows: shown to people without Google's redirect notice.
+  assert.equal(resolveOutboundUrl(wrapped), real);
+  assert.equal(resolveOutboundUrl(real), real);
+  // url_hash input is identical, so new scrapes land on the same row/page.
+  assert.equal(normalizeJobUrl(real), normalizeJobUrl(wrapped));
 });

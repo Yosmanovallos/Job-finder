@@ -305,7 +305,11 @@ export async function scrapeComputrabajo(keyword: string, country: string = "CO"
 
         const cleanPathFormatted = cleanPath.startsWith("/") ? cleanPath : `/${cleanPath}`;
         const canonicalUrl = `https://${domainConfig.canonicalHost}${cleanPathFormatted}`;
-        const jobUrl = `https://www.google.com/url?q=${encodeURIComponent(canonicalUrl)}`;
+        // Stored as the real Computrabajo URL. It used to be wrapped in
+        // google.com/url?q=, which shows people Google's "Aviso de
+        // redireccionamiento" page before the offer. url_hash already
+        // unwraps it (normalizeJobUrl), so existing rows keep their identity.
+        const jobUrl = canonicalUrl;
 
         const idMatch = rawHref.match(/-([A-F0-9]{32})/i);
         const jobId = idMatch ? idMatch[1] : `ct-${Math.random()}`;
@@ -353,8 +357,8 @@ export async function scrapeComputrabajo(keyword: string, country: string = "CO"
 
 // Detail-page enrichment for one Computrabajo job — same translate.goog
 // proxy bypass as the search fetch above (this source actively blocks
-// direct requests). `url` is the Google-redirect-wrapped link saveJobs()
-// stored (see the scraper above); resolveOutboundUrl() unwraps it to get
+// direct requests). Older rows still store a google.com/url?q= wrapped
+// link (see the scraper above); resolveOutboundUrl() unwraps it to get
 // the real host/path to route through the proxy.
 export async function fetchComputrabajoDetail(url: string): Promise<Partial<JobDetail> | null> {
   const canonical = resolveOutboundUrl(url);
