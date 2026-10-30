@@ -212,13 +212,15 @@ function remoteLabel(job: SeoJob): string | null {
 export function buildJobLocationLabel(job: SeoJob): string {
   if (!job.location) return getCountryConfig(job.country).name;
   const { location: resolved } = resolveGoogleLocation(job);
-  const addedRegion =
-    resolved?.kind === "physical" && resolved.region && !job.location.includes(resolved.region)
-      ? resolved.region
-      : null;
-  if (!addedRegion) return job.location;
+  if (resolved?.kind !== "physical" || !resolved.region || job.location.includes(resolved.region)) return job.location;
+  // The department goes right after the city, before any country the source
+  // wrote: "Medellín, Colombia" -> "Medellín, Antioquia, Colombia".
   // "Bogotá" + "Bogotá, D.C." reads as just "Bogotá, D.C.".
-  return addedRegion.startsWith(job.location) ? addedRegion : `${job.location}, ${addedRegion}`;
+  const { locality, region } = resolved;
+  const at = job.location.indexOf(locality);
+  if (at < 0) return `${job.location}, ${region}`;
+  const replacement = region.startsWith(locality) ? region : `${locality}, ${region}`;
+  return job.location.slice(0, at) + replacement + job.location.slice(at + locality.length);
 }
 
 export function buildJobPageBody(job: SeoJob): string {
