@@ -6,7 +6,8 @@ import {
   searchActiveCompanies
 } from "../src/db/job-repository.js";
 import { COMPANY_LOGO_DOMAINS } from "../src/data/company-logo-domains.js";
-import { jobMatchesRole } from "../src/lib/job-filters.js";
+import { applyJobFilters, jobMatchesRole } from "../src/lib/job-filters.js";
+import { buildSearchPlan, likeMatches, searchTitleText, sqlLowerText, sqlSearchTitle } from "../src/lib/job-search-intent.js";
 import { pool } from "../src/db/client.js";
 
 let failures = 0;
@@ -138,6 +139,60 @@ async function run(): Promise<void> {
     "La consulta SQL comparte la misma semántica de roles que jobMatchesRole().",
     "El filtro SQL por rol se desvió del matcher determinista."
   );
+
+  // Job-family search (job-search-intent.ts): the same regexes must behave
+  // identically in Postgres and JS, and SQL rows/order must equal the
+  // in-memory filter over the same canonical set. Read-only.
+  {
+    const titles = [
+      "Senior AI Engineer", "Ingeniero(a) de IA", "INGENIERO RESIDENTE DE OBRA", "Gerencia de Energía",
+      "Auxiliar de cocina", "UX/UI Designer", "Ingeniería de Sistemas", "Analítica de Datos",
+      "Logística y Distribución", "Machine Learning Engineer", "Data Centers Engineer", "Front Desk Agent"
+    ];
+    const patterns = Array.from(new Set(["AI Engineer", "UX", "ingeniero de sistemas", "data engineer", "logistica", "frontend"]
+      .flatMap((query) => {
+        const plan = buildSearchPlan(query)!;
+        return [
+          ...plan.families.flatMap((f) => [...f.match.like, ...f.match.stems, ...(f.exclude?.like ?? [])]),
+          ...plan.exact.flatMap((p) => p.like),
+          ...plan.core.flatMap((p) => p.like)
+        ];
+      })));
+    const result = await pool.query(
+      `SELECT t.title, ${sqlSearchTitle("t.title")} AS normalized, p.pattern,
+              ${sqlSearchTitle("t.title")} LIKE p.pattern AS normalized_match,
+              ${sqlLowerText("t.title")} LIKE p.pattern AS raw_match
+       FROM unnest($1::text[]) AS t(title) CROSS JOIN unnest($2::text[]) AS p(pattern)`,
+      [titles, patterns]
+    );
+    const mismatches = result.rows.filter(
+      (row: { title: string; normalized: string; pattern: string; normalized_match: boolean; raw_match: boolean }) =>
+        row.normalized !== searchTitleText(row.title) ||
+        row.normalized_match !== likeMatches(searchTitleText(row.title), row.pattern) ||
+        row.raw_match !== likeMatches(row.title.toLowerCase(), row.pattern)
+    );
+    check(
+      mismatches.length === 0,
+      `La normalización de títulos y los patrones LIKE coinciden en PostgreSQL y JS (${result.rows.length} pares).`,
+      `PostgreSQL y JS difieren en ${mismatches.length} pares título/patrón.`
+    );
+
+    const corpus: Awaited<ReturnType<typeof getJobsPage>>["jobs"] = [];
+    for (let offset = 0; offset < 2000; offset += 100) {
+      const page = await getJobsPage({ filters: { country: "CO" }, limit: 100, offset, includeDetails: false });
+      corpus.push(...page.jobs);
+      if (page.jobs.length < 100) break;
+    }
+    for (const search of ["AI Engineer", "IA", "datos", "Bogotá", "ux"]) {
+      const sqlPage = await getJobsPage({ filters: { country: "CO", search }, limit: 100, includeDetails: false });
+      const expected = applyJobFilters(corpus, { search }).slice(0, 100).map((job) => job.jobId);
+      check(
+        JSON.stringify(sqlPage.jobs.map((job) => job.jobId)) === JSON.stringify(expected),
+        `Búsqueda "${search}": SQL y filtro en memoria devuelven las mismas ${expected.length} vacantes en el mismo orden.`,
+        `Búsqueda "${search}": SQL y filtro en memoria difieren.`
+      );
+    }
+  }
 
   const synthetic = first.jobs.slice(0, 2).map((job) => ({ ...job, isLocked: true }));
   const visible = maskLockedFields(synthetic, "free");
