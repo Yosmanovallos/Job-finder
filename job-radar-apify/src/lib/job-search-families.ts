@@ -400,15 +400,26 @@ export const SEARCH_FAMILIES: SearchFamily[] = [
   },
   {
     id: "therapy",
-    groups: [["fisioterapeut*", "terapeut*", "terapia*", "fonoaudiolog*", "physiotherap*"]]
+    groups: [
+      ["fisioterapeut*", "physiotherap*"],
+      ["terapeut*", "terapia*"],
+      ["fonoaudiolog*"]
+    ]
   },
   {
     id: "lab",
-    groups: [["bacteriolog*", "laboratorio", "laboratorista*", "microbiolog*", "analista quimic*", "quimic*"]]
+    groups: [
+      ["bacteriolog*", "microbiolog*"],
+      ["laboratorio", "laboratorista*"],
+      ["analista quimic*", "quimic*"]
+    ]
   },
   {
     id: "psychology",
-    groups: [["psicolog*", "psychologist", "trabajador* social", "trabajo social"]]
+    groups: [
+      ["psicolog*", "psychologist"],
+      ["trabajador* social", "trabajo social"]
+    ]
   },
   {
     id: "veterinary",
@@ -418,10 +429,12 @@ export const SEARCH_FAMILIES: SearchFamily[] = [
   // ---- Services ----
   {
     id: "education",
-    groups: [[
-      "docente*", "profesor*", "teacher", "maestro", "maestra", "tutor*", "instructor*",
-      "educador*", "pedagog*", "licenciad*"
-    ]],
+    groups: [
+      ["docente*", "profesor*", "teacher", "maestro", "maestra", "educador*", "licenciad*"],
+      ["tutor*"],
+      ["instructor*"],
+      ["pedagog*"]
+    ],
     exclude: ["maestro de obra*"]
   },
   {
@@ -453,7 +466,8 @@ export const SEARCH_FAMILIES: SearchFamily[] = [
   {
     id: "security-guard",
     groups: [
-      ["vigilante*", "guarda de seguridad", "guardia de seguridad", "guarda", "escolta*", "seguridad privada", "security guard"],
+      ["vigilante*", "guarda de seguridad", "guardia de seguridad", "guarda", "seguridad privada", "security guard"],
+      ["escolta*"],
       ["prevencion de perdidas", "control de perdidas", "loss prevention"]
     ]
   },
@@ -542,14 +556,23 @@ export const SEARCH_FAMILIES: SearchFamily[] = [
     id: "construction-trades",
     groups: [
       ["oficial de obra*", "oficial de acabados", "mamposter*", "obra blanca", "obra gris", "estructura metalica"],
-      ["plomer*", "fontaner*", "soldador*", "carpinter*", "pintor*", "albanil*", "ornamentador*"],
+      ["plomer*", "fontaner*"],
+      ["soldador*"],
+      ["carpinter*"],
+      ["pintor*"],
+      ["albanil*"],
+      ["ornamentador*"],
       ["refrigeracion", "aire acondicionado", "hvac"]
     ],
     related: ["construccion", "obra civil", "residente de obra*"]
   },
   {
     id: "automotive",
-    groups: [["automotri*", "repuestos", "latoner*", "carroceria", "concesionario*", "pintor* de autos"]],
+    groups: [
+      ["automotri*", "concesionario*"],
+      ["repuestos"],
+      ["latoner*", "carroceria", "pintor* de autos"]
+    ],
     related: ["mecanic*", "posventa"]
   },
   {

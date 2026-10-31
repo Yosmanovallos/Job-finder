@@ -195,3 +195,11 @@ test("new families: operations, billing, internships", () => {
   assert.deepEqual(searchMore("facturación"), ["Auxiliar de Facturación"]);
   assert.deepEqual(searchMore("practicante"), ["Aprendiz SENA Logística"]);
 });
+
+test("each trade ranks its own postings first, related trades after", () => {
+  const trades = ["Pintor productos industriales", "Soldador armador TIG", "Plomero redes hidráulicas"]
+    .map((title, i) => ({ ...jobs[0], jobId: `trade-${i}`, title }));
+  const titles = applyJobFilters(trades, { search: "soldador" }).map((job) => job.title);
+  assert.equal(titles[0], "Soldador armador TIG");
+  assert.equal(titles.length, 3);
+});
