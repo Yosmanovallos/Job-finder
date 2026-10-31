@@ -2,6 +2,7 @@ import type { Job } from "../sources/types.js";
 import { DEFAULT_ROLES_200 } from "../queue/scheduler.js";
 import { TRANSLATION_MAP } from "../ai-role-agent.js";
 import { getCountryConfig } from "../countries/index.js";
+import { buildSearchPlan, familyRank, titleMatchesFamilies, type SearchPlan } from "./job-search-intent.js";
 
 // Shared between the server (GET /api/jobs, so a 10k+ job corpus is filtered
 // before it's ever serialized to the browser) and, previously, the client —
@@ -200,6 +201,37 @@ export interface JobFilterParams {
 
 const normalizeText = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
+/** One word of a literal (multi-word) search: the word plus its synonyms. */
+export function literalSearchForms(word: string): string[] {
+  // expandRoleWords applies its own length/stopword filter, so it can
+  // return [] for a short word even though we already decided to require
+  // it — fall back to the literal word so it's still checked, just without
+  // synonym expansion.
+  const candidates = expandRoleWords(word);
+  return candidates.length > 0 ? candidates : [word];
+}
+
+function literalWordMatchesJob(word: string, job: Job): boolean {
+  const title = (job.title || "").toLowerCase();
+  const company = (job.company || "").toLowerCase();
+  const location = (job.location || "").toLowerCase();
+  return literalSearchForms(word).some(
+    (form) => title.includes(form) || company.includes(form) || location.includes(form)
+  );
+}
+
+/**
+ * -1 when the job doesn't match a family search; otherwise 0 exact role,
+ * 1 same family, 2 related family, 3 matched only as an employer name.
+ */
+export function searchRankForJob(plan: SearchPlan, job: Job): number {
+  if (titleMatchesFamilies(plan, job.title) && plan.residual.every((word) => literalWordMatchesJob(word, job))) {
+    return familyRank(plan, job.title);
+  }
+  if (plan.companyPhrase && (job.company || "").toLowerCase().includes(plan.companyPhrase)) return 3;
+  return -1;
+}
+
 /**
  * Applies every corpus-wide filter (search/sources/cities/modality/
  * freshness/roles) in one pass. Deliberately excludes savedOnly/appliedOnly
@@ -211,7 +243,17 @@ export function applyJobFilters(jobs: Job[], filters: JobFilterParams): Job[] {
   let result = jobs;
 
   const rawSearch = filters.search?.trim();
-  if (rawSearch) {
+  const searchPlan = rawSearch ? buildSearchPlan(rawSearch) : null;
+  if (searchPlan) {
+    // The query names a job family ("AI Engineer", "QA", "enfermera"):
+    // title-only family match, best-ranked first (job-search-intent.ts).
+    const ranked: Array<{ job: Job; rank: number }> = [];
+    for (const job of result) {
+      const rank = searchRankForJob(searchPlan, job);
+      if (rank >= 0) ranked.push({ job, rank });
+    }
+    result = ranked.sort((a, b) => a.rank - b.rank).map((entry) => entry.job);
+  } else if (rawSearch) {
     const search = rawSearch.toLowerCase();
     // Only drop genuine stopwords ("de", "la", ...) — NOT short words. A
     // 1-2 char query ("r", "go") is a legitimate literal search and must
@@ -252,25 +294,7 @@ export function applyJobFilters(jobs: Job[], filters: JobFilterParams): Job[] {
       // tracked role name, those are English, e.g. "QA Engineer") and got
       // OR'd, so any "ingeniería" job matched regardless of "civil": the
       // second word never actually narrowed anything.
-      result = result.filter((j) => {
-        const title = (j.title || "").toLowerCase();
-        const company = (j.company || "").toLowerCase();
-        const location = (j.location || "").toLowerCase();
-        return searchWords.every((word) => {
-          // expandRoleWords applies its own length/stopword filter, so it
-          // can return [] for a short word even though we already decided
-          // to require it — fall back to the literal word so it's still
-          // checked, just without synonym expansion.
-          const candidates = expandRoleWords(word);
-          const forms = candidates.length > 0 ? candidates : [word];
-          return forms.some(
-            (candidate) =>
-              title.includes(candidate) ||
-              company.includes(candidate) ||
-              location.includes(candidate)
-          );
-        });
-      });
+      result = result.filter((j) => searchWords.every((word) => literalWordMatchesJob(word, j)));
     }
   }
 

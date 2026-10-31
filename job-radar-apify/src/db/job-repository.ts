@@ -7,7 +7,15 @@ import { getCountryConfig } from "../countries/index.js";
 import { saveRunToCache } from "../cache-manager.js";
 import { validateJobs } from "./job-validator.js";
 import { PAYWALL_ENABLED } from "../config.js";
-import { expandRoleWords, getRoleMatchWords, tokenizeJobSearch } from "../lib/job-filters.js";
+import { getRoleMatchWords, literalSearchForms, tokenizeJobSearch } from "../lib/job-filters.js";
+import {
+  buildSearchPlan,
+  sqlLowerText,
+  sqlPrefilterText,
+  sqlSearchTitle,
+  type SearchPlan,
+  type TitlePattern
+} from "../lib/job-search-intent.js";
 import type { JobFilterParams } from "../lib/job-filters.js";
 import { initialDetailStatus, refreshGoogleReadinessInTransaction } from "./job-readiness-repository.js";
 import { sourceSupportsDetail } from "../sources/detail-capability.js";
@@ -675,6 +683,51 @@ function rolePredicate(sql: SqlParts, role: string, column = "title"): string {
   return `(${match.words.map((word) => titleWordPredicate(sql, word, column)).join(joiner)})`;
 }
 
+// Literal search text across title/company/location — unchanged substring
+// semantics (the short words that used to misfire, "ia"/"ux"/"bi", are job
+// families now and never reach this path).
+function literalTextPredicate(sql: SqlParts, text: string): string {
+  const like = sql.param(`%${text.toLowerCase()}%`);
+  return `(LOWER(title) LIKE ${like} OR LOWER(COALESCE(company, '')) LIKE ${like} OR LOWER(COALESCE(location, '')) LIKE ${like})`;
+}
+
+function literalWordPredicate(sql: SqlParts, word: string): string {
+  return `(${literalSearchForms(word).map((form) => literalTextPredicate(sql, form)).join(" OR ")})`;
+}
+
+function titleLikeAny(sql: SqlParts, pattern: TitlePattern): string {
+  return `${sqlSearchTitle("title")} LIKE ANY (${sql.param(pattern.like)}::text[])`;
+}
+
+// CASE keeps the evaluation order: the raw-title prefilter discards most
+// rows before the (costlier) normalized title is ever built.
+function familyPlanPredicate(sql: SqlParts, plan: SearchPlan): string {
+  const parts = plan.families.map((family) => {
+    const matched = family.exclude
+      ? `CASE WHEN ${titleLikeAny(sql, family.match)} THEN NOT (${titleLikeAny(sql, family.exclude)}) ELSE FALSE END`
+      : titleLikeAny(sql, family.match);
+    const prefilter = [`${sqlPrefilterText("title")} LIKE ANY (${sql.param(family.match.stems)}::text[])`];
+    if (family.match.shortWords) prefilter.push(`${sqlLowerText("title")} ~ ${sql.param(family.match.shortWords)}`);
+    return `CASE WHEN ${prefilter.join(" OR ")} THEN ${matched} ELSE FALSE END`;
+  });
+  for (const word of plan.residual) parts.push(literalWordPredicate(sql, word));
+  return parts.map((part) => `(${part})`).join(" AND ");
+}
+
+// Same ranks as job-filters.ts searchRankForJob(): 0 exact role, 1 same
+// family, 2 related family, 3 employer-name match. Only evaluated for rows
+// that already passed the WHERE. Null for any other search (or none), so
+// those queries keep their exact previous SQL.
+function searchRankSql(filters: JobFilterParams, sql: SqlParts): string | null {
+  const plan = buildSearchPlan(filters.search);
+  if (!plan) return null;
+  const all = (patterns: TitlePattern[]) => patterns.map((pattern) => titleLikeAny(sql, pattern)).join(" AND ");
+  // Without an employer-name alternative every row in the WHERE already
+  // matched the families, so that check isn't repeated.
+  const employerOnly = plan.companyPhrase ? `WHEN NOT (${familyPlanPredicate(sql, plan)}) THEN 3 ` : "";
+  return `CASE ${employerOnly}WHEN ${all(plan.exact)} THEN 0 WHEN ${all(plan.core)} THEN 1 ELSE 2 END`;
+}
+
 // A company filter/page matches every spelling of the same employer
 // ("Accenture", "Accenture Colombia", "ACCENTURE LTDA" — company-identity.ts),
 // except placeholder employers ("Empresa Confidencial"), which only ever
@@ -691,28 +744,23 @@ function buildJobWhere(filters: JobFilterParams, sql: SqlParts): string[] {
   const where: string[] = [];
   const rawSearch = filters.search?.trim();
 
-  if (rawSearch) {
+  const searchPlan = rawSearch ? buildSearchPlan(rawSearch) : null;
+  if (searchPlan) {
+    // Job-family search (job-search-intent.ts): title only, ranked by
+    // searchRankSql() in queryJobsPage.
+    const familyMatch = `(${familyPlanPredicate(sql, searchPlan)})`;
+    where.push(
+      searchPlan.companyPhrase
+        ? `(${familyMatch} OR LOWER(COALESCE(company, '')) LIKE ${sql.param(`%${searchPlan.companyPhrase}%`)})`
+        : familyMatch
+    );
+  } else if (rawSearch) {
     const search = rawSearch.toLowerCase();
     const searchWords = tokenizeJobSearch(search);
     if (searchWords.length <= 1) {
-      const like = sql.param(`%${search}%`);
-      where.push(
-        `(LOWER(title) LIKE ${like} OR LOWER(COALESCE(company, '')) LIKE ${like} OR ` +
-          `LOWER(COALESCE(location, '')) LIKE ${like} OR ${rolePredicate(sql, rawSearch)})`
-      );
+      where.push(`(${literalTextPredicate(sql, search)} OR ${rolePredicate(sql, rawSearch)})`);
     } else {
-      for (const word of searchWords) {
-        const expanded = expandRoleWords(word);
-        const forms = expanded.length > 0 ? expanded : [word];
-        const predicates = forms.map((form) => {
-          const like = sql.param(`%${form.toLowerCase()}%`);
-          return (
-            `(LOWER(title) LIKE ${like} OR LOWER(COALESCE(company, '')) LIKE ${like} OR ` +
-            `LOWER(COALESCE(location, '')) LIKE ${like})`
-          );
-        });
-        where.push(`(${predicates.join(" OR ")})`);
-      }
+      for (const word of searchWords) where.push(literalWordPredicate(sql, word));
     }
   }
 
@@ -819,6 +867,7 @@ async function queryJobsPage(options: JobsPageOptions): Promise<JobsPage> {
   const preferencePredicate = preferredRoles.length
     ? `(${preferredRoles.map((role) => rolePredicate(sql, role)).join(" OR ")})`
     : "FALSE";
+  const searchRank = searchRankSql(filters, sql);
   const limitParam = sql.param(limit);
   const offsetParam = sql.param(offset);
   const detailColumns = options.includeDetails === false
@@ -836,19 +885,20 @@ async function queryJobsPage(options: JobsPageOptions): Promise<JobsPage> {
        ORDER BY ${VACANCY_IDENTITY_KEYS}, published_at DESC, id DESC
      ), filtered AS (
        SELECT canonical.*,
-              CASE WHEN ${preferencePredicate} THEN 0 ELSE 1 END AS preference_rank,
+              CASE WHEN ${preferencePredicate} THEN 0 ELSE 1 END AS preference_rank,${searchRank ? `
+              ${searchRank} AS search_rank,` : ""}
               COUNT(*) OVER() AS total_count
        FROM canonical
        ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
      ), page AS (
        SELECT * FROM filtered
-       ORDER BY preference_rank, published_at DESC, id DESC
+       ORDER BY ${searchRank ? "search_rank, " : ""}preference_rank, published_at DESC, id DESC
        LIMIT ${limitParam} OFFSET ${offsetParam}
      )
      SELECT page.*, ${detailColumns}
      FROM page
      JOIN jobs details ON details.id = page.id
-     ORDER BY page.preference_rank, page.published_at DESC, page.id DESC`,
+     ORDER BY ${searchRank ? "page.search_rank, " : ""}page.preference_rank, page.published_at DESC, page.id DESC`,
     sql.values
   );
 
