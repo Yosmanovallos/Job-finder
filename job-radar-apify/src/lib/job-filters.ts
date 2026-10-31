@@ -2,7 +2,13 @@ import type { Job } from "../sources/types.js";
 import { DEFAULT_ROLES_200 } from "../queue/scheduler.js";
 import { TRANSLATION_MAP } from "../ai-role-agent.js";
 import { getCountryConfig } from "../countries/index.js";
-import { buildSearchPlan, familyRank, titleMatchesFamilies, type SearchPlan } from "./job-search-intent.js";
+import {
+  buildSearchPlan,
+  familyRank,
+  textContainsResidual,
+  titleMatchesFamilies,
+  type SearchPlan
+} from "./job-search-intent.js";
 
 // Shared between the server (GET /api/jobs, so a 10k+ job corpus is filtered
 // before it's ever serialized to the browser) and, previously, the client —
@@ -220,16 +226,25 @@ function literalWordMatchesJob(word: string, job: Job): boolean {
   );
 }
 
+function residualWordMatchesJob(word: string, job: Job): boolean {
+  return literalSearchForms(word).some(
+    (form) =>
+      textContainsResidual(job.title, form) ||
+      textContainsResidual(job.company, form) ||
+      textContainsResidual(job.location, form)
+  );
+}
+
 /**
- * -1 when the job doesn't match a family search; otherwise 0 exact role,
- * 1 same family, 2 related family, 3 matched only as an employer name.
+ * Null when the job doesn't match a family search; otherwise -1 employer
+ * named by the whole query, 0 exact role, 1 same family, 2 related family.
  */
-export function searchRankForJob(plan: SearchPlan, job: Job): number {
-  if (titleMatchesFamilies(plan, job.title) && plan.residual.every((word) => literalWordMatchesJob(word, job))) {
+export function searchRankForJob(plan: SearchPlan, job: Job): number | null {
+  if (plan.companyPhrase && (job.company || "").toLowerCase().includes(plan.companyPhrase)) return -1;
+  if (titleMatchesFamilies(plan, job.title, job.company) && plan.residual.every((word) => residualWordMatchesJob(word, job))) {
     return familyRank(plan, job.title);
   }
-  if (plan.companyPhrase && (job.company || "").toLowerCase().includes(plan.companyPhrase)) return 3;
-  return -1;
+  return null;
 }
 
 /**
@@ -250,7 +265,7 @@ export function applyJobFilters(jobs: Job[], filters: JobFilterParams): Job[] {
     const ranked: Array<{ job: Job; rank: number }> = [];
     for (const job of result) {
       const rank = searchRankForJob(searchPlan, job);
-      if (rank >= 0) ranked.push({ job, rank });
+      if (rank !== null) ranked.push({ job, rank });
     }
     result = ranked.sort((a, b) => a.rank - b.rank).map((entry) => entry.job);
   } else if (rawSearch) {

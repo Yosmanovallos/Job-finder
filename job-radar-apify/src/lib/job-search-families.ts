@@ -34,6 +34,9 @@ export interface SearchFamily {
   // A title containing one of these is not a match for this family
   // ("Structural Engineering (Data Centers)" is not a data job).
   exclude?: string[];
+  // Industry families ("seguros", "inmobiliaria", "viajes"): a posting AT
+  // such an employer also matches, ranked with the related families.
+  matchCompany?: boolean;
 }
 
 export const SEARCH_FAMILIES: SearchFamily[] = [
@@ -59,6 +62,7 @@ export const SEARCH_FAMILIES: SearchFamily[] = [
     groups: [
       ["data", "datos"],
       ["big data", "data lake", "data warehouse", "etl", "databricks"],
+      ["analista de informacion", "gestion de informacion"],
       ["business intelligence", "inteligencia de negocio*", "bi", "power bi"],
       ["analytics", "analitica", "analitica de datos"]
     ],
@@ -91,9 +95,10 @@ export const SEARCH_FAMILIES: SearchFamily[] = [
       ["diseno grafico", "disenador grafico", "disenadora grafica", "graphic design", "graphic designer"],
       ["diseno publicitario", "disenador publicitario", "disenadora publicitaria"],
       ["motion graphic*", "motion designer"],
-      ["ilustrador*", "illustrator"]
+      ["ilustrador*", "illustrator"],
+      ["logo*", "logotipo*", "identidad visual", "manual de marca", "branding", "flyer*", "vectorizacion"]
     ],
-    related: ["disenador*", "designer", "editor* de video", "video editor", "creativo", "creativa", "branding"]
+    related: ["disenador*", "designer", "editor* de video", "video editor", "creativo", "creativa"]
   },
   {
     id: "devops-cloud",
@@ -158,7 +163,10 @@ export const SEARCH_FAMILIES: SearchFamily[] = [
       "ciberseguridad", "cybersecurity", "cyber security", "seguridad informatica",
       "seguridad de la informacion", "information security", "infosec", "pentester", "pentest*", "ethical hack*"
     ]],
-    extra: ["siem", "soc analyst", "analista soc"]
+    // English postings write "Security Engineer"/"Security Analyst" for
+    // cybersecurity; physical security is its own family.
+    extra: ["siem", "soc analyst", "analista soc", "security"],
+    exclude: ["security guard", "security officer", "seguridad fisica"]
   },
   {
     id: "it-support",
@@ -166,7 +174,7 @@ export const SEARCH_FAMILIES: SearchFamily[] = [
       "soporte tecnico", "soporte ti", "soporte it", "mesa de ayuda", "help desk", "helpdesk",
       "service desk", "tecnic* de soporte", "soporte de sistemas", "soporte informatico"
     ]],
-    extra: ["auxiliar de sistemas", "tecnic* en sistemas", "tecnolog* en sistemas", "mantenimiento de equipos de computo"]
+    extra: ["auxiliar de sistemas", "tecnic* en sistemas", "tecnolog* en sistemas", "mantenimiento de equipos de computo", "systems administration", "sysadmin"]
   },
   {
     id: "networks",
@@ -177,7 +185,8 @@ export const SEARCH_FAMILIES: SearchFamily[] = [
     id: "business-analysis",
     groups: [
       ["business analyst", "analista de negocio*"],
-      ["analista funcional", "functional analyst", "consultor* funcional"]
+      ["analista funcional", "functional analyst", "consultor* funcional"],
+      ["analista* de procesos", "mejora de procesos", "transformacion de procesos", "excelencia operacional"]
     ],
     related: ["analista de procesos", "process analyst", "product owner", "business intelligence"]
   },
@@ -187,7 +196,7 @@ export const SEARCH_FAMILIES: SearchFamily[] = [
       "project manager", "gerente de proyecto*", "lider de proyecto*", "jefe de proyecto*", "director* de proyecto*",
       "coordinador* de proyecto*", "project lead", "project management", "pmo"
     ]],
-    related: ["scrum master", "product owner", "agile coach", "program manager", "proyecto*"]
+    related: ["scrum master", "product owner", "agile coach", "program manager", "delivery manager", "proyecto*"]
   },
   {
     id: "agile",
@@ -229,8 +238,9 @@ export const SEARCH_FAMILIES: SearchFamily[] = [
       ["ventas", "sales"],
       ["comercial", "asesor* comercial", "ejecutiv* comercial", "representante comercial"],
       ["televentas", "telemercadeo", "telemarketing"],
-      ["account executive", "key account", "gerente de cuenta*"],
-      ["sdr", "bdr", "business development", "desarrollo de negocio*"]
+      ["account executive", "account manager", "key account", "kam", "gerente de cuenta*", "ejecutiv* de cuenta*"],
+      ["sdr", "bdr", "business development", "desarrollo de negocio*"],
+      ["appointment setter", "setter", "closer", "cold caller", "captacion de clientes"]
     ],
     related: ["cajer*", "mercaderista*", "impulsador*", "preventa*"]
   },
@@ -238,7 +248,8 @@ export const SEARCH_FAMILIES: SearchFamily[] = [
     id: "customer-service",
     groups: [
       ["servicio al cliente", "atencion al cliente", "customer service", "customer support", "soporte al cliente", "customer success"],
-      ["call center", "contact center", "teleoperador*", "agente de call center"]
+      ["call center", "contact center", "teleoperador*", "agente de call center"],
+      ["experiencia del cliente", "customer experience", "cx", "posventa"]
     ],
     related: ["televentas", "telemercadeo", "recepcionista"]
   },
@@ -248,7 +259,8 @@ export const SEARCH_FAMILIES: SearchFamily[] = [
       ["recursos humanos", "rrhh", "rr hh", "human resources", "hr"],
       ["talento humano", "gestion humana", "gestion del talento", "hrbp", "people partner"],
       ["reclutador*", "reclutamiento", "recruiter", "talent acquisition", "seleccion de personal", "analista de seleccion"],
-      ["nomina", "payroll"]
+      ["nomina", "payroll"],
+      ["desarrollo humano", "relaciones laborales", "bienestar laboral"]
     ]
   },
   {
@@ -257,17 +269,21 @@ export const SEARCH_FAMILIES: SearchFamily[] = [
       ["contador", "contadora", "contador publico", "contadora publica", "accountant", "contaduria"],
       ["contable", "contabilidad", "accounting"],
       ["impuestos", "tributari*", "tax"],
-      ["revisor fiscal"]
+      ["revisor fiscal"],
+      ["facturacion", "billing", "cuentas por pagar", "accounts payable", "cuentas por cobrar", "accounts receivable", "recaudo*"],
+      ["costos", "presupuesto*"]
     ],
     related: ["auditor*", "auditoria", "finanzas", "financiero", "financiera", "tesoreria"]
   },
   {
     id: "finance",
     groups: [
-      ["finanzas", "financiero", "financiera", "finance", "financial"],
+      ["finanzas", "financiero", "financiera", "finance", "financial", "pricing"],
       ["tesoreria", "tesorero", "tesorera", "treasury"],
       ["cartera", "cobranza*", "collections"],
-      ["credito", "creditos", "credit"]
+      ["credito", "creditos", "credit", "microcredito*", "microfinanz*"],
+      ["bancari*", "banca", "banking"],
+      ["inversiones", "patrimonial", "wealth", "medios de pago", "payments"]
     ],
     related: ["contable", "contabilidad", "contador", "auditor*", "riesgo*", "risk"]
   },
@@ -285,7 +301,8 @@ export const SEARCH_FAMILIES: SearchFamily[] = [
       ["supply chain", "cadena de suministro", "cadena de abastecimiento"],
       ["bodega", "bodeguero", "almacen", "almacenista", "warehouse", "inventario*"],
       ["comercio exterior", "importacion*", "exportacion*", "aduana*", "comex"],
-      ["compras", "procurement", "purchasing", "comprador*"]
+      ["compras", "procurement", "purchasing", "comprador*"],
+      ["distribucion", "almacenamiento", "cedi", "cargue*", "descargue*", "estibador*", "transporte", "trazabilidad"]
     ],
     related: ["montacarga*", "despacho*", "picking"]
   },
@@ -297,7 +314,9 @@ export const SEARCH_FAMILIES: SearchFamily[] = [
       ["recepcionista", "receptionist"],
       ["asistente de gerencia", "asistente ejecutiv*", "executive assistant"],
       ["asistente virtual", "virtual assistant"],
-      ["archivo", "gestion documental", "digitador*", "digitacion"]
+      ["archivo", "gestion documental", "digitador*", "digitacion"],
+      ["data entry", "entrada de datos", "transcripcion*", "mecanografia"],
+      ["gerente de oficina", "office manager", "auxiliar de oficina", "jefe de oficina"]
     ]
   },
 
@@ -365,7 +384,10 @@ export const SEARCH_FAMILIES: SearchFamily[] = [
   },
   {
     id: "medical",
-    groups: [["medico", "medica", "medicos", "medicina", "physician"]],
+    groups: [
+      ["medico", "medica", "medicos", "medicina", "physician", "medical", "clinical"],
+      ["atencion prehospitalaria", "prehospitalari*", "paramedic*"]
+    ],
     related: ["enfermer*", "salud"]
   },
   {
@@ -382,7 +404,7 @@ export const SEARCH_FAMILIES: SearchFamily[] = [
   },
   {
     id: "lab",
-    groups: [["bacteriolog*", "laboratorio", "laboratorista*", "microbiolog*"]]
+    groups: [["bacteriolog*", "laboratorio", "laboratorista*", "microbiolog*", "analista quimic*", "quimic*"]]
   },
   {
     id: "psychology",
@@ -422,13 +444,18 @@ export const SEARCH_FAMILIES: SearchFamily[] = [
     id: "retail",
     groups: [
       ["cajer*", "cashier"],
-      ["mercaderista*", "impulsador*", "impulsadora*", "promotor* de ventas"]
+      ["mercaderista*", "impulsador*", "impulsadora*", "promotor* de ventas"],
+      ["tienda*", "punto* de venta", "store manager", "retail"]
     ],
-    related: ["vendedor*", "ventas"]
+    related: ["vendedor*", "ventas"],
+    exclude: ["tienda* online", "tienda* virtual*", "tienda* en linea", "shopify", "woocommerce", "ecommerce", "e commerce"]
   },
   {
     id: "security-guard",
-    groups: [["vigilante*", "guarda de seguridad", "guardia de seguridad", "guarda", "escolta*", "seguridad privada", "security guard"]]
+    groups: [
+      ["vigilante*", "guarda de seguridad", "guardia de seguridad", "guarda", "escolta*", "seguridad privada", "security guard"],
+      ["prevencion de perdidas", "control de perdidas", "loss prevention"]
+    ]
   },
   {
     id: "cleaning",
@@ -437,8 +464,9 @@ export const SEARCH_FAMILIES: SearchFamily[] = [
   {
     id: "audiovisual",
     groups: [
-      ["editor* de video", "video editor", "edicion de video", "audiovisual*"],
-      ["fotograf*", "photographer", "camarograf*", "videograf*"]
+      ["editor* de video", "video editor", "edicion de video", "creacion de video", "audiovisual*", "youtube"],
+      ["fotograf*", "photographer", "camarograf*", "videograf*"],
+      ["voz en off", "locutor*", "locucion"]
     ],
     related: ["motion graphic*", "creador* de contenido"]
   },
@@ -446,12 +474,108 @@ export const SEARCH_FAMILIES: SearchFamily[] = [
     id: "writing",
     groups: [
       ["redactor*", "copywriter", "copywriting", "content writer"],
-      ["traductor*", "translator", "interprete*", "corrector* de estilo"]
+      ["traductor*", "translator", "interprete*", "corrector* de estilo", "traduccion", "redaccion", "subtitul*"]
     ]
   },
   {
     id: "agro",
     groups: [["agronom*", "agricola", "agropecuari*", "agroindustri*"]]
+  },
+  // ---- Added 2026-10-31 from a uniform 9,761-title sample (CO + VE) ----
+  {
+    id: "operations",
+    groups: [["operaciones", "operations", "ops", "operativ*", "back office", "control operacional"]],
+    related: ["logistica", "procesos"]
+  },
+  {
+    id: "ecommerce",
+    groups: [[
+      "ecommerce", "e commerce", "comercio electronico", "tienda* online", "tienda* virtual*",
+      "tienda* en linea", "shopify", "woocommerce", "marketplace*"
+    ]],
+    related: ["marketing digital", "desarrollo web", "pagina* web"]
+  },
+  {
+    id: "web-development",
+    groups: [["desarrollo web", "pagina* web", "sitio* web", "web developer", "desarrollador* web", "wordpress", "landing page*", "wix", "webflow"]],
+    related: ["frontend", "front end", "full stack", "fullstack", "diseno web"]
+  },
+  {
+    id: "erp-crm",
+    groups: [["sap"], ["erp"], ["salesforce"], ["crm"], ["odoo"], ["oracle"], ["dynamics 365"]],
+    related: ["consultor* funcional", "analista funcional"]
+  },
+  {
+    id: "compliance-risk",
+    groups: [
+      ["cumplimiento", "compliance", "oficial de cumplimiento", "control interno"],
+      ["aml", "kyc", "sarlaft", "fincrime", "financial crime", "lavado de activos", "antilavado", "fraude", "fraud"],
+      ["riesgo*", "risk"]
+    ],
+    related: ["auditor*", "auditoria"]
+  },
+  {
+    id: "insurance",
+    groups: [["seguros", "bancaseguros", "insurance", "siniestro*", "claims", "suscriptor*", "underwriter*", "ajustador*", "aseguradora*"]],
+    matchCompany: true
+  },
+  {
+    id: "real-estate",
+    groups: [["inmobiliari*", "real estate", "bienes raices", "finca raiz", "propiedad horizontal", "arrendamiento*"]],
+    matchCompany: true
+  },
+  {
+    id: "travel-tourism",
+    groups: [["viajes", "turismo", "turistic*", "travel", "hotel*", "hoteler*", "reservas", "tours"]],
+    matchCompany: true
+  },
+  {
+    id: "automation",
+    groups: [["automatizacion*", "automation", "rpa", "chatbot*", "bot", "bots", "n8n", "zapier"]],
+    related: ["inteligencia artificial", "ai", "ia"]
+  },
+  {
+    id: "research",
+    groups: [["investigacion", "research", "investigador*", "researcher", "i+d"]]
+  },
+  {
+    id: "construction-trades",
+    groups: [
+      ["oficial de obra*", "oficial de acabados", "mamposter*", "obra blanca", "obra gris", "estructura metalica"],
+      ["plomer*", "fontaner*", "soldador*", "carpinter*", "pintor*", "albanil*", "ornamentador*"],
+      ["refrigeracion", "aire acondicionado", "hvac"]
+    ],
+    related: ["construccion", "obra civil", "residente de obra*"]
+  },
+  {
+    id: "automotive",
+    groups: [["automotri*", "repuestos", "latoner*", "carroceria", "concesionario*", "pintor* de autos"]],
+    related: ["mecanic*", "posventa"]
+  },
+  {
+    id: "field-service",
+    groups: [["field service*", "servicio tecnico", "tecnic* de campo", "tecnic* instalador*", "instalador*", "tecnic* de instalacion"]],
+    related: ["mantenimiento", "soporte tecnico"]
+  },
+  {
+    id: "interior-design",
+    groups: [["diseno de interiores", "disenador* de interiores", "interiorismo", "interiorista*"]]
+  },
+  {
+    id: "3d",
+    groups: [["modelado 3d", "modelador* 3d", "modelo* 3d", "render*", "animacion 3d", "blender"]]
+  },
+  {
+    id: "architecture-drafting",
+    groups: [["diseno arquitectonico", "auxiliar de arquitectura", "dibujante*", "autocad", "revit", "sketchup", "bim"]]
+  },
+  {
+    id: "hosting",
+    groups: [["anfitrion*", "hostess"]]
+  },
+  {
+    id: "internship",
+    groups: [["aprendiz*", "practicante*", "pasante*", "intern", "internship", "practica* profesional*", "etapa productiva"]]
   },
   {
     id: "mining-oil",
