@@ -157,3 +157,41 @@ test("title normalization and LIKE emulation", () => {
   assert.ok(!likeMatches(" auxiliar ", "% ux %"));
   assert.ok(likeMatches("a.b", "a.b") && !likeMatches("axb", "a.b"));
 });
+
+// Families added from the uniform 9,761-title sample (2026-10-31).
+const more: Array<[string, string]> = [
+  ["Consultor SAP MM", "Accenture"],
+  ["Automatización de Respuestas en Whatsapp", "J. C."],
+  ["Diseño de Logo para Restaurante", "M. S."],
+  ["Psicólogo Educativo", "Colegio bennett"],
+  ["Gestor Comercial - Bogotá", "Cardif Colombia Seguros Generales S A"],
+  ["Analista de Siniestros", "Confidencial"],
+  ["Administrador Tienda - Neiva", "Tiendas Ara"],
+  ["Desarrollo de Tienda Online con Shopify", "L. D."],
+  ["IT Ops & Service Oversight Lead", "Confidencial"],
+  ["Auxiliar de Facturación", "Clínica Norte"],
+  ["Aprendiz SENA Logística", "Alpina"]
+];
+const moreJobs = more.map(([title, company], i) => ({ ...jobs[0], jobId: `more-${i}`, title, company }));
+const searchMore = (query: string) => applyJobFilters(moreJobs, { search: query }).map((job) => job.title);
+
+test("SAP and logo match whole words, not WhatsApp or psicólogo", () => {
+  assert.deepEqual(searchMore("SAP"), ["Consultor SAP MM"]);
+  assert.deepEqual(searchMore("logo"), ["Diseño de Logo para Restaurante"]);
+});
+
+test("industry families also match the employer, ranked after the title", () => {
+  assert.deepEqual(searchMore("seguros"), ["Analista de Siniestros", "Gestor Comercial - Bogotá"]);
+});
+
+test("retail stores and online stores are different families", () => {
+  assert.deepEqual(searchMore("tienda"), ["Administrador Tienda - Neiva"]);
+  assert.deepEqual(searchMore("shopify"), ["Desarrollo de Tienda Online con Shopify"]);
+});
+
+test("new families: operations, billing, internships", () => {
+  // Logistics is related to operations, so it is listed after.
+  assert.deepEqual(searchMore("operaciones"), ["IT Ops & Service Oversight Lead", "Aprendiz SENA Logística"]);
+  assert.deepEqual(searchMore("facturación"), ["Auxiliar de Facturación"]);
+  assert.deepEqual(searchMore("practicante"), ["Aprendiz SENA Logística"]);
+});

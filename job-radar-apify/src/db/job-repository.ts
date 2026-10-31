@@ -13,6 +13,7 @@ import {
   sqlLowerText,
   sqlPrefilterText,
   sqlSearchTitle,
+  shortResidualPatterns,
   type SearchPlan,
   type TitlePattern
 } from "../lib/job-search-intent.js";
@@ -695,37 +696,58 @@ function literalWordPredicate(sql: SqlParts, word: string): string {
   return `(${literalSearchForms(word).map((form) => literalTextPredicate(sql, form)).join(" OR ")})`;
 }
 
-function titleLikeAny(sql: SqlParts, pattern: TitlePattern): string {
-  return `${sqlSearchTitle("title")} LIKE ANY (${sql.param(pattern.like)}::text[])`;
+function titleLikeAny(sql: SqlParts, pattern: TitlePattern, column = "title"): string {
+  return `${sqlSearchTitle(column)} LIKE ANY (${sql.param(pattern.like)}::text[])`;
 }
 
-// CASE keeps the evaluation order: the raw-title prefilter discards most
-// rows before the (costlier) normalized title is ever built.
-function familyPlanPredicate(sql: SqlParts, plan: SearchPlan): string {
-  const parts = plan.families.map((family) => {
-    const matched = family.exclude
-      ? `CASE WHEN ${titleLikeAny(sql, family.match)} THEN NOT (${titleLikeAny(sql, family.exclude)}) ELSE FALSE END`
-      : titleLikeAny(sql, family.match);
-    const prefilter = [`${sqlPrefilterText("title")} LIKE ANY (${sql.param(family.match.stems)}::text[])`];
-    if (family.match.shortWords) prefilter.push(`${sqlLowerText("title")} ~ ${sql.param(family.match.shortWords)}`);
-    return `CASE WHEN ${prefilter.join(" OR ")} THEN ${matched} ELSE FALSE END`;
+// CASE keeps the evaluation order: the cheap prefilter discards most rows
+// before the (costlier) normalized text is ever built.
+function familyColumnPredicate(sql: SqlParts, family: SearchPlan["families"][number], column: string): string {
+  const matched = family.exclude
+    ? `CASE WHEN ${titleLikeAny(sql, family.match, column)} THEN NOT (${titleLikeAny(sql, family.exclude, column)}) ELSE FALSE END`
+    : titleLikeAny(sql, family.match, column);
+  const prefilter = [`${sqlPrefilterText(column)} LIKE ANY (${sql.param(family.match.stems)}::text[])`];
+  if (family.match.shortWords) prefilter.push(`${sqlLowerText(column)} ~ ${sql.param(family.match.shortWords)}`);
+  return `CASE WHEN ${prefilter.join(" OR ")} THEN ${matched} ELSE FALSE END`;
+}
+
+function residualWordPredicate(sql: SqlParts, word: string): string {
+  const forms = literalSearchForms(word).map((form) => {
+    const short = shortResidualPatterns(form);
+    if (!short) return literalTextPredicate(sql, form);
+    const stem = sql.param(short.stem);
+    const like = sql.param(short.like);
+    return `(${["title", "company", "location"]
+      .map((column) => `CASE WHEN ${sqlLowerText(column)} LIKE ${stem} THEN ${sqlSearchTitle(column)} LIKE ${like} ELSE FALSE END`)
+      .join(" OR ")})`;
   });
-  for (const word of plan.residual) parts.push(literalWordPredicate(sql, word));
+  return `(${forms.join(" OR ")})`;
+}
+
+// Industry families (matchCompany) also accept the employer's name.
+function familyPlanPredicate(sql: SqlParts, plan: SearchPlan): string {
+  const parts = plan.families.map((family) =>
+    family.matchCompany
+      ? `${familyColumnPredicate(sql, family, "title")} OR ${familyColumnPredicate(sql, family, "company")}`
+      : familyColumnPredicate(sql, family, "title")
+  );
+  for (const word of plan.residual) parts.push(residualWordPredicate(sql, word));
   return parts.map((part) => `(${part})`).join(" AND ");
 }
 
-// Same ranks as job-filters.ts searchRankForJob(): 0 exact role, 1 same
-// family, 2 related family, 3 employer-name match. Only evaluated for rows
-// that already passed the WHERE. Null for any other search (or none), so
-// those queries keep their exact previous SQL.
+// Same ranks as job-filters.ts searchRankForJob(): -1 employer named by the
+// whole query, 0 exact role, 1 same family, 2 related family. Only evaluated
+// for rows that already passed the WHERE, so a row that isn't the employer
+// matched the families. Null for any other search (or none), so those
+// queries keep their exact previous SQL.
 function searchRankSql(filters: JobFilterParams, sql: SqlParts): string | null {
   const plan = buildSearchPlan(filters.search);
   if (!plan) return null;
   const all = (patterns: TitlePattern[]) => patterns.map((pattern) => titleLikeAny(sql, pattern)).join(" AND ");
-  // Without an employer-name alternative every row in the WHERE already
-  // matched the families, so that check isn't repeated.
-  const employerOnly = plan.companyPhrase ? `WHEN NOT (${familyPlanPredicate(sql, plan)}) THEN 3 ` : "";
-  return `CASE ${employerOnly}WHEN ${all(plan.exact)} THEN 0 WHEN ${all(plan.core)} THEN 1 ELSE 2 END`;
+  const employer = plan.companyPhrase
+    ? `WHEN LOWER(COALESCE(company, '')) LIKE ${sql.param(`%${plan.companyPhrase}%`)} THEN -1 `
+    : "";
+  return `CASE ${employer}WHEN ${all(plan.exact)} THEN 0 WHEN ${all(plan.core)} THEN 1 ELSE 2 END`;
 }
 
 // A company filter/page matches every spelling of the same employer

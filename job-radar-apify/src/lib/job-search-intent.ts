@@ -199,7 +199,7 @@ const COMPILED_FAMILIES: CompiledFamily[] = SEARCH_FAMILIES.map((family) => {
 export interface SearchPlan {
   // Each family named in the query: the title must match `match` (family
   // plus related vocabulary) and must not match `exclude`.
-  families: Array<{ id: string; match: TitlePattern; exclude: TitlePattern | null }>;
+  families: Array<{ id: string; match: TitlePattern; exclude: TitlePattern | null; matchCompany: boolean }>;
   // Rank 0: every one of these (the exact names the query used, plus its
   // role-type word if it had one).
   exact: TitlePattern[];
@@ -208,11 +208,14 @@ export interface SearchPlan {
   // `families` is rank 2.
   core: TitlePattern[];
   // Leftover words ("medellín", "python") keep the literal per-word search,
-  // spelled as the user typed them.
+  // spelled as the user typed them; words of 3 letters or fewer as whole
+  // words ("Tiendas Ara" must not take "ara" from "para"/"Barranquilla").
   residual: string[];
-  // When the query has leftover words it may be an employer name that
-  // happens to contain a family word ("Torre.ai", "Logística Express"):
-  // the whole query is also tried against the company, ranked last.
+  // A query with leftover words may be an employer name that contains a
+  // family word ("Tiendas Ara", "Torre.ai"): postings at an employer whose
+  // name contains the whole query rank first. Not for pure family queries,
+  // where it would put a "Consultora de Recursos Humanos" developer posting
+  // above every HR job for "recursos humanos".
   companyPhrase: string | null;
 }
 
@@ -275,7 +278,12 @@ function computeSearchPlan(query: string): SearchPlan | null {
   for (const [f, groups] of hits) {
     const compiled = COMPILED_FAMILIES[f];
     if (!compiled.all || !compiled.core) continue;
-    families.push({ id: SEARCH_FAMILIES[f].id, match: compiled.all, exclude: compiled.exclude });
+    families.push({
+      id: SEARCH_FAMILIES[f].id,
+      match: compiled.all,
+      exclude: compiled.exclude,
+      matchCompany: SEARCH_FAMILIES[f].matchCompany === true
+    });
     core.push(compiled.core);
     // Two names of the same family in one query ("cuidadora adultos
     // mayores") rank first when the title has either of them.
@@ -316,14 +324,24 @@ export function titlePassesPrefilter(title: string | null | undefined, pattern: 
   );
 }
 
-/** Whether a title satisfies the plan's family part (residual words are checked by the caller). */
-export function titleMatchesFamilies(plan: SearchPlan, title: string | null | undefined): boolean {
-  let normalized: string | null = null;
-  return plan.families.every((family) => {
-    if (!titlePassesPrefilter(title, family.match)) return false;
-    normalized ??= searchTitleText(title);
-    return likeAny(normalized, family.match.like) && !(family.exclude && likeAny(normalized, family.exclude.like));
-  });
+function textMatchesFamily(text: string | null | undefined, family: SearchPlan["families"][number]): boolean {
+  if (!titlePassesPrefilter(text, family.match)) return false;
+  const normalized = searchTitleText(text);
+  return likeAny(normalized, family.match.like) && !(family.exclude && likeAny(normalized, family.exclude.like));
+}
+
+/**
+ * Whether a posting satisfies the plan's family part (residual words are
+ * checked by the caller): its title, or for industry families its employer.
+ */
+export function titleMatchesFamilies(
+  plan: SearchPlan,
+  title: string | null | undefined,
+  company?: string | null
+): boolean {
+  return plan.families.every(
+    (family) => textMatchesFamily(title, family) || (family.matchCompany && textMatchesFamily(company, family))
+  );
 }
 
 /** 0 exact role, 1 same family, 2 related family. Only meaningful for titles that match the families. */
@@ -332,4 +350,22 @@ export function familyRank(plan: SearchPlan, title: string | null | undefined): 
   if (plan.exact.every((pattern) => likeAny(normalized, pattern.like))) return 0;
   if (plan.core.every((pattern) => likeAny(normalized, pattern.like))) return 1;
   return 2;
+}
+
+// ---- Leftover words of a family search ----
+
+const SHORT_RESIDUAL_MAX_LENGTH = 3;
+
+/** Whole-word patterns for a short leftover word; null keeps the substring match. */
+export function shortResidualPatterns(word: string): { stem: string; like: string } | null {
+  const lower = word.toLowerCase();
+  if (lower.length > SHORT_RESIDUAL_MAX_LENGTH || !/^[a-z0-9]+$/.test(lower)) return null;
+  return { stem: `%${lower}%`, like: `% ${lower} %` };
+}
+
+export function textContainsResidual(text: string | null | undefined, word: string): boolean {
+  const lower = (text || "").toLowerCase();
+  const short = shortResidualPatterns(word);
+  if (!short) return lower.includes(word.toLowerCase());
+  return likeMatches(lower, short.stem) && likeMatches(searchTitleText(text), short.like);
 }

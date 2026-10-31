@@ -183,7 +183,7 @@ async function run(): Promise<void> {
       corpus.push(...page.jobs);
       if (page.jobs.length < 100) break;
     }
-    for (const search of ["AI Engineer", "IA", "datos", "Bogotá", "ux"]) {
+    for (const search of ["AI Engineer", "IA", "datos", "Bogotá", "ux", "seguros", "Empresa Sintetica", "AI 36", "datos Sintetica"]) {
       const sqlPage = await getJobsPage({ filters: { country: "CO", search }, limit: 100, includeDetails: false });
       const expected = applyJobFilters(corpus, { search }).slice(0, 100).map((job) => job.jobId);
       check(
