@@ -74,12 +74,13 @@ Lectura:
   foco no les cambia nada: para ellas, la vía útil es la del sitio propio o el
   inventario ATS (D5, §13), no el nombre.
 - Las 562 candidatas nuevas son la cola larga: cada una tiene ≤ 8 vacantes en
-  esas bolsas (la mayoría 1-2). Ninguna se había sondeado porque el foco
+  esas bolsas (la lista sale ordenada por vacantes y la primera pendiente
+  tiene 8). Ninguna se había sondeado porque el foco
   programado es Computrabajo y solo 32 de las 980 se solapan con él.
 - Con el ~3 % de aciertos de §7, se esperan del orden de 15 tableros nuevos
   en total, insert-only y con tope de 10 por corrida.
-- "known 2" sin tablero habilitado: empresas cuyo tablero existe pero está
-  apagado (p. ej. un rechazo previo). No se reactivan.
+- "known 2" sin tablero habilitado: tienen alias de empleador pero ningún
+  tablero encendido; la causa no se verificó en este censo. No se reactivan.
 
 Recomendación: no cambiar la programación. Basta con unas pocas corridas
 manuales `focus=browser-boards` (ensayo en seco primero) para vaciar las 562;
