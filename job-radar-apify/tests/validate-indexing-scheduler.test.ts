@@ -57,13 +57,22 @@ test("unused share spills over: new → delete → content → reconcile", () =>
   assert.equal(count(busy, "content"), 0, "content updates rank below new jobs and deletes");
 });
 
-test("dropped candidates spend no budget; lanes are FIFO", () => {
+test("dropped candidates spend no budget; the new lane is newest-first (GOOGLE-JOBS F2)", () => {
   const queues = lanes({ new: 300 });
   const plan = planIndexingSends(queues, 100, DEFAULT_SCHEDULER, 0, (row) => Number(row.id.split("-")[1]) % 2 === 0);
   assert.equal(plan.length, 100, "odd rows are dropped, the budget is still fully used");
-  assert.deepEqual(plan.slice(0, 3).map((row) => row.id), ["new-0", "new-2", "new-4"], "oldest first");
-  // 199 rows scanned (100 sent + 99 dropped); the 101 never reached stay queued.
-  assert.equal(queues.new.length, 101, "sent and dropped rows leave the lane; unscanned rows stay");
+  assert.deepEqual(plan.slice(0, 3).map((row) => row.id), ["new-298", "new-296", "new-294"], "newest first");
+  // 200 rows scanned (100 sent + 100 dropped); the 100 oldest never reached stay queued.
+  assert.equal(queues.new.length, 100, "sent and dropped rows leave the lane; unscanned rows stay");
+  assert.equal(queues.new[0].id, "new-0", "what is never reached waits for its API window to close");
+});
+
+test("the shipped scheduler drains new jobs newest-first; content and reconcile stay FIFO", () => {
+  assert.ok(newestFirstLanes(DEFAULT_SCHEDULER).includes("new"));
+  const plan = planIndexingSends(lanes({ new: 50, content: 50, reconcile: 50 }), 120, DEFAULT_SCHEDULER, 0);
+  assert.equal(plan[0].id, "new-49");
+  assert.deepEqual(plan.filter((row) => row.lane === "content").slice(0, 2).map((row) => row.id), ["content-0", "content-1"]);
+  assert.deepEqual(plan.filter((row) => row.lane === "reconcile").slice(0, 2).map((row) => row.id), ["reconcile-0", "reconcile-1"]);
 });
 
 test("contrast (why S0 was rejected): strict delete-first priority starves new jobs", () => {
@@ -161,4 +170,14 @@ test("the F0 reconstruction reproduces the measured FIFO funnel", () => {
   assert.ok(today.newSentPct >= 25 && today.newSentPct <= 40, `about a third notified (F0: 30 %): ${today.newSentPct}%`);
   assert.ok(today.sendsPerDay >= 180 && today.sendsPerDay <= 190, `burst sends ~187/day (F0): ${today.sendsPerDay}`);
   assert.ok(today.deleteLaneEnd > 8_000, `the delete backlog does not drain (F0: 8,850): ${today.deleteLaneEnd}`);
+});
+
+test("change 1 — newest-first notifies new jobs within 24 h instead of a week later (F0 arrivals, 200/day)", () => {
+  const fifo = simulate(f0, f0Base);
+  const newest = simulate(f0, { ...f0Base, scheduler: "S2N" });
+  assert.ok(newest.newWithin24hPct >= 25, `newest-first: ${newest.newWithin24hPct}% within 24 h`);
+  assert.ok(fifo.newWithin24hPct < 2, `FIFO: ${fifo.newWithin24hPct}% within 24 h`);
+  assert.ok(newest.newSentP50h <= 12, `sent within hours of readiness: ${newest.newSentP50h} h`);
+  assert.ok(newest.newSentPct >= fifo.newSentPct - 5, "about as many new jobs notified overall");
+  assert.equal(newest.sends.delete, fifo.sends.delete, "the delete lane keeps its share");
 });

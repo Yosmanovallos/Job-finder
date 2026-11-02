@@ -3,7 +3,7 @@ import { pool } from "./client.js";
 import type { NotificationType } from "../lib/google-indexing.js";
 import { buildJobUrl, buildJobUrlPrefix } from "../lib/job-seo.js";
 import { canonicalSql, seoReadySql } from "../lib/google-job-readiness.js";
-import type { LaneQueues, QueueLane, Schedulable } from "../lib/indexing-scheduler.js";
+import { DEFAULT_SCHEDULER, newestFirstLanes, type LaneQueues, type QueueLane, type Schedulable } from "../lib/indexing-scheduler.js";
 
 // Google's default Indexing API quota (Search Console-verified project,
 // no quota increase requested). Budget is derived from what's actually
@@ -184,25 +184,42 @@ const LANE_SQL = `CASE WHEN notification_type = 'URL_DELETED' THEN 'delete'
   WHEN priority = ${INDEXING_PRIORITY.contentUpdate} THEN 'content' ELSE 'reconcile' END`;
 
 /**
- * The oldest `perLane` pending rows of each lane, for planIndexingSends().
- * Oldest-first inside a lane is deliberate: confirmed 2026-08-10 that LIFO
- * let a continuous stream of new arrivals starve everything already waiting.
+ * `perLane` pending rows of each lane for planIndexingSends(), oldest first
+ * in each array. Which rows: the oldest of a FIFO lane, the NEWEST of a lane
+ * the scheduler drains newest-first (GOOGLE-JOBS F2) — otherwise a
+ * newest-first planner would only see the newest of the oldest rows.
+ *
+ * Newest-first no longer starves what waits (the 2026-08-10 LIFO lesson,
+ * SEO-IMPROVEMENT-PLAN §1.20): since ADR 0004 nothing waits unboundedly. A
+ * URL_UPDATED not sent within its 7-day API window is closed as
+ * api_window_expired and the sitemap covers it.
  */
-export async function getPendingIndexingLanes(perLane: number): Promise<LaneQueues<PendingLaneRow>> {
+export async function getPendingIndexingLanesWith(
+  db: Queryable,
+  perLane: number,
+  newestFirst: QueueLane[] = newestFirstLanes(DEFAULT_SCHEDULER)
+): Promise<LaneQueues<PendingLaneRow>> {
   const lanes: LaneQueues<PendingLaneRow> = { new: [], delete: [], content: [], reconcile: [] };
   if (perLane <= 0) return lanes;
-  const result = await pool.query<PendingIndexingRow & { lane: QueueLane; created_at: Date }>(
+  const result = await db.query<PendingIndexingRow & { lane: QueueLane; created_at: Date }>(
     `SELECT id, url, notification_type, job_id, priority, created_at, lane FROM (
-       SELECT id, url, notification_type, job_id, priority, created_at, ${LANE_SQL} AS lane,
-              ROW_NUMBER() OVER (PARTITION BY ${LANE_SQL} ORDER BY created_at ASC, id ASC) AS rank
-       FROM indexing_queue WHERE status = 'pending'
+       SELECT id, url, notification_type, job_id, priority, created_at, lane,
+              ROW_NUMBER() OVER (
+                PARTITION BY lane
+                ORDER BY (CASE WHEN lane = ANY($2::text[]) THEN created_at END) DESC NULLS LAST, created_at ASC, id ASC
+              ) AS rank
+       FROM (SELECT *, ${LANE_SQL} AS lane FROM indexing_queue WHERE status = 'pending') pending
      ) ranked WHERE rank <= $1 ORDER BY created_at ASC, id ASC`,
-    [perLane]
+    [perLane, newestFirst]
   );
   for (const row of result.rows) {
     lanes[row.lane].push({ ...row, arrival: new Date(row.created_at).getTime() / 3_600_000 });
   }
   return lanes;
+}
+
+export async function getPendingIndexingLanes(perLane: number): Promise<LaneQueues<PendingLaneRow>> {
+  return getPendingIndexingLanesWith(pool, perLane);
 }
 
 /**

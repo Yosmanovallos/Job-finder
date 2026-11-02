@@ -40,11 +40,18 @@ const LANES: QueueLane[] = ["new", "delete", "content", "reconcile"];
  * share the budget 50/50 and any unused share spills over — new first, then
  * delete, then content updates, then reconcile. Neither new jobs nor deletes
  * can starve the other while both have work.
+ *
+ * GOOGLE-JOBS F2 (ADR 0004 amendment): the new lane is drained newest-first.
+ * With 200/day and ~300 new-ready jobs/day the lane is always full, and FIFO
+ * sent each job ~160 h after it became ready, just before its 7-day window
+ * closed. Newest-first sends the same count within hours of readiness; what
+ * it cannot reach expires into the sitemap, as before.
  */
 export const DEFAULT_SCHEDULER: SchedulerConfig = {
   kind: "weighted",
   shares: { new: 0.5, delete: 0.5, content: 0, reconcile: 0 },
-  spillOrder: ["new", "delete", "content", "reconcile"]
+  spillOrder: ["new", "delete", "content", "reconcile"],
+  newestFirst: ["new"]
 };
 
 /**
