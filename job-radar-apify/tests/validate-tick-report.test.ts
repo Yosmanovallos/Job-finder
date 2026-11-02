@@ -163,6 +163,35 @@ test("drain step summary shows 429s and paced-out sources without error text", (
   assert.deepEqual(log.sources.map((s) => [s.source, s.rate_limited]), [["LinkedIn", 1], ["Magneto", 0]]);
 });
 
+// Run 41364751660: "Detalle Computrabajo: 8 reclamadas → 3 completas, 0
+// reintento, 5 sin detalle" — pages that do not exist, no fault. Must not
+// raise a streak; LinkedIn's 429 in the same tick must.
+test("detail pages that simply don't exist are not degradation; a 429 is", async () => {
+  const recorder = RunRecorder.disabled();
+  await recorder.trackAttempt({ source: "Computrabajo", role: null, stage: "detail" }, async (attempt) => {
+    attempt.setCounters({ received: 8, filtered: 0, valid: 3, failed: 0 });
+  });
+  await recorder.trackAttempt({ source: "LinkedIn", role: null, stage: "detail" }, async (attempt) => {
+    reportSourceSignal("retries_exhausted");
+    attempt.setCounters({ received: 8, filtered: 0, valid: 2, failed: 1 });
+  });
+  assert.deepEqual(
+    recorder.outcomes().map((o) => [o.source, o.status, o.reason]),
+    [["Computrabajo", "partial", "detail_unavailable"], ["LinkedIn", "partial", "retries_exhausted"]]
+  );
+  const report = buildTickReport(
+    input({
+      attempts: recorder.outcomes(),
+      drain: {
+        Computrabajo: drain({ claimed: 8, complete: 3, noDetail: 5 }),
+        LinkedIn: drain({ claimed: 8, complete: 2, retry: 1, stoppedEarly: true, faultClasses: { FetchRateLimitedError: 1 } })
+      }
+    }),
+    NOW
+  );
+  assert.deepEqual(report.degradedSources, ["LinkedIn"]);
+});
+
 test("recorder outcomes expose status, reason and not_found without changing classification", async () => {
   const recorder = RunRecorder.disabled();
   await recorder.trackAttempt({ source: "Elempleo", role: "AI Engineer", stage: "listing" }, async (attempt) => {

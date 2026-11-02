@@ -34,8 +34,11 @@ const NEUTRAL_STATUSES = new Set<AttemptStatus>(["success", "empty", "skipped", 
 
 export function isDegradedAttempt(status: AttemptStatus, reason: string | null): boolean {
   if (NEUTRAL_STATUSES.has(status)) return false;
-  // Data arrived but the budget cut the rest: a capacity fact, not source health.
-  if (status === "partial" && reason === "deadline_exceeded") return false;
+  // Data arrived but the budget cut the rest: a capacity fact, not source
+  // health. `detail_unavailable` = some postings simply have no detail page
+  // (Computrabajo, run 41364751660: 3 complete, 5 sin detalle, no fault),
+  // which circuit-policy also treats as neutral.
+  if (status === "partial" && (reason === "deadline_exceeded" || reason === "detail_unavailable")) return false;
   return true;
 }
 

@@ -82,6 +82,8 @@ Detalles de funcionamiento:
 
 **Mientras todos los ticks vengan del `schedule` (hoy), esta guarda no cambia nada.**
 
+Un cambio de comportamiento que conviene saber: si lanzas una corrida a mano desde la UI de Actions («Run workflow»), también cuenta como `workflow_dispatch`. Por eso **esa corrida omite LinkedIn y Computrabajo**, salvo que hayan pasado ≥ 7 h desde su última participación. Las demás fuentes corren normalmente.
+
 El resultado es que el volumen hacia LinkedIn y Computrabajo queda acotado por el ritmo del `schedule` de GitHub, más como mucho un tick de respaldo cada ≥ 7 h. No aumenta por usar el cron externo.
 
 ## Medición antes / después (7 días)
@@ -110,6 +112,16 @@ Para los roles pendientes, sumar los registros `tick_health` del log (`roles.due
 - ≥ 20 ticks/día en CO, con p90 del intervalo ≤ 1,5 h;
 - `roles.duePairs` a la baja;
 - 429 de LinkedIn y Computrabajo por día **≤ la línea base**;
+- **sin hambre en las fuentes protegidas:** LinkedIn y Computrabajo participan **≥ 5 veces al día**, igual que hoy. Si los ticks de `schedule` empiezan a quedar reemplazados en la cola, bajarían en silencio a uno cada 7 h, y Computrabajo es la fuente de listado más grande. Se cuenta así:
+  ```sql
+  SELECT date_trunc('day', r.started_at) AS dia, a.source_name, COUNT(DISTINCT r.id) AS ticks
+    FROM scrape_runs r JOIN source_attempts a ON a.run_id = r.id
+   WHERE r.workflow = 'scrape-tick' AND r.country = 'CO' AND r.is_test = FALSE
+     AND a.source_name IN ('LinkedIn', 'Computrabajo')
+     AND r.started_at > NOW() - INTERVAL '7 days'
+   GROUP BY 1, 2 ORDER BY 1, 2;
+  ```
+  También puedes contar las líneas `🚦 … participan` del log;
 - ningún aumento de `cancelled` aparte de las corridas en espera reemplazadas.
 
 Si no se cumplen, se desactiva el trabajo en cron-job.org (paso 6 de la guía). La guarda puede quedarse, porque no tiene efecto en los ticks de `schedule`.

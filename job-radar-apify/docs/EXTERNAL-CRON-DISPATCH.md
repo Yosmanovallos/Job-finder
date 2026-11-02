@@ -99,6 +99,16 @@ Para los roles pendientes y los 429, cada tick deja una línea `{"event":"tick_h
 gh run view <RUN_ID> --repo Yosmanovallos/Job-finder --log | grep -o '{"event":"\(tick\|drain\)_health".*'
 ```
 
+Comprueba también que LinkedIn y Computrabajo **no se queden sin turno**. Cuenta los ticks diarios en que participaron; deben ser **≥ 5**, como hoy:
+
+```bash
+for id in $(gh run list --repo Yosmanovallos/Job-finder --workflow scrape-jobs.yml --limit 200 --json databaseId -q '.[].databaseId'); do gh run view $id --repo Yosmanovallos/Job-finder --log | grep -m1 -o '🚦 \[Tick\].*: participan.*'; done | wc -l
+```
+
+Divide ese total entre los días que abarcan las corridas revisadas. Si sale menos de 5 al día, baja la frecuencia del cron externo. Los ticks de `schedule` de GitHub están quedando reemplazados en la cola.
+
+**Ojo con las corridas manuales:** «Run workflow» en la UI de Actions también es `workflow_dispatch`. Esas corridas omiten LinkedIn y Computrabajo salvo que hayan pasado ≥ 7 h desde la última vez que participaron.
+
 **Línea base para comparar** (2026-10-25 → 2026-11-01): 5,2 ticks/día, intervalo p50 de 4,85 h, p90 de 6,76 h y máximo de 7,17 h. Había 35 roles vencidos y se procesaban 8 por tick.
 
 Los criterios de éxito y la consulta SQL equivalente sobre `scrape_runs` están en el ADR 0010.
