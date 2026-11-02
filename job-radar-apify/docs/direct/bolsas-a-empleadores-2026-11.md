@@ -86,6 +86,30 @@ Recomendación: no cambiar la programación. Basta con unas pocas corridas
 manuales `focus=browser-boards` (ensayo en seco primero) para vaciar las 562;
 después el backoff las espacia solo.
 
+### 4.1 Ensayo en seco `focus=browser-boards` (2026-11-02)
+
+Run [41449835085](https://github.com/Yosmanovallos/Job-finder/actions/runs/41449835085),
+`mode=dry-run`, aprobado por el dueño. Antes de lanzarlo se corrigió el
+ensayo con foco para que respete el backoff (`isDueInQueue`): solo revisa lo
+que elegiría una corrida `execute`, no las empresas ya `not_found`.
+
+| Medida | Valor |
+|---|---|
+| Revisadas (tope `--limit 100` del ensayo) | 100 de las 562 listas |
+| Duración del paso de descubrimiento | ~1 min 47 s (plazo 9 min) |
+| `not_found` | 96 |
+| Error de red al sondear por nombre (quedan `pending`) | 3 (Hacienda el porvenir, Compañía Comercial Universal, Boston Scientific) |
+| `needs_review` | 1 — 5CA: `greenhouse:5ca`, 1 vacante en Colombia; va a revisión humana |
+| Se habilitaría solo | 0 |
+
+Rendimiento observado: 1 % en las 100 primeras (por debajo del ~3 % de §7).
+A ese ritmo, una corrida `execute` (`--limit 1000`, plazo 9 min) cubriría las
+562 en 1-2 corridas. Lo más probable es que deje decisiones `not_found` con
+backoff y unas pocas `needs_review`, y casi ningún tablero habilitado solo.
+
+El paso previo del mismo workflow (sondeo del inventario ATS, ensayo)
+revisó 110 de 278 tableros antes del plazo; no habilitaría ninguno.
+
 ## 5. Cautelas
 
 - **Venezuela**: el directorio excluye `country = 'VE'` y §7.1/§13 exigen una
