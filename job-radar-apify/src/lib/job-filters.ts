@@ -9,7 +9,7 @@ import {
   titleMatchesFamilies,
   type SearchPlan
 } from "./job-search-intent.js";
-import { classifyModality, modalityForFilter } from "./job-modality.js";
+import { classifyModality, isFreelanceProject, modalityForFilter } from "./job-modality.js";
 
 // Shared between the server (GET /api/jobs, so a 10k+ job corpus is filtered
 // before it's ever serialized to the browser) and, previously, the client —
@@ -256,12 +256,14 @@ export function applyJobFilters(jobs: Job[], filters: JobFilterParams): Job[] {
   if (searchPlan) {
     // The query names a job family ("AI Engineer", "QA", "enfermera"):
     // title-only family match, best-ranked first (job-search-intent.ts).
-    const ranked: Array<{ job: Job; rank: number }> = [];
+    // Within a rank, employment before freelance projects (same order as
+    // job-repository.ts freelanceRankSql).
+    const ranked: Array<{ job: Job; rank: number; freelance: number }> = [];
     for (const job of result) {
       const rank = searchRankForJob(searchPlan, job);
-      if (rank !== null) ranked.push({ job, rank });
+      if (rank !== null) ranked.push({ job, rank, freelance: isFreelanceProject(job) ? 1 : 0 });
     }
-    result = ranked.sort((a, b) => a.rank - b.rank).map((entry) => entry.job);
+    result = ranked.sort((a, b) => a.rank - b.rank || a.freelance - b.freelance).map((entry) => entry.job);
   } else if (rawSearch) {
     const search = rawSearch.toLowerCase();
     // Only drop genuine stopwords ("de", "la", ...) — NOT short words. A

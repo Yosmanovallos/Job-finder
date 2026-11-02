@@ -83,6 +83,37 @@ async function run(): Promise<void> {
     "La página del dashboard no trae remoteType: la tarjeta volvería a leer solo la ubicación."
   );
 
+  // A job-title search lists employment before freelance projects of the
+  // same rank, in SQL as in memory; the projects stay in the results.
+  const gigs: Job[] = [
+    { title: "Community manager para marca ZzModal", source: "Workana", location: "España", minutes: 1 },
+    { title: "Community Manager ZzModal y edición de video", source: "Workana", location: "Argentina", minutes: 2 },
+    { title: "Community Manager ZzModal", source: "LinkedIn", location: "Bogotá", minutes: 30 }
+  ].map((row, index) => ({
+    jobId: `modality-gig-${index}`,
+    title: row.title,
+    company: COMPANY,
+    location: row.location,
+    url: `${TEST_URL_PREFIX}gig-${index}`,
+    dateText: "Hace 1 día",
+    source: row.source,
+    country: row.source === "Workana" ? null : "CO",
+    publishedAt: new Date(Date.now() - row.minutes * 60_000).toISOString()
+  }));
+  await saveJobs(gigs, "Modality test");
+  const filters = { company: COMPANY, search: "community manager" };
+  const searched = await getJobsPage({ filters, limit: 100, offset: 0 });
+  // limit 99: a different cache key from the page read before the gigs were saved.
+  const everything = await getJobsPage({ filters: { company: COMPANY }, limit: 99, offset: 0 });
+  const memory = applyJobFilters(everything.jobs, filters).map((job) => job.source);
+  const sqlOrder = searched.jobs.map((job) => job.source);
+  check(
+    sqlOrder[0] === "LinkedIn" && sqlOrder.slice(1).every((source) => source === "Workana") && sqlOrder.length >= 3 &&
+      JSON.stringify(memory) === JSON.stringify(sqlOrder),
+    "«community manager»: la vacante va antes que los proyectos freelance, igual en SQL y en memoria.",
+    `Orden SQL ${sqlOrder.join(",")} / memoria ${memory.join(",")}.`
+  );
+
   await pool.query(`DELETE FROM jobs WHERE url LIKE $1`, [`${TEST_URL_PREFIX}%`]);
   await pool.end();
   if (failures > 0) process.exit(1);

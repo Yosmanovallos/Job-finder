@@ -4,6 +4,7 @@ import type { Job } from "../src/sources/types.js";
 import { applyJobFilters, getJobModalityLabel } from "../src/lib/job-filters.js";
 import { classifyModality, sqlJobModality } from "../src/lib/job-modality.js";
 import { MODALITY_CASES } from "./fixtures/modality-cases.js";
+import { buildLocationLabel } from "../src/countries/index.js";
 
 test("classifyModality: precedence fuente > título > ubicación, sin evidencia = unknown", () => {
   for (const [input, expected] of MODALITY_CASES) {
@@ -46,4 +47,28 @@ test("el SQL generado no lleva parámetros y cubre cada regla", () => {
   for (const kind of ["freelance", "remoto", "hibrido", "presencial", "unknown"]) assert.ok(sql.includes(`'${kind}'`), kind);
   assert.ok(sql.includes("remote_type = 'fully_remote'"));
   assert.ok(sql.includes("'% remote sensing %'"));
+});
+
+test("Workana: el país es el del cliente, no el lugar de trabajo", () => {
+  assert.equal(buildLocationLabel({ source: "Workana", location: "España", country: null }, "CO"), "Cliente en España");
+  assert.equal(buildLocationLabel({ source: "Workana", location: "", country: null }, "CO"), "Cliente sin país indicado");
+  assert.equal(buildLocationLabel({ source: "LinkedIn", location: "Bogotá", country: "CO" }, "CO"), "Bogotá");
+  // The job page keeps the server's label (rule E parity with the SSR body).
+  assert.equal(buildLocationLabel({ source: "Workana", location: "España", locationLabel: "España" }), "España");
+});
+
+test("búsqueda por cargo: proyectos freelance detrás de los empleos del mismo rango", () => {
+  const base = { company: "ZzCorp", dateText: "", url: "https://example.com/x" };
+  const jobs: Job[] = [
+    { ...base, jobId: "w1", title: "Community manager para marca de ropa", location: "España", source: "Workana" },
+    { ...base, jobId: "w2", title: "Community Manager y edición de video", location: "Argentina", source: "Workana" },
+    { ...base, jobId: "l1", title: "Community Manager", location: "Bogotá", source: "LinkedIn" },
+    { ...base, jobId: "m1", title: "COMMUNITY MANAGER", location: "Remoto", source: "Magneto" }
+  ];
+  const ids = applyJobFilters(jobs, { search: "community manager" }).map((job) => job.jobId);
+  assert.deepEqual(ids, ["l1", "m1", "w1", "w2"]);
+  // Not a hidden result: every project is still there.
+  assert.equal(ids.length, jobs.length);
+  // Without a search the order is untouched.
+  assert.deepEqual(applyJobFilters(jobs, {}).map((job) => job.jobId), ["w1", "w2", "l1", "m1"]);
 });

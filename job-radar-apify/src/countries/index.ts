@@ -145,6 +145,7 @@ export function isRemoteLocation(location: string | undefined | null): boolean {
 // rows had country='CO' despite locations like "Argentina"/"México"/
 // "España" — see the one-time backfill in scripts/backfill-workana-country.ts).
 export const ALWAYS_REMOTE_SOURCES = new Set(["RemoteOK", "Remotive", "WeRemoto", "Workana"]);
+const FREELANCE_LOCATION_SOURCES = new Set(["Workana"]);
 
 // Single source of truth for what country (if any) a freshly-fetched job
 // gets stamped with — used by both the per-role path (scrape-worker.ts) and
@@ -170,13 +171,22 @@ export function resolveJobCountry(
 // would be exactly the kind of unsupported inference AGENTS.md §5 forbids
 // — "Remoto" with nothing else is the honest answer, not a bug.
 export function buildLocationLabel(
-  job: { location?: string | null; country?: string | null; locationLabel?: string | null },
+  job: { location?: string | null; country?: string | null; locationLabel?: string | null; source?: string | null },
   contextCountry?: string | null
 ): string {
   // The job page payload carries the server's label (ADR 0009 department
   // included), so the hydrated page shows exactly what the SSR body showed.
   const label = (job.locationLabel || "").trim();
   if (label) return label;
+  // Cards only: the job page keeps its server label above (rule E). A
+  // freelance project's location is its client's country, not where the
+  // work is done (see ALWAYS_REMOTE_SOURCES above). Same source list as
+  // job-modality.ts FREELANCE_SOURCES, kept here so this leaf stays
+  // dependency-free.
+  if (job.source && FREELANCE_LOCATION_SOURCES.has(job.source)) {
+    const client = (job.location || "").trim();
+    return client ? `Cliente en ${client}` : "Cliente sin país indicado";
+  }
   const loc = (job.location || "").trim();
   if (loc) return loc;
   return getCountryConfig(job.country || contextCountry).name;
