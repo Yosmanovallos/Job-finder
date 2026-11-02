@@ -1,7 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { Job } from "../sources/types.js";
-import { getModalityLabel } from "../lib/job-filters.js";
+import { getJobModalityLabel } from "../lib/job-filters.js";
 import { getSourceColor } from "../lib/source-colors.js";
 import { buildJobPath } from "../lib/job-seo.js";
 import { buildLocationLabel } from "../countries/index.js";
@@ -22,7 +22,7 @@ export interface CategoryJobRowProps {
 // /empleos/:id/:slug — the "hub → item" internal linking these pages exist
 // for (see docs/SEO-PLAN.md §4.4) — never straight to the external source URL.
 export const CategoryJobRow: React.FC<CategoryJobRowProps> = ({ job, origin, showCompany = true }) => {
-  const modality = getModalityLabel(job.location);
+  const modality = getJobModalityLabel(job);
   const color = getSourceColor(job.source);
 
   return (

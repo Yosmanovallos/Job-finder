@@ -18,6 +18,7 @@ import {
   type TitlePattern
 } from "../lib/job-search-intent.js";
 import type { JobFilterParams } from "../lib/job-filters.js";
+import { modalityForFilter, sqlJobModality } from "../lib/job-modality.js";
 import { initialDetailStatus, refreshGoogleReadinessInTransaction } from "./job-readiness-repository.js";
 import { sourceSupportsDetail } from "../sources/detail-capability.js";
 import { seoReadySql } from "../lib/google-job-readiness.js";
@@ -645,6 +646,7 @@ interface JobPageRow {
   salary_currency: string | null;
   salary_raw: string | null;
   applicant_count: number | null;
+  remote_type: Job["remoteType"] | null;
   is_locked: boolean;
   description: string | null;
   requirements: unknown;
@@ -803,19 +805,9 @@ function buildJobWhere(filters: JobFilterParams, sql: SqlParts): string[] {
     where.push(`(${cityPredicates.join(" OR ")})`);
   }
 
-  if (filters.modality && filters.modality !== "all") {
-    const location = "LOWER(COALESCE(location, ''))";
-    if (filters.modality === "remoto") {
-      where.push(`(${location} LIKE '%remoto%' OR ${location} LIKE '%remote%')`);
-    } else if (filters.modality === "hibrido") {
-      where.push(`(${location} LIKE '%híbrido%' OR ${location} LIKE '%hibrido%')`);
-    } else if (filters.modality === "presencial") {
-      where.push(
-        `(${location} NOT LIKE '%remoto%' AND ${location} NOT LIKE '%remote%' AND ` +
-          `${location} NOT LIKE '%híbrido%' AND ${location} NOT LIKE '%hibrido%')`
-      );
-    }
-  }
+  // Same classifier as job-filters.ts applyJobFilters (job-modality.ts).
+  const modality = modalityForFilter(filters.modality);
+  if (modality) where.push(`${sqlJobModality()} = ${sql.param(modality)}`);
 
   if (filters.freshness && filters.freshness !== "all") {
     const hours = filters.freshness === "24h" ? 24 : filters.freshness === "48h" ? 48 : 168;
@@ -901,7 +893,7 @@ async function queryJobsPage(options: JobsPageOptions): Promise<JobsPage> {
        SELECT DISTINCT ON (${VACANCY_IDENTITY_KEYS})
               id, title, company, company_key, location, url, source, sources, date_text, published_at,
               role_origin, country, employment_type, salary_min, salary_max,
-              salary_currency, salary_raw, applicant_count,
+              salary_currency, salary_raw, applicant_count, remote_type,
               (published_at > NOW() - INTERVAL '48 hours') AS is_locked
        FROM ${vacancyIdentitySourceSql(`is_active = TRUE AND ${liveJobSql()}`)} jobs
        ORDER BY ${VACANCY_IDENTITY_KEYS}, published_at DESC, id DESC
@@ -946,6 +938,7 @@ async function queryJobsPage(options: JobsPageOptions): Promise<JobsPage> {
       technologies: Array.isArray(row.technologies) ? row.technologies : [],
       employmentType: row.employment_type ?? undefined,
       applicantCount: row.applicant_count ?? undefined,
+      remoteType: row.remote_type ?? undefined,
       salary: buildSalaryLabel(row),
       // Already selected above; city hubs summarize them (job-seo.ts
       // buildSalaryRange). Same rule as buildSalaryLabel: no currency, no number.
@@ -1168,7 +1161,7 @@ async function queryHomeJobCounts(country: string, cities: string[]): Promise<Ho
     `WITH canonical AS MATERIALIZED (
        SELECT DISTINCT ON (${VACANCY_IDENTITY_KEYS})
               id, title, company, company_key, location, url, source, sources, date_text, published_at,
-              role_origin, country, (published_at > NOW() - INTERVAL '48 hours') AS is_locked
+              role_origin, country, remote_type, (published_at > NOW() - INTERVAL '48 hours') AS is_locked
        FROM ${vacancyIdentitySourceSql(`is_active = TRUE AND ${liveJobSql()}`)} jobs
        ORDER BY ${VACANCY_IDENTITY_KEYS}, published_at DESC, id DESC
      ), scoped AS MATERIALIZED (

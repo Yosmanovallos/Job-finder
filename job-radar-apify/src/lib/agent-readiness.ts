@@ -327,7 +327,7 @@ const publicJobSchema = {
 const queryParameters = [
   { name: "search", in: "query", description: "Cargo, empresa, ubicación o palabras clave; máximo 120 caracteres.", schema: { type: "string", maxLength: 120 } },
   { name: "country", in: "query", description: "Mercado solicitado; las vacantes remotas sin país también pueden aparecer.", schema: { type: "string", enum: ["CO", "VE"] } },
-  { name: "modality", in: "query", description: "Modalidad inferida del texto real de ubicación.", schema: { type: "string", enum: ["remoto", "hibrido", "presencial"] } },
+  { name: "modality", in: "query", description: "Modalidad según la fuente, el título o la ubicación. presencial solo devuelve vacantes con evidencia de presencialidad; las que no la indican quedan fuera de los tres valores.", schema: { type: "string", enum: ["remoto", "hibrido", "presencial"] } },
   { name: "freshness", in: "query", description: "Antigüedad máxima desde la fecha publicada.", schema: { type: "string", enum: ["24h", "48h", "7d"] } },
   { name: "sources", in: "query", description: "Fuente repetible; máximo 10 valores.", style: "form", explode: true, schema: { type: "array", maxItems: 10, items: { type: "string", maxLength: 80 } } },
   { name: "cities", in: "query", description: "Ciudad repetible; máximo 10 valores.", style: "form", explode: true, schema: { type: "array", maxItems: 10, items: { type: "string", maxLength: 80 } } },

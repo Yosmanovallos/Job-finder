@@ -1,5 +1,5 @@
 import React, { memo } from "react";
-import { getModalityLabel } from "../lib/job-filters.js";
+import { getJobModalityLabel } from "../lib/job-filters.js";
 import { getSourceColor } from "../lib/source-colors.js";
 import { Badge } from "./ui/badge.js";
 import { cn } from "../lib/utils.js";
@@ -17,10 +17,12 @@ export interface JobListItemProps {
   onSelect: (jobId: string) => void;
 }
 
-const MODALITY_VARIANT: Record<string, "remote" | "hybrid" | "default"> = {
+const MODALITY_VARIANT: Record<string, "remote" | "hybrid" | "default" | "primary" | "outline"> = {
   Remoto: "remote",
   Híbrido: "hybrid",
-  Presencial: "default"
+  Presencial: "default",
+  "Freelance · proyecto remoto": "primary",
+  "Sin especificar": "outline"
 };
 
 function isFresh(job: JobListItemProps["job"]): boolean {
@@ -41,7 +43,7 @@ export function otherSourcesOf(job: { source: string; sources?: unknown; alsoIn?
 // that detail. JobCard stays the mobile/stacked-list representation, which
 // keeps its own actions since there's no separate detail pane there.
 export const JobListItem = memo(function JobListItem({ job, selected, onSelect }: JobListItemProps) {
-  const modality = getModalityLabel(job.location);
+  const modality = getJobModalityLabel(job);
   const sourceColor = getSourceColor(job.source);
   const others = otherSourcesOf(job);
 

@@ -1,6 +1,10 @@
 /**
  * Job page <title> and meta description (F5, contract §5) — pure, offline.
  * JMT-001 pins hashes computed on origin/main (4459862) before the change.
+ * 2026-11-02 (job-modality.ts): the visible body no longer prints
+ * "Modalidad: Presencial" for a job without modality evidence; that line is
+ * the only difference in the re-pinned hashes (JobPosting, payload and
+ * sitemap hashed separately were byte-identical before and after).
  */
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
@@ -43,16 +47,16 @@ const sha = (value: unknown) =>
 const length = (text: string) => Array.from(text).length;
 
 const UNCHANGED: Record<string, string> = {
-  "aaaaaaaa-1111-4111-8111-111111111111": "02c96f68b5f1067464b2e220bc11323cc5abfa641f001fdcc0cb4688b65dd5f8",
-  "bbbbbbbb-2222-4222-8222-222222222222": "6af077468311af35260abb7ad59b7baa4572dc2a08428bf25aa6b2e0c00498cf",
-  "cccccccc-3333-4333-8333-333333333333": "fd5ec908b2d98e4859728ea0dd7d25171ca256a56d24572ab664dc92cf2116ac",
+  "aaaaaaaa-1111-4111-8111-111111111111": "b7b224a07792445fe59ffe93bc8d0898b5d404c20fa0eea8874670953ca07684",
+  "bbbbbbbb-2222-4222-8222-222222222222": "09dfd5223a1357ca5a512e406ef31ee1e7757288560b70f93146574f2c1db867",
+  "cccccccc-3333-4333-8333-333333333333": "149fa7b3ff08674348fc4e549b3efd31b8344c2ce8cca4158993fce18d553a47",
   "dddddddd-4444-4444-8444-444444444444": "e42c0979b918c6cccfe2457f92e9c74fe4f7e819d22e6ffde1b2c1add49a856e",
-  "eeeeeeee-5555-4555-8555-555555555555": "c9ff1ea5ab857ffd61d2d5fdeaac952a7c01593ed3394ad96c7e3a5ecc079627",
-  "ffffffff-6666-4666-8666-666666666666": "1d3f4d1b6c4bd47987415e40ea00f9b64cfd20a00311f5a36974f79d068c7d6c",
-  "abababab-7777-4777-8777-777777777777": "44497a74a6c042bb7e5c356d29031906f304af50f5e851b63bbbe202422aa343",
-  "cdcdcdcd-8888-4888-8888-888888888888": "ef08c4694b4f280134a8bc95917d829db32b9ac57581bd27848beff7773b0549",
+  "eeeeeeee-5555-4555-8555-555555555555": "4af8e998bb4e4f2b268518a5ea6a1ddbf78b987f4f26102dbbbc5978d3cc0447",
+  "ffffffff-6666-4666-8666-666666666666": "e30ede55c0fce7b93c5950a525ee88fe60a63ee1dd20bc9a4d1b4e4c6f9843ad",
+  "abababab-7777-4777-8777-777777777777": "177744d1b0260147e3cc4c2c1cadca697740ed7eae77844b1fc25c7b321acb9d",
+  "cdcdcdcd-8888-4888-8888-888888888888": "c1aea3ef3ef4549fa317fe921bfe7d624548e1ac6128e4b0b9cfa57d18880f78",
   "efefefef-9999-4999-8999-999999999999": "805c3093a7ee901cb3f001a43a99dbd1f644c52b54856d0c28497e598369e268",
-  "fafafafa-0000-4000-8000-000000000000": "8dcbec100aed4e4e1b1e73c6b047a81088e0a138bd200e3e2fe2044c7a71f743"
+  "fafafafa-0000-4000-8000-000000000000": "6db90cbf42db58a18a81619d2b70e6d285e623d31037a7fdf03d0b6a1d0a18be"
 };
 const OTHER_PAGES_UNCHANGED = "306fc945966e687ab5799bbb22cc3723f654cd71d2e5f6eeb48b1d1ce9a6f03e";
 

@@ -28,6 +28,7 @@ const suites: Record<string, string[]> = {
     "validate-dashboard-filters.ts",
     "validate-role-matching.ts",
     "validate-job-search-intent.test.ts",
+    "validate-job-modality.test.ts",
     "validate-run-telemetry.test.ts",
     "validate-tick-report.test.ts",
     "validate-source-pacing.test.ts",
@@ -86,7 +87,8 @@ const suites: Record<string, string[]> = {
     "validate-direct-projection.ts",
     "validate-direct-inventory.ts",
     "validate-direct-inventory-probe.ts",
-    "validate-saved-jobs.ts"
+    "validate-saved-jobs.ts",
+    "validate-job-modality.ts"
   ],
     direct: ["validate-direct-employers.test.ts", "validate-direct-discovery.test.ts", "validate-direct-d5.test.ts", "validate-direct-d5-workday.test.ts", "validate-direct-d5-phenom.test.ts", "validate-direct-d5-eightfold.test.ts", "validate-direct-d5-magneto.test.ts", "validate-direct-d5-google.test.ts", "validate-direct-tp.test.ts", "validate-direct-frisby.test.ts", "validate-direct-altipal.test.ts", "validate-direct-workeando.test.ts", "validate-direct-inventory.test.ts", "validate-direct-inventory-probe.test.ts", "validate-computrabajo-backlog.test.ts", "validate-source-focus.test.ts", "validate-direct-employers.ts", "validate-direct-discovery.ts", "validate-direct-projection.ts", "validate-direct-inventory.ts", "validate-direct-inventory-probe.ts"],
   "source-closure": ["validate-source-closure.test.ts", "validate-source-closure.ts"],
@@ -94,6 +96,7 @@ const suites: Record<string, string[]> = {
   sitemap: ["validate-sitemap-streaming.ts"],
   observability: ["validate-run-observability.ts"],
   pagination: ["validate-job-pagination.ts"],
+  modality: ["validate-job-modality.test.ts", "validate-job-modality.ts"],
   seo: ["validate-seo-job-pages.ts", "validate-job-page-blocks.ts"],
   "job-page-blocks": ["validate-job-page-blocks.ts", "validate-job-page-blocks.test.ts"],
   companies: ["validate-company-identity.test.ts", "validate-companies-search.ts"],
@@ -111,7 +114,7 @@ const selection = process.argv[2] || "unit";
 const offline = selection === "unit" || selection === "job-render";
 if (!Object.hasOwn(suites, selection) || process.argv.slice(3).some((arg) => arg !== "--dry-run")) {
   throw new Error(
-    "[P0] Suite inválida. Usa unit, integration, job-render, sitemap, observability, pagination, seo, companies, home, baseline, agent-readiness, job-seo, job-page-blocks, source-closure, job-freshness o direct; --dry-run es opcional."
+    "[P0] Suite inválida. Usa unit, integration, job-render, sitemap, observability, pagination, modality, seo, companies, home, baseline, agent-readiness, job-seo, job-page-blocks, source-closure, job-freshness o direct; --dry-run es opcional."
   );
 }
 

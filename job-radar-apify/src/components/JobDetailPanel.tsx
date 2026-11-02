@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { ArrowUpRight, Search } from "lucide-react";
 import { Job } from "../sources/types.js";
 import { getSourceColor } from "../lib/source-colors.js";
-import { getModalityLabel } from "../lib/job-filters.js";
+import { getJobModalityLabel } from "../lib/job-filters.js";
 import { extractTechnologies } from "../lib/extract-technologies.js";
 import { buildCompanyPath, officialCareersLink, officialEmployerSource } from "../lib/job-seo.js";
 import { isPlaceholderEmployer } from "../lib/company-key.js";
@@ -55,10 +55,12 @@ export interface JobDetailPanelProps {
   variant?: "default" | "ink";
 }
 
-const MODALITY_VARIANT: Record<string, "remote" | "hybrid" | "default"> = {
+const MODALITY_VARIANT: Record<string, "remote" | "hybrid" | "default" | "primary" | "outline"> = {
   Remoto: "remote",
   Híbrido: "hybrid",
-  Presencial: "default"
+  Presencial: "default",
+  "Freelance · proyecto remoto": "primary",
+  "Sin especificar": "outline"
 };
 
 function initialFor(job: { company?: string; source?: string }): string {
@@ -101,7 +103,7 @@ export const JobDetailPanel: React.FC<JobDetailPanelProps> = ({
     (Array.isArray(job.sources)
       ? job.sources.filter((s: string) => s !== job.source)
       : []);
-  const modality = getModalityLabel(job.location);
+  const modality = getJobModalityLabel(job);
   const sourceColor = getSourceColor(job.source);
   // Bug real encontrado 2026-08-12 (reporte directo del usuario, "Desarrollador
   // De Software AI First"): job.technologies es el campo `skills` que cada

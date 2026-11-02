@@ -92,8 +92,9 @@ export const SOURCES_BY_COUNTRY: Record<string, string[]> = {
   VE: ["LinkedIn Jobs", "Computrabajo", "Torre", "GetOnBoard", "RemoteOK", "Remotive", "WeRemoto"]
 };
 
-// Mirrors job-filters.ts's getModalityLabel remote detection
-// (loc.includes("remoto") / loc.includes("remote")) and
+// Country stamping at ingest, NOT the dashboard modality (that one is
+// job-modality.ts and reads remote_type and the title too). Checks the raw
+// location substrings (loc.includes("remoto") / loc.includes("remote")), like
 // scripts/migrate-country.ts's backfill predicate. Deliberately duplicated
 // rather than imported from job-filters.ts — that file's matching logic is
 // already precision-tuned (see its own comments on past false-positive
