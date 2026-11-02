@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 import { Job } from "../sources/types.js";
 import { getSourceColor } from "../lib/source-colors.js";
-import { getModalityLabel } from "../lib/job-filters.js";
+import { getJobModalityLabel } from "../lib/job-filters.js";
 import { buildCompanyPath, buildJobPath } from "../lib/job-seo.js";
 import { isPlaceholderEmployer } from "../lib/company-key.js";
 import { buildLocationLabel } from "../countries/index.js";
@@ -50,10 +50,12 @@ function isFresh(job: JobCardProps["job"]): boolean {
   return ageHours <= 48;
 }
 
-const MODALITY_VARIANT: Record<string, "remote" | "hybrid" | "default"> = {
+const MODALITY_VARIANT: Record<string, "remote" | "hybrid" | "default" | "primary" | "outline"> = {
   Remoto: "remote",
   Híbrido: "hybrid",
-  Presencial: "default"
+  Presencial: "default",
+  "Freelance · proyecto remoto": "primary",
+  "Sin especificar": "outline"
 };
 
 export const JobCard = memo(function JobCard({
@@ -71,7 +73,7 @@ export const JobCard = memo(function JobCard({
 
   const otherSources =
     job.alsoIn || (Array.isArray(job.sources) ? job.sources.filter((s) => s !== job.source) : []);
-  const modality = getModalityLabel(job.location);
+  const modality = getJobModalityLabel(job);
   const sourceColor = getSourceColor(job.source);
 
   return (

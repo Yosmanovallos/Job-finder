@@ -18,6 +18,7 @@ import {
   type TitlePattern
 } from "../lib/job-search-intent.js";
 import type { JobFilterParams } from "../lib/job-filters.js";
+import { FREELANCE_SOURCES, modalityForFilter, sqlJobModality } from "../lib/job-modality.js";
 import { initialDetailStatus, refreshGoogleReadinessInTransaction } from "./job-readiness-repository.js";
 import { sourceSupportsDetail } from "../sources/detail-capability.js";
 import { seoReadySql } from "../lib/google-job-readiness.js";
@@ -645,6 +646,7 @@ interface JobPageRow {
   salary_currency: string | null;
   salary_raw: string | null;
   applicant_count: number | null;
+  remote_type: Job["remoteType"] | null;
   is_locked: boolean;
   description: string | null;
   requirements: unknown;
@@ -750,6 +752,14 @@ function searchRankSql(filters: JobFilterParams, sql: SqlParts): string | null {
   return `CASE ${employer}WHEN ${all(plan.exact)} THEN 0 WHEN ${all(plan.core)} THEN 1 ELSE 2 END`;
 }
 
+// Within a rank, a job-title search lists employment before freelance
+// projects (Workana): "community manager" showed video-editing gigs for
+// clients abroad ahead of the actual Community Manager vacancy. Nothing is
+// hidden, and searches by other text keep their order.
+function freelanceRankSql(): string {
+  return `CASE WHEN source IN (${FREELANCE_SOURCES.map((name) => `'${name}'`).join(", ")}) THEN 1 ELSE 0 END`;
+}
+
 // A company filter/page matches every spelling of the same employer
 // ("Accenture", "Accenture Colombia", "ACCENTURE LTDA" — company-identity.ts),
 // except placeholder employers ("Empresa Confidencial"), which only ever
@@ -803,19 +813,9 @@ function buildJobWhere(filters: JobFilterParams, sql: SqlParts): string[] {
     where.push(`(${cityPredicates.join(" OR ")})`);
   }
 
-  if (filters.modality && filters.modality !== "all") {
-    const location = "LOWER(COALESCE(location, ''))";
-    if (filters.modality === "remoto") {
-      where.push(`(${location} LIKE '%remoto%' OR ${location} LIKE '%remote%')`);
-    } else if (filters.modality === "hibrido") {
-      where.push(`(${location} LIKE '%híbrido%' OR ${location} LIKE '%hibrido%')`);
-    } else if (filters.modality === "presencial") {
-      where.push(
-        `(${location} NOT LIKE '%remoto%' AND ${location} NOT LIKE '%remote%' AND ` +
-          `${location} NOT LIKE '%híbrido%' AND ${location} NOT LIKE '%hibrido%')`
-      );
-    }
-  }
+  // Same classifier as job-filters.ts applyJobFilters (job-modality.ts).
+  const modality = modalityForFilter(filters.modality);
+  if (modality) where.push(`${sqlJobModality()} = ${sql.param(modality)}`);
 
   if (filters.freshness && filters.freshness !== "all") {
     const hours = filters.freshness === "24h" ? 24 : filters.freshness === "48h" ? 48 : 168;
@@ -901,26 +901,27 @@ async function queryJobsPage(options: JobsPageOptions): Promise<JobsPage> {
        SELECT DISTINCT ON (${VACANCY_IDENTITY_KEYS})
               id, title, company, company_key, location, url, source, sources, date_text, published_at,
               role_origin, country, employment_type, salary_min, salary_max,
-              salary_currency, salary_raw, applicant_count,
+              salary_currency, salary_raw, applicant_count, remote_type,
               (published_at > NOW() - INTERVAL '48 hours') AS is_locked
        FROM ${vacancyIdentitySourceSql(`is_active = TRUE AND ${liveJobSql()}`)} jobs
        ORDER BY ${VACANCY_IDENTITY_KEYS}, published_at DESC, id DESC
      ), filtered AS (
        SELECT canonical.*,
               CASE WHEN ${preferencePredicate} THEN 0 ELSE 1 END AS preference_rank,${searchRank ? `
-              ${searchRank} AS search_rank,` : ""}
+              ${searchRank} AS search_rank,
+              ${freelanceRankSql()} AS freelance_rank,` : ""}
               COUNT(*) OVER() AS total_count
        FROM canonical
        ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
      ), page AS (
        SELECT * FROM filtered
-       ORDER BY ${searchRank ? "search_rank, " : ""}preference_rank, published_at DESC, id DESC
+       ORDER BY ${searchRank ? "search_rank, freelance_rank, " : ""}preference_rank, published_at DESC, id DESC
        LIMIT ${limitParam} OFFSET ${offsetParam}
      )
      SELECT page.*, ${detailColumns}
      FROM page
      JOIN jobs details ON details.id = page.id
-     ORDER BY ${searchRank ? "page.search_rank, " : ""}page.preference_rank, page.published_at DESC, page.id DESC`,
+     ORDER BY ${searchRank ? "page.search_rank, page.freelance_rank, " : ""}page.preference_rank, page.published_at DESC, page.id DESC`,
     sql.values
   );
 
@@ -946,6 +947,7 @@ async function queryJobsPage(options: JobsPageOptions): Promise<JobsPage> {
       technologies: Array.isArray(row.technologies) ? row.technologies : [],
       employmentType: row.employment_type ?? undefined,
       applicantCount: row.applicant_count ?? undefined,
+      remoteType: row.remote_type ?? undefined,
       salary: buildSalaryLabel(row),
       // Already selected above; city hubs summarize them (job-seo.ts
       // buildSalaryRange). Same rule as buildSalaryLabel: no currency, no number.
@@ -1168,7 +1170,7 @@ async function queryHomeJobCounts(country: string, cities: string[]): Promise<Ho
     `WITH canonical AS MATERIALIZED (
        SELECT DISTINCT ON (${VACANCY_IDENTITY_KEYS})
               id, title, company, company_key, location, url, source, sources, date_text, published_at,
-              role_origin, country, (published_at > NOW() - INTERVAL '48 hours') AS is_locked
+              role_origin, country, remote_type, (published_at > NOW() - INTERVAL '48 hours') AS is_locked
        FROM ${vacancyIdentitySourceSql(`is_active = TRUE AND ${liveJobSql()}`)} jobs
        ORDER BY ${VACANCY_IDENTITY_KEYS}, published_at DESC, id DESC
      ), scoped AS MATERIALIZED (

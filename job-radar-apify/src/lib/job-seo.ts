@@ -1,5 +1,6 @@
 import type { Job } from "../sources/types.js";
-import { getModalityLabel, roleTitleMatcher, CITY_OPTIONS } from "./job-filters.js";
+import { roleTitleMatcher, CITY_OPTIONS } from "./job-filters.js";
+import { classifyModality, modalityLabel } from "./job-modality.js";
 import { DEFAULT_ROLES_200 } from "../queue/scheduler.js";
 import { getCountryConfig, DEFAULT_COUNTRY } from "../countries/index.js";
 import { isGoogleReadyNow, resolveGoogleLocation } from "./google-job-readiness.js";
@@ -194,10 +195,12 @@ function formatPublishedDate(value: string | Date | undefined): string | null {
   });
 }
 
+// Same classifier as the dashboard card (job-modality.ts). Without
+// evidence the job page says nothing about modality instead of guessing.
 function remoteLabel(job: SeoJob): string | null {
   if (job.remoteType === "fully_remote") return "Remoto (100%)";
-  if (job.remoteType === "hybrid") return "Híbrido";
-  return getModalityLabel(job.location);
+  const modality = classifyModality(job);
+  return modality === "unknown" ? null : modalityLabel(modality);
 }
 
 /**
@@ -1016,14 +1019,7 @@ export function buildCategoryInsights(
       Array.isArray(job.sources) && job.sources.length > 0 ? job.sources : [job.source];
     for (const source of jobSources) if (source) incrementCount(sources, source);
 
-    const modality =
-      job.remoteType === "fully_remote"
-        ? "Remoto"
-        : job.remoteType === "hybrid"
-          ? "Híbrido"
-          : job.remoteType === "onsite"
-            ? "Presencial"
-            : getModalityLabel(job.location) || "Sin especificar";
+    const modality = modalityLabel(classifyModality(job));
     modalityCounts.set(modality, (modalityCounts.get(modality) || 0) + 1);
 
     if (job.publishedAt) {
@@ -1054,7 +1050,7 @@ export function buildCategoryInsights(
       ? `Encuentra ${countLabel} de ${target}. Compara ${sampleLabel}; las cifras de empresas, fuentes, modalidades y frescura se calculan únicamente con esas ofertas.`
       : `Todavía no hay vacantes activas de ${target}. Vuelve pronto o explora todas las ofertas disponibles.`;
 
-  const modalityOrder = ["Remoto", "Híbrido", "Presencial", "Sin especificar"];
+  const modalityOrder = ["Remoto", "Híbrido", "Presencial", "Freelance · proyecto remoto", "Sin especificar"];
   const modalities = [...modalityCounts.entries()]
     .map(([label, count]) => ({ label, count }))
     .sort((a, b) => modalityOrder.indexOf(a.label) - modalityOrder.indexOf(b.label));

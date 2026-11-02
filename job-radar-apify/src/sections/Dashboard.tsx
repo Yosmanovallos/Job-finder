@@ -11,7 +11,7 @@ import { StatsBar } from "../components/StatsBar.js";
 import { useAuth } from "../auth/auth-provider.js";
 import { usePageMeta } from "../lib/use-page-meta.js";
 import { dashboardDescription } from "../lib/page-meta.js";
-import { jobAnalyticsParams, trackEvent } from "../lib/analytics.js";
+import { clearSearchContext, jobAnalyticsParams, sanitizeSearchTerm, startSearchContext, trackEvent } from "../lib/analytics.js";
 import { getCityOptionsForCountry } from "../lib/job-filters.js";
 import { getCountryConfig } from "../countries/index.js";
 import { Input } from "../components/ui/input.js";
@@ -72,6 +72,9 @@ export default function Dashboard() {
   const [debouncedSearch, setDebouncedSearch] = useState(() => searchParams.get("search") || "");
   const [jobs, setJobs] = useState<Job[]>([]);
   const [total, setTotal] = useState(0);
+  // Closed-dictionary correction the server sends with an empty result
+  // ("markerting" → "marketing"); shown as a choice, never applied by itself.
+  const [suggestion, setSuggestion] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
   // Saved/applied marks live in the account (src/lib/saved-jobs.tsx).
   const { mode: savedMode, savedIds: savedJobIds, appliedIds: appliedJobIds, toggleSaved: handleSaveToggle, toggleApplied: handleAppliedToggle } = useSavedJobs();
@@ -118,6 +121,9 @@ export default function Dashboard() {
   // refreshed. Session restoration used to erase useful content and show a
   // spinner for the entire /api/jobs round trip.
   const hasHydratedInitialPageRef = useRef(false);
+  // The filter key last reported to GA4, so a session refresh of the same
+  // results doesn't count the search twice.
+  const trackedSearchKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(filters.search), SEARCH_DEBOUNCE_MS);
@@ -224,6 +230,7 @@ export default function Dashboard() {
       hasHydratedInitialPageRef.current = false;
       setJobs([]);
     }
+    setSuggestion(null);
 
     const headers: Record<string, string> = {};
     if (accessToken) headers["Authorization"] = `Bearer ${accessToken}`;
@@ -238,7 +245,34 @@ export default function Dashboard() {
         setJobs(Array.isArray(data.jobs) ? data.jobs : []);
         setTotal(data.total || 0);
         setHasMore(!!data.hasMore);
+        setSuggestion(typeof data.suggestion === "string" && data.suggestion ? data.suggestion : null);
         hasHydratedInitialPageRef.current = true;
+        if (isDefaultFilterRequest) {
+          clearSearchContext();
+          trackedSearchKeyRef.current = null;
+        } else if (trackedSearchKeyRef.current !== filterKey) {
+          trackedSearchKeyRef.current = filterKey;
+          const searchId = startSearchContext();
+          const searchTerm = sanitizeSearchTerm(effectiveFilters.search);
+          if (searchTerm) trackEvent("search", { search_id: searchId, search_term: searchTerm });
+          const active = [
+            effectiveFilters.search.trim() && "search",
+            effectiveFilters.modality !== "all" && "modality",
+            effectiveFilters.freshness !== "all" && "freshness",
+            effectiveFilters.cities.length > 0 && "cities",
+            effectiveFilters.sources.length > 0 && "sources",
+            effectiveFilters.selectedRoles.length > 0 && "roles",
+            effectiveFilters.company && "company"
+          ].filter(Boolean);
+          trackEvent("search_results", {
+            search_id: searchId,
+            search_term: searchTerm,
+            results_count: Number(data.total) || 0,
+            filters_active: active.join(","),
+            modality: effectiveFilters.modality,
+            has_suggestion: typeof data.suggestion === "string" && !!data.suggestion
+          });
+        }
       })
       .catch(() => {
         if (myRequestId !== requestIdRef.current) return;
@@ -462,7 +496,14 @@ export default function Dashboard() {
   // meaningful at lg+ (mobile keeps the old stacked JobCard list, no
   // detail pane) but tracked unconditionally since it's cheap either way.
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
-  const handleSelectJob = useCallback((jobId: string) => setSelectedJobId(jobId), []);
+  const handleSelectJob = useCallback(
+    (jobId: string) => {
+      setSelectedJobId(jobId);
+      const position = visibleJobs.findIndex((job) => job.jobId === jobId);
+      if (position >= 0) trackEvent("select_job", { ...jobAnalyticsParams(visibleJobs[position], "dashboard_card"), position: position + 1 });
+    },
+    [visibleJobs]
+  );
   useEffect(() => {
     if (visibleJobs.length === 0) {
       setSelectedJobId(null);
@@ -929,6 +970,22 @@ export default function Dashboard() {
             <div className="text-center py-16 px-4 rounded-2xl border-2 border-foreground bg-[#fdf1d3] text-[#2a1d06] shadow-[4px_4px_0_hsl(var(--foreground))]">
               <span className="text-3xl block mb-2">🔍</span>
               No se encontraron vacantes con los filtros seleccionados.
+              {suggestion && suggestion !== filters.search.trim() && (
+                <p className="mt-3">
+                  ¿Quisiste decir{" "}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFilters((f) => ({ ...f, search: suggestion }));
+                      setDebouncedSearch(suggestion);
+                    }}
+                    className="font-bold underline underline-offset-2 hover:text-primary"
+                  >
+                    {suggestion}
+                  </button>
+                  ?
+                </p>
+              )}
             </div>
           )}
         </div>

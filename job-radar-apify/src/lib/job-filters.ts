@@ -9,6 +9,7 @@ import {
   titleMatchesFamilies,
   type SearchPlan
 } from "./job-search-intent.js";
+import { classifyModality, isFreelanceProject, modalityForFilter } from "./job-modality.js";
 
 // Shared between the server (GET /api/jobs, so a 10k+ job corpus is filtered
 // before it's ever serialized to the browser) and, previously, the client —
@@ -121,17 +122,10 @@ export function getRoleMatchWords(role: string): { mode: "any" | "all"; words: s
     : { mode: "all", words };
 }
 
-// Same detection the modality filter uses, exposed separately so the job
-// card can show a "Remoto/Híbrido/Presencial" tag consistent with what
-// filtering that same job would match — derived from the real `location`
-// text, never a separate/inventable field.
-export function getModalityLabel(location: string | undefined | null): string | null {
-  const loc = (location || "").toLowerCase();
-  if (!loc) return null;
-  if (loc.includes("remoto") || loc.includes("remote")) return "Remoto";
-  if (loc.includes("híbrido") || loc.includes("hibrido")) return "Híbrido";
-  return "Presencial";
-}
+// The card's "Remoto/Híbrido/Presencial/Sin especificar" tag and the
+// modality filter share one classifier (job-modality.ts), so a job's label
+// always agrees with what filtering on that label returns.
+export { getJobModalityLabel } from "./job-modality.js";
 
 // Raw `location` values are messy free text (hundreds of variants like
 // "Bogotá, D.C., Capital District, Colombia" vs plain "Bogotá"), so this is a
@@ -262,12 +256,14 @@ export function applyJobFilters(jobs: Job[], filters: JobFilterParams): Job[] {
   if (searchPlan) {
     // The query names a job family ("AI Engineer", "QA", "enfermera"):
     // title-only family match, best-ranked first (job-search-intent.ts).
-    const ranked: Array<{ job: Job; rank: number }> = [];
+    // Within a rank, employment before freelance projects (same order as
+    // job-repository.ts freelanceRankSql).
+    const ranked: Array<{ job: Job; rank: number; freelance: number }> = [];
     for (const job of result) {
       const rank = searchRankForJob(searchPlan, job);
-      if (rank !== null) ranked.push({ job, rank });
+      if (rank !== null) ranked.push({ job, rank, freelance: isFreelanceProject(job) ? 1 : 0 });
     }
-    result = ranked.sort((a, b) => a.rank - b.rank).map((entry) => entry.job);
+    result = ranked.sort((a, b) => a.rank - b.rank || a.freelance - b.freelance).map((entry) => entry.job);
   } else if (rawSearch) {
     const search = rawSearch.toLowerCase();
     // Only drop genuine stopwords ("de", "la", ...) — NOT short words. A
@@ -332,17 +328,8 @@ export function applyJobFilters(jobs: Job[], filters: JobFilterParams): Job[] {
     });
   }
 
-  if (filters.modality && filters.modality !== "all") {
-    const m = filters.modality.toLowerCase();
-    result = result.filter((j) => {
-      const loc = (j.location || "").toLowerCase();
-      if (m === "remoto") return loc.includes("remoto") || loc.includes("remote");
-      if (m === "hibrido") return loc.includes("híbrido") || loc.includes("hibrido");
-      if (m === "presencial")
-        return !loc.includes("remoto") && !loc.includes("remote") && !loc.includes("híbrido");
-      return true;
-    });
-  }
+  const modality = modalityForFilter(filters.modality);
+  if (modality) result = result.filter((j) => classifyModality(j) === modality);
 
   if (filters.freshness && filters.freshness !== "all") {
     const maxAgeHours =
