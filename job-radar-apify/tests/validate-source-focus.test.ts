@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { FOCUS_PRESETS, focusFromArgs, parseFocusSources, summarizeSourceCensus } from "../src/direct/discovery/source-focus.js";
+import { FOCUS_PRESETS, focusFromArgs, isDueInQueue, parseFocusSources, summarizeSourceCensus } from "../src/direct/discovery/source-focus.js";
 import type { SourceCoverageRow } from "../src/db/direct-discovery-repository.js";
 
 test("focus sources are validated, de-duplicated and never free text", () => {
@@ -65,4 +65,15 @@ test("the scheduled discovery keeps the Computrabajo focus; browser-boards is ma
   const tick = readFileSync(new URL("../../.github/workflows/direct-employers-tick.yml", import.meta.url), "utf8");
   assert.match(tick, /browser-boards-coverage\) cmd="npx tsx scripts\/direct-source-coverage\.ts --sources Indeed,Glassdoor --allow-remote-db"/);
   assert.doesNotMatch(tick, /direct-source-coverage\.ts[^\n]*--execute/);
+});
+
+test("a focused dry-run probes only what the execute queue would pick", () => {
+  assert.equal(isDueInQueue({ decision: null, probeDue: null }), true, "not synced yet: enters as pending");
+  assert.equal(isDueInQueue({ decision: "pending", probeDue: true }), true);
+  assert.equal(isDueInQueue({ decision: "not_found", probeDue: false }), false, "backoff is respected");
+  for (const sticky of ["known", "verified", "rejected", "needs_review"]) {
+    assert.equal(isDueInQueue({ decision: sticky, probeDue: false }), false, `${sticky} is never re-probed`);
+  }
+  const script = readFileSync(new URL("../scripts/discover-direct-employers.ts", import.meta.url), "utf8");
+  assert.match(script, /focusRows\.filter\(\(row\) => !dryRun \|\| isDueInQueue\(row\)\)/);
 });

@@ -71,6 +71,16 @@ export interface SourceCensus {
 
 const OPEN_DECISIONS = new Set(["pending", "not_found", "unsupported_ats", "magneto"]);
 
+/**
+ * Would the discovery queue pick this company now? Open decision (or no row
+ * yet: the next sync adds it as `pending`) and retry time reached. A focused
+ * dry-run uses it so it probes what an execute run would, never a company in
+ * backoff or with a sticky decision.
+ */
+export function isDueInQueue(row: Pick<SourceCoverageRow, "decision" | "probeDue">): boolean {
+  return (row.decision === null || OPEN_DECISIONS.has(row.decision)) && row.probeDue !== false;
+}
+
 export function summarizeSourceCensus(input: {
   sources: string[];
   co: SourceCoverageRow[];
@@ -86,8 +96,7 @@ export function summarizeSourceCensus(input: {
     byDecision[key] = (byDecision[key] ?? 0) + 1;
   }
   const open = targets.filter((row) => row.decision === null || OPEN_DECISIONS.has(row.decision));
-  // A company without a discovery row enters the queue as `pending` on the next sync.
-  const due = open.filter((row) => row.probeDue !== false);
+  const due = open.filter(isDueInQueue);
   return {
     sources: input.sources,
     companies: { CO: input.co.length, VE: input.veCompanies, none: input.noCountryCompanies },

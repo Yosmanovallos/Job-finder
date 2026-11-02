@@ -29,7 +29,7 @@ import { curatedDomains, parseAgencyKeys, parseDirectorySnapshot, toCandidates, 
 import { boundedSiteGet } from "../src/direct/discovery/html-http.js";
 import { probeCandidate, verifiedBoards, type DiscoveryCandidate, type ProbeOutcome } from "../src/direct/discovery/probe.js";
 import { probeSite } from "../src/direct/discovery/site-probe.js";
-import { focusFromArgs } from "../src/direct/discovery/source-focus.js";
+import { focusFromArgs, isDueInQueue } from "../src/direct/discovery/source-focus.js";
 
 dotenv.config();
 
@@ -87,7 +87,9 @@ async function main() {
     const entries = fileEntries ?? (await repo!.loadDirectoryCandidates(DIRECTORY_LIMIT));
     const all = toCandidates(entries, agencyKeys, domains);
     const focusRows = focusSources ? await repo!.loadSourceCoverage(focusSources) : [];
-    const focusCounts = new Map(focusRows.map((row) => [row.companyKey, row.directoryCount]));
+    // Dry-run with a focus mirrors the execute queue: companies in backoff or
+    // with a sticky decision are left out, so no request is spent on them.
+    const focusCounts = new Map(focusRows.filter((row) => !dryRun || isDueInQueue(row)).map((row) => [row.companyKey, row.directoryCount]));
     console.log(
       `[discover] Directorio: ${all.length} empresas (${all.filter((candidate) => candidate.websiteDomain).length} con dominio curado, ` +
         `${all.filter((candidate) => candidate.isAgency).length} agencias).`
