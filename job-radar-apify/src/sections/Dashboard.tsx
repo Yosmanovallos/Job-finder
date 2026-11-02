@@ -72,6 +72,9 @@ export default function Dashboard() {
   const [debouncedSearch, setDebouncedSearch] = useState(() => searchParams.get("search") || "");
   const [jobs, setJobs] = useState<Job[]>([]);
   const [total, setTotal] = useState(0);
+  // Closed-dictionary correction the server sends with an empty result
+  // ("markerting" → "marketing"); shown as a choice, never applied by itself.
+  const [suggestion, setSuggestion] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
   // Saved/applied marks live in the account (src/lib/saved-jobs.tsx).
   const { mode: savedMode, savedIds: savedJobIds, appliedIds: appliedJobIds, toggleSaved: handleSaveToggle, toggleApplied: handleAppliedToggle } = useSavedJobs();
@@ -224,6 +227,7 @@ export default function Dashboard() {
       hasHydratedInitialPageRef.current = false;
       setJobs([]);
     }
+    setSuggestion(null);
 
     const headers: Record<string, string> = {};
     if (accessToken) headers["Authorization"] = `Bearer ${accessToken}`;
@@ -238,6 +242,7 @@ export default function Dashboard() {
         setJobs(Array.isArray(data.jobs) ? data.jobs : []);
         setTotal(data.total || 0);
         setHasMore(!!data.hasMore);
+        setSuggestion(typeof data.suggestion === "string" && data.suggestion ? data.suggestion : null);
         hasHydratedInitialPageRef.current = true;
       })
       .catch(() => {
@@ -929,6 +934,22 @@ export default function Dashboard() {
             <div className="text-center py-16 px-4 rounded-2xl border-2 border-foreground bg-[#fdf1d3] text-[#2a1d06] shadow-[4px_4px_0_hsl(var(--foreground))]">
               <span className="text-3xl block mb-2">🔍</span>
               No se encontraron vacantes con los filtros seleccionados.
+              {suggestion && suggestion !== filters.search.trim() && (
+                <p className="mt-3">
+                  ¿Quisiste decir{" "}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFilters((f) => ({ ...f, search: suggestion }));
+                      setDebouncedSearch(suggestion);
+                    }}
+                    className="font-bold underline underline-offset-2 hover:text-primary"
+                  >
+                    {suggestion}
+                  </button>
+                  ?
+                </p>
+              )}
             </div>
           )}
         </div>

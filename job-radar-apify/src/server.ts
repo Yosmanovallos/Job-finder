@@ -40,6 +40,7 @@ import {
 } from "./db/company-reputation-repository.js";
 import type { ReputationEntry } from "./db/company-reputation-repository.js";
 import type { JobFilterParams } from "./lib/job-filters.js";
+import { suggestSearch } from "./lib/search-suggestions.js";
 import type { Job } from "./sources/types.js";
 import { StaleWhileRevalidateCache } from "./lib/stale-while-revalidate-cache.js";
 import { isPlaceholderEmployer } from "./lib/company-key.js";
@@ -744,7 +745,12 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
         jobs: page,
         count: page.length,
         total: result.total,
-        hasMore: offset + page.length < result.total
+        hasMore: offset + page.length < result.total,
+        // "¿Quisiste decir…?" only for an empty first page: a closed
+        // dictionary in memory, no query (search-suggestions.ts).
+        ...(result.total === 0 && offset === 0 && filters.search
+          ? { suggestion: suggestSearch(filters.search) }
+          : {})
       })
     );
     return;
