@@ -216,17 +216,17 @@ export function renderContentMarkdown(content: PublicContent): string {
 export function injectPublicContent(indexHtml: string, content: PublicContent): string {
   const canonicalUrl = `${SITE_ORIGIN}${content.pathname}`;
   const result = indexHtml
-    .replace('<div id="app"></div>', `<div id="app">${renderContentHtml(content)}</div>`)
-    .replace(/<title>[\s\S]*?<\/title>/, `<title>${escapeHtml(content.title)}</title>`)
-    .replace(/<meta[^>]*name=["']description["'][^>]*>/, `<meta name="description" content="${escapeHtml(content.description)}" />`)
-    .replace(/<link[^>]*rel=["']canonical["'][^>]*>/, `<link rel="canonical" href="${escapeHtml(canonicalUrl)}" />`)
-    .replace(/<meta[^>]*property=["']og:title["'][^>]*>/, `<meta property="og:title" content="${escapeHtml(content.title)}" />`)
-    .replace(/<meta[^>]*property=["']og:description["'][^>]*>/, `<meta property="og:description" content="${escapeHtml(content.description)}" />`)
-    .replace(/<meta[^>]*name=["']twitter:title["'][^>]*>/, `<meta name="twitter:title" content="${escapeHtml(content.title)}" />`)
-    .replace(/<meta[^>]*name=["']twitter:description["'][^>]*>/, `<meta name="twitter:description" content="${escapeHtml(content.description)}" />`);
+    .replace('<div id="app"></div>', () => `<div id="app">${renderContentHtml(content)}</div>`)
+    .replace(/<title>[\s\S]*?<\/title>/, () => `<title>${escapeHtml(content.title)}</title>`)
+    .replace(/<meta[^>]*name=["']description["'][^>]*>/, () => `<meta name="description" content="${escapeHtml(content.description)}" />`)
+    .replace(/<link[^>]*rel=["']canonical["'][^>]*>/, () => `<link rel="canonical" href="${escapeHtml(canonicalUrl)}" />`)
+    .replace(/<meta[^>]*property=["']og:title["'][^>]*>/, () => `<meta property="og:title" content="${escapeHtml(content.title)}" />`)
+    .replace(/<meta[^>]*property=["']og:description["'][^>]*>/, () => `<meta property="og:description" content="${escapeHtml(content.description)}" />`)
+    .replace(/<meta[^>]*name=["']twitter:title["'][^>]*>/, () => `<meta name="twitter:title" content="${escapeHtml(content.title)}" />`)
+    .replace(/<meta[^>]*name=["']twitter:description["'][^>]*>/, () => `<meta name="twitter:description" content="${escapeHtml(content.description)}" />`);
   return result.includes('property="og:url"')
-    ? result.replace(/<meta[^>]*property=["']og:url["'][^>]*>/, `<meta property="og:url" content="${escapeHtml(canonicalUrl)}" />`)
-    : result.replace("</head>", `  <meta property="og:url" content="${escapeHtml(canonicalUrl)}" />\n</head>`);
+    ? result.replace(/<meta[^>]*property=["']og:url["'][^>]*>/, () => `<meta property="og:url" content="${escapeHtml(canonicalUrl)}" />`)
+    : result.replace("</head>", () => `  <meta property="og:url" content="${escapeHtml(canonicalUrl)}" />\n</head>`);
 }
 
 // Head (+ an H1/intro body when the route has one) for the client-rendered

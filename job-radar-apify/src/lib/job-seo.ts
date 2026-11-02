@@ -469,6 +469,43 @@ export function injectJobHeadMeta(html: string, meta: JobMeta): string {
     .replace(/<meta[^>]*name=["']twitter:description["'][^>]*>/, () => `<meta name="twitter:description" content="${description}" />`);
 }
 
+export interface JobPageContent {
+  /** Rendered inner HTML of <div id="app">. */
+  appHtml: string;
+  /** window.__SSR_JOB_LINKS__ */
+  links: unknown;
+  breadcrumb: unknown;
+  /** window.__SSR_JOB__, anonymous visitors only. */
+  payload: unknown | null;
+  noindex: boolean;
+  jobPosting: unknown | null;
+}
+
+/**
+ * Writes a job page's body and <head> scripts into the SPA shell, in the
+ * order the page always had. Function replacers for the same reason as
+ * injectJobHeadMeta: the body, the payload and the JSON-LD carry source text,
+ * and neither escapeHtml nor escapeJsonForScriptTag touches "$".
+ */
+export function injectJobPageContent(html: string, content: JobPageContent): string {
+  const appendToHead = (page: string, snippet: string) => page.replace("</head>", () => `${snippet}</head>`);
+  let page = html.replace('<div id="app"></div>', () => `<div id="app">${content.appHtml}</div>`);
+  page = appendToHead(
+    page,
+    `  <script>window.__SSR_JOB_LINKS__=${escapeJsonForScriptTag(content.links)};</script>\n` +
+      `  <script type="application/ld+json">${escapeJsonForScriptTag(content.breadcrumb)}</script>\n`
+  );
+  if (content.payload) {
+    page = appendToHead(page, `  <script>window.__SSR_JOB__=${escapeJsonForScriptTag(content.payload)};</script>\n`);
+  }
+  page = page.replace(/<meta[^>]*name=["']robots["'][^>]*>/i, "");
+  if (content.noindex) page = appendToHead(page, `  <meta name="robots" content="noindex,follow">\n`);
+  if (content.jobPosting) {
+    page = appendToHead(page, `  <script type="application/ld+json">${escapeJsonForScriptTag(content.jobPosting)}</script>\n`);
+  }
+  return page;
+}
+
 export function buildJobMeta(job: SeoJob): JobMeta {
   return {
     title: buildJobTitleTag(job),

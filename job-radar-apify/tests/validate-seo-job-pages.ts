@@ -57,6 +57,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // EADDRINUSE flakiness if something else is on 3000.
 const TEST_PORT = Number(process.env.TEST_HTTP_PORT);
 const BASE_URL = `http://127.0.0.1:${TEST_PORT}`;
+const DOLLAR_PATTERNS = "$& $` $' $$";
+const DOLLAR_TITLE = `Cajero ${DOLLAR_PATTERNS}`;
 
 let failures = 0;
 
@@ -541,9 +543,24 @@ async function runHttpTests() {
   // so the noindex path is too. This runs only against the runner's
   // disposable PostgreSQL (require-isolated-database), never production.
   const fixtureRows = await pool.query<{ id: string }>(
-    `SELECT id FROM jobs WHERE is_active AND country = 'CO' AND location = 'Bogotá, Colombia' ORDER BY id LIMIT 2`
+    `SELECT id FROM jobs WHERE is_active AND country = 'CO' AND location = 'Bogotá, Colombia' ORDER BY id LIMIT 3`
   );
-  const [readyId, thinId] = fixtureRows.rows.map((row) => row.id);
+  const [readyId, thinId, dollarId] = fixtureRows.rows.map((row) => row.id);
+  // A Google-ready job whose source text carries every String.replace
+  // pattern ($&, $`, $', $$): the SSR page must reproduce it verbatim.
+  if (dollarId) {
+    await pool.query(
+      `UPDATE jobs SET title = $2, description = $3, requirements = $4::jsonb, detail_status = 'complete', description_kind = 'full'
+       WHERE id = $1`,
+      [
+        dollarId,
+        DOLLAR_TITLE,
+        `Atiende la caja ${DOLLAR_PATTERNS} con cuidado y cuadra el turno al cierre de cada jornada.\nSalario $$1.300.000 más comisiones por ventas cumplidas y auxilio de transporte.`,
+        JSON.stringify(["Bachiller.", "Un año de experiencia en caja.", "Manejo de datáfono."])
+      ]
+    );
+    await refreshGoogleReadiness(dollarId, { contentObtained: true });
+  }
   if (readyId) {
     await pool.query(
       `UPDATE jobs SET description = $2, requirements = $3::jsonb, detail_status = 'complete', description_kind = 'full'
@@ -892,6 +909,65 @@ async function runHttpTests() {
           jobPosting.hiringOrganization?.name === realJob.company,
         "Los datos del JobPosting coinciden con los datos reales de la vacante (nada inventado).",
         "Los datos del JobPosting no coinciden con la vacante real que se pidió."
+      );
+    }
+
+    // "$" in source text: a string replacement expanded "$&", "$`", "$'" and
+    // "$$" in the body, the payload and the JSON-LD.
+    const dollarJob = visibleJobs.find((j) => j.jobId === dollarId);
+    if (!dollarJob) {
+      check(false, "", "La vacante con '$' en la descripción no quedó visible para probar la página.");
+    } else {
+      const dollarRes = await fetch(`${BASE_URL}${buildJobPath(dollarJob as SeoJob)}`);
+      const dollarHtml = await dollarRes.text();
+      const escapedPatterns = "$&amp; $` $&#39; $$";
+      // An expanded "$`" breaks the JSON: report it as a failed check.
+      const parseOrNull = (text: string) => {
+        try {
+          return JSON.parse(text);
+        } catch {
+          return null;
+        }
+      };
+      const scriptJson = (opener: string) => {
+        const start = dollarHtml.indexOf(opener);
+        if (start < 0) return null;
+        return parseOrNull(dollarHtml.slice(start + opener.length, dollarHtml.indexOf("</script>", start)).replace(/;$/, ""));
+      };
+      const dollarLd = [...dollarHtml.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map(
+        (block) => parseOrNull(block[1])
+      );
+      const dollarPosting = dollarLd.find((block) => block?.["@type"] === "JobPosting");
+      const dollarCrumbs = dollarLd.find((block) => block?.["@type"] === "BreadcrumbList");
+      const payload = scriptJson("<script>window.__SSR_JOB__=");
+      const links = scriptJson("<script>window.__SSR_JOB_LINKS__=");
+      check(
+        dollarRes.status === 200 &&
+          ["<title>", "</head>", '<div id="app">', "<body"].every((tag) => dollarHtml.split(tag).length === 2),
+        "Con '$' en la fuente la página sigue teniendo un solo <title>, </head>, <div id=\"app\"> y <body>.",
+        `Con '$' en la fuente la página quedó mal armada (status ${dollarRes.status}).`
+      );
+      check(
+        dollarHtml.includes(`Atiende la caja ${escapedPatterns} con cuidado`) && dollarHtml.includes("Salario $$1.300.000"),
+        "El cuerpo muestra $&, $`, $' y $$ tal como vienen de la fuente.",
+        "El cuerpo cambió el texto de la fuente al insertar patrones $."
+      );
+      check(
+        dollarHtml.includes(`<title>${escapeHtml(DOLLAR_TITLE)}`),
+        "El <title> conserva los patrones $ del título.",
+        "El <title> cambió los patrones $ del título."
+      );
+      check(
+        payload?.job?.title === DOLLAR_TITLE && links?.jobId === dollarJob.jobId,
+        "window.__SSR_JOB__ y __SSR_JOB_LINKS__ son JSON válido con el título intacto.",
+        `window.__SSR_JOB__ o __SSR_JOB_LINKS__ cambiaron al insertarse: ${JSON.stringify(payload?.job?.title)} / ${JSON.stringify(links?.jobId)} / ${JSON.stringify(dollarJob.title)}`
+      );
+      check(
+        dollarPosting?.title === DOLLAR_TITLE &&
+          String(dollarPosting?.description).includes("Salario $$1.300.000") &&
+          JSON.stringify(dollarCrumbs).includes(JSON.stringify(DOLLAR_TITLE).slice(1, -1)),
+        "JobPosting y BreadcrumbList conservan $&, $`, $' y $$.",
+        `JobPosting o BreadcrumbList cambiaron los patrones $ de la fuente: ${JSON.stringify(dollarPosting?.title)} / ${String(dollarPosting?.description).slice(0, 160)} / ${JSON.stringify(dollarCrumbs).slice(0, 400)}`
       );
     }
 
