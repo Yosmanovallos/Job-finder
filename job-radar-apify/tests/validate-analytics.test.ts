@@ -223,3 +223,18 @@ test("trackEvent añade atribución y ruta sin transmitir la query", () => {
   });
   assert.doesNotMatch(JSON.stringify(calls), /secret/);
 });
+
+test("search: término sin PII y search_id en el embudo", async () => {
+  const { sanitizeSearchTerm, startSearchContext, currentSearchId, clearSearchContext } = await import("../src/lib/analytics.js");
+  assert.equal(sanitizeSearchTerm("  Community MANAGER  "), "community manager");
+  assert.equal(sanitizeSearchTerm("contador ana@correo.com"), "contador");
+  assert.equal(sanitizeSearchTerm("asesor 300 123 4567"), "asesor");
+  assert.equal(sanitizeSearchTerm("cc 1020304050 auxiliar"), "cc auxiliar");
+  assert.equal(sanitizeSearchTerm("python 3"), "python 3");
+  assert.equal(sanitizeSearchTerm("x".repeat(300)).length, 100);
+  const id = startSearchContext(1000);
+  assert.equal(currentSearchId(1000 + 60_000), id);
+  assert.equal(currentSearchId(1000 + 31 * 60_000), undefined);
+  clearSearchContext();
+  assert.equal(currentSearchId(1001), undefined);
+});
