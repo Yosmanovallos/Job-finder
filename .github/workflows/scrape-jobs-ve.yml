@@ -27,6 +27,7 @@ on:
     # real al bajarlo. Se mide con scrape_runs a los 7 días; si no mejora,
     # se revierte esta línea y se escala a docs/adr/0003-scheduler-cadence.md.
     - cron: "*/30 * * * *"
+  # F-fuentes (ADR 0010): disparable también por cron externo; ver scrape-jobs.yml.
   workflow_dispatch:
 
 # A DIFFERENT group name than scrape-jobs.yml's "scrape-jobs-tick" is the

@@ -18,7 +18,7 @@ import { emptyResult, successResult, type JobDetailResult } from "../sources/det
 import { circuitKeyFor, resolvePolicy } from "../sources/source-policy.js";
 import { BUDGET_ESTIMATES, hasBudget, isCancelled, type FetchContext } from "../engine/fetch-context.js";
 import { jitterDelay } from "../engine/jitter-delay.js";
-import { reportSourceSignal, type AttemptHandle } from "../observability/run-telemetry.js";
+import { reportSourceSignal, type AttemptHandle, type RunRecorder } from "../observability/run-telemetry.js";
 import { claimDueDetailJobs, recordDetailOutcome, type ClaimedDetailJob } from "../db/job-readiness-repository.js";
 import { DETAIL_ADAPTER_NAMES } from "../sources/detail-capability.js";
 
@@ -164,10 +164,15 @@ export function drainOrder(adapters: SourceAdapter[]): SourceAdapter[] {
 /**
  * Bounded drain of due 'pending'/'retry' rows, one adapter at a time, each
  * capped by its own detail policy. Never touches legacy 'backlog' rows.
+ *
+ * F-fuentes: with a recorder, each source that claimed rows becomes a
+ * `detail` attempt (role null), so a 429 here reaches source_attempts and
+ * the degradation streak instead of living only in a log line.
  */
 export async function drainDetailQueue(
   adapters: SourceAdapter[],
-  ctx?: FetchContext
+  ctx?: FetchContext,
+  recorder?: RunRecorder
 ): Promise<Record<string, EnrichmentCounters>> {
   const report: Record<string, EnrichmentCounters> = {};
   const order = drainOrder(adapters);
@@ -184,7 +189,16 @@ export async function drainDetailQueue(
         detailCapFor(adapter.name)
       );
       counters.claimed = claimed.length;
-      if (claimed.length > 0) await runClaimed(adapter, claimed, counters, slice);
+      if (claimed.length > 0) {
+        if (recorder) {
+          await recorder.trackAttempt({ source: adapter.name, role: null, stage: "detail" }, async (attempt) => {
+            attempt.setCounters({ received: claimed.length, filtered: 0, valid: 0, failed: 0 });
+            await runClaimed(adapter, claimed, counters, slice, attempt);
+          });
+        } else {
+          await runClaimed(adapter, claimed, counters, slice);
+        }
+      }
       report[adapter.name] = counters;
     } finally {
       slice?.dispose();

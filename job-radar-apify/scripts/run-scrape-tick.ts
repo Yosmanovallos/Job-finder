@@ -12,15 +12,30 @@ import {
 import { DEFAULT_ROLES_200 } from "../src/queue/scheduler.js";
 import { ScrapeWorker, type SourceRunResult } from "../src/queue/scrape-worker.js";
 import { runListingAttempt } from "../src/queue/listing-attempt.js";
-import { RunRecorder, runTelemetrySafely } from "../src/observability/run-telemetry.js";
-import { createPgRunStore, purgeOldRuns, reconcileStaleRuns } from "../src/db/run-repository.js";
+import { RunRecorder, detectRunEnvironment, runTelemetrySafely, type RunSummary } from "../src/observability/run-telemetry.js";
+import { createPgRunStore, purgeOldRuns, reconcileStaleRuns, recentSourceHealth } from "../src/db/run-repository.js";
+import {
+  DEGRADED_STREAK_THRESHOLD,
+  DEGRADED_STREAK_WINDOW,
+  buildTickReport,
+  currentTickHealth,
+  degradationStreaks,
+  groupHealthRows,
+  streakWarnings,
+  type DrainCountersLike,
+  type RoleProgress,
+  type SourceListingInput
+} from "../src/observability/tick-report.js";
+import { PACED_ENV_VAR, PACED_ROLE_SENTINEL, decidePacing, type PacingDecision } from "../src/queue/source-pacing.js";
 import { resolveJobCountry } from "../src/countries/index.js";
 import {
   seedSearchRoles,
   getDueRoleSources,
   getDueGlobalSources,
   markGlobalSourceRun,
-  purgeOldJobs
+  purgeOldJobs,
+  getPacedParticipation,
+  markPacedParticipation
 } from "../src/db/scheduler-repository.js";
 import { pool } from "../src/db/client.js";
 import { BUDGET_ESTIMATES, createFetchContext, hasBudget, isCancelled, whenAborted, type FetchContext } from "../src/engine/fetch-context.js";
@@ -368,62 +383,125 @@ async function runGlobalCatalogWithBudget(
 }
 
 
-function writeSummary(results: RoleResult[], deletedOld: number) {
-  const perSourceTotals: Record<string, { fetched: number; errors: number; statuses: Set<string> }> = {};
-  let totalSaved = 0;
-  let totalDuplicates = 0;
-  let timedOutRoles = 0;
+interface TickTally {
+  roles: RoleProgress;
+  pacing: PacingDecision;
+  drain: Record<string, DrainCountersLike>;
+  deletedOld: number;
+}
 
+function appendStepSummary(text: string): void {
+  if (!process.env.GITHUB_STEP_SUMMARY) return;
+  try {
+    fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, text + "\n");
+  } catch {
+    // A summary that can't be written must never fail the tick.
+  }
+}
+
+/**
+ * F-fuentes (ADR 0010): written AFTER recorder.finish(), so the summary says
+ * the run's real status instead of a table of green listing rows next to a
+ * hidden `partial`. Observational only — nothing here changes the exit code.
+ */
+async function writeSummary(results: RoleResult[], tally: TickTally, run: RunSummary, recorder: RunRecorder, trigger: string) {
+  const listings: Record<string, SourceListingInput[]> = {};
+  let savedCount = 0;
+  let duplicateCount = 0;
   for (const r of results) {
-    totalSaved += r.savedCount;
-    totalDuplicates += r.duplicateCount;
-    if (r.timedOut) timedOutRoles++;
+    savedCount += r.savedCount;
+    duplicateCount += r.duplicateCount;
     for (const [source, stats] of Object.entries(r.perSource)) {
-      const bucket = (perSourceTotals[source] ||= { fetched: 0, errors: 0, statuses: new Set() });
-      bucket.fetched += stats.fetched;
-      if (stats.error) bucket.errors++;
-      if (stats.status) bucket.statuses.add(stats.status);
+      (listings[source] ||= []).push({ fetched: stats.fetched, threw: Boolean(stats.error) });
     }
   }
 
-  const lines: string[] = [];
-  lines.push(`## 🕒 Scrape tick — ${new Date().toISOString()}`);
-  lines.push("");
-  lines.push(`Roles procesados: **${results.length}** | Timeouts: **${timedOutRoles}**`);
-  lines.push(
-    `Vacantes nuevas guardadas: **${totalSaved}** | Duplicadas fusionadas: **${totalDuplicates}** | Purgadas (>30d): **${deletedOld}**`
+  const report = buildTickReport(
+    {
+      country: TICK_COUNTRY,
+      trigger,
+      runStatus: run.status,
+      runReason: run.reason,
+      roles: tally.roles,
+      savedCount,
+      duplicateCount,
+      purged: tally.deletedOld,
+      attempts: recorder.outcomes(),
+      listings,
+      drain: tally.drain,
+      pacedOut: tally.pacing.allowed ? [] : [...tally.pacing.sources]
+    },
+    new Date()
   );
-  lines.push("");
-  lines.push("| Fuente | Vacantes obtenidas | Errores | Estado |");
-  lines.push("|---|---|---|---|");
 
-  const sourceNames = Object.keys(perSourceTotals).sort();
-  for (const source of sourceNames) {
-    const { fetched, errors, statuses } = perSourceTotals[source];
-    // fetched === 0 alone (even with errors === 0) is flagged too: several
+  console.log("\n" + report.markdown + "\n");
+  // One structured line (no PII, no error text, no HTML) for log search.
+  console.log(JSON.stringify(report.log));
+  appendStepSummary(report.markdown);
+
+  for (const entry of report.sources) {
+    // fetched === 0 alone (even with no exception) is flagged too: several
     // adapters swallow request-level failures (e.g. a 403) internally and
-    // just return an empty array instead of throwing, so the exception-only
-    // check misses a real block. Zero results across every keyword variant
-    // for an active role in a 48h window is itself the strongest signal.
-    const flag = fetched === 0 ? " ⚠️ posible bloqueo/caída (0 resultados)" : "";
-    lines.push(`| ${source} | ${fetched} | ${errors}${flag} | ${[...statuses].sort().join(", ") || "—"} |`);
-  }
-
-  const summary = lines.join("\n");
-  console.log("\n" + summary + "\n");
-
-  if (process.env.GITHUB_STEP_SUMMARY) {
-    fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary + "\n");
-  }
-
-  for (const source of sourceNames) {
-    const { fetched, errors } = perSourceTotals[source];
-    if (fetched === 0) {
+    // just return an empty array instead of throwing. Zero results across
+    // every keyword variant for an active role in a 48h window is itself the
+    // strongest signal. Detail-only rows (drain) have no listing to judge.
+    const hasListing = (listings[entry.source]?.length ?? 0) > 0;
+    if (hasListing && entry.fetched === 0) {
       console.log(
-        `::warning title=Fuente posiblemente bloqueada::${source} devolvió 0 vacantes en este tick${errors > 0 ? ` (${errors} errores)` : ""}.`
+        `::warning title=Fuente posiblemente bloqueada::${entry.source} devolvió 0 vacantes en este tick${entry.listing.threw > 0 ? ` (${entry.listing.threw} excepciones)` : ""}.`
       );
     }
   }
+
+  // Persistent signal: N consecutive degraded ticks, this one included.
+  // Read-only and fail-safe: without history it simply warns less.
+  const history = await runTelemetrySafely(
+    "recentSourceHealth",
+    () =>
+      recentSourceHealth({ workflow: "scrape-tick", country: TICK_COUNTRY, excludeRunId: recorder.runId, limit: DEGRADED_STREAK_WINDOW }),
+    { runIds: [], rows: [] }
+  );
+  const streaks = degradationStreaks([currentTickHealth(report.sources), ...groupHealthRows(history.rows, history.runIds)]);
+  const warnings = streakWarnings(streaks, TICK_COUNTRY);
+  for (const warning of warnings) console.log(warning);
+  if (warnings.length > 0) {
+    appendStepSummary(
+      `\n**Rachas de degradación (≥${DEGRADED_STREAK_THRESHOLD} ticks seguidos):** ${[...streaks.entries()]
+        .filter(([, n]) => n >= DEGRADED_STREAK_THRESHOLD)
+        .map(([source, n]) => `${source} ×${n}`)
+        .join(", ")}\n`
+    );
+  }
+}
+
+/**
+ * F-fuentes (src/queue/source-pacing.ts): may LinkedIn/Computrabajo run in
+ * this tick? A failure to read or write the marker never fails the tick; it
+ * only fails closed for non-schedule ticks.
+ */
+async function resolvePacing(trigger: string): Promise<PacingDecision> {
+  let last: number | null | undefined;
+  try {
+    last = await getPacedParticipation(PACED_ROLE_SENTINEL, TICK_COUNTRY);
+  } catch {
+    last = undefined;
+  }
+  const decision = decidePacing({ country: TICK_COUNTRY, trigger, lastParticipationMs: last, nowMs: Date.now() });
+  if (decision.allowed) {
+    await markPacedParticipation(PACED_ROLE_SENTINEL, TICK_COUNTRY).catch(() => undefined);
+  }
+  console.log(
+    `🚦 [Tick] Fuentes de ritmo protegido [${decision.sources.join(", ")}]: ${decision.allowed ? "participan" : "fuera de este tick"} (${decision.reason}).`
+  );
+  // Hand the decision to the separate drain step of this same job.
+  if (process.env.GITHUB_ENV) {
+    try {
+      fs.appendFileSync(process.env.GITHUB_ENV, `${PACED_ENV_VAR}=${decision.allowed ? "1" : "0"}\n`);
+    } catch {
+      // The drain step falls back to the same rule from the trigger.
+    }
+  }
+  return decision;
 }
 
 // Set as soon as main() opens a run, so the fatal handler can still close it
@@ -481,6 +559,16 @@ async function main() {
 
   await seedSearchRoles(DEFAULT_ROLES_200);
 
+  const trigger = detectRunEnvironment(process.env).trigger;
+  const pacing = await resolvePacing(trigger);
+  const pacedOut = new Set(pacing.allowed ? [] : pacing.sources);
+  const tally: TickTally = {
+    roles: { due: 0, duePairs: 0, selected: 0, completed: 0, timedOut: 0 },
+    pacing,
+    drain: {},
+    deletedOld: 0
+  };
+
   const trackedPromises: Promise<unknown>[] = [];
 
   // Independent of per-role due-ness below: these sources ignore role and
@@ -494,7 +582,17 @@ async function main() {
     recorder.runId
   );
 
-  const due = await getDueRoleSources(ROLE_CADENCE_MS);
+  const allDue = await getDueRoleSources(ROLE_CADENCE_MS);
+  // F-fuentes: paced sources held out of this tick stay due (their
+  // role_source_runs rows are untouched); a role due ONLY for them is not
+  // selected, so its slot goes to a role other sources can serve now.
+  const due = new Map(
+    [...allDue.entries()]
+      .map(([roleName, sourceNames]) => [roleName, sourceNames.filter((name) => !pacedOut.has(name))] as const)
+      .filter(([, sourceNames]) => sourceNames.length > 0)
+  );
+  tally.roles.due = allDue.size;
+  tally.roles.duePairs = [...allDue.values()].reduce((n, sources) => n + sources.length, 0);
   const results: RoleResult[] = [];
 
   if (due.size === 0) {
@@ -515,10 +613,14 @@ async function main() {
       .filter((item) => item.sourceNames.length > 0);
 
     console.log(
-      `🕒 [Tick] ${due.size} roles con fuentes vencidas — procesando ${items.length} (tope ${MAX_ROLES_PER_RUN}/tick, el resto se recoge en el próximo).`
+      `🕒 [Tick] ${allDue.size} roles con fuentes vencidas — procesando ${items.length} (tope ${MAX_ROLES_PER_RUN}/tick, el resto se recoge en el próximo).`
     );
 
-    results.push(...(await runBatched(items, rootCtx, plan, startedAt, trackedPromises, recorder, recorder.runId)));
+    const roleResults = await runBatched(items, rootCtx, plan, startedAt, trackedPromises, recorder, recorder.runId);
+    tally.roles.selected = items.length;
+    tally.roles.timedOut = roleResults.filter((r) => r.timedOut).length;
+    tally.roles.completed = roleResults.length - tally.roles.timedOut;
+    results.push(...roleResults);
   }
 
   if (globalResult) results.push(globalResult);
@@ -530,11 +632,13 @@ async function main() {
   // 'backlog' rows are never touched here (historical backfill = separate
   // authorization).
   if (!isCancelled(rootCtx) && hasBudget(rootCtx, BUDGET_ESTIMATES.detailFetch)) {
-    const marketAdapters = allAdapters.filter((adapter) =>
-      TICK_COUNTRY === "VE" ? adapter.name.endsWith("-VE") : !adapter.name.endsWith("-VE")
+    const marketAdapters = allAdapters.filter(
+      (adapter) =>
+        (TICK_COUNTRY === "VE" ? adapter.name.endsWith("-VE") : !adapter.name.endsWith("-VE")) && !pacedOut.has(adapter.name)
     );
     try {
-      const drained = await drainDetailQueue(marketAdapters, rootCtx);
+      const drained = await drainDetailQueue(marketAdapters, rootCtx, recorder);
+      tally.drain = drained;
       for (const [name, counters] of Object.entries(drained)) {
         const line = formatDrainLine(name, counters);
         if (line) console.log(line);
@@ -560,9 +664,8 @@ async function main() {
 
   // Retention cleanup, not ingestion: if the budget is gone it simply waits
   // for the next tick rather than pushing the process past its deadline.
-  let deletedOld = 0;
   if (!isCancelled(rootCtx)) {
-    deletedOld = await purgeOldJobs();
+    tally.deletedOld = await purgeOldJobs();
   } else {
     console.warn("⏱️ [Tick] Sin presupuesto para la purga de vacantes antiguas — se hará en el próximo tick.");
   }
@@ -582,8 +685,6 @@ async function main() {
       console.warn("⚠️ [Tick] Paso de copias oficiales omitido:", (error as Error)?.message || error);
     }
   }
-
-  writeSummary(results, deletedOld);
 
   // --- Cierre acotado (P3, EXE-006) ---------------------------------------
   // Every stretch below has a bound. Before this phase the process ended here
@@ -613,6 +714,10 @@ async function main() {
   console.log(
     `📡 [Tick] Ejecución ${run.runId}: ${run.status} (${run.reason})${run.telemetryEnabled ? "" : " — telemetría no persistida"}.`
   );
+  // F-fuentes: after finish(), so it reports the real run status. Never throws.
+  await writeSummary(results, tally, run, recorder, trigger).catch((error) => {
+    console.warn("⚠️ [Tick] Resumen por fuente omitido:", (error as Error)?.name);
+  });
   await runTelemetrySafely("releaseRunLeases", () => releaseRunLeases(recorder.runId), 0);
   await runTelemetrySafely("purgeOldRuns", () => purgeOldRuns(), 0);
 

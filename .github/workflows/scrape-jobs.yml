@@ -12,6 +12,9 @@ on:
     # real al bajarlo. Se mide con scrape_runs a los 7 días; si no mejora,
     # se revierte esta línea y se escala a docs/adr/0003-scheduler-cadence.md.
     - cron: "*/30 * * * *" # $0 USD en repositorio público
+  # F-fuentes (ADR 0010): un cron externo puede disparar este workflow por
+  # API (docs/EXTERNAL-CRON-DISPATCH.md). LinkedIn/Computrabajo solo
+  # participan en ticks de schedule (o tras >=7 h), ver source-pacing.ts.
   workflow_dispatch:
 
 # If a tick is still running when the next 15-min trigger fires (e.g. some

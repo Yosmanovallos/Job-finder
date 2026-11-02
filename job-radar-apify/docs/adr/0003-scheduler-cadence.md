@@ -2,6 +2,7 @@
 
 **Fecha:** 2026-09-15
 **Estado:** aceptado para P3 · recomendación pendiente de aprobación de coste
+**Enmendado por:** [ADR 0010](0010-external-dispatch-cadence.md) (2026-11-01) — revisión de 7 días cerrada con datos: el experimento */30 no mejoró la cadencia (5,2 ticks/día); se propone disparo externo $0 con guarda de ritmo para LinkedIn/Computrabajo.
 **Contexto:** `docs/PROD-IMPROVEMENTS-PLAN.md` §P3,
 `openspec/changes/p3-execution-deadlines/`
 

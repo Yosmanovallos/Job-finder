@@ -10,11 +10,15 @@
  * as the tick; healthy robots-allowed sources first (DETAIL_ADAPTERS order),
  * each with a fair slice of the budget.
  */
+import fs from "fs";
 import dotenv from "dotenv";
 import { allAdapters } from "../src/sources/index.js";
 import { pool } from "../src/db/client.js";
 import { createFetchContext } from "../src/engine/fetch-context.js";
 import { drainDetailQueue, formatDrainLine } from "../src/queue/detail-enrichment.js";
+import { detectRunEnvironment } from "../src/observability/run-telemetry.js";
+import { drainHealthLog, formatDrainSummary } from "../src/observability/tick-report.js";
+import { PACED_ENV_VAR, pacedOutForDrain } from "../src/queue/source-pacing.js";
 
 dotenv.config();
 
@@ -33,11 +37,24 @@ async function main(): Promise<void> {
   const budget = budgetMs();
   const ctx = createFetchContext(budget);
   console.log(`🧾 [Drain] TICK_COUNTRY=${TICK_COUNTRY} · presupuesto ${Math.round(budget / 1000)}s`);
-  const marketAdapters = allAdapters.filter((adapter) =>
-    TICK_COUNTRY === "VE" ? adapter.name.endsWith("-VE") : !adapter.name.endsWith("-VE")
+  // F-fuentes: same pacing decision as this job's tick step (ADR 0010).
+  const pacedOut = pacedOutForDrain(TICK_COUNTRY, process.env[PACED_ENV_VAR], detectRunEnvironment(process.env).trigger);
+  if (pacedOut.length > 0) console.log(`🚦 [Drain] Fuera de este drenaje por ritmo protegido: ${pacedOut.join(", ")}.`);
+  const marketAdapters = allAdapters.filter(
+    (adapter) =>
+      (TICK_COUNTRY === "VE" ? adapter.name.endsWith("-VE") : !adapter.name.endsWith("-VE")) && !pacedOut.includes(adapter.name)
   );
   try {
     const drained = await drainDetailQueue(marketAdapters, ctx);
+    const summary = formatDrainSummary(TICK_COUNTRY, drained, pacedOut);
+    console.log(JSON.stringify(drainHealthLog(TICK_COUNTRY, drained, pacedOut)));
+    if (process.env.GITHUB_STEP_SUMMARY) {
+      try {
+        fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `\n${summary}\n`);
+      } catch {
+        // Never fail the drain over a summary.
+      }
+    }
     let lines = 0;
     for (const [name, counters] of Object.entries(drained)) {
       const line = formatDrainLine(name, counters);

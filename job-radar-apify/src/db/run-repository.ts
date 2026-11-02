@@ -131,6 +131,40 @@ export async function purgeOldRuns(retentionDays = RUN_RETENTION_DAYS, batchSize
 
 // --- Reads ------------------------------------------------------------------
 
+export interface SourceHealthHistory {
+  /** Previous finished runs, newest first. */
+  runIds: string[];
+  rows: { run_id: string; source_name: string; status: AttemptStatus; reason: string | null }[];
+}
+
+/**
+ * F-fuentes: per-source attempt outcomes of the last `limit` finished,
+ * non-test runs of one workflow/country, excluding `excludeRunId` (the
+ * current run, which the caller already has in memory). Read-only, bounded.
+ */
+export async function recentSourceHealth(options: {
+  workflow: string;
+  country: string;
+  excludeRunId: string;
+  limit: number;
+}): Promise<SourceHealthHistory> {
+  const runs = await timedQuery<{ id: string }>(
+    `SELECT id FROM scrape_runs
+      WHERE workflow = $1 AND country = $2 AND is_test = FALSE AND status <> 'running' AND id <> $3
+      ORDER BY started_at DESC
+      LIMIT $4::int`,
+    [options.workflow, options.country, options.excludeRunId, Math.max(1, Math.min(options.limit, 50))]
+  );
+  const runIds = runs.rows.map((row) => row.id);
+  if (runIds.length === 0) return { runIds, rows: [] };
+  const attempts = await timedQuery<{ run_id: string; source_name: string; status: AttemptStatus; reason: string | null }>(
+    `SELECT run_id, source_name, status, reason FROM source_attempts
+      WHERE run_id = ANY($1::uuid[]) AND stage IN ('listing', 'detail')`,
+    [runIds]
+  );
+  return { runIds, rows: attempts.rows };
+}
+
 export interface PublicRunSummary {
   id: string;
   name: string;
