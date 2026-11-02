@@ -318,6 +318,92 @@ only when the source text contains `$`.
 - **After deploy (pending):** the same 5 URLs with unique query strings and
   `MISS`. The limit is +10 % of 264 ms.
 
+### 2026-11-02 searches read only the matching vacancy groups (`codex/search-latency`, before deploy)
+
+A search on `/api/jobs` that is not cached cost about 1.0-1.4 s in
+production, against about 0.25 s once cached. `EXPLAIN (ANALYZE, BUFFERS)` on
+a disposable PostgreSQL 16 shows the cause. The canonical projection
+(country-only sibling window, sort and `DISTINCT ON` over every live row)
+took about 380 ms of a 590 ms `contador` search. The search predicate over
+the ~38k canonical rows took about 175 ms. `COUNT(*) OVER()`, the `details`
+join and the `LIMIT` took under 40 ms.
+
+Two tweaks were measured and discarded:
+
+- Dropping `description` from the projection: no change.
+- `COLLATE "C"` on the identity keys: slower, because it loses the
+  incremental sort.
+
+What changed (`queryJobsPage`, searches only):
+
+- A `search_groups` CTE (`MATERIALIZED`, hash semi-join) collects the
+  `(identity_title, identity_company, identity_instance)` keys
+  (`vacancyGroupKeySql`) of the live rows that pass the same WHERE.
+- The canonical projection then reads only the live rows of those groups.
+- A `DISTINCT ON` group only adds the location, and a `has_city_sibling`
+  partition only adds the country. Every kept group therefore elects the
+  same canonical row. The unchanged WHERE then gives the same rows, total
+  and order.
+- None of the three keys can be NULL.
+- `tests/validate-search-narrowing.ts` (`test:integration`, `test:job-pagination`)
+  compares every page of 89 queries with and without the narrowing. The
+  queries cover: a canonical row that fails while an older sibling passes,
+  country-only rows, official postings, confidential employers, NULL
+  company/location, the same title in CO and VE, and the modality filters.
+  A naive pre-filter (rows instead of groups) fails it.
+- Queries without a search (dashboard, warmup, category and company pages,
+  home stats) send exactly the same SQL as before. The job-page LRU, the
+  block cache and the CO/VE warmup are untouched. No migration.
+
+Local measurement, `scripts/bench-search-latency.ts`:
+
+- Setup: disposable PostgreSQL 16 in Docker with `--cpus 1` and 512 MB.
+  56.5k synthetic rows, 49.9k active, including 1.5k official projections.
+- Method: old and new SQL timed alternately in the same process, 9 rounds,
+  median (range). Parity was identical on every page of all 25 queries.
+
+| Query (`country=CO`, `limit=20`) | Before | After |
+| --- | ---: | ---: |
+| contador / analista / vendedor | 643 / 1,034 / 1,008 ms | 452 / 303 / 518 ms |
+| auxiliar / desarrollador | 587 / 624 ms | 312 / 390 ms |
+| AI Engineer / community manager / marketing | 666 / 528 / 538 ms | 438 / 318 / 319 ms |
+| markerting / zzzzqx (0 results) | 1,205 / 529 ms | 209 / 154 ms |
+| AI Engineer + remoto / marketing + hibrido | 759 / 637 ms | 540 / 345 ms |
+| analista offset 24 / 120 (blocks) | 1,223 / 1,060 ms | 326 / 312 ms |
+| No search (dashboard) / modality only | 515 / 803 ms | 494 / 817 ms (same SQL) |
+
+Cold process, measured locally:
+
+- Setup: `NODE_ENV=production` and the same disposable database, with only
+  synthetic environment variables and no `.env`.
+- Startup logged `dashboard_cache_warmed` for CO/VE in 1,183 ms before the
+  port opened.
+- `/dashboard` on 5 unique URLs: 6-24 ms.
+- New searches through HTTP: `contador`, `analista`, `vendedor`, `auxiliar`
+  and `desarrollador` took 0.27-0.50 s; `markerting` took 0.13 s. Repeats
+  took about 5 ms, served from cache.
+
+What remains of a search:
+
+- Two sequential scans: the predicate over the live rows (about 90 ms) and
+  the group join (about 110 ms).
+- A precomputed normalized title with a trigram index could remove the first.
+  That is an additive migration, deferred until production numbers show it
+  is needed.
+- Network time to the database is unchanged, so expect production to drop by
+  the database share only, roughly 0.3-0.6 s of the 1.0-1.4 s.
+
+**After deploy:**
+
+- Request `/api/jobs?country=CO&search=<term>&limit=20` for five terms
+  nobody has searched since the deploy: `contador`, `analista`, `vendedor`,
+  `auxiliar`, `desarrollador`. Add a unique `&coldcheck=<random>` so the edge
+  answers `MISS`. Then repeat each URL once.
+- Compare the first requests with the 2026-11-02 baseline of 1.03-1.39 s.
+  The repeats should stay at about 0.25 s.
+- `/dashboard` on unique URLs must stay at 250-330 ms. The Render log must
+  show `dashboard_cache_warmed`.
+
 ## Required regression check
 
 For any change that can affect this path:

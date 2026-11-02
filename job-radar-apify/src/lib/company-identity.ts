@@ -118,13 +118,41 @@ export const VACANCY_IDENTITY_KEYS = "identity_title, identity_company, identity
  */
 export function vacancyIdentityColumnsSql(): string {
   return (
-    `COALESCE(title_key, ${titleKeySql()}) AS identity_title, ` +
-    `(CASE WHEN lower(COALESCE(company, '')) LIKE '%confidencial%' THEN lower(trim(company)) ` +
-    `ELSE ${storedCompanyKeySql()} END) AS identity_company, ` +
+    `${identityTitleSql()} AS identity_title, ` +
+    `${identityCompanySql()} AS identity_company, ` +
     `COALESCE(location_key, ${locationKeySql()}) AS identity_location, ` +
-    `CASE WHEN direct_job_id IS NULL THEN '' ` +
-    `ELSE COALESCE(md5(NULLIF(btrim(description), '')), direct_job_id::text) END AS identity_instance`
+    `${identityInstanceSql()} AS identity_instance`
   );
+}
+
+function identityTitleSql(): string {
+  return `COALESCE(title_key, ${titleKeySql()})`;
+}
+
+function identityCompanySql(): string {
+  return (
+    `(CASE WHEN lower(COALESCE(company, '')) LIKE '%confidencial%' THEN lower(trim(company)) ` +
+    `ELSE ${storedCompanyKeySql()} END)`
+  );
+}
+
+function identityInstanceSql(): string {
+  return (
+    `CASE WHEN direct_job_id IS NULL THEN '' ` +
+    `ELSE COALESCE(md5(NULLIF(btrim(description), '')), direct_job_id::text) END`
+  );
+}
+
+/**
+ * Expression list over `jobs` columns: identity_title, identity_company,
+ * identity_instance). Every row that can decide a vacancy's canonical row
+ * shares it: a DISTINCT ON group only adds the location, and a
+ * has_city_sibling partition only adds the country. Narrowing the source rows
+ * to whole values of this tuple therefore leaves the canonical row of every
+ * kept group unchanged.
+ */
+export function vacancyGroupKeySql(): string {
+  return `${identityTitleSql()}, ${identityCompanySql()}, ${identityInstanceSql()}`;
 }
 
 // Location keys that name only the country, not a city. Remote is not here:

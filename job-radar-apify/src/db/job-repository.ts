@@ -34,6 +34,7 @@ import {
   foldSearchText,
   foldedCompanySql,
   isPlaceholderCompanyKeySql,
+  vacancyGroupKeySql,
   vacancyIdentitySourceSql
 } from "../lib/company-identity.js";
 
@@ -879,7 +880,16 @@ function jobsBlockFor(offset: number, limit: number): number | null {
   return offset - block + limit <= JOBS_BLOCK_SIZE ? block : null;
 }
 
-async function queryJobsPage(options: JobsPageOptions): Promise<JobsPage> {
+/**
+ * Test-only: queryJobsPage() without the cache and, with `narrowSearch:
+ * false`, without the search narrowing below, so the integration suite can
+ * prove both return the same rows in the same order.
+ */
+export function queryJobsPageForParity(options: JobsPageOptions, narrowSearch: boolean): Promise<JobsPage> {
+  return queryJobsPage(options, narrowSearch);
+}
+
+async function queryJobsPage(options: JobsPageOptions, narrowSearch = true): Promise<JobsPage> {
   const filters = options.filters || {};
   const limit = Math.min(Math.max(options.limit ?? 24, 1), 100);
   const offset = Math.max(options.offset ?? 0, 0);
@@ -896,14 +906,29 @@ async function queryJobsPage(options: JobsPageOptions): Promise<JobsPage> {
     ? "NULL::text AS description, NULL::jsonb AS requirements, NULL::jsonb AS technologies"
     : "details.description, details.requirements, details.technologies";
 
+  // A search keeps a few thousand of the ~45k live rows, but the canonical
+  // projection (sort + DISTINCT ON over every live row) cost ~380 ms of a
+  // ~500 ms search. With a search, it now reads only the identity groups
+  // (vacancyGroupKeySql) that hold at least one row passing the same WHERE.
+  // Every row that decides a kept group's canonical row is in that group, so
+  // the canonical rows, the WHERE below, the total and the order are exactly
+  // the same as before (tests/validate-search-narrowing.ts).
+  // Searches only: the dashboard, warmup, category and company pages keep
+  // their exact previous SQL.
+  const live = `is_active = TRUE AND ${liveJobSql()}`;
+  const narrowToMatches = narrowSearch && Boolean(filters.search?.trim()) && where.length > 0;
+  const groupKey = vacancyGroupKeySql();
+
   const result = await pool.query(
-    `WITH canonical AS MATERIALIZED (
+    `WITH ${narrowToMatches ? `search_groups (identity_title, identity_company, identity_instance) AS MATERIALIZED (
+       SELECT DISTINCT ${groupKey} FROM jobs WHERE ${live} AND ${where.join(" AND ")}
+     ), ` : ""}canonical AS MATERIALIZED (
        SELECT DISTINCT ON (${VACANCY_IDENTITY_KEYS})
               id, title, company, company_key, location, url, source, sources, date_text, published_at,
               role_origin, country, employment_type, salary_min, salary_max,
               salary_currency, salary_raw, applicant_count, remote_type,
               (published_at > NOW() - INTERVAL '48 hours') AS is_locked
-       FROM ${vacancyIdentitySourceSql(`is_active = TRUE AND ${liveJobSql()}`)} jobs
+       FROM ${vacancyIdentitySourceSql(narrowToMatches ? `${live} AND (${groupKey}) IN (SELECT * FROM search_groups)` : live)} jobs
        ORDER BY ${VACANCY_IDENTITY_KEYS}, published_at DESC, id DESC
      ), filtered AS (
        SELECT canonical.*,
@@ -956,7 +981,7 @@ async function queryJobsPage(options: JobsPageOptions): Promise<JobsPage> {
   });
 
   if (rows.length === 0 && offset > 0) {
-    const first = await queryJobsPage({ ...options, limit: 1, offset: 0, includeDetails: false });
+    const first = await queryJobsPage({ ...options, limit: 1, offset: 0, includeDetails: false }, narrowSearch);
     return { jobs: [], total: first.total };
   }
   return { jobs, total: Number(rows[0]?.total_count || 0) };
