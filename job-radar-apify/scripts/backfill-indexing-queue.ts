@@ -19,8 +19,9 @@
  *      'delete_not_api_notified' (the 410 tombstone is kept);
  *  0d. (GOOGLE-JOBS F2) pending URL_DELETED older than the 7-day delete window
  *      → closed 'delete_window_expired' (the 410 tombstone is kept: any status
- *      backs it). The first run after deploy closes the F0 backlog of ~8,850;
- *      run with --dry-run first to see the count.
+ *      backs it). The first run after deploy closes most of the F0 backlog
+ *      (an estimated ~7,700 rows older than 7 days on 2026-11-02); run with
+ *      --dry-run first for the exact count.
  *  2. only versions inside the window are (re)queued, and a version whose
  *     window already expired is never resurrected.
  *

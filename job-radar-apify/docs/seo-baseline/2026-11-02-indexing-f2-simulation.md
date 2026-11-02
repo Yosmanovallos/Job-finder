@@ -88,9 +88,9 @@ Planificadores:
 |---|---|---|---|---|---|---|
 | S2N | 50/50 | sin ventana | 30.1 % | 0 % | nunca | 8,509 |
 | S2N | 50/50 | 7 d | 30.6 % | 96.8 % | 2.7 d | 329 |
-| S2NB | 50/50 | 7 d | 33.3 % | 85.3 % | 2 h | 86 |
+| **S2NB** | **50/50** | **7 d** | **33.3 %** | **85.3 %** | **2 h** | **86** |
 | S2NB | 60/40 | 7 d | 38.2 % | 63.5 % | 3 h | 299 |
-| **S2NB** | **75/25** | **7 d** | **46.0 %** | **35.9 %** | **— (la mayoría se cierra)** | **670** |
+| S2NB | 75/25 | 7 d | 46.0 % | 35.9 % | — (la mayoría se cierra) | 670 |
 | S2NB | 90/10 | 7 d | 54.8 % | 11.2 % | — | 1,077 |
 
 - **Sin ventana, el carril de retiros nunca se vacía.**
@@ -98,25 +98,31 @@ Planificadores:
     días atrás.
   - El carril recibe 100/día con FIFO, así que siempre envía el más viejo
     del atasco: hoy, una URL con 410 desde hace unos 44 días.
-- **La ventana de 7 días** cierra el atasco heredado (unas 8,400 filas) y
-  acota la cola.
+- **La ventana de 7 días** cierra el atasco heredado (unas 7,700 filas el
+  2-nov, estimación con F0) y acota la cola.
 - **Newest-first en retiros** envía cada retiro unas 2 h después de la purga,
   en vez de días después.
-- **La proporción es el único compromiso real entre los dos carriles.** Se
-  eligió 75/25:
-  - Una vacante nueva solo tiene el sitemap como respaldo, y tarda días.
-  - Un retiro ya tiene el 410, la salida del sitemap y `validThrough`
-    (`datePosted` + 30 d, ADR 0008), que le dijo a Google la fecha de fin
-    desde el primer rastreo.
-  - Con 75/25, cada carril sigue teniendo garantizada su parte y se queda
-    con lo que no use el otro.
+- **La proporción es el único compromiso real entre los dos carriles, y se
+  mantiene en 50/50.**
+  - Una vacante nueva solo tiene el sitemap como respaldo.
+  - Un retiro solo tiene el 410 y la salida del sitemap. No se emite
+    `validThrough` salvo que la fuente dé una fecha (contrato §2), y hoy
+    ningún parser la lee.
+  - F0 no midió cuánto tarda Google en rastrear por cada vía (GSC solo
+    muestra el último rastreo). Ningún carril tiene, por tanto, un respaldo
+    demostradamente mejor.
+  - Con 50/50 la demanda D2 de los dos carriles es la misma (ADR 0004,
+    Decisión 2).
+  - Si F6 muestra que las nuevas notificadas pronto se indexan antes, mover
+    la proporción es cambiar una constante (`DEFAULT_SCHEDULER.shares`). La
+    curva está arriba: 75/25 da 46 % / 36 %.
 
 ### Cambio 3: reparto en el día (configuración final)
 
-| Modo | Envíos/día | Máximo por ejecución | Nuevas en ≤24 h | p50 apta→enviada | Retiros en ≤7 d |
-|---|---|---|---|---|---|
-| burst (hoy) | 184 | 200 | 46.6 % | 6 h | 37 % |
-| **paced** | **180** | **74** | **46.0 %** | **1 h** | **35.9 %** |
+| Modo | Envíos/día | Máximo por ejecución | Nuevas en ≤24 h | p50 apta→enviada | Retiros en ≤7 d | p50 purga→retiro |
+|---|---|---|---|---|---|---|
+| burst (hoy) | 184 | 200 | 34.0 % | 4 h | 85.9 % | 15 h |
+| **paced** | **180** | **74** | **33.3 %** | **<1 h** | **85.3 %** | **2 h** |
 
 Reproducción aparte, con las ejecuciones reales y los carriles siempre llenos
 (prueba `pacing spreads the quota…`):
@@ -133,20 +139,35 @@ a 200/día.
 El reparto cuesta alrededor del 2 % de la cuota. A cambio:
 
 - no hay días de Bogotá sin envíos (F0 vio uno);
-- cada vacante sale una hora después de pasar a apta, en vez de seis;
+- una vacante sale en menos de una hora tras pasar a apta (antes, 4 h) y un
+  retiro unas 2 h después de la purga (antes, 15 h);
 - Google recibe avisos a lo largo de todo el día.
 
 ## Antes y después (200/día, llegadas de F0)
 
-| Indicador | Antes (S2, 50/50, FIFO, burst) | Después (S2NB, 75/25, ventana de retiros de 7 d, paced) |
+| Indicador | Antes (S2, 50/50, FIFO, burst) | Después (S2NB, 50/50, ventana de retiros de 7 d, paced) |
 |---|---|---|
-| Nuevas aptas notificadas en ≤24 h | **0.4 %** | **46.0 %** |
-| Nuevas aptas notificadas en total | 33 % | 46 % |
-| p50 apta → `URL_UPDATED` enviada | 6.8 d | 1 h |
-| Retiros enviados en ≤7 d desde la purga | 0 % | 35.9 % |
-| `URL_DELETED` pendientes al día 90 | 8,760 | 670 |
+| Nuevas aptas notificadas en ≤24 h | **0.4 %** | **33.3 %** |
+| Nuevas aptas notificadas en total | 33 % | 33 % |
+| p50 apta → `URL_UPDATED` enviada | 6.8 d | <1 h |
+| Retiros enviados en ≤7 d desde la purga | 0 % | 85.3 % |
+| p50 purga → `URL_DELETED` enviado | nunca dentro del horizonte (FIFO sirve el atasco de ~44 d) | 2 h |
+| `URL_DELETED` pendientes al día 90 | 8,760 | 86 |
 | Envíos/día | 184 | 180 |
 | Máximo por ejecución | 200 | 74 |
+
+Las nuevas notificadas en total no suben: con 200/día y unas 300 llegadas, la
+cuota es la misma. Lo que cambia es cuándo se avisa. La cuota pasa de gastarse
+en vacantes de una semana, que Google en su mayoría ya había rastreado (F0
+§4), a las vacantes de la última hora.
+
+**Escritura en producción.** El primer reconcile tras el despliegue cierra
+los `URL_DELETED` con más de 7 días. La estimación para el 2-nov, hecha con
+F0, es de unos 7,700: 8,850 pendientes menos unos 1,160 encolados entre el
+26 y el 31 de octubre. El número crece hasta el despliegue. El conteo exacto
+sale de `npx tsx scripts/backfill-indexing-queue.ts --dry-run` (de solo
+lectura). La simulación mide «del closed» a lo largo de 90 días, no esa
+primera ejecución.
 
 ## Límites de esta simulación
 
@@ -158,6 +179,7 @@ El reparto cuesta alrededor del 2 % de la cuota. A cambio:
 - La simulación mide cuándo se avisa, no si Google indexa antes. F0 encontró
   que 19 de 20 aptas recientes ya estaban indexadas, 9 de 10 solo por el
   sitemap. El efecto real se mide en F6.
-- El valor de un retiro frente al de una vacante nueva es un juicio, no una
-  medida. La proporción es una constante (`DEFAULT_SCHEDULER.shares`) y
-  `--grid=f2` muestra la curva completa si hay que moverla.
+- El valor de un retiro frente al de una vacante nueva no está medido. Por
+  eso se mantiene el 50/50 del ADR. La proporción es una constante
+  (`DEFAULT_SCHEDULER.shares`), y `--grid=f2` muestra la curva completa si
+  hay que moverla.

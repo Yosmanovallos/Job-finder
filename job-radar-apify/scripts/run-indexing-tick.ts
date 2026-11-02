@@ -64,8 +64,8 @@ async function main() {
   const CONSECUTIVE_FAILURE_LIMIT = 5;
   let stop = false;
 
-  // ADR 0004 (+ F2 amendment): the budget is shared by lane (new-ready 75% /
-  // API-notified deletes 25%, both newest-first; unused share spills new →
+  // ADR 0004 (+ F2 amendment): the budget is shared by lane (new-ready 50% /
+  // API-notified deletes 50%, both newest-first; unused share spills new →
   // delete → content → reconcile), so neither new jobs nor deletes can starve
   // the other. Rows the pre-send check closes free their slot, so the
   // remaining budget is planned again.

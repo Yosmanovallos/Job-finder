@@ -98,7 +98,7 @@ export interface SimResult {
   sends: Record<QueueLane, number>;
 }
 
-/** The scheduler variants compared by the ADR; S2 is what src/lib/indexing-scheduler.ts ships. */
+/** The scheduler variants compared by the ADR; S2NB with newShare 0.5 is what src/lib/indexing-scheduler.ts ships (F2). */
 export function schedulerConfig(name: SimScheduler, newShare = 0.5): SchedulerConfig {
   const shares = { new: newShare, delete: 1 - newShare, content: 0, reconcile: 0 };
   switch (name) {
@@ -450,7 +450,7 @@ if (process.argv[1]?.endsWith("simulate-indexing-queue.ts")) {
           if (r.growthPerDay <= 0 && r.newP95h <= 48 && r.delP95h <= 7 * 24) { results.push(r); break; }
         }
   } else if (grid === "f2") {
-    // GOOGLE-JOBS F2, 200/day. Before: S2 + burst (deployed). After: S2NB 0.75, delete window 7, paced.
+    // GOOGLE-JOBS F2, 200/day. Before: S2 + burst (deployed). After: S2NB 0.5, delete window 7, paced.
     const base = { policy: "D2" as const, quota: 200, windowDays: 7, legacyReconcile: false };
     // Change 1: order of the new lane (daily is the ADR 0004 model; burst/paced replay the real runs).
     for (const sendMode of ["daily", "burst", "paced"] as const)
@@ -463,7 +463,7 @@ if (process.argv[1]?.endsWith("simulate-indexing-queue.ts")) {
           run({ ...base, scheduler, sendMode: "paced", newShare, deleteWindowDays });
     // Change 3, on the shipped order: burst vs paced.
     for (const sendMode of ["burst", "paced"] as const)
-      run({ ...base, scheduler: "S2NB", sendMode, newShare: 0.75, deleteWindowDays: 7 });
+      run({ ...base, scheduler: "S2NB", sendMode, newShare: 0.5, deleteWindowDays: 7 });
   }
   if (process.argv.includes("--json")) console.log(JSON.stringify(results));
   else if (grid === "f2") { console.log(F2_HEADER); for (const r of results) console.log(formatF2Row(r)); }

@@ -37,25 +37,25 @@ const LANES: QueueLane[] = ["new", "delete", "content", "reconcile"];
 
 /**
  * The shipped policy (ADR 0004, chosen by simulation, amended by GOOGLE-JOBS
- * F2): new-ready and delete share the budget and any unused share spills over
- * — new first, then delete, then content updates, then reconcile. Neither new
- * jobs nor deletes can starve the other while both have work: each keeps its
- * guaranteed share.
+ * F2): new-ready and delete share the budget 50/50 and any unused share spills
+ * over — new first, then delete, then content updates, then reconcile.
+ * Neither new jobs nor deletes can starve the other while both have work.
  *
- * F2 (simulated with the F0 arrivals and the real tick runs, 200/day):
- * - both lanes are drained newest-first. With ~300 new-ready jobs/day the new
- *   lane is always full, and FIFO sent each job ~160 h after it became ready,
- *   just before its 7-day window closed; newest-first sends the same count
- *   within hours. Deletes are newest-first inside their 7-day window, so the
- *   ones that are sent go out within hours of the purge;
- * - 75/25 instead of 50/50. A new job's only fallback is the sitemap (days); a
- *   delete's fallbacks are the 410, the sitemap removal and validThrough,
- *   which already told Google the end date. New-ready notified within 24 h:
- *   0.4 % (deployed) → ~46 %; deletes sent: ~0 % within 7 days → ~36 %.
+ * F2 (simulated with the F0 arrivals and the real tick runs, 200/day): both
+ * lanes are drained newest-first. With ~300 new-ready jobs/day the new lane is
+ * always full, and FIFO sent each job ~160 h after it became ready, just
+ * before its 7-day window closed; newest-first sends the same count within
+ * hours (notified within 24 h: 0.4 % → ~33 %). Deletes are newest-first inside
+ * their 7-day window, so they go out ~2 h after the purge instead of ~44 days
+ * (within 7 days: ~0 % → ~85 %). The share stays 50/50: a new job's only
+ * fallback is the sitemap and a delete's is the 410 + sitemap removal (no
+ * validThrough without a source date, contract §2), so neither lane has a
+ * proven better fallback. Moving it is the only trade-off left: 75/25 gives
+ * ~46 % / ~36 % (docs/seo-baseline/2026-11-02-indexing-f2-simulation.md).
  */
 export const DEFAULT_SCHEDULER: SchedulerConfig = {
   kind: "weighted",
-  shares: { new: 0.75, delete: 0.25, content: 0, reconcile: 0 },
+  shares: { new: 0.5, delete: 0.5, content: 0, reconcile: 0 },
   spillOrder: ["new", "delete", "content", "reconcile"],
   newestFirst: ["new", "delete"]
 };

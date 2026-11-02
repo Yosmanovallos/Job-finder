@@ -254,13 +254,12 @@ Simulación: `docs/seo-baseline/2026-11-02-indexing-f2-simulation.md`
 1. **Los carriles de nuevas y de retiros se vacían newest-first**
    (`newestFirst: ["new", "delete"]`). Contenido y reconcile siguen FIFO.
    `getPendingIndexingLanes` entrega las filas más nuevas de esos carriles.
-   - Nuevas notificadas en ≤24 h: de 0.4 % a ~30 % con el mismo 50/50.
+   - Nuevas notificadas en ≤24 h: de 0.4 % a ~33 %.
    - Se envía la misma cantidad, pero en horas y no en una semana.
-2. **Reparto de 75/25** (antes 50/50), con desborde en el orden nuevas →
-   retiros → contenido → reconcile.
-   - Cada carril conserva su parte garantizada.
-   - Nuevas en ≤24 h: ~46 %. Retiros enviados en ≤7 días desde la purga:
-     ~36 % (hoy ~0 %).
+2. **Se mantiene el reparto 50/50 con desborde.**
+   - Con la ventana de 7 días y newest-first, los retiros enviados en ≤7 días
+     desde la purga pasan de ~0 % a ~85 %, unas 2 h después de la purga.
+   - Mover la proporción es el único compromiso que queda (ver más abajo).
 3. **Ventana de retiros de 7 días** (`DELETE_WINDOW_DAYS`).
    - Un `URL_DELETED` con más de 7 días no se entrega al planificador.
    - El reconcile lo cierra como `superseded` con
@@ -277,6 +276,8 @@ Simulación: `docs/seo-baseline/2026-11-02-indexing-f2-simulation.md`
    - Cuesta un ~2 % de la cuota (180 frente a 184 envíos/día): con la ventana
      rodante, un cupo liberado espera a la siguiente ejecución con cualquier
      política.
+   - A cambio, una vacante sale en menos de una hora tras pasar a apta, y no
+     hay días sin envíos.
 
 **Por qué ya no aplican los dos motivos para descartar S4** (Decisión 2):
 
@@ -291,24 +292,30 @@ Simulación: `docs/seo-baseline/2026-11-02-indexing-f2-simulation.md`
     `delete_window_expired` y lo cubre el 410.
   - Nada espera indefinidamente: lo que newest-first no alcanza se cierra.
 
-**Por qué 75/25 y no 50/50.**
+**Por qué se mantiene 50/50.**
 
-- Una vacante nueva solo tiene el sitemap como respaldo: Google tardó entre 1
-  y 4 días en rastrear la muestra de F0.
-- Un retiro tiene tres respaldos: el 410, la salida del sitemap y
-  `validThrough` = `datePosted` + 30 d, la misma fecha de la purga (ADR 0008).
-  Google conoce el fin de la oferta desde el primer rastreo.
-- Es un juicio sobre el valor relativo, no una medida. La tabla de la
-  simulación da la curva completa: 50/50 → 33 % / 85 %, 60/40 → 38 % / 64 %,
-  75/25 → 46 % / 36 %, 90/10 → 55 % / 11 % (nuevas en ≤24 h / retiros en
-  ≤7 d).
+- Una vacante nueva solo tiene el sitemap como respaldo.
+- Un retiro solo tiene el 410 y la salida del sitemap: no hay `validThrough`
+  sin una fecha de la fuente (contrato §2).
+- F0 no midió cuánto tarda Google por cada vía (GSC solo muestra el último
+  rastreo), así que ningún carril tiene un respaldo demostradamente mejor.
+- Con D2 la demanda de ambos carriles es la misma, que es la razón original
+  del 50/50.
+- La curva queda medida para cuando F6 aporte datos: 50/50 → 33 % / 85 %,
+  60/40 → 38 % / 64 %, 75/25 → 46 % / 36 %, 90/10 → 55 % / 11 % (nuevas en
+  ≤24 h / retiros en ≤7 d).
+- La mejora en ≤24 h es de envío, no de indexación. Su efecto en Google se
+  comprueba en F6.
 
 **Escritura en producción.** El primer reconcile tras el despliegue cierra
-el atasco heredado: unos 8,400 `URL_DELETED` con más de 7 días. Va acotado a
-`RECONCILE_CLOSE_LIMIT` por ejecución y solo cambia el estado; no borra
-filas. Antes de desplegar hay que ver el conteo con
-`npx tsx scripts/backfill-indexing-queue.ts --dry-run`, y el despliegue
-necesita aprobación explícita.
+el atasco heredado de `URL_DELETED` con más de 7 días.
+
+- Estimación con F0 para el 2-nov: unos 7,700. Crece hasta el despliegue.
+- Va acotado a `RECONCILE_CLOSE_LIMIT` por ejecución y solo cambia el
+  estado; no borra filas.
+- Antes de desplegar hay que ver el conteo exacto con
+  `npx tsx scripts/backfill-indexing-queue.ts --dry-run`.
+- El despliegue necesita aprobación explícita.
 
 ## Reproducir
 

@@ -15,7 +15,7 @@ import {
   type Schedulable,
   type SchedulerConfig
 } from "../src/lib/indexing-scheduler.js";
-import { simDataFromFunnel, simulate, type FunnelExport, type SimData, type SimParams } from "../scripts/simulate-indexing-queue.js";
+import { schedulerConfig, simDataFromFunnel, simulate, type FunnelExport, type SimData, type SimParams } from "../scripts/simulate-indexing-queue.js";
 
 interface Row extends Schedulable { id: string }
 
@@ -33,18 +33,18 @@ test("a delete backlog cannot starve new ready jobs, day after day", () => {
     queues.new.push(...Array.from({ length: 400 }, (_, i) => ({ id: `n${day}-${i}`, lane: "new" as const, arrival: day * 24 })));
     const plan = planIndexingSends(queues, 200, DEFAULT_SCHEDULER, day * 24);
     assert.equal(plan.length, 200);
-    assert.equal(count(plan, "new"), 150, `day ${day}: new jobs keep their 75 %`);
+    assert.equal(count(plan, "new"), 100, `day ${day}: new jobs keep their half`);
   }
 });
 
 test("a stream of new jobs cannot starve API-notified deletes", () => {
   const queues = lanes({ delete: 1_000 });
-  for (let day = 0; day < 20; day++) {
+  for (let day = 0; day < 10; day++) {
     queues.new.push(...Array.from({ length: 5_000 }, (_, i) => ({ id: `n${day}-${i}`, lane: "new" as const, arrival: day * 24 })));
     const plan = planIndexingSends(queues, 200, DEFAULT_SCHEDULER, day * 24);
-    assert.equal(count(plan, "delete"), 50, `day ${day}: deletes keep their 25 %`);
+    assert.equal(count(plan, "delete"), 100, `day ${day}: deletes keep their half`);
   }
-  assert.equal(queues.delete.length, 0, "the delete backlog drains in 20 days at 50/day");
+  assert.equal(queues.delete.length, 0, "the delete backlog drains in 10 days at 100/day");
 });
 
 test("deletes are newest-first too (GOOGLE-JOBS F2): a fresh purge is sent before an old one", () => {
@@ -187,21 +187,25 @@ test("change 1 — newest-first notifies new jobs within 24 h instead of a week 
   assert.equal(newest.sends.delete, fifo.sends.delete, "the delete lane keeps its share");
 });
 
-test("change 2 — the delete lane: 25 % newest-first inside a 7-day window (F0 arrivals, 200/day)", () => {
+test("what the simulation measures is what ships", () => {
+  assert.deepEqual(schedulerConfig("S2NB", 0.5), DEFAULT_SCHEDULER);
+});
+
+test("change 2 — the delete lane: newest-first inside a 7-day window (F0 arrivals, 200/day)", () => {
   const today = simulate(f0, f0Base);
-  const f2 = simulate(f0, { ...f0Base, scheduler: "S2NB", newShare: 0.75, deleteWindowDays: 7 });
+  const f2 = simulate(f0, { ...f0Base, scheduler: "S2NB", deleteWindowDays: 7 });
   assert.ok(today.delWithin7dPct < 1, `today almost no delete goes out within 7 days of the purge: ${today.delWithin7dPct}%`);
   assert.ok(today.deleteLaneEnd > 8_000, "today the delete backlog never drains");
-  assert.ok(f2.delWithin7dPct >= 30, `deletes sent within 7 days: ${f2.delWithin7dPct}%`);
-  assert.ok(f2.delP50h === Infinity || f2.delP50h <= 7 * 24, "a delete is sent within its window or closed");
+  assert.ok(f2.delWithin7dPct >= 75, `deletes sent within 7 days: ${f2.delWithin7dPct}%`);
+  assert.ok(f2.delP50h <= 24, `sent within a day of the purge: ${f2.delP50h} h`);
   assert.ok(f2.deleteLaneEnd < 1_000, `the delete lane is bounded by its window: ${f2.deleteLaneEnd}`);
-  assert.ok(f2.newWithin24hPct >= 40, `new-ready notified within 24 h: ${f2.newWithin24hPct}%`);
-  const half = simulate(f0, { ...f0Base, scheduler: "S2NB", newShare: 0.5, deleteWindowDays: 7 });
-  assert.ok(half.delWithin7dPct > f2.delWithin7dPct && half.newWithin24hPct < f2.newWithin24hPct, "the share is the trade-off between the two lanes");
+  assert.ok(f2.newWithin24hPct >= 28, `new-ready still notified within 24 h: ${f2.newWithin24hPct}%`);
+  const newHeavy = simulate(f0, { ...f0Base, scheduler: "S2NB", newShare: 0.75, deleteWindowDays: 7 });
+  assert.ok(newHeavy.newWithin24hPct > f2.newWithin24hPct && newHeavy.delWithin7dPct < f2.delWithin7dPct, "the share is the trade-off between the two lanes");
 });
 
 test("change 3 — pacing spreads each day's sends over the runs at almost no cost (F0 arrivals, real tick runs)", () => {
-  const shipped = { ...f0Base, scheduler: "S2NB" as const, newShare: 0.75, deleteWindowDays: 7 };
+  const shipped = { ...f0Base, scheduler: "S2NB" as const, deleteWindowDays: 7 };
   const burst = simulate(f0, shipped);
   const paced = simulate(f0, { ...shipped, sendMode: "paced" });
   assert.equal(burst.maxSendsPerRun, 200, "today: the whole quota in one run");

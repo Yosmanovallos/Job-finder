@@ -42,12 +42,11 @@ export const DELETE_WINDOW_EXPIRED = "delete_window_expired";
 
 /**
  * ADR 0004, F2 amendment: an URL_DELETED only accelerates what the 410 and the
- * sitemap removal already say, and JobPosting's validThrough (datePosted + 30
- * d, ADR 0008) already told Google when the posting ends. Sent within 7 days of
- * the purge it still speeds up the removal; F0 found 8,850 pending with a
- * median age of 44 days, which accelerate nothing. Older ones are closed as
- * 'delete_window_expired': terminal, history kept, the row still backs the 410
- * (wasJobPurged reads any status).
+ * sitemap removal already say. Sent within 7 days of the purge it still speeds
+ * up the removal; F0 found 8,850 pending with a median age of 44 days, which
+ * accelerate nothing. Older ones are closed as 'delete_window_expired':
+ * terminal, history kept, the row still backs the 410 (wasJobPurged reads any
+ * status).
  */
 export const DELETE_WINDOW_DAYS = 7;
 

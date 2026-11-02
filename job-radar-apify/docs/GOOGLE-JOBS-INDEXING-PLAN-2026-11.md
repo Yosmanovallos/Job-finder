@@ -20,7 +20,7 @@ Fuente: Google Search Central, «Job posting (JobPosting) structured data» y
 | Requisito de Google | Estado en BuscoTrabajo |
 |---|---|
 | `title`, `description` completa en HTML, `datePosted`, `hiringOrganization`, `jobLocation` (o `applicantLocationRequirements` + `TELECOMMUTE` en 100 % remoto) | Cumple. Solo se emite si el evaluador único `evaluateGoogleJobReadiness()` (`src/lib/google-job-readiness.ts`) da apta; si falta algo, no hay JobPosting parcial |
-| `validThrough` cuando la oferta vence | Cumple. `datePosted + 30 d` es veraz porque ADR 0008 hace del día 30 un máximo público estricto |
+| `validThrough` cuando la oferta vence | Cumple. Solo se emite si la fuente publica una fecha de vencimiento (contrato §2, `buildJobPosting`); hoy ningún parser la lee. El fin se expresa con 410 + salida del sitemap. *Corregido en F2: antes decía `datePosted + 30 d`, que es lo que el contrato retiró.* |
 | Marcado solo en la página de detalle; una oferta por página | Cumple. Solo `/empleos/:id/:slug`; hubs con ItemList, nunca JobPosting |
 | El marcado coincide con lo visible | Cumple. Mismo renderizador para cuerpo y JSON-LD (contrato §3) |
 | Una vía para postular sin login | Cumple. Enlace a la fuente en el HTML del servidor; captura de leads opcional |
@@ -165,18 +165,25 @@ migración ni escritura en producción sin aprobación explícita del usuario.
 
     | Indicador | Antes | Después |
     |---|---|---|
-    | Nuevas aptas notificadas en ≤24 h | 0.4 % | ~46 % |
-    | p50 apta → envío | 6.8 d | 1 h |
-    | Retiros enviados en ≤7 d | ~0 % | ~36 % |
-    | `URL_DELETED` pendientes | ~8,800 | <700 |
+    | Nuevas aptas notificadas en ≤24 h | 0.4 % | ~33 % |
+    | p50 apta → envío | 6.8 d | <1 h |
+    | Retiros enviados en ≤7 d | ~0 % | ~85 % |
+    | p50 purga → retiro | ~44 d (atasco FIFO) | 2 h |
+    | `URL_DELETED` pendientes | ~8,800 | <100 |
     | Envíos/día | 184 | 180 |
+
+    El total notificado no sube (misma cuota). Cambia el momento: la cuota
+    deja de gastarse en vacantes de una semana que Google ya había rastreado.
+    El efecto en la indexación se mide en F6.
 
   - Tres cambios, cada uno con su commit y sus pruebas:
     1. **Orden.** Nuevas newest-first. `age` no ayuda.
        `getPendingIndexingLanes` trae las filas más nuevas de ese carril.
-    2. **Retiros.** Newest-first, ventana de 7 días
-       (`delete_window_expired`, sin borrar filas, el 410 intacto) y reparto
-       75/25 en vez de 50/50.
+    2. **Retiros.** Newest-first y ventana de 7 días
+       (`delete_window_expired`, sin borrar filas, el 410 intacto). El reparto
+       se queda en 50/50: no está medido que un carril tenga mejor respaldo, y
+       `validThrough` no se emite. La curva para moverlo está en la
+       simulación (75/25 → 46 % / 36 %).
     3. **Reparto en el día.** `pacedSendAllowance` limita cada ejecución a 74
        envíos como máximo, frente a 200, con el mismo presupuesto rodante.
   - Validación:
@@ -185,8 +192,9 @@ migración ni escritura en producción sin aprobación explícita del usuario.
     - `test:job-seo`/`test:integration` no se corrieron: no hay Docker en el
       equipo.
   - **Pendiente de aprobación del usuario:** push, merge y despliegue.
-    - El primer reconcile tras el despliegue cierra unas 8,400 filas
-      `URL_DELETED` viejas (solo cambio de estado).
+    - El primer reconcile tras el despliegue cierra los `URL_DELETED` con más
+      de 7 días, solo con cambio de estado. Estimación con F0: unas 7,700
+      filas.
     - Antes de desplegar, ver el conteo con
       `npx tsx scripts/backfill-indexing-queue.ts --dry-run`.
 
