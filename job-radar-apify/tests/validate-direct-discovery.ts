@@ -99,11 +99,15 @@ async function run(): Promise<void> {
   const browserCo = await loadSourceCoverage(["Indeed", "Glassdoor"]);
   const browserVe = await loadSourceCoverage(["Indeed", "Glassdoor"], "VE");
   const browserNone = await loadSourceCoverage(["Indeed", "Glassdoor"], "none");
+  // Other suites may leave Indeed/Glassdoor rows in the shared database, so the
+  // exact check is on this test's companies: each lands in exactly its slice.
+  const ownKeys = new Set(["otraprueba", "radarindeed", "radarve", "radarremoto", "discotest"]);
+  const own = (rows: { companyKey: string }[]) => rows.map((row) => row.companyKey).filter((key) => ownKeys.has(key)).sort().join(",");
   check(
-    browserCo.map((row) => row.companyKey).sort().join(",") === "otraprueba,radarindeed" &&
+    own(browserCo) === "otraprueba,radarindeed" &&
       browserCo.every((row) => row.probeDue === null) &&
-      browserVe.map((row) => row.companyKey).join(",") === "radarve" &&
-      browserNone.map((row) => row.companyKey).join(",") === "radarremoto",
+      own(browserVe) === "radarve" &&
+      own(browserNone) === "radarremoto",
     "El censo por fuente (Indeed + Glassdoor) cuenta fuente primaria y deduplicada y separa CO, VE y sin país.",
     `Censo por fuente: ${JSON.stringify({ browserCo, browserVe, browserNone })}`
   );
