@@ -11,7 +11,9 @@ import {
   escapeJsonForScriptTag
 } from "../src/lib/job-seo.js";
 import { readSsrJob, isMissingJobResponse } from "../src/lib/job-page-state.js";
+import { buildCompanyJobsBlock, renderCompanyJobsHtml } from "../src/lib/job-company-links.js";
 import type { Job } from "../src/sources/types.js";
+import { boardJob, officialJob } from "./fixtures/job-page-blocks.js";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const job: Job = {
@@ -238,3 +240,100 @@ test("JRD-004 client navigation ignores stale snapshot and aborted old response"
     await browser.close();
   }
 });
+
+// JPD-007: B1, B2 and B3 read the same in the raw HTML and after React mounts
+// (createRoot replaces the server markup), from the same embedded payloads.
+const parityReputation = [
+  { source: "merco", score: 7.5, scoreScale: "0-10", reviewCount: null, sourceUrl: "https://merco.example.invalid/ranking" },
+  { source: "computrabajo", score: 4.2, scoreScale: "1-5", reviewCount: 318, sourceUrl: "https://ct.example.invalid/empresa" }
+];
+const companyRows = Array.from({ length: 9 }, (_, index) => ({
+  jobId: `dddddddd-0000-4000-8000-${String(index).padStart(12, "0")}`,
+  title: `Consultor ${index}`,
+  company: "ACCENTURE S.A.S.",
+  location: index % 3 ? "Medellín, Antioquia" : "Bogotá, D.C.",
+  url: `https://example.invalid/c/${index}`,
+  isLocked: false
+}));
+const parityCases = [
+  { name: "warm B1 + reputation + careers", job: { ...boardJob, reputation: parityReputation }, snapshot: { total: 10, jobs: companyRows } },
+  { name: "cold B1 + official employer", job: officialJob, snapshot: undefined }
+];
+
+function readBlocks() {
+  const links = (selector: string) =>
+    [...document.querySelectorAll(selector)].map((a) => [
+      a.getAttribute("href"),
+      (a.textContent || "").replace(/\s+/g, " ").trim(),
+      a.getAttribute("rel") || ""
+    ]);
+  const reputation = document.querySelector("[data-company-reputation]");
+  return {
+    company: links("[data-company-jobs] a").map(([href, text]) => [href, text]),
+    reputationLinks: [...(reputation?.querySelectorAll("a") || [])].map((a) => a.getAttribute("href")),
+    reputationText: (reputation?.textContent || "").replace(/\s+/g, " "),
+    careers: links("[data-official-careers] a"),
+    officialSource: links("[data-official-source] a"),
+    overflow: document.documentElement.scrollWidth - window.innerWidth
+  };
+}
+
+for (const width of [390, 1440]) {
+  for (const parity of parityCases) {
+    test(`JPD-007 SSR and React show the same blocks: ${parity.name} (${width}px)`, async () => {
+      const block = buildCompanyJobsBlock(parity.job, parity.snapshot)!;
+      const browser = await chromium.launch({ headless: true });
+      try {
+        const html = (await readFile(path.join(root, "public/index.html"), "utf8"))
+          .replace('<div id="app"></div>', `<div id="app">${buildJobPageBody(parity.job)}${renderCompanyJobsHtml(block)}</div>`)
+          .replace(
+            "</head>",
+            `<script>window.__SSR_JOB_LINKS__=${escapeJsonForScriptTag({ jobId: parity.job.jobId, related: [], company: block })};</script>` +
+              `<script>window.__SSR_JOB__=${escapeJsonForScriptTag(buildJobPagePayload(parity.job))};</script></head>`
+          );
+        const snapshots = [];
+        for (const javaScriptEnabled of [false, true]) {
+          const context = await browser.newContext({ viewport: { width, height: 900 }, serviceWorkers: "block", javaScriptEnabled });
+          await context.route("**/*", async (route) => {
+            const url = new URL(route.request().url());
+            if (url.origin !== "https://render-test.invalid") return route.abort();
+            if (url.pathname.startsWith("/assets/")) {
+              const file = path.resolve(root, "public", `.${url.pathname}`);
+              assert.ok(file.startsWith(path.resolve(root, "public", "assets") + path.sep));
+              return route.fulfill({ path: file });
+            }
+            if (url.pathname === buildJobPath(parity.job)) return route.fulfill({ status: 200, contentType: "text/html", body: html });
+            return route.abort();
+          });
+          const page = await context.newPage();
+          await page.goto(`https://render-test.invalid${buildJobPath(parity.job)}`, { waitUntil: "networkidle" });
+          if (javaScriptEnabled) {
+            // React mounted: its own card (not the server <article>) holds the h1.
+            await page.locator("#app h1").first().waitFor({ timeout: 5000 });
+            await page.waitForFunction(() => !document.querySelector("#app > article"), null, { timeout: 5000 });
+            await page.screenshot({ path: path.join(process.cwd(), `job-blocks-${parity.snapshot ? "warm" : "cold"}-${width}.png`), fullPage: true });
+          }
+          snapshots.push(await page.evaluate(readBlocks));
+          await context.close();
+        }
+        const [server, client] = snapshots;
+        assert.deepEqual(client.company, server.company, "B1 links");
+        assert.ok(server.company.length > 0, "B1 present");
+        assert.deepEqual(client.reputationLinks, server.reputationLinks, "B2 source links");
+        for (const entry of parity.job.reputation || []) {
+          for (const side of [server, client]) {
+            assert.ok(side.reputationText.includes(String(entry.score)) && side.reputationText.includes(`(${entry.scoreScale})`), entry.source);
+            if (entry.reviewCount !== null) assert.ok(side.reputationText.includes(`${entry.reviewCount} reseñas`));
+          }
+        }
+        assert.deepEqual(client.careers, server.careers, "B3 careers link");
+        assert.deepEqual(client.officialSource, server.officialSource, "B3 official source");
+        if (parity.job.source === "Portal oficial") assert.equal(server.officialSource.length, 1);
+        else assert.equal(server.careers.length, 1);
+        assert.ok(client.overflow <= 0 && server.overflow <= 0, `no horizontal scroll at ${width}px`);
+      } finally {
+        await browser.close();
+      }
+    });
+  }
+}
