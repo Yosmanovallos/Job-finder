@@ -1,7 +1,10 @@
 # Indexing API — material para solicitar más cuota
 
-**Estado:** preparado 2026-09-18 · **NO enviado**. Lo envía el dueño del
-proyecto de Google Cloud, después de desplegar la v2 (ver "Cuándo enviarlo").
+**Estado:** preparado 2026-09-18 · cifras actualizadas con producción el
+2026-11-01 (F0 de `GOOGLE-JOBS-INDEXING-PLAN-2026-11.md`) · **NO enviado**
+(confirmado por el usuario el 2026-11-01). Lo envía el dueño del proyecto de
+Google Cloud: es la fase F1 del plan. La v2 lleva en producción más de 7 días,
+así que la condición de "Cuándo enviarlo" ya se cumple.
 Base: `docs/adr/0004-indexing-api-notification-policy.md`.
 
 No incluye claves, tokens ni credenciales. Nunca pegar la clave privada de la
@@ -27,13 +30,21 @@ cuenta de servicio en el formulario, en un chat ni en un ticket.
 |---|---|
 | Sitio | https://buscotrabajo.co |
 | Tipo de contenido | Páginas de vacante individuales con `JobPosting` (`/empleos/:id/:slug`) |
-| Cuota actual | 200 solicitudes de publicación/día (inicial) |
+| Cuota actual | 200 solicitudes de publicación/día (inicial), gastada entera cada día |
 | **Cuota solicitada** | **1,500 publicaciones/día** |
-| Vacantes nuevas aptas para Google | ~389/día (media de 14 días); ~500/día (media de 30 días); semana pico ~1,000/día |
-| Retiros notificados por la API (política D2) | ≈ las publicaciones enviadas ~30 días antes: ~350-500/día en régimen estable |
-| Demanda total estable | ~780/día (base) · ~1,000/día (pico) |
-| Por qué 1,500 | La simulación con llegadas reales exige 1,325/día para p95 ≤48 h en semanas pico; se añade ~13% de margen |
-| Mínimo útil | 800/día (p95 33 h con la mezcla base) |
+| Vacantes nuevas aptas para Google (sin proyecciones oficiales, que no usan la API) | **286/día** (media 19–31 oct; mediana 262; rango 219–398; últimos 7 días 301) |
+| `URL_UPDATED` encoladas | **308/día** (media; máximo 412) |
+| `URL_UPDATED` que caducan sin enviarse (`api_window_expired`) | **172/día** (media; mediana 196; últimos 7 días 185) |
+| `URL_DELETED` de URLs notificadas antes por la API (política D2) | **95/día** de media, **172/día** en los últimos 7 días y subiendo; además hay **8,850 pendientes** con una mediana de 44 días de espera |
+| Enviadas hoy | 100 `URL_UPDATED` + 100 `URL_DELETED` por día, 0 fallos |
+| Proporción de nuevas aptas notificadas | **30 %** (cohorte ya cerrada, aptas hace 8–14 días: 494 de 1,639; 68 % caducó sin enviarse) |
+| Demanda total estable | ~310 nuevas + ~170 retiros = **~480/día**, más el atraso de 8,850 retiros |
+| Por qué 1,500 | Cubre la demanda estable con margen para picos (412 nuevas/día observadas) y vacía el atraso de retiros en ~10 días. La simulación del 2026-09-18 (1,325/día para p95 ≤48 h en semanas pico) sigue siendo la referencia de dimensionamiento |
+| Mínimo útil | 800/día: cubre la demanda estable sin caducidades y vacía el atraso en ~1 mes |
+
+Fuente de las cifras: `docs/seo-baseline/2026-11-google-jobs-funnel.md`
+(consulta agregada de solo lectura y logs de `indexing-tick`, 18-oct a
+1-nov de 2026).
 
 ## 3. Evidencia de uso correcto (resumen para el formulario)
 
@@ -63,9 +74,10 @@ cuenta de servicio en el formulario, en un chat ni en un ticket.
 
 ## 4. Cuándo enviarlo
 
-Después de desplegar la v2 y observar al menos 7 días de `URL_UPDATED` solo
-para vacantes aptas, para que las cifras del formulario sean las de
-producción. Antes de enviarlo, volver a medir en solo lectura:
+Ya: la v2 lleva más de 7 días enviando `URL_UPDATED` solo para vacantes
+aptas, y las cifras de la sección 2 son de producción (2026-11-01). Si se
+envía después del 2026-11-15, volver a medir en solo lectura con
+`docs/seo-baseline/google-jobs-funnel-queries.mjs`:
 
 - nuevos aptos/día;
 - retiros notificados/día;

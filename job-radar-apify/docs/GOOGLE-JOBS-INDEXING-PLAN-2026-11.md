@@ -49,8 +49,8 @@ GitHub Actions indexing-tick.yml (cron horario, corre ~5 veces/día)
 Día 30 (ADR 0008): archivo privado + 410 + fuera del sitemap
 ```
 
-El «usuario administrador que indexa» es esa cuenta de servicio
-(**pendiente de confirmar con el usuario**). La web (Render) solo lee el
+El «usuario administrador que indexa» es esa cuenta de servicio (confirmado
+por el usuario el 2026-11-01). La web (Render) solo lee el
 veredicto guardado. Por eso las fases 0 a 3 no afectan el rendimiento del
 sitio.
 
@@ -113,6 +113,22 @@ migración ni escritura en producción sin aprobación explícita del usuario.
   API y 10 solo por sitemap. Registrar URL, fecha, indexada sí/no y canonical.
 - Salida: `docs/seo-baseline/2026-11-google-jobs-funnel.md` con los números
   que necesitan F1 y F2. Sin cambios de código.
+- **Registro (2026-11-01, hecho).** Rama `codex/google-jobs-f0-baseline`.
+  Consulta de solo lectura aprobada por el usuario, logs de 18-oct a 1-nov e
+  inspección en GSC de 20 URLs.
+  - Embudo: 286 aptas no oficiales/día y 308 `URL_UPDATED`/día. Se envían
+    100 al día; caducan 172 al día.
+  - En la cohorte cerrada, solo el **30 %** de las aptas se notificó por la
+    API.
+  - Cada envío sale **158–167 h** después de que la vacante pasa a apta,
+    justo antes de caducar.
+  - Muestra de GSC: 19/20 indexadas (API 10/10, solo sitemap 9/10). En 8 de
+    las 10 notificadas, Google ya había rastreado la página antes del envío.
+  - Hay 8,850 `URL_DELETED` pendientes, con una mediana de 44 días.
+  - **F2 está justificada.** Las fuentes que limitan F3 son Computrabajo CO
+    (2 % aptas, 429), LinkedIn CO (21 %, 429) y el atraso del drain de
+    Magneto (107–113 h hasta apta, sin 429).
+  - `INDEXING-API-QUOTA-REQUEST.md` está actualizado para F1.
 
 ### F1. Cuota de la Indexing API (acción del usuario)
 
@@ -164,9 +180,9 @@ migración ni escritura en producción sin aprobación explícita del usuario.
 
 | Indicador | Hoy | Fuente |
 |---|---|---|
-| Notificaciones nuevas caducadas sin enviar/día | ~190 (mediana) | logs `indexing-tick` |
-| Aptas nuevas/día y % por fuente | por medir (F0) | consulta de solo lectura |
-| % de aptas recientes indexadas (muestra de 20) | por medir (F0) | inspección de URL |
+| Notificaciones nuevas caducadas sin enviar/día | 172 (media), 196 (mediana), 19–31 oct | consulta de solo lectura + logs `indexing-tick` |
+| Aptas nuevas/día y % por fuente | 286/día no oficiales (+72 oficiales). LinkedIn 159, Magneto 56, Elempleo 36, Computrabajo 30. Notificadas por la API: 30 % | consulta de solo lectura |
+| % de aptas recientes indexadas (muestra de 20) | 95 % (API 10/10, solo sitemap 9/10) | inspección de URL, 2026-11-01 |
 | Páginas de vacante con impresiones (28 d) | por medir | Search Analytics |
 | Clics de «Ofertas de empleo» (3 meses) | 65 | GSC aparición en búsquedas |
 | Clics orgánicos/día | 9–24 (26–30 oct) | GSC |
@@ -181,6 +197,7 @@ migración ni escritura en producción sin aprobación explícita del usuario.
 
 ## 8. Decisiones del usuario pendientes
 
-1. ¿Se envió alguna vez la solicitud de cuota de 1.500/día?
-2. ¿El «usuario administrador que indexa» es la cuenta de servicio de la
-   Indexing API, o algo distinto (por ejemplo, un panel)?
+1. ~~¿Se envió alguna vez la solicitud de cuota de 1.500/día?~~ No, nunca
+   (respuesta del usuario, 2026-11-01). Se envía en F1.
+2. ~~¿El «usuario administrador que indexa» es la cuenta de servicio?~~ Sí
+   (respuesta del usuario, 2026-11-01).
