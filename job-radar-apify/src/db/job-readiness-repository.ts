@@ -342,7 +342,7 @@ export async function claimDueDetailJobs(
     );
     return result.rows;
   }
-  const result = await pool.query<ClaimedDetailJob>(
+  const result = await pool.query<ClaimedDetailJob & { created_at: Date }>(
     `UPDATE jobs SET detail_next_attempt_at = NOW() + ($3::int * INTERVAL '1 millisecond')
      WHERE id IN (
        SELECT id FROM jobs
@@ -355,10 +355,16 @@ export async function claimDueDetailJobs(
        LIMIT $2
        FOR UPDATE SKIP LOCKED
      )
-     RETURNING id, url, source, country, detail_attempts`,
+     RETURNING id, url, source, country, detail_attempts, created_at`,
     [filter.source, limit, DETAIL_CLAIM_LEASE_MS, filter.market]
   );
-  return result.rows;
+  // RETURNING has no order of its own. For newest_first the drain must also
+  // ASK newest first, so a deadline mid-batch cuts the oldest, not the newest.
+  const rows =
+    order === "newest_first"
+      ? [...result.rows].sort((a, b) => b.created_at.getTime() - a.created_at.getTime() || b.id.localeCompare(a.id))
+      : result.rows;
+  return rows.map(({ created_at: _createdAt, ...job }) => job);
 }
 
 /**
@@ -369,14 +375,19 @@ export async function claimDueDetailJobs(
  * for 10 minutes — and newest-first would have leased exactly the newest.
  * A database write only: no source is asked anything.
  */
-export async function releaseDetailClaims(ids: string[]): Promise<number> {
-  if (ids.length === 0) return 0;
+export async function releaseDetailClaims(claimed: Pick<ClaimedDetailJob, "id" | "detail_attempts">[]): Promise<number> {
+  if (claimed.length === 0) return 0;
+  // detail_attempts unchanged since the claim = no outcome was recorded. A
+  // row settled to 'retry' also has a future detail_next_attempt_at (its
+  // backoff), and must keep it.
   const result = await pool.query(
     `UPDATE jobs SET detail_next_attempt_at = NOW()
-     WHERE id = ANY($1::uuid[])
-       AND detail_status IN ('pending', 'retry')
-       AND detail_next_attempt_at > NOW()`,
-    [ids]
+     FROM unnest($1::uuid[], $2::int[]) AS c(id, attempts)
+     WHERE jobs.id = c.id
+       AND jobs.detail_attempts = c.attempts
+       AND jobs.detail_status IN ('pending', 'retry')
+       AND jobs.detail_next_attempt_at > NOW()`,
+    [claimed.map((job) => job.id), claimed.map((job) => job.detail_attempts)]
   );
   return result.rowCount ?? 0;
 }

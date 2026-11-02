@@ -82,7 +82,7 @@ async function runClaimed(
   } finally {
     // GOOGLE-JOBS F3: those rows go back to the queue now instead of when
     // the lease expires (see releaseDetailClaims).
-    const unasked = jobs.slice(unsettledFrom).map((job) => job.id);
+    const unasked = jobs.slice(unsettledFrom);
     if (unasked.length > 0) {
       try {
         await releaseDetailClaims(unasked);

@@ -352,14 +352,18 @@ try {
   }
   const newest = await claimDueDetailJobs({ source: "Magneto", market: "OTHER" }, 2, "newest_first");
   assert.deepEqual(newest.map((c) => c.id), [f3Ids[2], f3Ids[1]], "newest_first claims the most recent rows first");
-  assert.equal(await releaseDetailClaims(newest.map((c) => c.id)), 2, "unasked claimed rows go back to the queue");
+  assert.equal(await releaseDetailClaims(newest), 2, "unasked claimed rows go back to the queue");
   const reclaimed = await claimDueDetailJobs({ source: "Magneto", market: "OTHER" }, 2, "newest_first");
   assert.deepEqual(reclaimed.map((c) => c.id), [f3Ids[2], f3Ids[1]], "released rows are claimable at once, no lease wait");
+  // A recorded outcome (here the first no_detail → 'retry' with backoff) is
+  // settled: the release must leave its backoff alone.
   await recordDetailOutcome(f3Ids[2], { kind: "no_detail" });
-  assert.equal(await releaseDetailClaims([f3Ids[2]]), 0, "a settled row is never moved by a release");
-  assert.equal((await row(f3Ids[2])).detail_status, "no_detail");
-  assert.equal(await releaseDetailClaims([f3Ids[1]]), 1);
-  assert.equal(await releaseDetailClaims([f3Ids[0]]), 0, "a row that was never claimed is not touched");
+  const settled = await row(f3Ids[2]);
+  assert.equal(await releaseDetailClaims([reclaimed[0]]), 0, "a settled row is never moved by a release");
+  assert.equal((await row(f3Ids[2])).detail_next_attempt_at.getTime(), settled.detail_next_attempt_at.getTime());
+  assert.equal(await releaseDetailClaims([reclaimed[1]]), 1);
+  const neverClaimed = await row(f3Ids[0]);
+  assert.equal(await releaseDetailClaims([{ id: f3Ids[0], detail_attempts: neverClaimed.detail_attempts }]), 0, "a row that was never claimed is not touched");
   console.log("✅ [drain] F3: newest_first claim order; release only moves leased pending/retry rows.");
 
   // --- 8. Detail success → COMPLETE → READY → one URL_UPDATED ---------------------
