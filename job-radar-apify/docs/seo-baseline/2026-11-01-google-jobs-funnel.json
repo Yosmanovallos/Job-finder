@@ -1,0 +1,4556 @@
+{
+ "window_days": 14,
+ "new_by_day_source": [
+  {
+   "day": "2026-10-18",
+   "source": "Computrabajo",
+   "country": "CO",
+   "new_rows": "109",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-18",
+   "source": "LinkedIn",
+   "country": "CO",
+   "new_rows": "43",
+   "official_projection": "0",
+   "became_ready": "21",
+   "ready_within_24h": "21",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-18",
+   "source": "Magneto",
+   "country": "CO",
+   "new_rows": "3",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-18",
+   "source": "Workana",
+   "country": null,
+   "new_rows": "17",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-19",
+   "source": "Computrabajo",
+   "country": "CO",
+   "new_rows": "174",
+   "official_projection": "0",
+   "became_ready": "5",
+   "ready_within_24h": "5",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-19",
+   "source": "Computrabajo",
+   "country": "VE",
+   "new_rows": "23",
+   "official_projection": "0",
+   "became_ready": "10",
+   "ready_within_24h": "10",
+   "p50_h_created_to_ready": "1.3",
+   "p90_h_created_to_ready": "2.9"
+  },
+  {
+   "day": "2026-10-19",
+   "source": "Elempleo",
+   "country": "CO",
+   "new_rows": "34",
+   "official_projection": "0",
+   "became_ready": "34",
+   "ready_within_24h": "34",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-19",
+   "source": "GetOnBoard",
+   "country": null,
+   "new_rows": "4",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-19",
+   "source": "Glassdoor",
+   "country": "CO",
+   "new_rows": "150",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-19",
+   "source": "Glassdoor",
+   "country": "VE",
+   "new_rows": "10",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-19",
+   "source": "Indeed",
+   "country": "CO",
+   "new_rows": "66",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-19",
+   "source": "Indeed",
+   "country": "VE",
+   "new_rows": "10",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-19",
+   "source": "LinkedIn",
+   "country": "CO",
+   "new_rows": "644",
+   "official_projection": "0",
+   "became_ready": "94",
+   "ready_within_24h": "94",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-19",
+   "source": "LinkedIn",
+   "country": "VE",
+   "new_rows": "156",
+   "official_projection": "0",
+   "became_ready": "54",
+   "ready_within_24h": "49",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "20.1"
+  },
+  {
+   "day": "2026-10-19",
+   "source": "Magneto",
+   "country": "CO",
+   "new_rows": "78",
+   "official_projection": "0",
+   "became_ready": "29",
+   "ready_within_24h": "7",
+   "p50_h_created_to_ready": "163.9",
+   "p90_h_created_to_ready": "280.4"
+  },
+  {
+   "day": "2026-10-19",
+   "source": "Magneto",
+   "country": null,
+   "new_rows": "2",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-19",
+   "source": "RemoteOK",
+   "country": null,
+   "new_rows": "2",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-19",
+   "source": "Remotive",
+   "country": null,
+   "new_rows": "1",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-19",
+   "source": "WeRemoto",
+   "country": null,
+   "new_rows": "13",
+   "official_projection": "0",
+   "became_ready": "3",
+   "ready_within_24h": "3",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-19",
+   "source": "Workana",
+   "country": null,
+   "new_rows": "107",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-20",
+   "source": "Computrabajo",
+   "country": "CO",
+   "new_rows": "135",
+   "official_projection": "0",
+   "became_ready": "3",
+   "ready_within_24h": "3",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-20",
+   "source": "Computrabajo",
+   "country": "VE",
+   "new_rows": "55",
+   "official_projection": "0",
+   "became_ready": "30",
+   "ready_within_24h": "30",
+   "p50_h_created_to_ready": "1.4",
+   "p90_h_created_to_ready": "7.5"
+  },
+  {
+   "day": "2026-10-20",
+   "source": "Elempleo",
+   "country": "CO",
+   "new_rows": "17",
+   "official_projection": "0",
+   "became_ready": "17",
+   "ready_within_24h": "17",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-20",
+   "source": "GetOnBoard",
+   "country": null,
+   "new_rows": "9",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-20",
+   "source": "LinkedIn",
+   "country": "CO",
+   "new_rows": "665",
+   "official_projection": "0",
+   "became_ready": "124",
+   "ready_within_24h": "124",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-20",
+   "source": "LinkedIn",
+   "country": "VE",
+   "new_rows": "96",
+   "official_projection": "0",
+   "became_ready": "45",
+   "ready_within_24h": "42",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-20",
+   "source": "Magneto",
+   "country": "CO",
+   "new_rows": "69",
+   "official_projection": "0",
+   "became_ready": "13",
+   "ready_within_24h": "5",
+   "p50_h_created_to_ready": "148.4",
+   "p90_h_created_to_ready": "262.4"
+  },
+  {
+   "day": "2026-10-20",
+   "source": "Portal oficial",
+   "country": "CO",
+   "new_rows": "300",
+   "official_projection": "300",
+   "became_ready": "226",
+   "ready_within_24h": "226",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-20",
+   "source": "RemoteOK",
+   "country": null,
+   "new_rows": "1",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-20",
+   "source": "WeRemoto",
+   "country": null,
+   "new_rows": "18",
+   "official_projection": "0",
+   "became_ready": "9",
+   "ready_within_24h": "9",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-20",
+   "source": "Workana",
+   "country": null,
+   "new_rows": "100",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-21",
+   "source": "Computrabajo",
+   "country": "CO",
+   "new_rows": "245",
+   "official_projection": "0",
+   "became_ready": "8",
+   "ready_within_24h": "8",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-21",
+   "source": "Computrabajo",
+   "country": "VE",
+   "new_rows": "28",
+   "official_projection": "0",
+   "became_ready": "11",
+   "ready_within_24h": "11",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "2.5"
+  },
+  {
+   "day": "2026-10-21",
+   "source": "Elempleo",
+   "country": "CO",
+   "new_rows": "121",
+   "official_projection": "0",
+   "became_ready": "116",
+   "ready_within_24h": "50",
+   "p50_h_created_to_ready": "25.7",
+   "p90_h_created_to_ready": "70.3"
+  },
+  {
+   "day": "2026-10-21",
+   "source": "GetOnBoard",
+   "country": null,
+   "new_rows": "11",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-21",
+   "source": "Glassdoor",
+   "country": "CO",
+   "new_rows": "157",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-21",
+   "source": "Glassdoor",
+   "country": "VE",
+   "new_rows": "28",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-21",
+   "source": "Indeed",
+   "country": "CO",
+   "new_rows": "27",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-21",
+   "source": "Indeed",
+   "country": "VE",
+   "new_rows": "7",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-21",
+   "source": "LinkedIn",
+   "country": "CO",
+   "new_rows": "545",
+   "official_projection": "0",
+   "became_ready": "120",
+   "ready_within_24h": "120",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-21",
+   "source": "LinkedIn",
+   "country": "VE",
+   "new_rows": "132",
+   "official_projection": "0",
+   "became_ready": "70",
+   "ready_within_24h": "59",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "68.9"
+  },
+  {
+   "day": "2026-10-21",
+   "source": "Magneto",
+   "country": "CO",
+   "new_rows": "118",
+   "official_projection": "0",
+   "became_ready": "92",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": "246.3",
+   "p90_h_created_to_ready": "254.3"
+  },
+  {
+   "day": "2026-10-21",
+   "source": "Magneto",
+   "country": null,
+   "new_rows": "7",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-21",
+   "source": "Portal oficial",
+   "country": "CO",
+   "new_rows": "113",
+   "official_projection": "113",
+   "became_ready": "93",
+   "ready_within_24h": "93",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-21",
+   "source": "RemoteOK",
+   "country": null,
+   "new_rows": "2",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-21",
+   "source": "Torre",
+   "country": null,
+   "new_rows": "1",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-21",
+   "source": "WeRemoto",
+   "country": null,
+   "new_rows": "15",
+   "official_projection": "0",
+   "became_ready": "8",
+   "ready_within_24h": "8",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-21",
+   "source": "Workana",
+   "country": null,
+   "new_rows": "108",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-22",
+   "source": "Computrabajo",
+   "country": "CO",
+   "new_rows": "275",
+   "official_projection": "0",
+   "became_ready": "13",
+   "ready_within_24h": "13",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-22",
+   "source": "Computrabajo",
+   "country": "VE",
+   "new_rows": "25",
+   "official_projection": "0",
+   "became_ready": "16",
+   "ready_within_24h": "16",
+   "p50_h_created_to_ready": "2.5",
+   "p90_h_created_to_ready": "6.0"
+  },
+  {
+   "day": "2026-10-22",
+   "source": "Elempleo",
+   "country": "CO",
+   "new_rows": "75",
+   "official_projection": "0",
+   "became_ready": "74",
+   "ready_within_24h": "37",
+   "p50_h_created_to_ready": "20.4",
+   "p90_h_created_to_ready": "47.1"
+  },
+  {
+   "day": "2026-10-22",
+   "source": "GetOnBoard",
+   "country": "CO",
+   "new_rows": "1",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-22",
+   "source": "GetOnBoard",
+   "country": null,
+   "new_rows": "8",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-22",
+   "source": "LinkedIn",
+   "country": "CO",
+   "new_rows": "684",
+   "official_projection": "0",
+   "became_ready": "160",
+   "ready_within_24h": "160",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-22",
+   "source": "LinkedIn",
+   "country": "VE",
+   "new_rows": "75",
+   "official_projection": "0",
+   "became_ready": "38",
+   "ready_within_24h": "38",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-22",
+   "source": "Magneto",
+   "country": "CO",
+   "new_rows": "146",
+   "official_projection": "0",
+   "became_ready": "93",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": "117.3",
+   "p90_h_created_to_ready": "205.9"
+  },
+  {
+   "day": "2026-10-22",
+   "source": "Magneto",
+   "country": null,
+   "new_rows": "16",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-22",
+   "source": "Portal oficial",
+   "country": "CO",
+   "new_rows": "74",
+   "official_projection": "74",
+   "became_ready": "56",
+   "ready_within_24h": "56",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-22",
+   "source": "RemoteOK",
+   "country": null,
+   "new_rows": "4",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-22",
+   "source": "Torre",
+   "country": null,
+   "new_rows": "1",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-22",
+   "source": "WeRemoto",
+   "country": null,
+   "new_rows": "15",
+   "official_projection": "0",
+   "became_ready": "5",
+   "ready_within_24h": "5",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-22",
+   "source": "Workana",
+   "country": null,
+   "new_rows": "105",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-23",
+   "source": "Computrabajo",
+   "country": "CO",
+   "new_rows": "194",
+   "official_projection": "0",
+   "became_ready": "1",
+   "ready_within_24h": "1",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-23",
+   "source": "Computrabajo",
+   "country": "VE",
+   "new_rows": "19",
+   "official_projection": "0",
+   "became_ready": "15",
+   "ready_within_24h": "15",
+   "p50_h_created_to_ready": "3.0",
+   "p90_h_created_to_ready": "5.4"
+  },
+  {
+   "day": "2026-10-23",
+   "source": "Elempleo",
+   "country": "CO",
+   "new_rows": "49",
+   "official_projection": "0",
+   "became_ready": "49",
+   "ready_within_24h": "23",
+   "p50_h_created_to_ready": "40.4",
+   "p90_h_created_to_ready": "43.0"
+  },
+  {
+   "day": "2026-10-23",
+   "source": "Glassdoor",
+   "country": "CO",
+   "new_rows": "135",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-23",
+   "source": "Glassdoor",
+   "country": "VE",
+   "new_rows": "14",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-23",
+   "source": "Indeed",
+   "country": "CO",
+   "new_rows": "35",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-23",
+   "source": "Indeed",
+   "country": "VE",
+   "new_rows": "2",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-23",
+   "source": "LinkedIn",
+   "country": "CO",
+   "new_rows": "591",
+   "official_projection": "0",
+   "became_ready": "122",
+   "ready_within_24h": "122",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-23",
+   "source": "LinkedIn",
+   "country": "VE",
+   "new_rows": "141",
+   "official_projection": "0",
+   "became_ready": "84",
+   "ready_within_24h": "72",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "63.8"
+  },
+  {
+   "day": "2026-10-23",
+   "source": "Magneto",
+   "country": "CO",
+   "new_rows": "263",
+   "official_projection": "0",
+   "became_ready": "131",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": "128.1",
+   "p90_h_created_to_ready": "131.5"
+  },
+  {
+   "day": "2026-10-23",
+   "source": "Magneto",
+   "country": null,
+   "new_rows": "21",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-23",
+   "source": "Portal oficial",
+   "country": "CO",
+   "new_rows": "34",
+   "official_projection": "34",
+   "became_ready": "25",
+   "ready_within_24h": "25",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-23",
+   "source": "RemoteOK",
+   "country": null,
+   "new_rows": "3",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-23",
+   "source": "WeRemoto",
+   "country": null,
+   "new_rows": "15",
+   "official_projection": "0",
+   "became_ready": "7",
+   "ready_within_24h": "7",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-23",
+   "source": "Workana",
+   "country": null,
+   "new_rows": "113",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-24",
+   "source": "Computrabajo",
+   "country": "CO",
+   "new_rows": "308",
+   "official_projection": "0",
+   "became_ready": "4",
+   "ready_within_24h": "4",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-24",
+   "source": "Computrabajo",
+   "country": "VE",
+   "new_rows": "14",
+   "official_projection": "0",
+   "became_ready": "8",
+   "ready_within_24h": "8",
+   "p50_h_created_to_ready": "1.5",
+   "p90_h_created_to_ready": "3.2"
+  },
+  {
+   "day": "2026-10-24",
+   "source": "Elempleo",
+   "country": "CO",
+   "new_rows": "12",
+   "official_projection": "0",
+   "became_ready": "12",
+   "ready_within_24h": "12",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "21.4"
+  },
+  {
+   "day": "2026-10-24",
+   "source": "GetOnBoard",
+   "country": null,
+   "new_rows": "5",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-24",
+   "source": "LinkedIn",
+   "country": "CO",
+   "new_rows": "542",
+   "official_projection": "0",
+   "became_ready": "139",
+   "ready_within_24h": "139",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-24",
+   "source": "LinkedIn",
+   "country": "VE",
+   "new_rows": "33",
+   "official_projection": "0",
+   "became_ready": "21",
+   "ready_within_24h": "20",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-24",
+   "source": "Magneto",
+   "country": "CO",
+   "new_rows": "54",
+   "official_projection": "0",
+   "became_ready": "18",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": "118.4",
+   "p90_h_created_to_ready": "127.6"
+  },
+  {
+   "day": "2026-10-24",
+   "source": "Magneto",
+   "country": null,
+   "new_rows": "4",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-24",
+   "source": "Portal oficial",
+   "country": "CO",
+   "new_rows": "4",
+   "official_projection": "4",
+   "became_ready": "4",
+   "ready_within_24h": "4",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-24",
+   "source": "RemoteOK",
+   "country": null,
+   "new_rows": "5",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-24",
+   "source": "WeRemoto",
+   "country": null,
+   "new_rows": "8",
+   "official_projection": "0",
+   "became_ready": "4",
+   "ready_within_24h": "4",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-24",
+   "source": "Workana",
+   "country": null,
+   "new_rows": "119",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-25",
+   "source": "Computrabajo",
+   "country": "CO",
+   "new_rows": "172",
+   "official_projection": "0",
+   "became_ready": "3",
+   "ready_within_24h": "3",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-25",
+   "source": "Computrabajo",
+   "country": "VE",
+   "new_rows": "2",
+   "official_projection": "0",
+   "became_ready": "2",
+   "ready_within_24h": "2",
+   "p50_h_created_to_ready": "2.6",
+   "p90_h_created_to_ready": "4.6"
+  },
+  {
+   "day": "2026-10-25",
+   "source": "Elempleo",
+   "country": "CO",
+   "new_rows": "3",
+   "official_projection": "0",
+   "became_ready": "3",
+   "ready_within_24h": "3",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.1"
+  },
+  {
+   "day": "2026-10-25",
+   "source": "GetOnBoard",
+   "country": null,
+   "new_rows": "1",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-25",
+   "source": "Glassdoor",
+   "country": "CO",
+   "new_rows": "51",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-25",
+   "source": "Glassdoor",
+   "country": "VE",
+   "new_rows": "1",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-25",
+   "source": "Indeed",
+   "country": "CO",
+   "new_rows": "1",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-25",
+   "source": "LinkedIn",
+   "country": "CO",
+   "new_rows": "237",
+   "official_projection": "0",
+   "became_ready": "112",
+   "ready_within_24h": "112",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-25",
+   "source": "LinkedIn",
+   "country": "VE",
+   "new_rows": "14",
+   "official_projection": "0",
+   "became_ready": "5",
+   "ready_within_24h": "5",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-25",
+   "source": "Magneto",
+   "country": "CO",
+   "new_rows": "31",
+   "official_projection": "0",
+   "became_ready": "14",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": "105.3",
+   "p90_h_created_to_ready": "113.3"
+  },
+  {
+   "day": "2026-10-25",
+   "source": "Magneto",
+   "country": null,
+   "new_rows": "1",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-25",
+   "source": "Portal oficial",
+   "country": "CO",
+   "new_rows": "24",
+   "official_projection": "24",
+   "became_ready": "6",
+   "ready_within_24h": "6",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-25",
+   "source": "RemoteOK",
+   "country": null,
+   "new_rows": "1",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-25",
+   "source": "WeRemoto",
+   "country": null,
+   "new_rows": "22",
+   "official_projection": "0",
+   "became_ready": "4",
+   "ready_within_24h": "4",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-25",
+   "source": "Workana",
+   "country": null,
+   "new_rows": "98",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-26",
+   "source": "Computrabajo",
+   "country": "CO",
+   "new_rows": "165",
+   "official_projection": "0",
+   "became_ready": "10",
+   "ready_within_24h": "10",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-26",
+   "source": "Computrabajo",
+   "country": "VE",
+   "new_rows": "11",
+   "official_projection": "0",
+   "became_ready": "10",
+   "ready_within_24h": "10",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "3.1"
+  },
+  {
+   "day": "2026-10-26",
+   "source": "Elempleo",
+   "country": "CO",
+   "new_rows": "20",
+   "official_projection": "0",
+   "became_ready": "19",
+   "ready_within_24h": "19",
+   "p50_h_created_to_ready": "0.1",
+   "p90_h_created_to_ready": "0.1"
+  },
+  {
+   "day": "2026-10-26",
+   "source": "GetOnBoard",
+   "country": null,
+   "new_rows": "3",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-26",
+   "source": "LinkedIn",
+   "country": "CO",
+   "new_rows": "634",
+   "official_projection": "0",
+   "became_ready": "95",
+   "ready_within_24h": "95",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-26",
+   "source": "LinkedIn",
+   "country": "VE",
+   "new_rows": "92",
+   "official_projection": "0",
+   "became_ready": "44",
+   "ready_within_24h": "36",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "44.3"
+  },
+  {
+   "day": "2026-10-26",
+   "source": "Magneto",
+   "country": "CO",
+   "new_rows": "217",
+   "official_projection": "0",
+   "became_ready": "152",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": "106.7",
+   "p90_h_created_to_ready": "113.3"
+  },
+  {
+   "day": "2026-10-26",
+   "source": "Magneto",
+   "country": null,
+   "new_rows": "15",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-26",
+   "source": "Portal oficial",
+   "country": "CO",
+   "new_rows": "60",
+   "official_projection": "60",
+   "became_ready": "50",
+   "ready_within_24h": "50",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-26",
+   "source": "RemoteOK",
+   "country": null,
+   "new_rows": "1",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-26",
+   "source": "WeRemoto",
+   "country": null,
+   "new_rows": "15",
+   "official_projection": "0",
+   "became_ready": "4",
+   "ready_within_24h": "4",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-26",
+   "source": "Workana",
+   "country": null,
+   "new_rows": "72",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-27",
+   "source": "Computrabajo",
+   "country": "CO",
+   "new_rows": "175",
+   "official_projection": "0",
+   "became_ready": "2",
+   "ready_within_24h": "2",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-27",
+   "source": "Computrabajo",
+   "country": "VE",
+   "new_rows": "12",
+   "official_projection": "0",
+   "became_ready": "10",
+   "ready_within_24h": "10",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "6.7"
+  },
+  {
+   "day": "2026-10-27",
+   "source": "Elempleo",
+   "country": "CO",
+   "new_rows": "23",
+   "official_projection": "0",
+   "became_ready": "22",
+   "ready_within_24h": "22",
+   "p50_h_created_to_ready": "0.1",
+   "p90_h_created_to_ready": "0.1"
+  },
+  {
+   "day": "2026-10-27",
+   "source": "GetOnBoard",
+   "country": "CO",
+   "new_rows": "1",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-27",
+   "source": "GetOnBoard",
+   "country": null,
+   "new_rows": "7",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-27",
+   "source": "Glassdoor",
+   "country": "CO",
+   "new_rows": "137",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-27",
+   "source": "Glassdoor",
+   "country": "VE",
+   "new_rows": "12",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-27",
+   "source": "Indeed",
+   "country": "CO",
+   "new_rows": "51",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-27",
+   "source": "Indeed",
+   "country": "VE",
+   "new_rows": "3",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-27",
+   "source": "LinkedIn",
+   "country": "CO",
+   "new_rows": "587",
+   "official_projection": "0",
+   "became_ready": "112",
+   "ready_within_24h": "112",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-27",
+   "source": "LinkedIn",
+   "country": "VE",
+   "new_rows": "136",
+   "official_projection": "0",
+   "became_ready": "57",
+   "ready_within_24h": "44",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "72.2"
+  },
+  {
+   "day": "2026-10-27",
+   "source": "Magneto",
+   "country": "CO",
+   "new_rows": "268",
+   "official_projection": "0",
+   "became_ready": "184",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": "113.2",
+   "p90_h_created_to_ready": "120.9"
+  },
+  {
+   "day": "2026-10-27",
+   "source": "Magneto",
+   "country": null,
+   "new_rows": "14",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-27",
+   "source": "Portal oficial",
+   "country": "CO",
+   "new_rows": "79",
+   "official_projection": "79",
+   "became_ready": "63",
+   "ready_within_24h": "63",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-27",
+   "source": "RemoteOK",
+   "country": null,
+   "new_rows": "2",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-27",
+   "source": "Torre",
+   "country": null,
+   "new_rows": "1",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-27",
+   "source": "WeRemoto",
+   "country": null,
+   "new_rows": "13",
+   "official_projection": "0",
+   "became_ready": "3",
+   "ready_within_24h": "3",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-27",
+   "source": "Workana",
+   "country": null,
+   "new_rows": "75",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-28",
+   "source": "Computrabajo",
+   "country": "CO",
+   "new_rows": "206",
+   "official_projection": "0",
+   "became_ready": "6",
+   "ready_within_24h": "6",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-28",
+   "source": "Computrabajo",
+   "country": "VE",
+   "new_rows": "23",
+   "official_projection": "0",
+   "became_ready": "17",
+   "ready_within_24h": "17",
+   "p50_h_created_to_ready": "5.8",
+   "p90_h_created_to_ready": "20.4"
+  },
+  {
+   "day": "2026-10-28",
+   "source": "Elempleo",
+   "country": "CO",
+   "new_rows": "20",
+   "official_projection": "0",
+   "became_ready": "20",
+   "ready_within_24h": "20",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "6.6"
+  },
+  {
+   "day": "2026-10-28",
+   "source": "GetOnBoard",
+   "country": null,
+   "new_rows": "2",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-28",
+   "source": "LinkedIn",
+   "country": "CO",
+   "new_rows": "382",
+   "official_projection": "0",
+   "became_ready": "79",
+   "ready_within_24h": "79",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-28",
+   "source": "LinkedIn",
+   "country": "VE",
+   "new_rows": "73",
+   "official_projection": "0",
+   "became_ready": "43",
+   "ready_within_24h": "39",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-28",
+   "source": "Magneto",
+   "country": "CO",
+   "new_rows": "176",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-28",
+   "source": "Magneto",
+   "country": null,
+   "new_rows": "22",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-28",
+   "source": "Portal oficial",
+   "country": "CO",
+   "new_rows": "75",
+   "official_projection": "75",
+   "became_ready": "40",
+   "ready_within_24h": "40",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-28",
+   "source": "Torre",
+   "country": null,
+   "new_rows": "2",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-28",
+   "source": "WeRemoto",
+   "country": null,
+   "new_rows": "11",
+   "official_projection": "0",
+   "became_ready": "4",
+   "ready_within_24h": "4",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-28",
+   "source": "Workana",
+   "country": null,
+   "new_rows": "95",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-29",
+   "source": "Computrabajo",
+   "country": "CO",
+   "new_rows": "159",
+   "official_projection": "0",
+   "became_ready": "4",
+   "ready_within_24h": "4",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-29",
+   "source": "Computrabajo",
+   "country": "VE",
+   "new_rows": "30",
+   "official_projection": "0",
+   "became_ready": "23",
+   "ready_within_24h": "23",
+   "p50_h_created_to_ready": "5.6",
+   "p90_h_created_to_ready": "18.3"
+  },
+  {
+   "day": "2026-10-29",
+   "source": "Elempleo",
+   "country": "CO",
+   "new_rows": "60",
+   "official_projection": "0",
+   "became_ready": "59",
+   "ready_within_24h": "59",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "6.3"
+  },
+  {
+   "day": "2026-10-29",
+   "source": "GetOnBoard",
+   "country": "CO",
+   "new_rows": "1",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-29",
+   "source": "GetOnBoard",
+   "country": null,
+   "new_rows": "9",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-29",
+   "source": "Glassdoor",
+   "country": "CO",
+   "new_rows": "149",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-29",
+   "source": "Glassdoor",
+   "country": "VE",
+   "new_rows": "19",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-29",
+   "source": "Indeed",
+   "country": "CO",
+   "new_rows": "30",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-29",
+   "source": "Indeed",
+   "country": "VE",
+   "new_rows": "7",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-29",
+   "source": "LinkedIn",
+   "country": "CO",
+   "new_rows": "504",
+   "official_projection": "0",
+   "became_ready": "112",
+   "ready_within_24h": "112",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-29",
+   "source": "LinkedIn",
+   "country": "VE",
+   "new_rows": "128",
+   "official_projection": "0",
+   "became_ready": "63",
+   "ready_within_24h": "62",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-29",
+   "source": "Magneto",
+   "country": "CO",
+   "new_rows": "295",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-29",
+   "source": "Magneto",
+   "country": null,
+   "new_rows": "38",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-29",
+   "source": "Portal oficial",
+   "country": "CO",
+   "new_rows": "326",
+   "official_projection": "326",
+   "became_ready": "250",
+   "ready_within_24h": "250",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-29",
+   "source": "RemoteOK",
+   "country": null,
+   "new_rows": "1",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-29",
+   "source": "WeRemoto",
+   "country": null,
+   "new_rows": "15",
+   "official_projection": "0",
+   "became_ready": "3",
+   "ready_within_24h": "3",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-29",
+   "source": "Workana",
+   "country": null,
+   "new_rows": "140",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-30",
+   "source": "Computrabajo",
+   "country": "CO",
+   "new_rows": "102",
+   "official_projection": "0",
+   "became_ready": "1",
+   "ready_within_24h": "1",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-30",
+   "source": "Computrabajo",
+   "country": "VE",
+   "new_rows": "7",
+   "official_projection": "0",
+   "became_ready": "7",
+   "ready_within_24h": "7",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-30",
+   "source": "Elempleo",
+   "country": "CO",
+   "new_rows": "10",
+   "official_projection": "0",
+   "became_ready": "10",
+   "ready_within_24h": "10",
+   "p50_h_created_to_ready": "0.1",
+   "p90_h_created_to_ready": "0.1"
+  },
+  {
+   "day": "2026-10-30",
+   "source": "GetOnBoard",
+   "country": null,
+   "new_rows": "3",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-30",
+   "source": "LinkedIn",
+   "country": "CO",
+   "new_rows": "572",
+   "official_projection": "0",
+   "became_ready": "105",
+   "ready_within_24h": "105",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-30",
+   "source": "LinkedIn",
+   "country": "VE",
+   "new_rows": "84",
+   "official_projection": "0",
+   "became_ready": "39",
+   "ready_within_24h": "39",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-30",
+   "source": "Magneto",
+   "country": "CO",
+   "new_rows": "226",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-30",
+   "source": "Magneto",
+   "country": null,
+   "new_rows": "14",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-30",
+   "source": "Portal oficial",
+   "country": "CO",
+   "new_rows": "240",
+   "official_projection": "240",
+   "became_ready": "88",
+   "ready_within_24h": "88",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-30",
+   "source": "RemoteOK",
+   "country": null,
+   "new_rows": "1",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-30",
+   "source": "Torre",
+   "country": null,
+   "new_rows": "2",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-30",
+   "source": "WeRemoto",
+   "country": null,
+   "new_rows": "11",
+   "official_projection": "0",
+   "became_ready": "3",
+   "ready_within_24h": "3",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-30",
+   "source": "Workana",
+   "country": null,
+   "new_rows": "54",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-31",
+   "source": "Computrabajo",
+   "country": "CO",
+   "new_rows": "148",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-31",
+   "source": "Computrabajo",
+   "country": "VE",
+   "new_rows": "7",
+   "official_projection": "0",
+   "became_ready": "5",
+   "ready_within_24h": "5",
+   "p50_h_created_to_ready": "7.1",
+   "p90_h_created_to_ready": "7.1"
+  },
+  {
+   "day": "2026-10-31",
+   "source": "Elempleo",
+   "country": "CO",
+   "new_rows": "34",
+   "official_projection": "0",
+   "became_ready": "33",
+   "ready_within_24h": "33",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.1"
+  },
+  {
+   "day": "2026-10-31",
+   "source": "GetOnBoard",
+   "country": null,
+   "new_rows": "1",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-31",
+   "source": "Glassdoor",
+   "country": "CO",
+   "new_rows": "103",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-31",
+   "source": "Glassdoor",
+   "country": "VE",
+   "new_rows": "17",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-31",
+   "source": "Indeed",
+   "country": "CO",
+   "new_rows": "7",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-31",
+   "source": "Indeed",
+   "country": "VE",
+   "new_rows": "1",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-31",
+   "source": "LinkedIn",
+   "country": "CO",
+   "new_rows": "341",
+   "official_projection": "0",
+   "became_ready": "107",
+   "ready_within_24h": "107",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-31",
+   "source": "LinkedIn",
+   "country": "VE",
+   "new_rows": "60",
+   "official_projection": "0",
+   "became_ready": "25",
+   "ready_within_24h": "25",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-31",
+   "source": "Magneto",
+   "country": "CO",
+   "new_rows": "132",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-31",
+   "source": "Magneto",
+   "country": null,
+   "new_rows": "8",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-31",
+   "source": "Portal oficial",
+   "country": "CO",
+   "new_rows": "37",
+   "official_projection": "37",
+   "became_ready": "35",
+   "ready_within_24h": "35",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-31",
+   "source": "RemoteOK",
+   "country": null,
+   "new_rows": "7",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-31",
+   "source": "Torre",
+   "country": null,
+   "new_rows": "1",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-10-31",
+   "source": "WeRemoto",
+   "country": null,
+   "new_rows": "5",
+   "official_projection": "0",
+   "became_ready": "4",
+   "ready_within_24h": "4",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-10-31",
+   "source": "Workana",
+   "country": null,
+   "new_rows": "112",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-11-01",
+   "source": "Computrabajo",
+   "country": "CO",
+   "new_rows": "63",
+   "official_projection": "0",
+   "became_ready": "1",
+   "ready_within_24h": "1",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-11-01",
+   "source": "Computrabajo",
+   "country": "VE",
+   "new_rows": "2",
+   "official_projection": "0",
+   "became_ready": "1",
+   "ready_within_24h": "1",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-11-01",
+   "source": "Glassdoor",
+   "country": "CO",
+   "new_rows": "54",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-11-01",
+   "source": "Glassdoor",
+   "country": "VE",
+   "new_rows": "8",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-11-01",
+   "source": "Indeed",
+   "country": "CO",
+   "new_rows": "13",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-11-01",
+   "source": "Indeed",
+   "country": "VE",
+   "new_rows": "1",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-11-01",
+   "source": "LinkedIn",
+   "country": "CO",
+   "new_rows": "133",
+   "official_projection": "0",
+   "became_ready": "23",
+   "ready_within_24h": "23",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-11-01",
+   "source": "LinkedIn",
+   "country": "VE",
+   "new_rows": "12",
+   "official_projection": "0",
+   "became_ready": "3",
+   "ready_within_24h": "3",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-11-01",
+   "source": "Magneto",
+   "country": "CO",
+   "new_rows": "41",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-11-01",
+   "source": "Magneto",
+   "country": null,
+   "new_rows": "1",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-11-01",
+   "source": "Portal oficial",
+   "country": "CO",
+   "new_rows": "25",
+   "official_projection": "25",
+   "became_ready": "24",
+   "ready_within_24h": "24",
+   "p50_h_created_to_ready": "0.0",
+   "p90_h_created_to_ready": "0.0"
+  },
+  {
+   "day": "2026-11-01",
+   "source": "WeRemoto",
+   "country": null,
+   "new_rows": "2",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  },
+  {
+   "day": "2026-11-01",
+   "source": "Workana",
+   "country": null,
+   "new_rows": "69",
+   "official_projection": "0",
+   "became_ready": "0",
+   "ready_within_24h": "0",
+   "p50_h_created_to_ready": null,
+   "p90_h_created_to_ready": null
+  }
+ ],
+ "ready_by_day_source": [
+  {
+   "day": "2026-10-18",
+   "source": "Computrabajo",
+   "became_ready": "1",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-18",
+   "source": "Elempleo",
+   "became_ready": "4",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-18",
+   "source": "LinkedIn",
+   "became_ready": "22",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-18",
+   "source": "Magneto",
+   "became_ready": "6",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-19",
+   "source": "Computrabajo",
+   "became_ready": "24",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-19",
+   "source": "Elempleo",
+   "became_ready": "34",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-19",
+   "source": "LinkedIn",
+   "became_ready": "137",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-19",
+   "source": "Magneto",
+   "became_ready": "21",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-19",
+   "source": "WeRemoto",
+   "became_ready": "3",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-20",
+   "source": "Computrabajo",
+   "became_ready": "33",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-20",
+   "source": "Elempleo",
+   "became_ready": "17",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-20",
+   "source": "LinkedIn",
+   "became_ready": "173",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-20",
+   "source": "Magneto",
+   "became_ready": "15",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-20",
+   "source": "Portal oficial",
+   "became_ready": "226",
+   "official_projection": "226"
+  },
+  {
+   "day": "2026-10-20",
+   "source": "WeRemoto",
+   "became_ready": "9",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-21",
+   "source": "Computrabajo",
+   "became_ready": "28",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-21",
+   "source": "Elempleo",
+   "became_ready": "31",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-21",
+   "source": "LinkedIn",
+   "became_ready": "183",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-21",
+   "source": "Magneto",
+   "became_ready": "12",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-21",
+   "source": "Portal oficial",
+   "became_ready": "93",
+   "official_projection": "93"
+  },
+  {
+   "day": "2026-10-21",
+   "source": "WeRemoto",
+   "became_ready": "8",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-22",
+   "source": "Computrabajo",
+   "became_ready": "43",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-22",
+   "source": "Elempleo",
+   "became_ready": "79",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-22",
+   "source": "LinkedIn",
+   "became_ready": "202",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-22",
+   "source": "Magneto",
+   "became_ready": "16",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-22",
+   "source": "Portal oficial",
+   "became_ready": "56",
+   "official_projection": "56"
+  },
+  {
+   "day": "2026-10-22",
+   "source": "WeRemoto",
+   "became_ready": "5",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-23",
+   "source": "Computrabajo",
+   "became_ready": "28",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-23",
+   "source": "Elempleo",
+   "became_ready": "39",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-23",
+   "source": "LinkedIn",
+   "became_ready": "196",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-23",
+   "source": "Magneto",
+   "became_ready": "9",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-23",
+   "source": "Portal oficial",
+   "became_ready": "25",
+   "official_projection": "25"
+  },
+  {
+   "day": "2026-10-23",
+   "source": "WeRemoto",
+   "became_ready": "7",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-24",
+   "source": "Computrabajo",
+   "became_ready": "23",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-24",
+   "source": "Elempleo",
+   "became_ready": "55",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-24",
+   "source": "LinkedIn",
+   "became_ready": "168",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-24",
+   "source": "Magneto",
+   "became_ready": "4",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-24",
+   "source": "Portal oficial",
+   "became_ready": "4",
+   "official_projection": "4"
+  },
+  {
+   "day": "2026-10-24",
+   "source": "WeRemoto",
+   "became_ready": "4",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-25",
+   "source": "Computrabajo",
+   "became_ready": "34",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-25",
+   "source": "Elempleo",
+   "became_ready": "50",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-25",
+   "source": "LinkedIn",
+   "became_ready": "126",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-25",
+   "source": "Magneto",
+   "became_ready": "44",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-25",
+   "source": "Portal oficial",
+   "became_ready": "6",
+   "official_projection": "6"
+  },
+  {
+   "day": "2026-10-25",
+   "source": "WeRemoto",
+   "became_ready": "4",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-26",
+   "source": "Computrabajo",
+   "became_ready": "39",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-26",
+   "source": "Elempleo",
+   "became_ready": "19",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-26",
+   "source": "LinkedIn",
+   "became_ready": "133",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-26",
+   "source": "Magneto",
+   "became_ready": "49",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-26",
+   "source": "Portal oficial",
+   "became_ready": "49",
+   "official_projection": "49"
+  },
+  {
+   "day": "2026-10-26",
+   "source": "WeRemoto",
+   "became_ready": "4",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-27",
+   "source": "Computrabajo",
+   "became_ready": "32",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-27",
+   "source": "Elempleo",
+   "became_ready": "22",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-27",
+   "source": "LinkedIn",
+   "became_ready": "157",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-27",
+   "source": "Magneto",
+   "became_ready": "114",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-27",
+   "source": "Portal oficial",
+   "became_ready": "64",
+   "official_projection": "64"
+  },
+  {
+   "day": "2026-10-27",
+   "source": "WeRemoto",
+   "became_ready": "3",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-28",
+   "source": "Computrabajo",
+   "became_ready": "23",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-28",
+   "source": "Elempleo",
+   "became_ready": "12",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-28",
+   "source": "LinkedIn",
+   "became_ready": "125",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-28",
+   "source": "Magneto",
+   "became_ready": "78",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-28",
+   "source": "Portal oficial",
+   "became_ready": "40",
+   "official_projection": "40"
+  },
+  {
+   "day": "2026-10-28",
+   "source": "WeRemoto",
+   "became_ready": "4",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-29",
+   "source": "Computrabajo",
+   "became_ready": "44",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-29",
+   "source": "Elempleo",
+   "became_ready": "61",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-29",
+   "source": "LinkedIn",
+   "became_ready": "177",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-29",
+   "source": "Magneto",
+   "became_ready": "85",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-29",
+   "source": "Portal oficial",
+   "became_ready": "250",
+   "official_projection": "250"
+  },
+  {
+   "day": "2026-10-29",
+   "source": "WeRemoto",
+   "became_ready": "3",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-30",
+   "source": "Computrabajo",
+   "became_ready": "28",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-30",
+   "source": "Elempleo",
+   "became_ready": "16",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-30",
+   "source": "LinkedIn",
+   "became_ready": "150",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-30",
+   "source": "Magneto",
+   "became_ready": "70",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-30",
+   "source": "Portal oficial",
+   "became_ready": "88",
+   "official_projection": "88"
+  },
+  {
+   "day": "2026-10-30",
+   "source": "WeRemoto",
+   "became_ready": "3",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-31",
+   "source": "Computrabajo",
+   "became_ready": "14",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-31",
+   "source": "Elempleo",
+   "became_ready": "33",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-31",
+   "source": "LinkedIn",
+   "became_ready": "138",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-31",
+   "source": "Magneto",
+   "became_ready": "209",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-10-31",
+   "source": "Portal oficial",
+   "became_ready": "35",
+   "official_projection": "35"
+  },
+  {
+   "day": "2026-10-31",
+   "source": "WeRemoto",
+   "became_ready": "4",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-11-01",
+   "source": "Computrabajo",
+   "became_ready": "21",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-11-01",
+   "source": "LinkedIn",
+   "became_ready": "33",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-11-01",
+   "source": "Magneto",
+   "became_ready": "151",
+   "official_projection": "0"
+  },
+  {
+   "day": "2026-11-01",
+   "source": "Portal oficial",
+   "became_ready": "24",
+   "official_projection": "24"
+  }
+ ],
+ "detail_status_by_source": [
+  {
+   "source": "Computrabajo",
+   "detail_status": "complete",
+   "n": "227",
+   "ready": "226"
+  },
+  {
+   "source": "Computrabajo",
+   "detail_status": "no_detail",
+   "n": "91",
+   "ready": "0"
+  },
+  {
+   "source": "Computrabajo",
+   "detail_status": "pending",
+   "n": "2121",
+   "ready": "0"
+  },
+  {
+   "source": "Computrabajo",
+   "detail_status": "retry",
+   "n": "449",
+   "ready": "0"
+  },
+  {
+   "source": "Elempleo",
+   "detail_status": "complete",
+   "n": "468",
+   "ready": "468"
+  },
+  {
+   "source": "Elempleo",
+   "detail_status": "no_detail",
+   "n": "4",
+   "ready": "0"
+  },
+  {
+   "source": "Elempleo",
+   "detail_status": "rejected",
+   "n": "6",
+   "ready": "0"
+  },
+  {
+   "source": "GetOnBoard",
+   "detail_status": "complete",
+   "n": "64",
+   "ready": "0"
+  },
+  {
+   "source": "GetOnBoard",
+   "detail_status": "unsupported",
+   "n": "2",
+   "ready": "0"
+  },
+  {
+   "source": "Glassdoor",
+   "detail_status": "unsupported",
+   "n": "1045",
+   "ready": "0"
+  },
+  {
+   "source": "Indeed",
+   "detail_status": "unsupported",
+   "n": "261",
+   "ready": "0"
+  },
+  {
+   "source": "LinkedIn",
+   "detail_status": "complete",
+   "n": "2361",
+   "ready": "2116"
+  },
+  {
+   "source": "LinkedIn",
+   "detail_status": "no_detail",
+   "n": "323",
+   "ready": "0"
+  },
+  {
+   "source": "LinkedIn",
+   "detail_status": "pending",
+   "n": "4818",
+   "ready": "0"
+  },
+  {
+   "source": "LinkedIn",
+   "detail_status": "rejected",
+   "n": "241",
+   "ready": "0"
+  },
+  {
+   "source": "LinkedIn",
+   "detail_status": "retry",
+   "n": "593",
+   "ready": "0"
+  },
+  {
+   "source": "Magneto",
+   "detail_status": "complete",
+   "n": "853",
+   "ready": "726"
+  },
+  {
+   "source": "Magneto",
+   "detail_status": "pending",
+   "n": "1385",
+   "ready": "0"
+  },
+  {
+   "source": "Magneto",
+   "detail_status": "rejected",
+   "n": "37",
+   "ready": "0"
+  },
+  {
+   "source": "Magneto",
+   "detail_status": "retry",
+   "n": "5",
+   "ready": "0"
+  },
+  {
+   "source": "Portal oficial",
+   "detail_status": "complete",
+   "n": "1169",
+   "ready": "960"
+  },
+  {
+   "source": "Portal oficial",
+   "detail_status": "unsupported",
+   "n": "222",
+   "ready": "0"
+  },
+  {
+   "source": "RemoteOK",
+   "detail_status": "complete",
+   "n": "25",
+   "ready": "0"
+  },
+  {
+   "source": "RemoteOK",
+   "detail_status": "unsupported",
+   "n": "5",
+   "ready": "0"
+  },
+  {
+   "source": "Remotive",
+   "detail_status": "unsupported",
+   "n": "1",
+   "ready": "0"
+  },
+  {
+   "source": "Torre",
+   "detail_status": "unsupported",
+   "n": "8",
+   "ready": "0"
+  },
+  {
+   "source": "WeRemoto",
+   "detail_status": "complete",
+   "n": "166",
+   "ready": "61"
+  },
+  {
+   "source": "WeRemoto",
+   "detail_status": "unsupported",
+   "n": "12",
+   "ready": "0"
+  },
+  {
+   "source": "Workana",
+   "detail_status": "complete",
+   "n": "1380",
+   "ready": "0"
+  },
+  {
+   "source": "Workana",
+   "detail_status": "unsupported",
+   "n": "4",
+   "ready": "0"
+  }
+ ],
+ "not_ready_reasons_by_source": [
+  {
+   "source": "Computrabajo",
+   "reason": "MISSING_DESCRIPTION",
+   "n": "2661"
+  },
+  {
+   "source": "Computrabajo",
+   "reason": "MISSING_LOCATION",
+   "n": "4"
+  },
+  {
+   "source": "Computrabajo",
+   "reason": "LOCATION_COUNTRY_CONFLICT",
+   "n": "2"
+  },
+  {
+   "source": "Computrabajo",
+   "reason": "INACTIVE",
+   "n": "1"
+  },
+  {
+   "source": "Elempleo",
+   "reason": "MISSING_DESCRIPTION",
+   "n": "4"
+  },
+  {
+   "source": "Elempleo",
+   "reason": "DESCRIPTION_NAVIGATION_JUNK",
+   "n": "3"
+  },
+  {
+   "source": "Elempleo",
+   "reason": "DESCRIPTION_TOO_THIN",
+   "n": "2"
+  },
+  {
+   "source": "Elempleo",
+   "reason": "DESCRIPTION_DUPLICATED_BLOCKS",
+   "n": "1"
+  },
+  {
+   "source": "GetOnBoard",
+   "reason": "INVALID_REMOTE_LOCATION",
+   "n": "63"
+  },
+  {
+   "source": "GetOnBoard",
+   "reason": "MISSING_LOCATION",
+   "n": "3"
+  },
+  {
+   "source": "GetOnBoard",
+   "reason": "DESCRIPTION_NAVIGATION_JUNK",
+   "n": "2"
+  },
+  {
+   "source": "Glassdoor",
+   "reason": "MISSING_DESCRIPTION",
+   "n": "1045"
+  },
+  {
+   "source": "Glassdoor",
+   "reason": "INVALID_REMOTE_LOCATION",
+   "n": "53"
+  },
+  {
+   "source": "Glassdoor",
+   "reason": "MISSING_LOCATION",
+   "n": "51"
+  },
+  {
+   "source": "Glassdoor",
+   "reason": "INACTIVE",
+   "n": "47"
+  },
+  {
+   "source": "Indeed",
+   "reason": "MISSING_DESCRIPTION",
+   "n": "261"
+  },
+  {
+   "source": "Indeed",
+   "reason": "INVALID_REMOTE_LOCATION",
+   "n": "11"
+  },
+  {
+   "source": "Indeed",
+   "reason": "INACTIVE",
+   "n": "3"
+  },
+  {
+   "source": "Indeed",
+   "reason": "MISSING_LOCATION",
+   "n": "1"
+  },
+  {
+   "source": "LinkedIn",
+   "reason": "MISSING_DESCRIPTION",
+   "n": "5734"
+  },
+  {
+   "source": "LinkedIn",
+   "reason": "MISSING_LOCATION",
+   "n": "1464"
+  },
+  {
+   "source": "LinkedIn",
+   "reason": "INACTIVE",
+   "n": "304"
+  },
+  {
+   "source": "LinkedIn",
+   "reason": "INVALID_REMOTE_LOCATION",
+   "n": "254"
+  },
+  {
+   "source": "LinkedIn",
+   "reason": "DESCRIPTION_NAVIGATION_JUNK",
+   "n": "205"
+  },
+  {
+   "source": "LinkedIn",
+   "reason": "DESCRIPTION_DUPLICATED_BLOCKS",
+   "n": "58"
+  },
+  {
+   "source": "LinkedIn",
+   "reason": "DESCRIPTION_TOO_THIN",
+   "n": "5"
+  },
+  {
+   "source": "LinkedIn",
+   "reason": "LOCATION_COUNTRY_CONFLICT",
+   "n": "3"
+  },
+  {
+   "source": "LinkedIn",
+   "reason": "DESCRIPTION_TRUNCATED",
+   "n": "1"
+  },
+  {
+   "source": "Magneto",
+   "reason": "MISSING_DESCRIPTION",
+   "n": "1390"
+  },
+  {
+   "source": "Magneto",
+   "reason": "INVALID_REMOTE_LOCATION",
+   "n": "163"
+  },
+  {
+   "source": "Magneto",
+   "reason": "MISSING_LOCATION",
+   "n": "103"
+  },
+  {
+   "source": "Magneto",
+   "reason": "DESCRIPTION_TOO_THIN",
+   "n": "37"
+  },
+  {
+   "source": "Magneto",
+   "reason": "INACTIVE",
+   "n": "1"
+  },
+  {
+   "source": "Magneto",
+   "reason": "LOCATION_COUNTRY_CONFLICT",
+   "n": "1"
+  },
+  {
+   "source": "Portal oficial",
+   "reason": "MISSING_DESCRIPTION",
+   "n": "222"
+  },
+  {
+   "source": "Portal oficial",
+   "reason": "MISSING_LOCATION",
+   "n": "185"
+  },
+  {
+   "source": "Portal oficial",
+   "reason": "DESCRIPTION_NAVIGATION_JUNK",
+   "n": "12"
+  },
+  {
+   "source": "Portal oficial",
+   "reason": "DESCRIPTION_DUPLICATED_BLOCKS",
+   "n": "10"
+  },
+  {
+   "source": "Portal oficial",
+   "reason": "DESCRIPTION_TOO_THIN",
+   "n": "6"
+  },
+  {
+   "source": "Portal oficial",
+   "reason": "DESCRIPTION_IS_METADATA",
+   "n": "2"
+  },
+  {
+   "source": "RemoteOK",
+   "reason": "INVALID_REMOTE_LOCATION",
+   "n": "24"
+  },
+  {
+   "source": "RemoteOK",
+   "reason": "MISSING_LOCATION",
+   "n": "6"
+  },
+  {
+   "source": "RemoteOK",
+   "reason": "DESCRIPTION_DUPLICATED_BLOCKS",
+   "n": "4"
+  },
+  {
+   "source": "RemoteOK",
+   "reason": "DESCRIPTION_NAVIGATION_JUNK",
+   "n": "1"
+  },
+  {
+   "source": "Remotive",
+   "reason": "DESCRIPTION_NAVIGATION_JUNK",
+   "n": "1"
+  },
+  {
+   "source": "Remotive",
+   "reason": "INVALID_REMOTE_LOCATION",
+   "n": "1"
+  },
+  {
+   "source": "Torre",
+   "reason": "DESCRIPTION_SNIPPET",
+   "n": "8"
+  },
+  {
+   "source": "Torre",
+   "reason": "DESCRIPTION_TOO_THIN",
+   "n": "8"
+  },
+  {
+   "source": "Torre",
+   "reason": "INVALID_REMOTE_LOCATION",
+   "n": "8"
+  },
+  {
+   "source": "WeRemoto",
+   "reason": "INVALID_REMOTE_LOCATION",
+   "n": "112"
+  },
+  {
+   "source": "WeRemoto",
+   "reason": "DESCRIPTION_TOO_THIN",
+   "n": "12"
+  },
+  {
+   "source": "Workana",
+   "reason": "MISSING_LOCATION",
+   "n": "1384"
+  },
+  {
+   "source": "Workana",
+   "reason": "SOURCE_REQUIRES_JOB_CLASSIFICATION",
+   "n": "1384"
+  },
+  {
+   "source": "Workana",
+   "reason": "DESCRIPTION_NAVIGATION_JUNK",
+   "n": "3"
+  },
+  {
+   "source": "Workana",
+   "reason": "DESCRIPTION_ERROR_PAGE",
+   "n": "1"
+  }
+ ],
+ "sent_by_day_type": [
+  {
+   "day": "2026-10-19",
+   "notification_type": "URL_DELETED",
+   "status": "sent",
+   "n": "100"
+  },
+  {
+   "day": "2026-10-19",
+   "notification_type": "URL_UPDATED",
+   "status": "sent",
+   "n": "100"
+  },
+  {
+   "day": "2026-10-20",
+   "notification_type": "URL_DELETED",
+   "status": "sent",
+   "n": "100"
+  },
+  {
+   "day": "2026-10-20",
+   "notification_type": "URL_UPDATED",
+   "status": "sent",
+   "n": "100"
+  },
+  {
+   "day": "2026-10-21",
+   "notification_type": "URL_DELETED",
+   "status": "sent",
+   "n": "100"
+  },
+  {
+   "day": "2026-10-21",
+   "notification_type": "URL_UPDATED",
+   "status": "sent",
+   "n": "100"
+  },
+  {
+   "day": "2026-10-22",
+   "notification_type": "URL_DELETED",
+   "status": "sent",
+   "n": "100"
+  },
+  {
+   "day": "2026-10-22",
+   "notification_type": "URL_UPDATED",
+   "status": "sent",
+   "n": "100"
+  },
+  {
+   "day": "2026-10-23",
+   "notification_type": "URL_DELETED",
+   "status": "sent",
+   "n": "100"
+  },
+  {
+   "day": "2026-10-23",
+   "notification_type": "URL_UPDATED",
+   "status": "sent",
+   "n": "100"
+  },
+  {
+   "day": "2026-10-24",
+   "notification_type": "URL_DELETED",
+   "status": "sent",
+   "n": "100"
+  },
+  {
+   "day": "2026-10-24",
+   "notification_type": "URL_UPDATED",
+   "status": "sent",
+   "n": "100"
+  },
+  {
+   "day": "2026-10-25",
+   "notification_type": "URL_DELETED",
+   "status": "sent",
+   "n": "100"
+  },
+  {
+   "day": "2026-10-25",
+   "notification_type": "URL_UPDATED",
+   "status": "sent",
+   "n": "100"
+  },
+  {
+   "day": "2026-10-26",
+   "notification_type": "URL_DELETED",
+   "status": "sent",
+   "n": "100"
+  },
+  {
+   "day": "2026-10-26",
+   "notification_type": "URL_UPDATED",
+   "status": "sent",
+   "n": "100"
+  },
+  {
+   "day": "2026-10-27",
+   "notification_type": "URL_DELETED",
+   "status": "sent",
+   "n": "100"
+  },
+  {
+   "day": "2026-10-27",
+   "notification_type": "URL_UPDATED",
+   "status": "sent",
+   "n": "100"
+  },
+  {
+   "day": "2026-10-28",
+   "notification_type": "URL_DELETED",
+   "status": "sent",
+   "n": "100"
+  },
+  {
+   "day": "2026-10-28",
+   "notification_type": "URL_UPDATED",
+   "status": "sent",
+   "n": "100"
+  },
+  {
+   "day": "2026-10-30",
+   "notification_type": "URL_DELETED",
+   "status": "sent",
+   "n": "100"
+  },
+  {
+   "day": "2026-10-30",
+   "notification_type": "URL_UPDATED",
+   "status": "sent",
+   "n": "100"
+  },
+  {
+   "day": "2026-10-31",
+   "notification_type": "URL_DELETED",
+   "status": "sent",
+   "n": "100"
+  },
+  {
+   "day": "2026-10-31",
+   "notification_type": "URL_UPDATED",
+   "status": "sent",
+   "n": "100"
+  },
+  {
+   "day": "2026-11-01",
+   "notification_type": "URL_DELETED",
+   "status": "sent",
+   "n": "100"
+  },
+  {
+   "day": "2026-11-01",
+   "notification_type": "URL_UPDATED",
+   "status": "sent",
+   "n": "100"
+  }
+ ],
+ "superseded_by_day_reason": [
+  {
+   "day": "2026-10-18",
+   "notification_type": "URL_DELETED",
+   "reason": "delete_not_api_notified",
+   "n": "135"
+  },
+  {
+   "day": "2026-10-19",
+   "notification_type": "URL_DELETED",
+   "reason": "delete_not_api_notified",
+   "n": "580"
+  },
+  {
+   "day": "2026-10-19",
+   "notification_type": "URL_UPDATED",
+   "reason": "api_window_expired",
+   "n": "38"
+  },
+  {
+   "day": "2026-10-20",
+   "notification_type": "URL_DELETED",
+   "reason": "delete_not_api_notified",
+   "n": "342"
+  },
+  {
+   "day": "2026-10-20",
+   "notification_type": "URL_UPDATED",
+   "reason": "api_window_expired",
+   "n": "46"
+  },
+  {
+   "day": "2026-10-20",
+   "notification_type": "URL_UPDATED",
+   "reason": "target_deleted",
+   "n": "1"
+  },
+  {
+   "day": "2026-10-20",
+   "notification_type": "URL_UPDATED",
+   "reason": "target_not_seo_ready",
+   "n": "21"
+  },
+  {
+   "day": "2026-10-21",
+   "notification_type": "URL_DELETED",
+   "reason": "delete_not_api_notified",
+   "n": "1468"
+  },
+  {
+   "day": "2026-10-21",
+   "notification_type": "URL_UPDATED",
+   "reason": "api_window_expired",
+   "n": "206"
+  },
+  {
+   "day": "2026-10-21",
+   "notification_type": "URL_UPDATED",
+   "reason": "target_deleted",
+   "n": "1"
+  },
+  {
+   "day": "2026-10-21",
+   "notification_type": "URL_UPDATED",
+   "reason": "target_not_seo_ready",
+   "n": "9"
+  },
+  {
+   "day": "2026-10-22",
+   "notification_type": "URL_DELETED",
+   "reason": "delete_not_api_notified",
+   "n": "1466"
+  },
+  {
+   "day": "2026-10-22",
+   "notification_type": "URL_UPDATED",
+   "reason": "api_window_expired",
+   "n": "219"
+  },
+  {
+   "day": "2026-10-22",
+   "notification_type": "URL_UPDATED",
+   "reason": "target_deleted",
+   "n": "7"
+  },
+  {
+   "day": "2026-10-22",
+   "notification_type": "URL_UPDATED",
+   "reason": "target_not_seo_ready",
+   "n": "12"
+  },
+  {
+   "day": "2026-10-23",
+   "notification_type": "URL_DELETED",
+   "reason": "delete_not_api_notified",
+   "n": "1549"
+  },
+  {
+   "day": "2026-10-23",
+   "notification_type": "URL_UPDATED",
+   "reason": "api_window_expired",
+   "n": "207"
+  },
+  {
+   "day": "2026-10-23",
+   "notification_type": "URL_UPDATED",
+   "reason": "target_not_seo_ready",
+   "n": "9"
+  },
+  {
+   "day": "2026-10-24",
+   "notification_type": "URL_DELETED",
+   "reason": "delete_not_api_notified",
+   "n": "1354"
+  },
+  {
+   "day": "2026-10-24",
+   "notification_type": "URL_UPDATED",
+   "reason": "api_window_expired",
+   "n": "225"
+  },
+  {
+   "day": "2026-10-24",
+   "notification_type": "URL_UPDATED",
+   "reason": "target_not_seo_ready",
+   "n": "9"
+  },
+  {
+   "day": "2026-10-25",
+   "notification_type": "URL_DELETED",
+   "reason": "delete_not_api_notified",
+   "n": "1395"
+  },
+  {
+   "day": "2026-10-25",
+   "notification_type": "URL_UPDATED",
+   "reason": "api_window_expired",
+   "n": "137"
+  },
+  {
+   "day": "2026-10-25",
+   "notification_type": "URL_UPDATED",
+   "reason": "target_deleted",
+   "n": "1"
+  },
+  {
+   "day": "2026-10-25",
+   "notification_type": "URL_UPDATED",
+   "reason": "target_not_seo_ready",
+   "n": "6"
+  },
+  {
+   "day": "2026-10-26",
+   "notification_type": "URL_DELETED",
+   "reason": "delete_not_api_notified",
+   "n": "565"
+  },
+  {
+   "day": "2026-10-26",
+   "notification_type": "URL_UPDATED",
+   "reason": "api_window_expired",
+   "n": "143"
+  },
+  {
+   "day": "2026-10-26",
+   "notification_type": "URL_UPDATED",
+   "reason": "target_not_seo_ready",
+   "n": "7"
+  },
+  {
+   "day": "2026-10-27",
+   "notification_type": "URL_DELETED",
+   "reason": "delete_not_api_notified",
+   "n": "339"
+  },
+  {
+   "day": "2026-10-27",
+   "notification_type": "URL_UPDATED",
+   "reason": "api_window_expired",
+   "n": "196"
+  },
+  {
+   "day": "2026-10-27",
+   "notification_type": "URL_UPDATED",
+   "reason": "target_deleted",
+   "n": "1"
+  },
+  {
+   "day": "2026-10-27",
+   "notification_type": "URL_UPDATED",
+   "reason": "target_not_seo_ready",
+   "n": "8"
+  },
+  {
+   "day": "2026-10-28",
+   "notification_type": "URL_DELETED",
+   "reason": "delete_not_api_notified",
+   "n": "861"
+  },
+  {
+   "day": "2026-10-28",
+   "notification_type": "URL_UPDATED",
+   "reason": "api_window_expired",
+   "n": "246"
+  },
+  {
+   "day": "2026-10-28",
+   "notification_type": "URL_UPDATED",
+   "reason": "target_deleted",
+   "n": "6"
+  },
+  {
+   "day": "2026-10-28",
+   "notification_type": "URL_UPDATED",
+   "reason": "target_not_seo_ready",
+   "n": "6"
+  },
+  {
+   "day": "2026-10-29",
+   "notification_type": "URL_DELETED",
+   "reason": "delete_not_api_notified",
+   "n": "1263"
+  },
+  {
+   "day": "2026-10-29",
+   "notification_type": "URL_UPDATED",
+   "reason": "api_window_expired",
+   "n": "141"
+  },
+  {
+   "day": "2026-10-29",
+   "notification_type": "URL_UPDATED",
+   "reason": "target_deleted",
+   "n": "13"
+  },
+  {
+   "day": "2026-10-29",
+   "notification_type": "URL_UPDATED",
+   "reason": "target_not_seo_ready",
+   "n": "54"
+  },
+  {
+   "day": "2026-10-30",
+   "notification_type": "URL_DELETED",
+   "reason": "delete_not_api_notified",
+   "n": "1058"
+  },
+  {
+   "day": "2026-10-30",
+   "notification_type": "URL_UPDATED",
+   "reason": "api_window_expired",
+   "n": "258"
+  },
+  {
+   "day": "2026-10-30",
+   "notification_type": "URL_UPDATED",
+   "reason": "target_deleted",
+   "n": "72"
+  },
+  {
+   "day": "2026-10-30",
+   "notification_type": "URL_UPDATED",
+   "reason": "target_not_seo_ready",
+   "n": "27"
+  },
+  {
+   "day": "2026-10-31",
+   "notification_type": "URL_DELETED",
+   "reason": "delete_not_api_notified",
+   "n": "1568"
+  },
+  {
+   "day": "2026-10-31",
+   "notification_type": "URL_UPDATED",
+   "reason": "api_window_expired",
+   "n": "173"
+  },
+  {
+   "day": "2026-10-31",
+   "notification_type": "URL_UPDATED",
+   "reason": "target_deleted",
+   "n": "18"
+  },
+  {
+   "day": "2026-10-31",
+   "notification_type": "URL_UPDATED",
+   "reason": "target_not_seo_ready",
+   "n": "30"
+  },
+  {
+   "day": "2026-11-01",
+   "notification_type": "URL_DELETED",
+   "reason": "delete_not_api_notified",
+   "n": "945"
+  },
+  {
+   "day": "2026-11-01",
+   "notification_type": "URL_UPDATED",
+   "reason": "api_window_expired",
+   "n": "131"
+  },
+  {
+   "day": "2026-11-01",
+   "notification_type": "URL_UPDATED",
+   "reason": "target_deleted",
+   "n": "3"
+  },
+  {
+   "day": "2026-11-01",
+   "notification_type": "URL_UPDATED",
+   "reason": "target_not_seo_ready",
+   "n": "9"
+  }
+ ],
+ "enqueued_by_day_priority": [
+  {
+   "day": "2026-10-18",
+   "notification_type": "URL_DELETED",
+   "priority": 4,
+   "n": "135"
+  },
+  {
+   "day": "2026-10-18",
+   "notification_type": "URL_UPDATED",
+   "priority": 2,
+   "n": "38"
+  },
+  {
+   "day": "2026-10-19",
+   "notification_type": "URL_DELETED",
+   "priority": 1,
+   "n": "1"
+  },
+  {
+   "day": "2026-10-19",
+   "notification_type": "URL_DELETED",
+   "priority": 4,
+   "n": "580"
+  },
+  {
+   "day": "2026-10-19",
+   "notification_type": "URL_UPDATED",
+   "priority": 2,
+   "n": "241"
+  },
+  {
+   "day": "2026-10-20",
+   "notification_type": "URL_DELETED",
+   "priority": 1,
+   "n": "4"
+  },
+  {
+   "day": "2026-10-20",
+   "notification_type": "URL_DELETED",
+   "priority": 4,
+   "n": "342"
+  },
+  {
+   "day": "2026-10-20",
+   "notification_type": "URL_UPDATED",
+   "priority": 2,
+   "n": "281"
+  },
+  {
+   "day": "2026-10-21",
+   "notification_type": "URL_DELETED",
+   "priority": 1,
+   "n": "1"
+  },
+  {
+   "day": "2026-10-21",
+   "notification_type": "URL_DELETED",
+   "priority": 4,
+   "n": "1468"
+  },
+  {
+   "day": "2026-10-21",
+   "notification_type": "URL_UPDATED",
+   "priority": 2,
+   "n": "284"
+  },
+  {
+   "day": "2026-10-22",
+   "notification_type": "URL_DELETED",
+   "priority": 1,
+   "n": "3"
+  },
+  {
+   "day": "2026-10-22",
+   "notification_type": "URL_DELETED",
+   "priority": 4,
+   "n": "1466"
+  },
+  {
+   "day": "2026-10-22",
+   "notification_type": "URL_UPDATED",
+   "priority": 2,
+   "n": "375"
+  },
+  {
+   "day": "2026-10-22",
+   "notification_type": "URL_UPDATED",
+   "priority": 4,
+   "n": "1"
+  },
+  {
+   "day": "2026-10-23",
+   "notification_type": "URL_DELETED",
+   "priority": 1,
+   "n": "4"
+  },
+  {
+   "day": "2026-10-23",
+   "notification_type": "URL_DELETED",
+   "priority": 4,
+   "n": "1549"
+  },
+  {
+   "day": "2026-10-23",
+   "notification_type": "URL_UPDATED",
+   "priority": 2,
+   "n": "295"
+  },
+  {
+   "day": "2026-10-23",
+   "notification_type": "URL_UPDATED",
+   "priority": 4,
+   "n": "1"
+  },
+  {
+   "day": "2026-10-24",
+   "notification_type": "URL_DELETED",
+   "priority": 1,
+   "n": "13"
+  },
+  {
+   "day": "2026-10-24",
+   "notification_type": "URL_DELETED",
+   "priority": 4,
+   "n": "1354"
+  },
+  {
+   "day": "2026-10-24",
+   "notification_type": "URL_UPDATED",
+   "priority": 2,
+   "n": "266"
+  },
+  {
+   "day": "2026-10-24",
+   "notification_type": "URL_UPDATED",
+   "priority": 4,
+   "n": "1"
+  },
+  {
+   "day": "2026-10-25",
+   "notification_type": "URL_DELETED",
+   "priority": 1,
+   "n": "47"
+  },
+  {
+   "day": "2026-10-25",
+   "notification_type": "URL_DELETED",
+   "priority": 4,
+   "n": "1395"
+  },
+  {
+   "day": "2026-10-25",
+   "notification_type": "URL_UPDATED",
+   "priority": 2,
+   "n": "276"
+  },
+  {
+   "day": "2026-10-25",
+   "notification_type": "URL_UPDATED",
+   "priority": 4,
+   "n": "1"
+  },
+  {
+   "day": "2026-10-26",
+   "notification_type": "URL_DELETED",
+   "priority": 1,
+   "n": "74"
+  },
+  {
+   "day": "2026-10-26",
+   "notification_type": "URL_DELETED",
+   "priority": 4,
+   "n": "565"
+  },
+  {
+   "day": "2026-10-26",
+   "notification_type": "URL_UPDATED",
+   "priority": 2,
+   "n": "278"
+  },
+  {
+   "day": "2026-10-27",
+   "notification_type": "URL_DELETED",
+   "priority": 1,
+   "n": "90"
+  },
+  {
+   "day": "2026-10-27",
+   "notification_type": "URL_DELETED",
+   "priority": 4,
+   "n": "339"
+  },
+  {
+   "day": "2026-10-27",
+   "notification_type": "URL_UPDATED",
+   "priority": 2,
+   "n": "353"
+  },
+  {
+   "day": "2026-10-27",
+   "notification_type": "URL_UPDATED",
+   "priority": 4,
+   "n": "1"
+  },
+  {
+   "day": "2026-10-28",
+   "notification_type": "URL_DELETED",
+   "priority": 1,
+   "n": "291"
+  },
+  {
+   "day": "2026-10-28",
+   "notification_type": "URL_DELETED",
+   "priority": 4,
+   "n": "861"
+  },
+  {
+   "day": "2026-10-28",
+   "notification_type": "URL_UPDATED",
+   "priority": 2,
+   "n": "259"
+  },
+  {
+   "day": "2026-10-29",
+   "notification_type": "URL_DELETED",
+   "priority": 1,
+   "n": "323"
+  },
+  {
+   "day": "2026-10-29",
+   "notification_type": "URL_DELETED",
+   "priority": 4,
+   "n": "1263"
+  },
+  {
+   "day": "2026-10-29",
+   "notification_type": "URL_UPDATED",
+   "priority": 2,
+   "n": "399"
+  },
+  {
+   "day": "2026-10-29",
+   "notification_type": "URL_UPDATED",
+   "priority": 4,
+   "n": "1"
+  },
+  {
+   "day": "2026-10-30",
+   "notification_type": "URL_DELETED",
+   "priority": 1,
+   "n": "242"
+  },
+  {
+   "day": "2026-10-30",
+   "notification_type": "URL_DELETED",
+   "priority": 4,
+   "n": "1058"
+  },
+  {
+   "day": "2026-10-30",
+   "notification_type": "URL_UPDATED",
+   "priority": 2,
+   "n": "283"
+  },
+  {
+   "day": "2026-10-30",
+   "notification_type": "URL_UPDATED",
+   "priority": 4,
+   "n": "2"
+  },
+  {
+   "day": "2026-10-31",
+   "notification_type": "URL_DELETED",
+   "priority": 1,
+   "n": "139"
+  },
+  {
+   "day": "2026-10-31",
+   "notification_type": "URL_DELETED",
+   "priority": 4,
+   "n": "1568"
+  },
+  {
+   "day": "2026-10-31",
+   "notification_type": "URL_UPDATED",
+   "priority": 2,
+   "n": "411"
+  },
+  {
+   "day": "2026-10-31",
+   "notification_type": "URL_UPDATED",
+   "priority": 4,
+   "n": "1"
+  },
+  {
+   "day": "2026-11-01",
+   "notification_type": "URL_DELETED",
+   "priority": 1,
+   "n": "129"
+  },
+  {
+   "day": "2026-11-01",
+   "notification_type": "URL_DELETED",
+   "priority": 4,
+   "n": "945"
+  },
+  {
+   "day": "2026-11-01",
+   "notification_type": "URL_UPDATED",
+   "priority": 2,
+   "n": "210"
+  }
+ ],
+ "pending_now": [
+  {
+   "notification_type": "URL_DELETED",
+   "priority": 1,
+   "n": "8850",
+   "p50_age_h": "1059.5",
+   "max_age_h": "1584.3"
+  },
+  {
+   "notification_type": "URL_UPDATED",
+   "priority": 2,
+   "n": "2026",
+   "p50_age_h": "74.3",
+   "max_age_h": "168.2"
+  },
+  {
+   "notification_type": "URL_UPDATED",
+   "priority": 4,
+   "n": "4",
+   "p50_age_h": "61.9",
+   "max_age_h": "76.2"
+  }
+ ],
+ "sent_latency_by_day": [
+  {
+   "day": "2026-10-19",
+   "sent": "86",
+   "p50_h_enqueued_to_sent": "154.2",
+   "p90_h_enqueued_to_sent": "163.8",
+   "p50_h_ready_to_sent": "154.2",
+   "p90_h_ready_to_sent": "163.8",
+   "p50_h_job_age_at_send": "154.3",
+   "sent_job_older_48h": "86"
+  },
+  {
+   "day": "2026-10-20",
+   "sent": "82",
+   "p50_h_enqueued_to_sent": "155.7",
+   "p90_h_enqueued_to_sent": "160.5",
+   "p50_h_ready_to_sent": "155.7",
+   "p90_h_ready_to_sent": "160.5",
+   "p50_h_job_age_at_send": "155.8",
+   "sent_job_older_48h": "82"
+  },
+  {
+   "day": "2026-10-21",
+   "sent": "92",
+   "p50_h_enqueued_to_sent": "161.8",
+   "p90_h_enqueued_to_sent": "165.8",
+   "p50_h_ready_to_sent": "161.8",
+   "p90_h_ready_to_sent": "165.8",
+   "p50_h_job_age_at_send": "161.8",
+   "sent_job_older_48h": "92"
+  },
+  {
+   "day": "2026-10-22",
+   "sent": "91",
+   "p50_h_enqueued_to_sent": "165.7",
+   "p90_h_enqueued_to_sent": "166.1",
+   "p50_h_ready_to_sent": "165.7",
+   "p90_h_ready_to_sent": "166.1",
+   "p50_h_job_age_at_send": "165.8",
+   "sent_job_older_48h": "91"
+  },
+  {
+   "day": "2026-10-23",
+   "sent": "92",
+   "p50_h_enqueued_to_sent": "167.0",
+   "p90_h_enqueued_to_sent": "167.3",
+   "p50_h_ready_to_sent": "167.0",
+   "p90_h_ready_to_sent": "167.3",
+   "p50_h_job_age_at_send": "167.1",
+   "sent_job_older_48h": "92"
+  },
+  {
+   "day": "2026-10-24",
+   "sent": "90",
+   "p50_h_enqueued_to_sent": "165.0",
+   "p90_h_enqueued_to_sent": "167.4",
+   "p50_h_ready_to_sent": "165.0",
+   "p90_h_ready_to_sent": "167.4",
+   "p50_h_job_age_at_send": "167.4",
+   "sent_job_older_48h": "90"
+  },
+  {
+   "day": "2026-10-25",
+   "sent": "97",
+   "p50_h_enqueued_to_sent": "164.0",
+   "p90_h_enqueued_to_sent": "167.0",
+   "p50_h_ready_to_sent": "164.0",
+   "p90_h_ready_to_sent": "167.0",
+   "p50_h_job_age_at_send": "167.0",
+   "sent_job_older_48h": "97"
+  },
+  {
+   "day": "2026-10-26",
+   "sent": "92",
+   "p50_h_enqueued_to_sent": "163.1",
+   "p90_h_enqueued_to_sent": "165.3",
+   "p50_h_ready_to_sent": "163.1",
+   "p90_h_ready_to_sent": "165.3",
+   "p50_h_job_age_at_send": "165.1",
+   "sent_job_older_48h": "92"
+  },
+  {
+   "day": "2026-10-27",
+   "sent": "94",
+   "p50_h_enqueued_to_sent": "167.0",
+   "p90_h_enqueued_to_sent": "167.2",
+   "p50_h_ready_to_sent": "167.0",
+   "p90_h_ready_to_sent": "167.2",
+   "p50_h_job_age_at_send": "167.0",
+   "sent_job_older_48h": "94"
+  },
+  {
+   "day": "2026-10-28",
+   "sent": "97",
+   "p50_h_enqueued_to_sent": "157.9",
+   "p90_h_enqueued_to_sent": "163.8",
+   "p50_h_ready_to_sent": "157.9",
+   "p90_h_ready_to_sent": "163.8",
+   "p50_h_job_age_at_send": "163.6",
+   "sent_job_older_48h": "97"
+  },
+  {
+   "day": "2026-10-30",
+   "sent": "98",
+   "p50_h_enqueued_to_sent": "162.9",
+   "p90_h_enqueued_to_sent": "163.1",
+   "p50_h_ready_to_sent": "162.9",
+   "p90_h_ready_to_sent": "163.1",
+   "p50_h_job_age_at_send": "162.9",
+   "sent_job_older_48h": "98"
+  },
+  {
+   "day": "2026-10-31",
+   "sent": "100",
+   "p50_h_enqueued_to_sent": "162.3",
+   "p90_h_enqueued_to_sent": "165.1",
+   "p50_h_ready_to_sent": "162.3",
+   "p90_h_ready_to_sent": "165.1",
+   "p50_h_job_age_at_send": "162.4",
+   "sent_job_older_48h": "100"
+  },
+  {
+   "day": "2026-11-01",
+   "sent": "100",
+   "p50_h_enqueued_to_sent": "165.0",
+   "p90_h_enqueued_to_sent": "165.2",
+   "p50_h_ready_to_sent": "165.0",
+   "p90_h_ready_to_sent": "165.2",
+   "p50_h_job_age_at_send": "184.3",
+   "sent_job_older_48h": "100"
+  }
+ ],
+ "ready_fate_by_source": [
+  {
+   "cohort": "en_curso_0_7d",
+   "source": "LinkedIn",
+   "ready": "1039",
+   "official_no_api": "0",
+   "api_sent": "45",
+   "expired_unsent": "73",
+   "still_pending": "870",
+   "failed_only": "0",
+   "superseded_other": "51",
+   "never_enqueued": "0"
+  },
+  {
+   "cohort": "en_curso_0_7d",
+   "source": "Magneto",
+   "ready": "800",
+   "official_no_api": "0",
+   "api_sent": "16",
+   "expired_unsent": "19",
+   "still_pending": "765",
+   "failed_only": "0",
+   "superseded_other": "0",
+   "never_enqueued": "0"
+  },
+  {
+   "cohort": "en_curso_0_7d",
+   "source": "Portal oficial",
+   "ready": "556",
+   "official_no_api": "556",
+   "api_sent": "0",
+   "expired_unsent": "0",
+   "still_pending": "0",
+   "failed_only": "0",
+   "superseded_other": "0",
+   "never_enqueued": "0"
+  },
+  {
+   "cohort": "en_curso_0_7d",
+   "source": "Computrabajo",
+   "ready": "235",
+   "official_no_api": "0",
+   "api_sent": "5",
+   "expired_unsent": "19",
+   "still_pending": "211",
+   "failed_only": "0",
+   "superseded_other": "0",
+   "never_enqueued": "0"
+  },
+  {
+   "cohort": "en_curso_0_7d",
+   "source": "Elempleo",
+   "ready": "213",
+   "official_no_api": "0",
+   "api_sent": "34",
+   "expired_unsent": "16",
+   "still_pending": "163",
+   "failed_only": "0",
+   "superseded_other": "0",
+   "never_enqueued": "0"
+  },
+  {
+   "cohort": "en_curso_0_7d",
+   "source": "WeRemoto",
+   "ready": "25",
+   "official_no_api": "0",
+   "api_sent": "0",
+   "expired_unsent": "4",
+   "still_pending": "21",
+   "failed_only": "0",
+   "superseded_other": "0",
+   "never_enqueued": "0"
+  },
+  {
+   "cohort": "final_8_14d",
+   "source": "LinkedIn",
+   "ready": "1081",
+   "official_no_api": "0",
+   "api_sent": "356",
+   "expired_unsent": "687",
+   "still_pending": "0",
+   "failed_only": "0",
+   "superseded_other": "38",
+   "never_enqueued": "0"
+  },
+  {
+   "cohort": "final_8_14d",
+   "source": "Portal oficial",
+   "ready": "404",
+   "official_no_api": "404",
+   "api_sent": "0",
+   "expired_unsent": "0",
+   "still_pending": "0",
+   "failed_only": "0",
+   "superseded_other": "0",
+   "never_enqueued": "0"
+  },
+  {
+   "cohort": "final_8_14d",
+   "source": "Elempleo",
+   "ready": "259",
+   "official_no_api": "0",
+   "api_sent": "58",
+   "expired_unsent": "201",
+   "still_pending": "0",
+   "failed_only": "0",
+   "superseded_other": "0",
+   "never_enqueued": "0"
+  },
+  {
+   "cohort": "final_8_14d",
+   "source": "Computrabajo",
+   "ready": "180",
+   "official_no_api": "0",
+   "api_sent": "51",
+   "expired_unsent": "129",
+   "still_pending": "0",
+   "failed_only": "0",
+   "superseded_other": "0",
+   "never_enqueued": "0"
+  },
+  {
+   "cohort": "final_8_14d",
+   "source": "Magneto",
+   "ready": "83",
+   "official_no_api": "0",
+   "api_sent": "14",
+   "expired_unsent": "69",
+   "still_pending": "0",
+   "failed_only": "0",
+   "superseded_other": "0",
+   "never_enqueued": "0"
+  },
+  {
+   "cohort": "final_8_14d",
+   "source": "WeRemoto",
+   "ready": "36",
+   "official_no_api": "0",
+   "api_sent": "15",
+   "expired_unsent": "21",
+   "still_pending": "0",
+   "failed_only": "0",
+   "superseded_other": "0",
+   "never_enqueued": "0"
+  }
+ ],
+ "first_api_window_expired": [
+  {
+   "first_expired": "2026-09-27T02:31:01.915Z",
+   "total_expired": "14644"
+  }
+ ],
+ "ready_by_hour_top": [
+  {
+   "hour": "2026-10-20 21",
+   "n": "226"
+  },
+  {
+   "hour": "2026-10-29 14",
+   "n": "199"
+  },
+  {
+   "hour": "2026-10-29 08",
+   "n": "131"
+  },
+  {
+   "hour": "2026-10-29 01",
+   "n": "122"
+  },
+  {
+   "hour": "2026-10-29 18",
+   "n": "97"
+  },
+  {
+   "hour": "2026-10-31 18",
+   "n": "96"
+  },
+  {
+   "hour": "2026-10-28 15",
+   "n": "89"
+  },
+  {
+   "hour": "2026-10-30 11",
+   "n": "83"
+  },
+  {
+   "hour": "2026-10-27 21",
+   "n": "83"
+  },
+  {
+   "hour": "2026-10-31 01",
+   "n": "83"
+  }
+ ],
+ "detail_attempts_by_source": [
+  {
+   "source_name": "Computrabajo",
+   "status": "failed",
+   "attempts": "90",
+   "received": "830",
+   "valid": "0",
+   "failed": "245"
+  },
+  {
+   "source_name": "Computrabajo",
+   "status": "partial",
+   "attempts": "34",
+   "received": "502",
+   "valid": "54",
+   "failed": "120"
+  },
+  {
+   "source_name": "Computrabajo",
+   "status": "skipped",
+   "attempts": "10",
+   "received": "188",
+   "valid": "0",
+   "failed": "0"
+  },
+  {
+   "source_name": "Computrabajo",
+   "status": "success",
+   "attempts": "5",
+   "received": "7",
+   "valid": "7",
+   "failed": "0"
+  },
+  {
+   "source_name": "Computrabajo",
+   "status": "timeout",
+   "attempts": "16",
+   "received": "532",
+   "valid": "0",
+   "failed": "28"
+  },
+  {
+   "source_name": "Computrabajo-VE",
+   "status": "failed",
+   "attempts": "36",
+   "received": "85",
+   "valid": "0",
+   "failed": "44"
+  },
+  {
+   "source_name": "Computrabajo-VE",
+   "status": "partial",
+   "attempts": "22",
+   "received": "118",
+   "valid": "44",
+   "failed": "46"
+  },
+  {
+   "source_name": "Computrabajo-VE",
+   "status": "skipped",
+   "attempts": "2",
+   "received": "12",
+   "valid": "0",
+   "failed": "0"
+  },
+  {
+   "source_name": "Computrabajo-VE",
+   "status": "success",
+   "attempts": "19",
+   "received": "26",
+   "valid": "26",
+   "failed": "0"
+  },
+  {
+   "source_name": "Computrabajo-VE",
+   "status": "timeout",
+   "attempts": "2",
+   "received": "3",
+   "valid": "0",
+   "failed": "0"
+  },
+  {
+   "source_name": "Elempleo",
+   "status": "partial",
+   "attempts": "6",
+   "received": "71",
+   "valid": "28",
+   "failed": "1"
+  },
+  {
+   "source_name": "Elempleo",
+   "status": "success",
+   "attempts": "49",
+   "received": "218",
+   "valid": "191",
+   "failed": "0"
+  },
+  {
+   "source_name": "LinkedIn",
+   "status": "failed",
+   "attempts": "8",
+   "received": "47",
+   "valid": "0",
+   "failed": "5"
+  },
+  {
+   "source_name": "LinkedIn",
+   "status": "partial",
+   "attempts": "255",
+   "received": "4072",
+   "valid": "1229",
+   "failed": "489"
+  },
+  {
+   "source_name": "LinkedIn",
+   "status": "skipped",
+   "attempts": "5",
+   "received": "43",
+   "valid": "0",
+   "failed": "0"
+  },
+  {
+   "source_name": "LinkedIn",
+   "status": "success",
+   "attempts": "108",
+   "received": "1183",
+   "valid": "600",
+   "failed": "0"
+  },
+  {
+   "source_name": "LinkedIn",
+   "status": "timeout",
+   "attempts": "2",
+   "received": "38",
+   "valid": "0",
+   "failed": "0"
+  },
+  {
+   "source_name": "LinkedIn-VE",
+   "status": "failed",
+   "attempts": "46",
+   "received": "70",
+   "valid": "0",
+   "failed": "55"
+  },
+  {
+   "source_name": "LinkedIn-VE",
+   "status": "partial",
+   "attempts": "137",
+   "received": "837",
+   "valid": "415",
+   "failed": "254"
+  },
+  {
+   "source_name": "LinkedIn-VE",
+   "status": "success",
+   "attempts": "109",
+   "received": "327",
+   "valid": "270",
+   "failed": "0"
+  },
+  {
+   "source_name": "Magneto",
+   "status": "success",
+   "attempts": "4",
+   "received": "52",
+   "valid": "25",
+   "failed": "0"
+  },
+  {
+   "source_name": "Magneto",
+   "status": "timeout",
+   "attempts": "1",
+   "received": "5",
+   "valid": "0",
+   "failed": "0"
+  }
+ ],
+ "generated_at": "2026-11-02T01:42:43.684Z"
+}

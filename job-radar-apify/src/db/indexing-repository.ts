@@ -3,7 +3,7 @@ import { pool } from "./client.js";
 import type { NotificationType } from "../lib/google-indexing.js";
 import { buildJobUrl, buildJobUrlPrefix } from "../lib/job-seo.js";
 import { canonicalSql, seoReadySql } from "../lib/google-job-readiness.js";
-import type { LaneQueues, QueueLane, Schedulable } from "../lib/indexing-scheduler.js";
+import { DEFAULT_SCHEDULER, newestFirstLanes, type LaneQueues, type QueueLane, type Schedulable } from "../lib/indexing-scheduler.js";
 
 // Google's default Indexing API quota (Search Console-verified project,
 // no quota increase requested). Budget is derived from what's actually
@@ -35,9 +35,28 @@ export const INDEXING_PRIORITY = {
  */
 export const API_NOTIFICATION_WINDOW_DAYS = 7;
 
-/** Terminal, non-sendable reason codes introduced by ADR 0004. */
+/** Terminal, non-sendable reason codes introduced by ADR 0004 (and its F2 amendment). */
 export const API_WINDOW_EXPIRED = "api_window_expired";
 export const DELETE_NOT_API_NOTIFIED = "delete_not_api_notified";
+export const DELETE_WINDOW_EXPIRED = "delete_window_expired";
+
+/**
+ * ADR 0004, F2 amendment: an URL_DELETED only accelerates what the 410 and the
+ * sitemap removal already say. Sent within 7 days of the purge it still speeds
+ * up the removal; F0 found 8,850 pending with a median age of 44 days, which
+ * accelerate nothing. Older ones are closed as 'delete_window_expired':
+ * terminal, history kept, the row still backs the 410 (wasJobPurged reads any
+ * status).
+ */
+export const DELETE_WINDOW_DAYS = 7;
+
+/** SQL: ids of pending URL_DELETED rows older than the delete window (bounded). */
+export function expiredDeleteIdsSql(limit: number): string {
+  return `SELECT q.id FROM indexing_queue q
+          WHERE q.status = 'pending' AND q.notification_type = 'URL_DELETED'
+            AND q.created_at <= NOW() - INTERVAL '${DELETE_WINDOW_DAYS} days'
+          LIMIT ${Math.floor(limit)}`;
+}
 
 /** SQL: the job's current version is still inside the API window. */
 export function withinApiWindowSql(alias: string): string {
@@ -64,7 +83,8 @@ type Queryable = Pick<PoolClient, "query">;
  * - Already resolved → nothing: an URL_UPDATED whose (job_id, url,
  *   content_hash) was already sent successfully — or whose API window already
  *   expired (ADR 0004, never resurrected) — or an URL_DELETED whose url was
- *   already sent, is skipped. Identity is the hash, not a time cooldown.
+ *   already sent or whose delete window expired, is skipped. Identity is the
+ *   hash, not a time cooldown.
  * - A newer URL_UPDATED for a job supersedes that job's pending URL_UPDATED at
  *   another url (a title/location edit changes the slug): no obsolete stacking.
  *
@@ -89,7 +109,7 @@ export async function enqueueIndexingNotificationsWith(db: Queryable, entries: I
        WHERE NOT EXISTS (
          SELECT 1 FROM indexing_queue s
          WHERE s.url = i.url AND s.notification_type = i.type
-           AND (s.status = 'sent' OR (s.status = 'superseded' AND s.superseded_reason = '${API_WINDOW_EXPIRED}'))
+           AND (s.status = 'sent' OR (s.status = 'superseded' AND s.superseded_reason IN ('${API_WINDOW_EXPIRED}', '${DELETE_WINDOW_EXPIRED}')))
            AND (i.type = 'URL_DELETED'
                 OR (i.job_id IS NOT NULL AND i.content_hash IS NOT NULL
                     AND s.job_id = i.job_id AND s.content_hash = i.content_hash))
@@ -146,6 +166,28 @@ export async function getIndexingBudgetRemaining(): Promise<number> {
   return Math.max(0, DAILY_INDEXING_QUOTA - attemptedToday);
 }
 
+/**
+ * The rolling 24 h budget plus what pacing needs (GOOGLE-JOBS F2): hours since
+ * the last attempt inside the window, 24 when there was none. Same predicate as
+ * getIndexingBudgetRemaining(); pacedSendAllowance() turns it into this run's
+ * allowance.
+ */
+export async function getIndexingSendWindowWith(db: Queryable): Promise<{ remaining: number; hoursSinceLastAttempt: number }> {
+  const result = await db.query<{ attempted: string | number; hours_since_last: string | number | null }>(
+    `SELECT COUNT(*) AS attempted, EXTRACT(EPOCH FROM (NOW() - MAX(sent_at))) / 3600 AS hours_since_last
+     FROM indexing_queue
+     WHERE status IN ('sent', 'failed') AND sent_at > NOW() - INTERVAL '24 hours'`
+  );
+  const row = result.rows[0];
+  const attempted = Number(row?.attempted ?? 0);
+  const hours = row?.hours_since_last == null ? 24 : Number(row.hours_since_last);
+  return { remaining: Math.max(0, DAILY_INDEXING_QUOTA - attempted), hoursSinceLastAttempt: hours };
+}
+
+export async function getIndexingSendWindow(): Promise<{ remaining: number; hoursSinceLastAttempt: number }> {
+  return getIndexingSendWindowWith(pool);
+}
+
 export interface PendingIndexingRow {
   id: string;
   url: string;
@@ -184,25 +226,48 @@ const LANE_SQL = `CASE WHEN notification_type = 'URL_DELETED' THEN 'delete'
   WHEN priority = ${INDEXING_PRIORITY.contentUpdate} THEN 'content' ELSE 'reconcile' END`;
 
 /**
- * The oldest `perLane` pending rows of each lane, for planIndexingSends().
- * Oldest-first inside a lane is deliberate: confirmed 2026-08-10 that LIFO
- * let a continuous stream of new arrivals starve everything already waiting.
+ * `perLane` pending rows of each lane for planIndexingSends(), oldest first
+ * in each array. Which rows: the oldest of a FIFO lane, the NEWEST of a lane
+ * the scheduler drains newest-first (GOOGLE-JOBS F2) — otherwise a
+ * newest-first planner would only see the newest of the oldest rows.
+ *
+ * Newest-first no longer starves what waits (the 2026-08-10 LIFO lesson,
+ * SEO-IMPROVEMENT-PLAN §1.20): since ADR 0004 nothing waits unboundedly. A
+ * URL_UPDATED not sent within its 7-day API window is closed as
+ * api_window_expired and the sitemap covers it; an URL_DELETED past its
+ * delete window is never handed to the planner (and the reconcile closes it),
+ * the 410 covers it.
  */
-export async function getPendingIndexingLanes(perLane: number): Promise<LaneQueues<PendingLaneRow>> {
+export async function getPendingIndexingLanesWith(
+  db: Queryable,
+  perLane: number,
+  newestFirst: QueueLane[] = newestFirstLanes(DEFAULT_SCHEDULER)
+): Promise<LaneQueues<PendingLaneRow>> {
   const lanes: LaneQueues<PendingLaneRow> = { new: [], delete: [], content: [], reconcile: [] };
   if (perLane <= 0) return lanes;
-  const result = await pool.query<PendingIndexingRow & { lane: QueueLane; created_at: Date }>(
+  const result = await db.query<PendingIndexingRow & { lane: QueueLane; created_at: Date }>(
     `SELECT id, url, notification_type, job_id, priority, created_at, lane FROM (
-       SELECT id, url, notification_type, job_id, priority, created_at, ${LANE_SQL} AS lane,
-              ROW_NUMBER() OVER (PARTITION BY ${LANE_SQL} ORDER BY created_at ASC, id ASC) AS rank
-       FROM indexing_queue WHERE status = 'pending'
+       SELECT id, url, notification_type, job_id, priority, created_at, lane,
+              ROW_NUMBER() OVER (
+                PARTITION BY lane
+                ORDER BY (CASE WHEN lane = ANY($2::text[]) THEN created_at END) DESC NULLS LAST, created_at ASC, id ASC
+              ) AS rank
+       FROM (
+         SELECT *, ${LANE_SQL} AS lane FROM indexing_queue
+         WHERE status = 'pending'
+           AND NOT (notification_type = 'URL_DELETED' AND created_at <= NOW() - INTERVAL '${DELETE_WINDOW_DAYS} days')
+       ) pending
      ) ranked WHERE rank <= $1 ORDER BY created_at ASC, id ASC`,
-    [perLane]
+    [perLane, newestFirst]
   );
   for (const row of result.rows) {
     lanes[row.lane].push({ ...row, arrival: new Date(row.created_at).getTime() / 3_600_000 });
   }
   return lanes;
+}
+
+export async function getPendingIndexingLanes(perLane: number): Promise<LaneQueues<PendingLaneRow>> {
+  return getPendingIndexingLanesWith(pool, perLane);
 }
 
 /**
