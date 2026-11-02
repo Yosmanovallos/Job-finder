@@ -53,6 +53,7 @@ import {
   escapeJsonForScriptTag,
   isPubliclyDescribable,
   buildJobMeta,
+  injectJobHeadMeta,
   buildJobPosting,
   buildJobPageBody,
   buildJobPagePayload,
@@ -1588,32 +1589,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       );
     }
 
-    indexHtml = indexHtml
-      .replace(/<title>[\s\S]*?<\/title>/, `<title>${escapeHtml(meta.title)}</title>`)
-      .replace(
-        /<meta[^>]*name=["']description["'][^>]*>/,
-        `<meta name="description" content="${escapeHtml(meta.description)}" />`
-      )
-      .replace(
-        /<link[^>]*rel=["']canonical["'][^>]*>/,
-        `<link rel="canonical" href="${escapeHtml(meta.canonicalUrl)}" />`
-      )
-      .replace(
-        /<meta[^>]*property=["']og:title["'][^>]*>/,
-        `<meta property="og:title" content="${escapeHtml(meta.title)}" />`
-      )
-      .replace(
-        /<meta[^>]*property=["']og:description["'][^>]*>/,
-        `<meta property="og:description" content="${escapeHtml(meta.description)}" />`
-      )
-      .replace(
-        /<meta[^>]*name=["']twitter:title["'][^>]*>/,
-        `<meta name="twitter:title" content="${escapeHtml(meta.title)}" />`
-      )
-      .replace(
-        /<meta[^>]*name=["']twitter:description["'][^>]*>/,
-        `<meta name="twitter:description" content="${escapeHtml(meta.description)}" />`
-      )
+    indexHtml = injectJobHeadMeta(indexHtml, meta)
       .replace(
         "</head>",
         jobPosting

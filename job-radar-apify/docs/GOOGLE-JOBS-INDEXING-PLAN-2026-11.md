@@ -307,6 +307,39 @@ migración ni escritura en producción sin aprobación explícita del usuario.
 
 - Reemplazar la plantilla «Vacante agregada de…» por datos reales de la
   vacante. Cambia el `<head>`: `/seo drift compare` antes y después.
+- **Estado (2026-11-02):** implementado en la rama `codex/job-meta-f5`, sin
+  desplegar.
+  - **`<title>`:** `{título} en {ciudad} – {empresa} | BuscoTrabajo`, hasta
+    60 caracteres.
+    - Se quita primero la marca, después la empresa y por último la ciudad. El
+      título de la vacante nunca se recorta.
+    - La ciudad es la localidad física de la fuente. No aparece si la vacante
+      es 100 % remota ni si el título ya la nombra.
+  - **Meta description:** título, empresa y ubicación visible, más el tipo de
+    empleo y la primera frase con contenido de la descripción de la fuente,
+    hasta 160 caracteres.
+    - Se descartan encabezados, enlaces y correos, la copia del título y los
+      emojis.
+    - El corte nunca cae en medio de una palabra ni de un carácter.
+    - Un campo que falta se omite. Las empresas comodín, como «Confidencial»,
+      se tratan como ausentes.
+  - og:title, og:description, twitter:title y twitter:description usan los
+    mismos valores. El `<head>` hidratado coincide con el del servidor.
+  - `injectJobHeadMeta()` inserta todo con funciones de reemplazo, así que un
+    `$&` o un `` $` `` de la fuente no se expanden.
+  - JMT-001 fija con hash que no cambian el cuerpo visible, el JobPosting, el
+    payload, el canonical, el veredicto de robots, el sitemap ni los títulos de
+    hubs, dashboard y empresas.
+  - **Línea base:** `seo-drift`, baselines 31 a 35, de las mismas 5 vacantes de
+    F4.
+  - En el HTML real de producción de esas 5 vacantes, el nuevo `<head>` solo
+    cambia 6 etiquetas: title, description, og:title, og:description,
+    twitter:title y twitter:description.
+  - Es cálculo puro, sin consultas nuevas.
+  - **Tras desplegar:**
+    - Correr `/seo drift compare` contra los baselines 31 a 35.
+    - Medir el TTFB MISS de las mismas 5 vacantes; el límite es +10 % sobre la
+      mediana.
 
 ### F6. Seguimiento (cada checkpoint)
 

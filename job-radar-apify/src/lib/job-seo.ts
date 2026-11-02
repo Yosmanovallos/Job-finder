@@ -328,18 +328,147 @@ export interface JobMeta {
   canonicalUrl: string;
 }
 
+// --- <title> and meta description (contract §5, plan F5) ---------------------
+//
+// Built only from fields the page itself shows: a missing field is left out,
+// never filled with boilerplate. Pure string work over the job already in
+// hand — no lookups. Callers escape the result (server.ts, usePageMeta).
+
+export const JOB_TITLE_TAG_MAX = 60;
+export const JOB_META_DESCRIPTION_MAX = 160;
+const BRAND_SUFFIX = " | BuscoTrabajo";
+
+const collapseSpaces = (text: string) => text.replace(/\s+/g, " ").trim();
+const codePoints = (text: string) => Array.from(text).length;
+const foldForCompare = (text: string) =>
+  text.normalize("NFD").replace(COMBINING_DIACRITICS, "").toLowerCase();
+
+// Emoji plus the invisible pieces they leave behind: variation selector,
+// zero-width joiner, keycap, skin tones and regional indicators.
+const EMOJI = /[\p{Extended_Pictographic}\u{FE0F}\u{200D}\u{20E3}\u{1F3FB}-\u{1F3FF}\u{1F1E6}-\u{1F1FF}]/gu;
+
+/** Cuts at the last space within `max` code points; never inside a word or a character. */
+export function clipAtWord(text: string, max: number): string {
+  const chars = Array.from(text);
+  if (chars.length <= max) return text;
+  const head = chars.slice(0, max - 1).join("");
+  const space = head.lastIndexOf(" ");
+  // No space to cut at (one huge token): drop it rather than split it.
+  if (space <= 0) return "";
+  return `${head.slice(0, space).replace(/[\s,;:.\-–—(]+$/u, "")}…`;
+}
+
+// Abbreviations whose period doesn't end a sentence ("Sr. Analyst", "S.A.").
+const ABBREVIATIONS = new Set(["sr", "sra", "srta", "dr", "dra", "ing", "lic", "ltda", "sas", "etc", "ej", "aprox", "no", "av", "cra", "cl"]);
+
+function firstSentence(line: string): string {
+  const boundary = /[.!?](?=\s|[¡¿\p{Lu}]|$)/gu;
+  for (let match = boundary.exec(line); match; match = boundary.exec(line)) {
+    if (match[0] === ".") {
+      const word = /([\p{L}.]+)$/u.exec(line.slice(0, match.index))?.[1] ?? "";
+      const bare = word.replace(/\./g, "").toLowerCase();
+      if (bare.length <= 1 || ABBREVIATIONS.has(bare) || word.includes(".")) continue;
+    }
+    return line.slice(0, match.index + 1);
+  }
+  return line;
+}
+
+/**
+ * The first sentence of the source description that says something: section
+ * headers ("Job Description", "Requisitos:"), lines with links/emails, and a
+ * leading copy of the job title are skipped; emoji and stray markup removed.
+ */
+export function firstSourceSentence(description: string | null | undefined, title: string): string | null {
+  const cleanTitle = collapseSpaces(title.replace(EMOJI, " "));
+  for (const raw of (description || "").split("\n")) {
+    let line = collapseSpaces(raw.replace(/<[^>]*>/g, " ").replace(EMOJI, " "));
+    if (cleanTitle && foldForCompare(line).startsWith(foldForCompare(cleanTitle))) {
+      // ...and the title's own parenthetical, "(Gestión de Proveedores)".
+      line = line.slice(cleanTitle.length).trim().replace(/^\([^)]*\)\s*/, "");
+    }
+    line = line.replace(/^[^\p{L}\p{N}¡¿"(]+/u, "");
+    if (/https?:\/\/|www\.|@/i.test(line)) continue;
+    const sentence = firstSentence(line).trim();
+    if (sentence.endsWith(":") || codePoints(sentence) < 30 || sentence.split(" ").length < 5) continue;
+    return sentence;
+  }
+  return null;
+}
+
+/** City for the title: the source's own locality, only for a physical, non-remote job. */
+function titleCity(job: SeoJob): string | null {
+  const { location } = resolveGoogleLocation(job);
+  if (location?.kind !== "physical") return null;
+  const city = collapseSpaces(location.locality);
+  // "Auxiliar de bodega - Girardota en Girardota" says nothing new.
+  return city && !foldForCompare(job.title).includes(foldForCompare(city)) ? city : null;
+}
+
+function realCompany(job: SeoJob): string | null {
+  const company = collapseSpaces(job.company || "");
+  return company && !isPlaceholderEmployer(company) ? company : null;
+}
+
+/** `{title} en {city} – {company} | BuscoTrabajo`, dropping parts to fit; the job title is never cut. */
+export function buildJobTitleTag(job: SeoJob): string {
+  const title = collapseSpaces(job.title);
+  const city = titleCity(job);
+  const company = realCompany(job);
+  const where = city ? `${title} en ${city}` : title;
+  // The brand goes first: Google already shows the site name beside the
+  // result, while the city and the employer are what the searcher scans for.
+  const candidates = [
+    company ? `${where} – ${company}${BRAND_SUFFIX}` : null,
+    company ? `${where} – ${company}` : null,
+    `${where}${BRAND_SUFFIX}`,
+    where,
+    `${title}${BRAND_SUFFIX}`,
+    title
+  ].filter((candidate): candidate is string => Boolean(candidate));
+  return candidates.find((candidate) => codePoints(candidate) <= JOB_TITLE_TAG_MAX) ?? title;
+}
+
+/** Title, company and location, then employment type and the first real source sentence when they exist. */
+export function buildJobMetaDescription(job: SeoJob): string {
+  const company = realCompany(job);
+  const location = job.location ? collapseSpaces(buildJobLocationLabel(job)) : "";
+  // "Bogotá, D.C." already ends the sentence.
+  const endSentence = (part: string) => (/[.!?]$/.test(part) ? part : `${part}.`);
+  let text = endSentence(`${collapseSpaces(job.title)}${company ? ` en ${company}` : ""}${location ? `, ${location}` : ""}`);
+  const employmentType = collapseSpaces(job.employmentType || "");
+  if (employmentType && codePoints(`${text} ${endSentence(employmentType)}`) <= JOB_META_DESCRIPTION_MAX) {
+    text = `${text} ${endSentence(employmentType)}`;
+  }
+  const sentence = firstSourceSentence(job.description, job.title);
+  const room = JOB_META_DESCRIPTION_MAX - codePoints(text) - 1;
+  // Below ~40 characters a clipped sentence is a fragment, not information.
+  const clipped = sentence && room >= 40 ? clipAtWord(sentence, room) : "";
+  return clipped ? `${text} ${clipped}` : text;
+}
+
+/**
+ * Writes a job page's meta into the SPA shell's <head>. Function replacers on
+ * purpose: source text now reaches the description, and a string replacement
+ * would expand "$&" or "$`" (escapeHtml leaves "$" and "`" alone).
+ */
+export function injectJobHeadMeta(html: string, meta: JobMeta): string {
+  const title = escapeHtml(meta.title);
+  const description = escapeHtml(meta.description);
+  return html
+    .replace(/<title>[\s\S]*?<\/title>/, () => `<title>${title}</title>`)
+    .replace(/<meta[^>]*name=["']description["'][^>]*>/, () => `<meta name="description" content="${description}" />`)
+    .replace(/<link[^>]*rel=["']canonical["'][^>]*>/, () => `<link rel="canonical" href="${escapeHtml(meta.canonicalUrl)}" />`)
+    .replace(/<meta[^>]*property=["']og:title["'][^>]*>/, () => `<meta property="og:title" content="${title}" />`)
+    .replace(/<meta[^>]*property=["']og:description["'][^>]*>/, () => `<meta property="og:description" content="${description}" />`)
+    .replace(/<meta[^>]*name=["']twitter:title["'][^>]*>/, () => `<meta name="twitter:title" content="${title}" />`)
+    .replace(/<meta[^>]*name=["']twitter:description["'][^>]*>/, () => `<meta name="twitter:description" content="${description}" />`);
+}
+
 export function buildJobMeta(job: SeoJob): JobMeta {
-  const countryName = getCountryConfig(job.country).name;
-  const location = job.location || countryName;
-  const company = job.company || "una empresa confidencial";
   return {
-    title: `${job.title} — ${company} (${location}) | BuscoTrabajo`,
-    // An official vacancy comes from the company's own careers portal (ADR
-    // 0006 §10), not from a job board: said as such, never as "agregada de".
-    description:
-      job.source === "Portal oficial"
-        ? `${job.title} en ${company}, ${location}. Vacante del portal oficial de empleo de ${company}, en BuscoTrabajo — vacantes de empleo en ${countryName}.`
-        : `${job.title} en ${company}, ${location}. Vacante agregada de ${job.source} en BuscoTrabajo — vacantes de empleo en ${countryName}.`,
+    title: buildJobTitleTag(job),
+    description: buildJobMetaDescription(job),
     canonicalUrl: buildJobUrl(job)
   };
 }
