@@ -12,8 +12,8 @@ export const SITE_CHANGELOG: ChangelogEntry[] = [
   { date: "2026-11-02", text: "Las ofertas de Workana se marcan como proyecto freelance y aparecen después de los empleos." },
   { date: "2026-10-31", text: "La búsqueda entiende familias de cargos: al buscar un cargo también ves sus variantes más comunes." },
   { date: "2026-10-30", text: "El botón Aplicar de las ofertas de Computrabajo te lleva directo a la oferta." },
-  { date: "2026-10-28", text: "Volver a pedir el correo de registro ya no falla por exceso de intentos." },
-  { date: "2026-10-27", text: "Tus vacantes guardadas y postuladas quedan en tu cuenta, y en el celular tienes la barra inferior en toda la app." }
+  { date: "2026-10-27", text: "Tus vacantes guardadas y postuladas quedan en tu cuenta, y en el celular tienes la barra inferior en toda la app." },
+  { date: "2026-10-27", text: "Al crear tu cuenta te explicamos por qué una contraseña se considera débil." }
 ];
 
 const MONTHS = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
