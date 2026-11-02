@@ -38,7 +38,23 @@ export interface SourcePolicy {
   readonly maxRequestsPerAttempt: number | null;
   /** Upper bound on a Retry-After we are willing to honor. */
   readonly maxRetryAfterMs: number;
+  /**
+   * GOOGLE-JOBS F3: whether a 429 is retried inside the same call. The detail
+   * drain stops a source on its first rate limit anyway, so retrying only
+   * adds requests to a host that already asked us to slow down, plus up to
+   * maxRetryAfterMs of sleep per row.
+   */
+  readonly retryRateLimited: boolean;
+  /**
+   * GOOGLE-JOBS F3: which due detail rows the drain claims first.
+   * 'due_first' = earliest detail_next_attempt_at (oldest rows, pre-F3);
+   * 'newest_first' = most recently created, for sources whose backlog is
+   * age, not refusals (a listing lives ~2 days on its source).
+   */
+  readonly detailClaimOrder: DetailClaimOrder;
 }
+
+export type DetailClaimOrder = "due_first" | "newest_first";
 
 /** Today's constants, verbatim from resilient-fetch.ts before P4. */
 export const DEFAULT_SOURCE_POLICY: Omit<SourcePolicy, "source" | "stage"> = {
@@ -50,7 +66,9 @@ export const DEFAULT_SOURCE_POLICY: Omit<SourcePolicy, "source" | "stage"> = {
   // ~20 min, so honoring that verbatim is pointless; sleepWithContext would
   // cut it to the remaining budget anyway. Capping here makes the intent
   // explicit instead of leaving it to a downstream clamp.
-  maxRetryAfterMs: 60_000
+  maxRetryAfterMs: 60_000,
+  retryRateLimited: true,
+  detailClaimOrder: "due_first"
 };
 
 /**
@@ -63,33 +81,47 @@ export const SOURCE_POLICIES: readonly SourcePolicy[] = [
   // saved and visible, and the existing cap in scrape-worker.ts is 8 per
   // adapter per role (AGENTS.md #12). Declaring it here makes the ceiling a
   // policy rather than a constant buried in the worker.
+  //
+  // GOOGLE-JOBS F3: LinkedIn and Computrabajo are the hosts answering 429
+  // (docs/seo-baseline/2026-11-google-jobs-funnel.md §3). A 429 on their
+  // detail page ends that source's drain without in-call retries; the claim
+  // order stays as before, so their request pattern only ever shrinks.
   {
     source: "Computrabajo",
     stage: "detail",
     ...DEFAULT_SOURCE_POLICY,
-    maxRequestsPerAttempt: 8
+    maxRequestsPerAttempt: 8,
+    retryRateLimited: false
   },
   {
     source: "Computrabajo-VE",
     stage: "detail",
     ...DEFAULT_SOURCE_POLICY,
-    maxRequestsPerAttempt: 8
+    maxRequestsPerAttempt: 8,
+    retryRateLimited: false
   },
+  { source: "LinkedIn", stage: "detail", ...DEFAULT_SOURCE_POLICY, maxRequestsPerAttempt: 8, retryRateLimited: false },
+  { source: "LinkedIn-VE", stage: "detail", ...DEFAULT_SOURCE_POLICY, maxRequestsPerAttempt: 8, retryRateLimited: false },
   // Healthy, robots-allowed detail pages (JSON-LD). A larger ceiling than the
   // default 8 so the dedicated drain step can work through their backlog;
   // still bounded per attempt, jittered, and stopped by any refusal
   // (src/sources/detail-http.ts). LinkedIn/Computrabajo keep the default.
+  // GOOGLE-JOBS F3: newest first — Magneto rows reached Google-ready after
+  // 107–113 h on a ~2-day source life because the drain started with the
+  // oldest. Same cap, so the same number of requests per drain.
   {
     source: "Magneto",
     stage: "detail",
     ...DEFAULT_SOURCE_POLICY,
-    maxRequestsPerAttempt: 30
+    maxRequestsPerAttempt: 30,
+    detailClaimOrder: "newest_first"
   },
   {
     source: "Elempleo",
     stage: "detail",
     ...DEFAULT_SOURCE_POLICY,
-    maxRequestsPerAttempt: 20
+    maxRequestsPerAttempt: 20,
+    detailClaimOrder: "newest_first"
   },
   // The browser route: Glassdoor and Indeed are Cloudflare-blocked from
   // datacenter IPs, which is why the residential proxy exists for them and
@@ -123,4 +155,18 @@ export function resolvePolicy(source: string, stage: SourceStage): SourcePolicy 
  */
 export function circuitKeyFor(source: string, stage: SourceStage): string {
   return stage === "listing" ? source : `${source}-${stage}`;
+}
+
+/**
+ * Policy for a circuit key (`Computrabajo-detail` → the Computrabajo detail
+ * entry). Before F3 the resilient engine looked keys up verbatim, so every
+ * non-listing stage silently got the defaults; the declared detail entries
+ * only differed in maxRequestsPerAttempt, which the engine does not read.
+ */
+export function resolvePolicyForKey(circuitKey: string, stage: SourceStage): SourcePolicy {
+  const suffix = `-${stage}`;
+  if (stage !== "listing" && circuitKey.endsWith(suffix)) {
+    return resolvePolicy(circuitKey.slice(0, -suffix.length), stage);
+  }
+  return resolvePolicy(circuitKey, stage);
 }

@@ -18,6 +18,7 @@ import { assessDescription } from "../lib/job-description-quality.js";
 import { buildJobUrl } from "../lib/job-seo.js";
 import { enqueueIndexingNotificationsWith, INDEXING_PRIORITY } from "./indexing-repository.js";
 import type { JobDetail } from "../sources/types.js";
+import type { DetailClaimOrder } from "../sources/source-policy.js";
 
 export type DetailStatus =
   | "pending"
@@ -313,7 +314,8 @@ export interface ClaimedDetailJob {
  */
 export async function claimDueDetailJobs(
   filter: { source: string; market: "VE" | "OTHER"; ids?: undefined } | { ids: string[] },
-  limit: number
+  limit: number,
+  order: DetailClaimOrder = "due_first"
 ): Promise<ClaimedDetailJob[]> {
   if (limit <= 0) return [];
   if (filter.ids) {
@@ -349,7 +351,7 @@ export async function claimDueDetailJobs(
          AND is_active = TRUE
          AND source = $1
          AND (CASE WHEN $4 = 'VE' THEN country = 'VE' ELSE country IS DISTINCT FROM 'VE' END)
-       ORDER BY detail_next_attempt_at ASC, id ASC
+       ORDER BY ${order === "newest_first" ? "created_at DESC, id DESC" : "detail_next_attempt_at ASC, id ASC"}
        LIMIT $2
        FOR UPDATE SKIP LOCKED
      )
@@ -357,6 +359,26 @@ export async function claimDueDetailJobs(
     [filter.source, limit, DETAIL_CLAIM_LEASE_MS, filter.market]
   );
   return result.rows;
+}
+
+/**
+ * GOOGLE-JOBS F3: hands back claimed rows the drain stopped before asking
+ * for (deadline, refusal, open circuit). Only rows still holding the lease
+ * and still pending/retry move; their state is untouched. Without this, the
+ * tick's own drain leased ~19 Magneto rows per tick that nobody could claim
+ * for 10 minutes — and newest-first would have leased exactly the newest.
+ * A database write only: no source is asked anything.
+ */
+export async function releaseDetailClaims(ids: string[]): Promise<number> {
+  if (ids.length === 0) return 0;
+  const result = await pool.query(
+    `UPDATE jobs SET detail_next_attempt_at = NOW()
+     WHERE id = ANY($1::uuid[])
+       AND detail_status IN ('pending', 'retry')
+       AND detail_next_attempt_at > NOW()`,
+    [ids]
+  );
+  return result.rowCount ?? 0;
 }
 
 export type DetailOutcome =

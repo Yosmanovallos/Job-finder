@@ -25,7 +25,8 @@ import {
   DETAIL_BACKOFF_MS,
   mutateReadinessRelevantJobs,
   recordDetailOutcome,
-  refreshGoogleReadiness
+  refreshGoogleReadiness,
+  releaseDetailClaims
 } from "../src/db/job-readiness-repository.js";
 import { checkIndexingTarget, enqueueIndexingNotifications, getPendingIndexingBatch, wasJobPurged } from "../src/db/indexing-repository.js";
 import { purgeOldJobs } from "../src/db/scheduler-repository.js";
@@ -338,6 +339,28 @@ try {
   assert.equal((await claimDueDetailJobs({ source: "LinkedIn", market: "OTHER" }, 10)).length, 0, "a claimed row is leased");
   assert.equal((await claimDueDetailJobs({ source: "Glassdoor", market: "VE" }, 10)).length, 0, "unsupported rows are never claimed");
   console.log("✅ [drain] claim uses SKIP LOCKED + a lease; unsupported rows are never claimed.");
+
+  // --- 7b. GOOGLE-JOBS F3: newest-first claim + release of unasked rows -------
+  // Created "in the future" so they are the newest Magneto rows whatever
+  // earlier sections inserted; ids listed oldest → newest.
+  const f3Ids: string[] = [];
+  for (const [offsetMin, title] of [[1, "Cajero F3"], [2, "Bodeguero F3"], [3, "Mesero F3"]] as const) {
+    const id = await saveOne(job({ title, source: "Magneto" }));
+    assert.equal((await row(id)).detail_status, "pending");
+    await pool.query(`UPDATE jobs SET created_at = NOW() + ($2::int * INTERVAL '1 minute') WHERE id = $1`, [id, offsetMin]);
+    f3Ids.push(id);
+  }
+  const newest = await claimDueDetailJobs({ source: "Magneto", market: "OTHER" }, 2, "newest_first");
+  assert.deepEqual(newest.map((c) => c.id), [f3Ids[2], f3Ids[1]], "newest_first claims the most recent rows first");
+  assert.equal(await releaseDetailClaims(newest.map((c) => c.id)), 2, "unasked claimed rows go back to the queue");
+  const reclaimed = await claimDueDetailJobs({ source: "Magneto", market: "OTHER" }, 2, "newest_first");
+  assert.deepEqual(reclaimed.map((c) => c.id), [f3Ids[2], f3Ids[1]], "released rows are claimable at once, no lease wait");
+  await recordDetailOutcome(f3Ids[2], { kind: "no_detail" });
+  assert.equal(await releaseDetailClaims([f3Ids[2]]), 0, "a settled row is never moved by a release");
+  assert.equal((await row(f3Ids[2])).detail_status, "no_detail");
+  assert.equal(await releaseDetailClaims([f3Ids[1]]), 1);
+  assert.equal(await releaseDetailClaims([f3Ids[0]]), 0, "a row that was never claimed is not touched");
+  console.log("✅ [drain] F3: newest_first claim order; release only moves leased pending/retry rows.");
 
   // --- 8. Detail success → COMPLETE → READY → one URL_UPDATED ---------------------
   const successStatus = await recordDetailOutcome(thinId, {
