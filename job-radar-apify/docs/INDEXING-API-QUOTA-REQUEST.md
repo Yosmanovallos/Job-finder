@@ -38,9 +38,9 @@ cuenta de servicio en el formulario, en un chat ni en un ticket.
 | `URL_DELETED` de URLs notificadas antes por la API (política D2) | **95/día** de media, **172/día** en los últimos 7 días y subiendo; además hay **8,850 pendientes** con una mediana de 44 días de espera |
 | Enviadas hoy | 100 `URL_UPDATED` + 100 `URL_DELETED` por día, 0 fallos |
 | Proporción de nuevas aptas notificadas | **30 %** (cohorte ya cerrada, aptas hace 8–14 días: 494 de 1,639; 68 % caducó sin enviarse) |
-| Demanda total estable | ~310 nuevas + ~170 retiros = **~480/día**, más el atraso de 8,850 retiros |
-| Por qué 1,500 | Cubre la demanda estable con margen para picos (412 nuevas/día observadas) y vacía el atraso de retiros en ~10 días. La simulación del 2026-09-18 (1,325/día para p95 ≤48 h en semanas pico) sigue siendo la referencia de dimensionamiento |
-| Mínimo útil | 800/día: cubre la demanda estable sin caducidades y vacía el atraso en ~1 mes |
+| Demanda total estable | Si se notifican todas las nuevas, cada una recibe después su retiro: ~310 nuevas + ~310 retiros = **~620/día**, más el atraso de 8,850 retiros |
+| Por qué 1,500 | Cubre la demanda estable con margen para picos (412 nuevas/día observadas) y vacía el atraso de retiros en ~10 días (~880 libres/día). La simulación del 2026-09-18 (1,325/día para p95 ≤48 h en semanas pico) sigue siendo la referencia de dimensionamiento |
+| Mínimo útil | 800/día: cubre la demanda estable (~620) sin caducidades; con ~180 libres/día, el atraso de retiros tarda ~7 semanas en vaciarse |
 
 Fuente de las cifras: `docs/seo-baseline/2026-11-google-jobs-funnel.md`
 (consulta agregada de solo lectura y logs de `indexing-tick`, 18-oct a
@@ -54,7 +54,7 @@ Fuente de las cifras: `docs/seo-baseline/2026-11-google-jobs-funnel.md`
 2. **Puerta de calidad estricta.** Una vacante solo es apta con descripción
    completa de la fuente, empresa real, ubicación y país declarados por la
    fuente, y un enlace para postular. Evaluador único:
-   `src/lib/google-job-readiness.ts`. Hoy son 15,580 aptas de 65,956 activas
+   `src/lib/google-job-readiness.ts`. El 2026-09-18 eran 15,580 aptas de 65,956 activas
    (24%); Workana: 0 aptas.
 3. **Las no aptas no emiten `JobPosting`.** Se sirven con `noindex,follow`,
    quedan fuera del sitemap y nunca se notifican. Las pruebas

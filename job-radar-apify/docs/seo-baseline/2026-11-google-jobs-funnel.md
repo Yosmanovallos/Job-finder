@@ -77,6 +77,17 @@ dos tandas masivas de readiness: 226 aptas a la vez el 20-oct a las 21 h y
 ² `superseded` por otro motivo, por ejemplo una versión más nueva o que la
 vacante dejó de ser apta.
 
+Aptas no oficiales por día y fuente (media del 19 al 31 de octubre):
+
+- LinkedIn: 159
+- Magneto: 56
+- Elempleo: 36
+- Computrabajo: 30
+- WeRemoto: 5
+
+La tabla completa por día y fuente está en `2026-11-01-google-jobs-funnel.json`
+(`new_by_day_source`, `ready_by_day_source`).
+
 En la cohorte en curso (aptas en los últimos 7 días) hay **2,030
 `URL_UPDATED` pendientes**, con una mediana de 74 h de espera y un máximo de
 168 h.
@@ -119,6 +130,12 @@ M completas»:
 | Computrabajo | 944 | 223 (24 %) | 380 | 167 | 214 |
 | LinkedIn | 960 | 179 (19 %) | 602 | 87 | 161 |
 | Elempleo | 385 | 313 (81 %) | 3 | 4 | 0 |
+
+Los logs de `scrape-jobs-ve.yml` no tienen líneas «Detalle X: …», porque VE
+no tiene paso de drain. Sí registran reintentos 429 en el detalle:
+Computrabajo-VE 97 y LinkedIn-VE 72. Además, el **listado** de LinkedIn
+devuelve 429 muchas veces: 1,810 líneas «[LinkedIn] Failed: 429» en CO y
+1,555 en VE en 15 días.
 
 `source_attempts` (etapa `detail`) da el mismo cuadro. Computrabajo CO tiene
 90 intentos `failed` y 16 `timeout`, con 7 válidos en `success`. LinkedIn CO
@@ -166,13 +183,21 @@ navegador.
 **Resultado: 19 de 20 indexadas.** Notificadas por la API: 10/10. Solo
 sitemap: 9/10.
 
-- En todas, la página de referencia es `sitemap-jobs.xml`. En las indexadas,
-  la canonical que elige Google es la URL inspeccionada.
-- En 8 de las 10 notificadas, el último rastreo es **anterior** al envío por
-  la API. Google ya las había rastreado e indexado desde el sitemap, y el
-  envío no provocó un rastreo nuevo. Las otras 2 se rastrearon ~2 h después
-  del envío del 30-oct. GSC solo muestra el último rastreo, así que esas dos
-  ya podían estar indexadas antes.
+- En las 19 indexadas, la canonical que elige Google es la URL inspeccionada.
+- En 18 de esas 19, la página de referencia es `sitemap-jobs.xml`. En la de
+  Computrabajo (`937b6365…`), GSC dice «No se ha detectado ninguna».
+- En 5 indexadas, el campo Sitemaps muestra «Error temporal de
+  procesamiento» en vez de la lista: actuario, asesor de Barrancabermeja,
+  supervisor, auxiliar de Zipaquirá y asesor de Envigado. Es lo que muestra
+  GSC; de ahí no se saca ninguna conclusión.
+- En 8 de las 10 notificadas, el último rastreo es seguro **anterior** al
+  envío por la API. Google ya las había rastreado e indexado desde el
+  sitemap, y hasta la inspección (1–3 días después del envío) el envío no
+  provocó un rastreo nuevo.
+- Las otras 2 (ingeniero AI y aprendiz) se rastrearon el 30-oct a las 05:13
+  y 05:16, el mismo día del envío (08:06 UTC). Fue después del envío si GSC
+  muestra la hora de Bogotá, y antes si muestra UTC. GSC solo muestra el
+  último rastreo, así que esas dos ya podían estar indexadas antes.
 - La única no indexada es la más antigua de la muestra (apta el 21-oct). Se
   descubrió por el sitemap y no se ha rastreado.
 - Sesgo de la muestra: las 10 notificadas son de LinkedIn, la fuente que más
@@ -190,7 +215,9 @@ de GSC (569 indexadas y 29,519 sin indexar), que sigue atrasado (C4 del plan).
 - 172 caducadas/día;
 - 95–172 retiros notificados/día, más un atraso de 8,850.
 
-La demanda estable es de ~480/día frente a los 200/día actuales. El usuario
+Cada URL notificada recibe tarde o temprano su `URL_DELETED`. Si se
+notificaran todas las nuevas, la demanda estable sería de ~310 nuevas + ~310
+retiros = **~620/día**, frente a los 200/día actuales. El usuario
 confirmó que la solicitud nunca se envió.
 
 **F2, orden de envío: los datos lo justifican.**
@@ -199,8 +226,8 @@ confirmó que la solicitud nunca se envió.
   de pasar a apta, justo antes de caducar a las 168 h.
 - El 100 % de las enviadas tenía más de 48 h, frente a una vida mediana en la
   fuente de ~2 días (ADR 0004).
-- En la muestra, 8 de 10 notificaciones llegaron cuando Google ya había
-  rastreado la página desde el sitemap.
+- En la muestra, al menos 8 de 10 notificaciones llegaron cuando Google ya
+  había rastreado la página desde el sitemap.
 
 La cuota se gasta en la parte del ciclo de vida donde ya no acelera nada.
 Esto no prueba que `newest` mejore la indexación, pero sí que FIFO, con la

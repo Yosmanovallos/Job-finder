@@ -122,8 +122,9 @@ migración ni escritura en producción sin aprobación explícita del usuario.
     API.
   - Cada envío sale **158–167 h** después de que la vacante pasa a apta,
     justo antes de caducar.
-  - Muestra de GSC: 19/20 indexadas (API 10/10, solo sitemap 9/10). En 8 de
-    las 10 notificadas, Google ya había rastreado la página antes del envío.
+  - Muestra de GSC: 19/20 indexadas (API 10/10, solo sitemap 9/10). En al menos
+    8 de las 10 notificadas, Google ya había rastreado la página antes del
+    envío.
   - Hay 8,850 `URL_DELETED` pendientes, con una mediana de 44 días.
   - **F2 está justificada.** Las fuentes que limitan F3 son Computrabajo CO
     (2 % aptas, 429), LinkedIn CO (21 %, 429) y el atraso del drain de
