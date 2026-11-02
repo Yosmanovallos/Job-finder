@@ -266,6 +266,38 @@ missed it. `/` and `/empresas` measure 0.000. Fixed by metric-matched
 fallback fonts (`index.css`): the same test with the fixed CSS measures
 0.000, 0.000, 0.001. Re-measure after that change deploys.
 
+### 2026-11-02 job page blocks B1-B3 (`codex/job-page-blocks-b1-b3`, before deploy)
+
+`/empleos/:id` gained the employer's other vacancies (B1), reputation in the
+raw HTML (B2) and the official-employer mark (B3). The dashboard cache, its
+warmup and `companyPageCache` are untouched.
+
+- B1 has its own `companyJobsCache` with these rules:
+  - Policy: SWR 5 min / 6 h, 512 entries, light rows only.
+  - Reads: only through `peek`.
+  - Concurrency: one background load at a time; a load requested while one
+    is running is dropped. The pool has 5 connections.
+  - Timing: a cold load starts only after the response is sent.
+  - No startup warmup.
+- Queries per `/empleos/:id` response with warm caches: 2 anonymous and 2 with
+  a session, the same as `origin/main` 109f392. This is pinned by
+  `tests/validate-job-page-blocks.ts` (JPD-008).
+- Production before (5 job pages × 3 unique URLs, all Cloudflare `MISS`): TTFB
+  median 266 ms, range 248-322 ms.
+- Local cold process (disposable PostgreSQL, 9 fresh processes per side,
+  alternating):
+
+  | Measurement | `origin/main` | Branch |
+  | --- | ---: | ---: |
+  | First request of each process (median) | 65 ms | 70 ms |
+  | The 5 job pages | 15.1 ms | 14.9 ms |
+
+  The first-request numbers are noisy: 61-78 ms on `main` and 59-89 ms on the
+  branch.
+- **After deploy (pending):** the same 5 URLs with unique query strings and
+  `MISS`. The limit is +10 % of 266 ms. Re-check at +1 and +14 days. Revert B1
+  if a regression is traced to its cache.
+
 ## Required regression check
 
 For any change that can affect this path:

@@ -78,10 +78,13 @@ function job(overrides: Partial<Job>): Job {
   };
 }
 
+const createdIds: string[] = [];
 async function saveAll(jobs: Job[]): Promise<string[]> {
   const result = await saveJobs(jobs, "Blocks test");
   assert.equal(result.insertedJobs.length, jobs.length);
-  return result.insertedJobs.map((row) => row.id);
+  const ids = result.insertedJobs.map((row) => row.id);
+  createdIds.push(...ids);
+  return ids;
 }
 
 let sequence = 0;
@@ -210,6 +213,10 @@ try {
   // --- JPD-009 on the served page: no template copy inside #app's new blocks --
   for (const html of [warmBlock, coldBlock!]) assert.ok(!/agregada de|BuscoTrabajo encontrar/i.test(html));
 } finally {
+  // The integration suites share one database: leave no claimable rows
+  // (validate-job-seo-v2.ts counts LinkedIn detail claims) or reputation behind.
+  await pool.query(`DELETE FROM indexing_queue WHERE job_id = ANY($1::uuid[])`, [createdIds]);
+  await pool.query(`DELETE FROM jobs WHERE id = ANY($1::uuid[])`, [createdIds]);
   await pool.query(`DELETE FROM company_reputation_alias WHERE raw_company_name = 'Accenture Colombia'`);
   await pool.query(`DELETE FROM company_reputation WHERE company_name = 'Accenture'`);
 }

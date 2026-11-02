@@ -431,8 +431,14 @@ async function loadCompanyJobs(scope: CompanyJobsScope): Promise<CompanyJobsSnap
   }
 }
 
-function peekCompanyJobs(scope: CompanyJobsScope): CompanyJobsSnapshot | undefined {
-  return companyJobsCache.peek(scope.key, () => loadCompanyJobs(scope));
+// A cold load waits until this response is sent, so it never competes with
+// the response's own queries for a connection (measured: the first request
+// of a cold process got slower when both ran together).
+function peekCompanyJobs(scope: CompanyJobsScope, res: http.ServerResponse): CompanyJobsSnapshot | undefined {
+  return companyJobsCache.peek(scope.key, async () => {
+    if (!res.writableFinished && !res.destroyed) await new Promise((resolve) => res.once("close", resolve));
+    return loadCompanyJobs(scope);
+  });
 }
 
 // A route's own validation always returns its own specific, safe 400
@@ -1541,7 +1547,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     // B1: the employer's other vacancies, peeked like the hub above — never
     // a query this response waits for, never for a placeholder employer.
     const companyScope = companyJobsScope(visible);
-    const companySnapshot = companyScope ? peekCompanyJobs(companyScope) : undefined;
+    const companySnapshot = companyScope ? peekCompanyJobs(companyScope, res) : undefined;
     const companyJobs = buildCompanyJobsBlock(
       visible,
       companySnapshot && {

@@ -268,6 +268,40 @@ migración ni escritura en producción sin aprobación explícita del usuario.
 - Implementar B1–B3 de `openspec/changes/job-page-differentiation/`.
 - Descripción y JSON-LD idénticos byte a byte; nada inventado; sin consultas
   nuevas en caliente; TTFB en frío con edge MISS dentro de +10 %.
+- **Registro (2026-11-02, rama `codex/job-page-blocks-b1-b3`; PR abierto, sin
+  fusionar).** Diseño y requisitos JPD-001…010 en
+  `openspec/changes/job-page-differentiation/` (traídos del PR #90).
+  - **B1, otras vacantes de la empresa.** Se eligió la opción A del diseño
+    (§2): una caché por empresa leída con `peek`, que es lo que pidió la
+    sesión. La opción B (índice por país) necesitaba un `EXPLAIN ANALYZE` en
+    producción y se descartó.
+    - Tamaño: 512 entradas de filas ligeras, con frescura de 5 min y 6 h
+      stale.
+    - Concurrencia: una sola carga en segundo plano a la vez, y la que llega
+      mientras tanto se descarta. El pool tiene 5 conexiones.
+    - Aislamiento: sin warmup, y fuera de `companyPageCache` y del LRU del
+      dashboard.
+    - Datos: la misma consulta y la misma agrupación que `/empresas/:slug`,
+      por eso «Ver las N vacantes» cuenta lo mismo que lista esa página.
+    - Caché fría: solo el enlace a la empresa, sin cifra.
+  - **B2, reputación.** `attachReputation` se movió antes del body en la rama
+    anónima: es la misma consulta de siempre. Las etiquetas se comparten en
+    `src/lib/reputation-labels.ts`.
+  - **B3, empleador oficial.** «Portal oficial de empleo de {empresa}» enlaza
+    al dominio de la oferta. El enlace curado a su portal de empleo aparece en
+    cualquier vacante de esa empresa, con `nofollow noopener`.
+  - **Línea base de TTFB en producción** (antes del cambio, 2026-11-02): 5
+    vacantes × 3 URL únicas, todas con Cloudflare `MISS`. Mediana de 266 ms y
+    rango de 248 a 322 ms. El «después» de producción queda pendiente del
+    despliegue. Evidencia local, consultas por respuesta y JPD-001…010: en el
+    PR.
+  - Tras desplegar:
+    - Repetir las mismas 5 vacantes con URL única y `MISS`; el límite es
+      +10 % sobre la mediana.
+    - Correr `/seo drift compare` contra los baselines 26 a 30. Se esperan H2
+      y hash HTML nuevos, y el mismo title, meta, canonical, robots y JSON-LD.
+    - Repetir la muestra de §6.2 del diseño.
+    - Medir otra vez a +1 y a +14 días (§6.4).
 
 ### F5. Meta description y título (contrato §5)
 
