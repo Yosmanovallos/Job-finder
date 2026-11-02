@@ -589,7 +589,7 @@ export async function tickCapacity(): Promise<TickCapacity> {
 /** Measured, not computed: how many boards went more than 6 h without a good read. */
 export function formatTickCapacity(capacity: TickCapacity): string {
   return (
-    `Tick (cada hora, tableros más viejos primero): ${capacity.enabledBoards} tableros habilitados, ` +
+    `Tick (cron horario; GitHub dispara ~5 al día, tableros más viejos primero): ${capacity.enabledBoards} tableros habilitados, ` +
     `${capacity.neverRead} sin leer aún, ${capacity.behind} con más de 6 h sin lectura OK; último OK más viejo: ${capacity.oldestOkAt ?? "—"}.`
   );
 }

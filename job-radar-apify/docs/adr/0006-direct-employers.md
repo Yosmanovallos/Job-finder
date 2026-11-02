@@ -387,6 +387,30 @@ Decisión del dueño. Detalle y requisitos en
    Si no cabe, se frena la habilitación y se informa el déficit; no se
    agregan corridas ni servicios pagos.
 
+### 14. Enmienda de cadencia real del tick (2026-11-02)
+
+**Enmienda a §7.1 (capacidad) y §13.5.** El cron pide 24 corridas al día
+(`17 * * * *`), pero GitHub dispara unas 5, separadas 3,5–8 h (medido con
+`gh run list --event schedule`, 2026-10-24 → 2026-11-02; `indexing-tick`
+muestra lo mismo y ADR 0010 lo midió para `scrape-jobs`). Con
+`MIN_INTERVAL_HOURS = 5`, la corrida que llegaba ~4 h después de la
+anterior leía 0 tableros (casi una por día: 2026-10-27 23:50, 10-28
+23:17, 10-29 23:21, 10-30 23:00, 11-01 23:40), así que un tablero podía
+pasar 12 h sin lectura.
+
+- `MIN_INTERVAL_HOURS` baja a **3**: toda corrida que GitHub dispare lee
+  los tableros vencidos. Una lectura completa de ~156 tableros tarda ~6
+  min, dentro del plazo de 14; son las mismas ~5 lecturas diarias por
+  tablero que ya preveía §7.1, sin más corridas ni servicios pagos.
+- La métrica "con más de 6 h sin lectura OK" de `formatTickCapacity` no
+  cambia y es correcta: mide lo que pasa. Con ~5 disparos al día seguirá
+  marcando casi todos los tableros cuando se consulta más de 6 h después
+  del último tick; la garantía "≤ 6 h" de §13.5 solo se cumple con un
+  disparo más frecuente (cron externo, ADR 0010), que decide el usuario.
+- Un tablero que falla en cada tick (p. ej. Altipal entre el 2026-10-27 y
+  el PR #97) congela el "último OK más viejo"; el reporte por tablero del
+  tick es donde se ve el error.
+
 ## Consecuencias
 
 - Volumen honesto de arranque (medido 2026-10-19): 185 vacantes oficiales
