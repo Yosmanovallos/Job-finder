@@ -54,6 +54,7 @@ import {
   isPubliclyDescribable,
   buildJobMeta,
   injectJobHeadMeta,
+  injectJobPageContent,
   buildJobPosting,
   buildJobPageBody,
   buildJobPagePayload,
@@ -1346,7 +1347,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
           ? `\n<section data-related-cities aria-label="${escapeHtml(sectionHeadings.relatedCities)}"><h2>${escapeHtml(sectionHeadings.relatedCities)}</h2><ul>${relatedCityLinks.map((link) => `<li><a href="${escapeHtml(link.href)}">${escapeHtml(link.label)}</a></li>`).join("")}</ul></section>`
           : "";
       const ssrSnippet = `<h1>${escapeHtml(meta.heading)}</h1>\n${emptyNotice}${overviewHtml}${statsHtml}${jobsHeading}<nav aria-label="Vacantes"><ul>\n${items}\n</ul></nav>${relatedCitiesHtml}`;
-      indexHtml = indexHtml.replace('<div id="app"></div>', `<div id="app">${ssrSnippet}</div>`);
+      indexHtml = indexHtml.replace('<div id="app"></div>', () => `<div id="app">${ssrSnippet}</div>`);
 
       // Same fix /dashboard already had (Fase 1, §5.4) applied here too —
       // CategoryLanding.tsx previously always re-fetched /api/jobs on
@@ -1371,7 +1372,8 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       });
       indexHtml = indexHtml.replace(
         "</head>",
-        `  <script>window.__SSR_CATEGORY__=${ssrCategoryPayload};</script>\n</head>`
+        () =>
+          `  <script>window.__SSR_CATEGORY__=${ssrCategoryPayload};</script>\n</head>`
       );
 
       // BreadcrumbList + ItemList (SEO Fase 6, seo-technical §1.7's flagged
@@ -1383,19 +1385,22 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       const categoryItemList = buildCategoryItemList(meta, page);
       indexHtml = indexHtml.replace(
         "</head>",
-        `  <script type="application/ld+json">${escapeJsonForScriptTag(categoryBreadcrumb)}</script>\n` +
+        () =>
+          `  <script type="application/ld+json">${escapeJsonForScriptTag(categoryBreadcrumb)}</script>\n` +
           `  <script type="application/ld+json">${escapeJsonForScriptTag(categoryItemList)}</script>\n</head>`
       );
 
       indexHtml = indexHtml
-        .replace(/<title>[\s\S]*?<\/title>/, `<title>${escapeHtml(meta.title)}</title>`)
+        .replace(/<title>[\s\S]*?<\/title>/, () => `<title>${escapeHtml(meta.title)}</title>`)
         .replace(
           /<meta[^>]*name=["']description["'][^>]*>/,
-          `<meta name="description" content="${escapeHtml(meta.description)}" />`
+          () =>
+            `<meta name="description" content="${escapeHtml(meta.description)}" />`
         )
         .replace(
           /<link[^>]*rel=["']canonical["'][^>]*>/,
-          `<link rel="canonical" href="${escapeHtml(meta.canonicalUrl)}" />`
+          () =>
+            `<link rel="canonical" href="${escapeHtml(meta.canonicalUrl)}" />`
         );
 
       // Hreflang: role pages only ("rol"), never city pages. A role label
@@ -1423,19 +1428,23 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       indexHtml = indexHtml
         .replace(
           /<meta[^>]*property=["']og:title["'][^>]*>/,
-          `<meta property="og:title" content="${escapeHtml(meta.title)}" />`
+          () =>
+            `<meta property="og:title" content="${escapeHtml(meta.title)}" />`
         )
         .replace(
           /<meta[^>]*property=["']og:description["'][^>]*>/,
-          `<meta property="og:description" content="${escapeHtml(meta.description)}" />`
+          () =>
+            `<meta property="og:description" content="${escapeHtml(meta.description)}" />`
         )
         .replace(
           /<meta[^>]*name=["']twitter:title["'][^>]*>/,
-          `<meta name="twitter:title" content="${escapeHtml(meta.title)}" />`
+          () =>
+            `<meta name="twitter:title" content="${escapeHtml(meta.title)}" />`
         )
         .replace(
           /<meta[^>]*name=["']twitter:description["'][^>]*>/,
-          `<meta name="twitter:description" content="${escapeHtml(meta.description)}" />`
+          () =>
+            `<meta name="twitter:description" content="${escapeHtml(meta.description)}" />`
         );
 
       // Empty category (0 real matches today): a valid 200, honest copy,
@@ -1445,7 +1454,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       if (total === 0) {
         indexHtml = indexHtml
           .replace(/<meta[^>]*name=["']robots["'][^>]*>/i, "")
-          .replace("</head>", `  <meta name="robots" content="noindex">\n</head>`);
+          .replace("</head>", () => `  <meta name="robots" content="noindex">\n</head>`);
       }
 
       await sendBody(req, res, 200, { "Content-Type": "text/html; charset=utf-8" }, indexHtml);
@@ -1519,9 +1528,9 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       // it is today, in which case this branch never triggers).
       const title = `Vacante reservada para suscriptores Pro | BuscoTrabajo`;
       indexHtml = indexHtml
-        .replace(/<title>[\s\S]*?<\/title>/, `<title>${escapeHtml(title)}</title>`)
+        .replace(/<title>[\s\S]*?<\/title>/, () => `<title>${escapeHtml(title)}</title>`)
         .replace(/<meta[^>]*name=["']robots["'][^>]*>/i, "")
-        .replace("</head>", `  <meta name="robots" content="noindex">\n</head>`);
+        .replace("</head>", () => `  <meta name="robots" content="noindex">\n</head>`);
       await sendBody(req, res, 200, { "Content-Type": "text/html; charset=utf-8" }, indexHtml);
       return;
     }
@@ -1565,37 +1574,17 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     // optional enrichment may fail without making an otherwise healthy
     // vacancy unavailable.
     const publicJob = session ? null : (await attachReputation([visible]).catch(() => [visible]))[0];
-    indexHtml = indexHtml.replace(
-      '<div id="app"></div>',
-      `<div id="app">${renderJobBreadcrumbHtml(visible, cityHub)}${buildJobPageBody(publicJob ?? visible)}` +
-        `${companyJobs ? renderCompanyJobsHtml(companyJobs) : ""}${renderRelatedJobsHtml(cityHub, related)}</div>`
-    );
-    indexHtml = indexHtml.replace(
-      "</head>",
-      `  <script>window.__SSR_JOB_LINKS__=${escapeJsonForScriptTag({ jobId: visible.jobId, related, ...(companyJobs ? { company: companyJobs } : {}) })};</script>\n` +
-        `  <script type="application/ld+json">${escapeJsonForScriptTag(buildJobBreadcrumbList(visible, cityHub))}</script>\n</head>`
-    );
-    if (publicJob) {
-      indexHtml = indexHtml.replace(
-        "</head>",
-        `  <script>window.__SSR_JOB__=${escapeJsonForScriptTag(buildJobPagePayload(publicJob))};</script>\n</head>`
-      );
-    }
-    indexHtml = indexHtml.replace(/<meta[^>]*name=["']robots["'][^>]*>/i, "");
-    if (!googleReady || !jobPosting) {
-      indexHtml = indexHtml.replace(
-        "</head>",
-        `  <meta name="robots" content="noindex,follow">\n</head>`
-      );
-    }
-
-    indexHtml = injectJobHeadMeta(indexHtml, meta)
-      .replace(
-        "</head>",
-        jobPosting
-          ? `  <script type="application/ld+json">${escapeJsonForScriptTag(jobPosting)}</script>\n</head>`
-          : "</head>"
-      );
+    indexHtml = injectJobPageContent(indexHtml, {
+      appHtml:
+        `${renderJobBreadcrumbHtml(visible, cityHub)}${buildJobPageBody(publicJob ?? visible)}` +
+        `${companyJobs ? renderCompanyJobsHtml(companyJobs) : ""}${renderRelatedJobsHtml(cityHub, related)}`,
+      links: { jobId: visible.jobId, related, ...(companyJobs ? { company: companyJobs } : {}) },
+      breadcrumb: buildJobBreadcrumbList(visible, cityHub),
+      payload: publicJob ? buildJobPagePayload(publicJob) : null,
+      noindex: !googleReady || !jobPosting,
+      jobPosting
+    });
+    indexHtml = injectJobHeadMeta(indexHtml, meta);
 
     await sendBody(req, res, 200, { "Content-Type": "text/html; charset=utf-8" }, indexHtml);
     return;
@@ -1632,38 +1621,45 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       `<section><h2>Qué significa que rastreamos una fuente</h2><ul>${disclosures}</ul></section>` +
       `<nav aria-label="Explorar BuscoTrabajo"><ul>${links}</ul></nav>` +
       `</article>`;
-    indexHtml = indexHtml.replace('<div id="app"></div>', `<div id="app">${ssrSnippet}</div>`);
+    indexHtml = indexHtml.replace('<div id="app"></div>', () => `<div id="app">${ssrSnippet}</div>`);
 
     const canonicalUrl = `${SITE_URL}${SOURCES_PAGE_PATH}`;
     indexHtml = indexHtml
-      .replace(/<title>[\s\S]*?<\/title>/, `<title>${escapeHtml(SOURCES_PAGE_TITLE)}</title>`)
+      .replace(/<title>[\s\S]*?<\/title>/, () => `<title>${escapeHtml(SOURCES_PAGE_TITLE)}</title>`)
       .replace(
         /<meta[^>]*name=["']description["'][^>]*>/,
-        `<meta name="description" content="${escapeHtml(SOURCES_PAGE_DESCRIPTION)}" />`
+        () =>
+          `<meta name="description" content="${escapeHtml(SOURCES_PAGE_DESCRIPTION)}" />`
       )
       .replace(
         /<link[^>]*rel=["']canonical["'][^>]*>/,
-        `<link rel="canonical" href="${escapeHtml(canonicalUrl)}" />`
+        () =>
+          `<link rel="canonical" href="${escapeHtml(canonicalUrl)}" />`
       )
       .replace(
         /<meta[^>]*property=["']og:title["'][^>]*>/,
-        `<meta property="og:title" content="${escapeHtml(SOURCES_PAGE_TITLE)}" />`
+        () =>
+          `<meta property="og:title" content="${escapeHtml(SOURCES_PAGE_TITLE)}" />`
       )
       .replace(
         /<meta[^>]*property=["']og:description["'][^>]*>/,
-        `<meta property="og:description" content="${escapeHtml(SOURCES_PAGE_DESCRIPTION)}" />`
+        () =>
+          `<meta property="og:description" content="${escapeHtml(SOURCES_PAGE_DESCRIPTION)}" />`
       )
       .replace(
         /<meta[^>]*name=["']twitter:title["'][^>]*>/,
-        `<meta name="twitter:title" content="${escapeHtml(SOURCES_PAGE_TITLE)}" />`
+        () =>
+          `<meta name="twitter:title" content="${escapeHtml(SOURCES_PAGE_TITLE)}" />`
       )
       .replace(
         /<meta[^>]*name=["']twitter:description["'][^>]*>/,
-        `<meta name="twitter:description" content="${escapeHtml(SOURCES_PAGE_DESCRIPTION)}" />`
+        () =>
+          `<meta name="twitter:description" content="${escapeHtml(SOURCES_PAGE_DESCRIPTION)}" />`
       )
       .replace(
         "</head>",
-        `  <meta property="og:url" content="${escapeHtml(canonicalUrl)}" />\n</head>`
+        () =>
+          `  <meta property="og:url" content="${escapeHtml(canonicalUrl)}" />\n</head>`
       );
 
     await sendBody(req, res, 200, { "Content-Type": "text/html; charset=utf-8" }, indexHtml);
@@ -1740,7 +1736,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
         })
         .join("\n");
       const ssrSnippet = `<h1>${escapeHtml(heading)}</h1>\n<nav aria-label="Empresas"><ul>\n${items}\n</ul></nav>`;
-      indexHtml = indexHtml.replace('<div id="app"></div>', `<div id="app">${ssrSnippet}</div>`);
+      indexHtml = indexHtml.replace('<div id="app"></div>', () => `<div id="app">${ssrSnippet}</div>`);
 
       const ssrCompaniesPayload = escapeJsonForScriptTag({
         companies,
@@ -1750,24 +1746,28 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       });
       indexHtml = indexHtml.replace(
         "</head>",
-        `  <script>window.__SSR_COMPANIES__=${ssrCompaniesPayload};</script>\n</head>`
+        () =>
+          `  <script>window.__SSR_COMPANIES__=${ssrCompaniesPayload};</script>\n</head>`
       );
 
       const companiesItemList = buildCompaniesItemList(heading, companies, requestCountry);
       indexHtml = indexHtml.replace(
         "</head>",
-        `  <script type="application/ld+json">${escapeJsonForScriptTag(companiesItemList)}</script>\n</head>`
+        () =>
+          `  <script type="application/ld+json">${escapeJsonForScriptTag(companiesItemList)}</script>\n</head>`
       );
 
       indexHtml = indexHtml
-        .replace(/<title>[\s\S]*?<\/title>/, `<title>${escapeHtml(meta.title)}</title>`)
+        .replace(/<title>[\s\S]*?<\/title>/, () => `<title>${escapeHtml(meta.title)}</title>`)
         .replace(
           /<meta[^>]*name=["']description["'][^>]*>/,
-          `<meta name="description" content="${escapeHtml(meta.description)}" />`
+          () =>
+            `<meta name="description" content="${escapeHtml(meta.description)}" />`
         )
         .replace(
           /<link[^>]*rel=["']canonical["'][^>]*>/,
-          `<link rel="canonical" href="${escapeHtml(meta.canonicalUrl)}" />`
+          () =>
+            `<link rel="canonical" href="${escapeHtml(meta.canonicalUrl)}" />`
         );
 
       // Reciprocal hreflang — /empresas and /ve/empresas are two real,
@@ -1787,19 +1787,23 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       indexHtml = indexHtml
         .replace(
           /<meta[^>]*property=["']og:title["'][^>]*>/,
-          `<meta property="og:title" content="${escapeHtml(meta.title)}" />`
+          () =>
+            `<meta property="og:title" content="${escapeHtml(meta.title)}" />`
         )
         .replace(
           /<meta[^>]*property=["']og:description["'][^>]*>/,
-          `<meta property="og:description" content="${escapeHtml(meta.description)}" />`
+          () =>
+            `<meta property="og:description" content="${escapeHtml(meta.description)}" />`
         )
         .replace(
           /<meta[^>]*name=["']twitter:title["'][^>]*>/,
-          `<meta name="twitter:title" content="${escapeHtml(meta.title)}" />`
+          () =>
+            `<meta name="twitter:title" content="${escapeHtml(meta.title)}" />`
         )
         .replace(
           /<meta[^>]*name=["']twitter:description["'][^>]*>/,
-          `<meta name="twitter:description" content="${escapeHtml(meta.description)}" />`
+          () =>
+            `<meta name="twitter:description" content="${escapeHtml(meta.description)}" />`
         );
 
       await sendBody(req, res, 200, { "Content-Type": "text/html; charset=utf-8" }, indexHtml);
@@ -1878,7 +1882,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
         ? `<p><a href="${escapeHtml(companyView.officialCareersUrl)}" rel="nofollow noopener" target="_blank">Ver todas sus vacantes en su portal oficial</a></p>\n`
         : "") +
       `<nav aria-label="Vacantes"><ul>\n${jobItems}\n</ul></nav>`;
-    indexHtml = indexHtml.replace('<div id="app"></div>', `<div id="app">${ssrSnippet}</div>`);
+    indexHtml = indexHtml.replace('<div id="app"></div>', () => `<div id="app">${ssrSnippet}</div>`);
 
     const ssrCompanyPayload = escapeJsonForScriptTag({
       slug,
@@ -1892,40 +1896,48 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     });
     indexHtml = indexHtml.replace(
       "</head>",
-      `  <script>window.__SSR_COMPANY__=${ssrCompanyPayload};</script>\n</head>`
+      () =>
+        `  <script>window.__SSR_COMPANY__=${ssrCompanyPayload};</script>\n</head>`
     );
 
     const organizationSchema = buildCompanyOrganizationSchema(companyName, meta, reputation);
     indexHtml = indexHtml.replace(
       "</head>",
-      `  <script type="application/ld+json">${escapeJsonForScriptTag(organizationSchema)}</script>\n</head>`
+      () =>
+        `  <script type="application/ld+json">${escapeJsonForScriptTag(organizationSchema)}</script>\n</head>`
     );
 
     indexHtml = indexHtml
-      .replace(/<title>[\s\S]*?<\/title>/, `<title>${escapeHtml(meta.title)}</title>`)
+      .replace(/<title>[\s\S]*?<\/title>/, () => `<title>${escapeHtml(meta.title)}</title>`)
       .replace(
         /<meta[^>]*name=["']description["'][^>]*>/,
-        `<meta name="description" content="${escapeHtml(meta.description)}" />`
+        () =>
+          `<meta name="description" content="${escapeHtml(meta.description)}" />`
       )
       .replace(
         /<link[^>]*rel=["']canonical["'][^>]*>/,
-        `<link rel="canonical" href="${escapeHtml(meta.canonicalUrl)}" />`
+        () =>
+          `<link rel="canonical" href="${escapeHtml(meta.canonicalUrl)}" />`
       )
       .replace(
         /<meta[^>]*property=["']og:title["'][^>]*>/,
-        `<meta property="og:title" content="${escapeHtml(meta.title)}" />`
+        () =>
+          `<meta property="og:title" content="${escapeHtml(meta.title)}" />`
       )
       .replace(
         /<meta[^>]*property=["']og:description["'][^>]*>/,
-        `<meta property="og:description" content="${escapeHtml(meta.description)}" />`
+        () =>
+          `<meta property="og:description" content="${escapeHtml(meta.description)}" />`
       )
       .replace(
         /<meta[^>]*name=["']twitter:title["'][^>]*>/,
-        `<meta name="twitter:title" content="${escapeHtml(meta.title)}" />`
+        () =>
+          `<meta name="twitter:title" content="${escapeHtml(meta.title)}" />`
       )
       .replace(
         /<meta[^>]*name=["']twitter:description["'][^>]*>/,
-        `<meta name="twitter:description" content="${escapeHtml(meta.description)}" />`
+        () =>
+          `<meta name="twitter:description" content="${escapeHtml(meta.description)}" />`
       );
 
     await sendBody(req, res, 200, { "Content-Type": "text/html; charset=utf-8" }, indexHtml);
@@ -2027,7 +2039,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     // disagrees with itself once React replaces this markup.
     const dashboardHeading = `Vacantes de Empleo en ${countryConfig.name}`;
     const ssrSnippet = `<h1>${escapeHtml(dashboardHeading)}</h1>\n<nav aria-label="Vacantes recientes"><ul>\n${items}\n</ul></nav>`;
-    indexHtml = indexHtml.replace('<div id="app"></div>', `<div id="app">${ssrSnippet}</div>`);
+    indexHtml = indexHtml.replace('<div id="app"></div>', () => `<div id="app">${ssrSnippet}</div>`);
 
     // Head tags: same real facts Dashboard.tsx's usePageMeta() already
     // computes and applies client-side post-hydration (src/lib/use-page-
@@ -2037,14 +2049,16 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     const dashboardDescriptionText = dashboardDescription(country, countryConfig.name);
     const dashboardCanonical = `${SITE_URL}${pathname}`;
     indexHtml = indexHtml
-      .replace(/<title>[\s\S]*?<\/title>/, `<title>${escapeHtml(dashboardTitle)}</title>`)
+      .replace(/<title>[\s\S]*?<\/title>/, () => `<title>${escapeHtml(dashboardTitle)}</title>`)
       .replace(
         /<meta[^>]*name=["']description["'][^>]*>/,
-        `<meta name="description" content="${escapeHtml(dashboardDescriptionText)}" />`
+        () =>
+          `<meta name="description" content="${escapeHtml(dashboardDescriptionText)}" />`
       )
       .replace(
         /<link[^>]*rel=["']canonical["'][^>]*>/,
-        `<link rel="canonical" href="${escapeHtml(dashboardCanonical)}" />`
+        () =>
+          `<link rel="canonical" href="${escapeHtml(dashboardCanonical)}" />`
       );
 
     // Self + reciprocal + x-default hreflang — same trio "/" and "/ve"
@@ -2067,23 +2081,28 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     indexHtml = indexHtml
       .replace(
         /<meta property="og:locale" content="[^"]*" \/>/,
-        `<meta property="og:locale" content="${country === "VE" ? "es_VE" : "es_CO"}" />`
+        () =>
+          `<meta property="og:locale" content="${country === "VE" ? "es_VE" : "es_CO"}" />`
       )
       .replace(
         /<meta[^>]*property=["']og:title["'][^>]*>/,
-        `<meta property="og:title" content="${escapeHtml(dashboardTitle)}" />`
+        () =>
+          `<meta property="og:title" content="${escapeHtml(dashboardTitle)}" />`
       )
       .replace(
         /<meta[^>]*property=["']og:description["'][^>]*>/,
-        `<meta property="og:description" content="${escapeHtml(dashboardDescriptionText)}" />`
+        () =>
+          `<meta property="og:description" content="${escapeHtml(dashboardDescriptionText)}" />`
       )
       .replace(
         /<meta[^>]*name=["']twitter:title["'][^>]*>/,
-        `<meta name="twitter:title" content="${escapeHtml(dashboardTitle)}" />`
+        () =>
+          `<meta name="twitter:title" content="${escapeHtml(dashboardTitle)}" />`
       )
       .replace(
         /<meta[^>]*name=["']twitter:description["'][^>]*>/,
-        `<meta name="twitter:description" content="${escapeHtml(dashboardDescriptionText)}" />`
+        () =>
+          `<meta name="twitter:description" content="${escapeHtml(dashboardDescriptionText)}" />`
       );
 
     // Lets the client skip its own redundant first fetch to /api/jobs when
@@ -2102,7 +2121,8 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     const ssrJobsPayload = escapeJsonForScriptTag({ jobs: firstPage, total, hasMore, country });
     indexHtml = indexHtml.replace(
       "</head>",
-      `  <script>window.__SSR_JOBS__=${ssrJobsPayload};</script>\n</head>`
+      () =>
+        `  <script>window.__SSR_JOBS__=${ssrJobsPayload};</script>\n</head>`
     );
 
     await sendBody(req, res, 200, { "Content-Type": "text/html; charset=utf-8" }, indexHtml);
@@ -2301,7 +2321,8 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     const selfUrl = isVe ? `${SITE_URL}/ve` : `${SITE_URL}/`;
     indexHtml = indexHtml.replace(
       /<link[^>]*rel=["']canonical["'][^>]*>/,
-      `<link rel="canonical" href="${escapeHtml(selfUrl)}" />`
+      () =>
+        `<link rel="canonical" href="${escapeHtml(selfUrl)}" />`
     );
 
     // Self + reciprocal + x-default — the three checks seo-hreflang (the
@@ -2324,7 +2345,8 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     // never render that art.
     indexHtml = indexHtml.replace(
       "</head>",
-      `    <link rel="preload" as="image" href="/home/dash-desktop.webp" imagesrcset="/home/dash-desktop-960.webp 960w, /home/dash-desktop.webp 1600w" imagesizes="680px" type="image/webp" media="(min-width: 768px)" fetchpriority="high" />\n</head>`
+      () =>
+        `    <link rel="preload" as="image" href="/home/dash-desktop.webp" imagesrcset="/home/dash-desktop-960.webp 960w, /home/dash-desktop.webp 1600w" imagesizes="680px" type="image/webp" media="(min-width: 768px)" fetchpriority="high" />\n</head>`
     );
 
     if (isVe) {
@@ -2339,7 +2361,8 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       // keeping one content model prevents SSR and React from drifting.
       indexHtml = indexHtml.replace(
         /<meta property="og:locale" content="[^"]*" \/>/,
-        `<meta property="og:locale" content="es_VE" />`
+        () =>
+          `<meta property="og:locale" content="es_VE" />`
       );
     }
 

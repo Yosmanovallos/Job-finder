@@ -298,6 +298,26 @@ warmup and `companyPageCache` are untouched.
   `MISS`. The limit is +10 % of 266 ms. Re-check at +1 and +14 days. Revert B1
   if a regression is traced to its cache.
 
+### 2026-11-02 `$` in source text (`codex/ssr-replace-dollar`, before deploy)
+
+SSR insertions now use function replacers (`() => html`) instead of
+replacement strings, so `$&`, `` $` ``, `$'` and `$$` in source text are no
+longer expanded. There are no new queries, caches or warmups. The bytes change
+only when the source text contains `$`.
+
+- Production before (the same 5 job pages × 3 unique URLs, 15/15 Cloudflare
+  `MISS`): TTFB median 264 ms, range 248-410 ms.
+- Local cold process (disposable PostgreSQL, 9 fresh processes per side,
+  alternating, against `codex/job-meta-f5`):
+
+  | Measurement | Base | Branch |
+  | --- | ---: | ---: |
+  | First request of each process (median) | 75.5 ms | 73.2 ms |
+  | The 5 job pages | 17.8 ms | 18.5 ms |
+
+- **After deploy (pending):** the same 5 URLs with unique query strings and
+  `MISS`. The limit is +10 % of 264 ms.
+
 ## Required regression check
 
 For any change that can affect this path:
