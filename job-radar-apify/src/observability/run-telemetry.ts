@@ -43,11 +43,18 @@ export interface SignalTally {
   swallowed_error: number;
   /** P3: work refused or cut short because the tick's deadline ran out. */
   deadline_exceeded: number;
+  /**
+   * F-fuentes: the source answered 404 for one query (Elempleo does this for
+   * a search slug it has no page for, deterministically per keyword). Counted
+   * for the tick report only — deliberately NOT a negative signal, so it can
+   * never change a status, a circuit or a cadence.
+   */
+  not_found: number;
 }
 export type SourceSignalKind = keyof SignalTally;
 
 export function emptySignalTally(): SignalTally {
-  return { request: 0, circuit_open: 0, blocked: 0, retries_exhausted: 0, misconfigured: 0, swallowed_error: 0, deadline_exceeded: 0 };
+  return { request: 0, circuit_open: 0, blocked: 0, retries_exhausted: 0, misconfigured: 0, swallowed_error: 0, deadline_exceeded: 0, not_found: 0 };
 }
 
 const attemptContext = new AsyncLocalStorage<SignalTally>();
@@ -314,6 +321,18 @@ interface AttemptState {
   status: AttemptStatus;
   stage: AttemptStage;
   counters: AttemptCounters;
+  source: string;
+  reason: string;
+  notFound: number;
+}
+
+/** F-fuentes: how one attempt ended, for the end-of-tick report. No error text. */
+export interface AttemptOutcome {
+  source: string;
+  stage: AttemptStage;
+  status: AttemptStatus;
+  reason: string;
+  notFound: number;
 }
 
 export interface RunRecorderOptions {
@@ -389,6 +408,11 @@ export class RunRecorder {
     return this.attempts.get(attemptId)?.status;
   }
 
+  /** In memory, so the tick report works even when telemetry is not persisted. */
+  outcomes(): AttemptOutcome[] {
+    return [...this.attempts.values()].map(({ source, stage, status, reason, notFound }) => ({ source, stage, status, reason, notFound }));
+  }
+
   async trackAttempt<T>(meta: AttemptMeta, work: (attempt: AttemptHandle) => Promise<T>): Promise<T> {
     const id = randomUUID();
     const startedAt = new Date();
@@ -397,7 +421,10 @@ export class RunRecorder {
     const state: AttemptState = {
       status: "running",
       stage: meta.stage,
-      counters: { received: null, valid: null, filtered: null, new: null, duplicate: null, failed: null }
+      counters: { received: null, valid: null, filtered: null, new: null, duplicate: null, failed: null },
+      source: meta.source,
+      reason: "running",
+      notFound: 0
     };
     let phase: AttemptPhase = "fetch";
     const handle: AttemptHandle = {
@@ -425,6 +452,7 @@ export class RunRecorder {
       const failure = outcome.ok ? undefined : { error: outcome.error };
       const { status, reason } = classifyAttempt({ stage: meta.stage, counters: state.counters, signals: tally, phase, failure });
       state.status = status;
+      state.reason = reason;
       if (writable && this.summary === null) {
         const finishedAt = new Date();
         const record: AttemptFinishRecord = {
@@ -439,6 +467,7 @@ export class RunRecorder {
       }
     }
 
+    state.notFound = tally.not_found;
     if (!outcome.ok) throw outcome.error;
     return outcome.value;
   }
@@ -452,6 +481,7 @@ export class RunRecorder {
     for (const state of this.attempts.values()) {
       if (state.status === "running") {
         state.status = "timeout";
+        state.reason = "deadline_exceeded";
         stillRunning++;
       }
       if (state.stage === "listing") {

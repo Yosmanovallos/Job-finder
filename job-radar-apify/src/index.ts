@@ -402,8 +402,15 @@ export async function scrapeElempleo(keyword: string): Promise<Job[]> {
       });
 
       if (!response.ok) {
-        if (page === 1)
+        if (page === 1) {
           console.warn(`[Elempleo] Failed: ${response.status} ${response.statusText}`);
+          // F-fuentes: reported, never thrown — a throw would skip
+          // markRoleSourceRun and re-scrape the role next tick. A page-1 404
+          // is per keyword and deterministic (2026-11-01 logs: "Architect Ti",
+          // "Aide Nursing" among healthy searches), so it is counted apart and
+          // does not degrade the attempt; any other refusal does.
+          reportSourceSignal(response.status === 404 ? "not_found" : "swallowed_error");
+        }
         break;
       }
 
@@ -463,6 +470,7 @@ export async function scrapeElempleo(keyword: string): Promise<Job[]> {
     return jobs;
   } catch (error) {
     console.error("[Elempleo] Fetch error:", error);
+    reportSourceSignal("swallowed_error");
     return jobs;
   }
 }

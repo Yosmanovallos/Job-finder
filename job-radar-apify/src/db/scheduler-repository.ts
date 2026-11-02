@@ -128,6 +128,23 @@ export async function markGlobalSourceRun(sourceName: string): Promise<void> {
 }
 
 /**
+ * F-fuentes (src/queue/source-pacing.ts): when the rate-sensitive sources of
+ * a country last took part in a tick. Same table and sentinel pattern as
+ * `__global__`, so no migration. null = never recorded.
+ */
+export async function getPacedParticipation(roleSentinel: string, country: string): Promise<number | null> {
+  const result = await pool.query(
+    `SELECT last_run_at FROM role_source_runs WHERE role_name = $1 AND source_name = $2`,
+    [roleSentinel, country]
+  );
+  return result.rows[0] ? new Date(result.rows[0].last_run_at).getTime() : null;
+}
+
+export async function markPacedParticipation(roleSentinel: string, country: string): Promise<void> {
+  await markRoleSourceRun(roleSentinel, country);
+}
+
+/**
  * Cron C: atomically moves retired jobs into the private archive (ADR 0008).
  * Public reads already enforce the same 30-day/deadline rule, independent
  * of tick timing. Re-seeing a source never renews the original publication.
