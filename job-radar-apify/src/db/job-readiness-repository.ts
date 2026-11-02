@@ -18,6 +18,7 @@ import { assessDescription } from "../lib/job-description-quality.js";
 import { buildJobUrl } from "../lib/job-seo.js";
 import { enqueueIndexingNotificationsWith, INDEXING_PRIORITY } from "./indexing-repository.js";
 import type { JobDetail } from "../sources/types.js";
+import type { DetailClaimOrder } from "../sources/source-policy.js";
 
 export type DetailStatus =
   | "pending"
@@ -313,7 +314,8 @@ export interface ClaimedDetailJob {
  */
 export async function claimDueDetailJobs(
   filter: { source: string; market: "VE" | "OTHER"; ids?: undefined } | { ids: string[] },
-  limit: number
+  limit: number,
+  order: DetailClaimOrder = "due_first"
 ): Promise<ClaimedDetailJob[]> {
   if (limit <= 0) return [];
   if (filter.ids) {
@@ -340,7 +342,7 @@ export async function claimDueDetailJobs(
     );
     return result.rows;
   }
-  const result = await pool.query<ClaimedDetailJob>(
+  const result = await pool.query<ClaimedDetailJob & { created_at: Date }>(
     `UPDATE jobs SET detail_next_attempt_at = NOW() + ($3::int * INTERVAL '1 millisecond')
      WHERE id IN (
        SELECT id FROM jobs
@@ -349,14 +351,45 @@ export async function claimDueDetailJobs(
          AND is_active = TRUE
          AND source = $1
          AND (CASE WHEN $4 = 'VE' THEN country = 'VE' ELSE country IS DISTINCT FROM 'VE' END)
-       ORDER BY detail_next_attempt_at ASC, id ASC
+       ORDER BY ${order === "newest_first" ? "created_at DESC, id DESC" : "detail_next_attempt_at ASC, id ASC"}
        LIMIT $2
        FOR UPDATE SKIP LOCKED
      )
-     RETURNING id, url, source, country, detail_attempts`,
+     RETURNING id, url, source, country, detail_attempts, created_at`,
     [filter.source, limit, DETAIL_CLAIM_LEASE_MS, filter.market]
   );
-  return result.rows;
+  // RETURNING has no order of its own. For newest_first the drain must also
+  // ASK newest first, so a deadline mid-batch cuts the oldest, not the newest.
+  const rows =
+    order === "newest_first"
+      ? [...result.rows].sort((a, b) => b.created_at.getTime() - a.created_at.getTime() || b.id.localeCompare(a.id))
+      : result.rows;
+  return rows.map(({ created_at: _createdAt, ...job }) => job);
+}
+
+/**
+ * GOOGLE-JOBS F3: hands back claimed rows the drain stopped before asking
+ * for (deadline, refusal, open circuit). Only rows still holding the lease
+ * and still pending/retry move; their state is untouched. Without this, the
+ * tick's own drain leased ~19 Magneto rows per tick that nobody could claim
+ * for 10 minutes — and newest-first would have leased exactly the newest.
+ * A database write only: no source is asked anything.
+ */
+export async function releaseDetailClaims(claimed: Pick<ClaimedDetailJob, "id" | "detail_attempts">[]): Promise<number> {
+  if (claimed.length === 0) return 0;
+  // detail_attempts unchanged since the claim = no outcome was recorded. A
+  // row settled to 'retry' also has a future detail_next_attempt_at (its
+  // backoff), and must keep it.
+  const result = await pool.query(
+    `UPDATE jobs SET detail_next_attempt_at = NOW()
+     FROM unnest($1::uuid[], $2::int[]) AS c(id, attempts)
+     WHERE jobs.id = c.id
+       AND jobs.detail_attempts = c.attempts
+       AND jobs.detail_status IN ('pending', 'retry')
+       AND jobs.detail_next_attempt_at > NOW()`,
+    [claimed.map((job) => job.id), claimed.map((job) => job.detail_attempts)]
+  );
+  return result.rowCount ?? 0;
 }
 
 export type DetailOutcome =

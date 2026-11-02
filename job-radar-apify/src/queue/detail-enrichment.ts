@@ -19,7 +19,7 @@ import { circuitKeyFor, resolvePolicy } from "../sources/source-policy.js";
 import { BUDGET_ESTIMATES, hasBudget, isCancelled, type FetchContext } from "../engine/fetch-context.js";
 import { jitterDelay } from "../engine/jitter-delay.js";
 import { reportSourceSignal, type AttemptHandle, type RunRecorder } from "../observability/run-telemetry.js";
-import { claimDueDetailJobs, recordDetailOutcome, type ClaimedDetailJob } from "../db/job-readiness-repository.js";
+import { claimDueDetailJobs, recordDetailOutcome, releaseDetailClaims, type ClaimedDetailJob } from "../db/job-readiness-repository.js";
 import { DETAIL_ADAPTER_NAMES } from "../sources/detail-capability.js";
 
 /** Fallback cap when a source declares no maxRequestsPerAttempt (today's behavior). */
@@ -74,6 +74,33 @@ async function runClaimed(
   ctx?: FetchContext,
   attempt?: AttemptHandle
 ): Promise<void> {
+  // Index of the first row not yet settled; everything from here on was
+  // claimed but never asked for when the loop stops.
+  let unsettledFrom = 0;
+  try {
+    await runClaimedRows(adapter, jobs, counters, (next) => (unsettledFrom = next), ctx, attempt);
+  } finally {
+    // GOOGLE-JOBS F3: those rows go back to the queue now instead of when
+    // the lease expires (see releaseDetailClaims).
+    const unasked = jobs.slice(unsettledFrom);
+    if (unasked.length > 0) {
+      try {
+        await releaseDetailClaims(unasked);
+      } catch {
+        // Best effort: the lease still expires on its own, as before F3.
+      }
+    }
+  }
+}
+
+async function runClaimedRows(
+  adapter: SourceAdapter,
+  jobs: ClaimedDetailJob[],
+  counters: EnrichmentCounters,
+  settledUpTo: (next: number) => void,
+  ctx?: FetchContext,
+  attempt?: AttemptHandle
+): Promise<void> {
   for (let i = 0; i < jobs.length; i++) {
     if (!hasBudget(ctx, BUDGET_ESTIMATES.detailFetch) || isCancelled(ctx)) {
       reportSourceSignal("deadline_exceeded");
@@ -105,6 +132,7 @@ async function runClaimed(
         });
         counters.retry++;
         noteFault(counters, errorClass);
+        settledUpTo(i + 1);
       }
       counters.stoppedEarly = true;
       break;
@@ -127,6 +155,7 @@ async function runClaimed(
     else if (status === "retry") counters.retry++;
     else if (status === "no_detail") counters.noDetail++;
     else if (status === "failed") counters.failed++;
+    settledUpTo(i + 1);
     // "valid" = a usable detail really obtained from the source (P2/P4
     // telemetry meaning), whether or not it later passes the Google gate.
     attempt?.setCounters({ valid: counters.complete + counters.rejected, failed: counters.failed + counters.retry });
@@ -162,6 +191,22 @@ export function drainOrder(adapters: SourceAdapter[]): SourceAdapter[] {
 }
 
 /**
+ * GOOGLE-JOBS F3: this source's share of the drain time still left,
+ * proportional to its detail cap among the sources not yet drained.
+ *
+ * Before F3 each source got 1/n. Magneto (cap 30) then ran out of time
+ * with rows left while LinkedIn/Computrabajo (cap 8) spent theirs on 429
+ * retries. Weighting by cap gives each source time in line with what it
+ * may ask for; no cap changes, so no source makes more requests per drain.
+ * Surplus still flows forward to the next source, as before.
+ */
+export function drainSliceMs(remainingMs: number, capsLeft: readonly number[]): number {
+  const total = capsLeft.reduce((sum, cap) => sum + Math.max(cap, 0), 0);
+  if (total <= 0 || capsLeft.length === 0) return 0;
+  return Math.floor((remainingMs * Math.max(capsLeft[0], 0)) / total);
+}
+
+/**
  * Bounded drain of due 'pending'/'retry' rows, one adapter at a time, each
  * capped by its own detail policy. Never touches legacy 'backlog' rows.
  *
@@ -176,17 +221,19 @@ export async function drainDetailQueue(
 ): Promise<Record<string, EnrichmentCounters>> {
   const report: Record<string, EnrichmentCounters> = {};
   const order = drainOrder(adapters);
+  const caps = order.map((adapter) => detailCapFor(adapter.name));
   for (let i = 0; i < order.length; i++) {
     const adapter = order[i];
     if (!hasBudget(ctx, BUDGET_ESTIMATES.detailFetch) || isCancelled(ctx)) break;
-    // Fair slice of what is left, so the first source can't take the whole
-    // budget; a source that finishes early hands its surplus to the next.
-    const slice = ctx ? ctx.child(Math.floor(ctx.remainingMs() / (order.length - i))) : undefined;
+    // Cap-weighted slice of what is left, so the first source can't take the
+    // whole budget; a source that finishes early hands its surplus on.
+    const slice = ctx ? ctx.child(drainSliceMs(ctx.remainingMs(), caps.slice(i))) : undefined;
     try {
       const counters = emptyCounters();
       const claimed = await claimDueDetailJobs(
         { source: adapter.name.replace(/-VE$/, ""), market: adapter.name.endsWith("-VE") ? "VE" : "OTHER" },
-        detailCapFor(adapter.name)
+        caps[i],
+        resolvePolicy(adapter.name, "detail").detailClaimOrder
       );
       counters.claimed = claimed.length;
       if (claimed.length > 0) {

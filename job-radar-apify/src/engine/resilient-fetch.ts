@@ -11,7 +11,7 @@ import {
 } from "../sources/fetch-result.js";
 import {
   DEFAULT_SOURCE_POLICY,
-  resolvePolicy,
+  resolvePolicyForKey,
   type SourcePolicy,
   type SourceStage
 } from "../sources/source-policy.js";
@@ -167,7 +167,7 @@ export async function executeWithResilienceResult<T>(
   maxRetries: number = 3,
   ctx?: FetchContext
 ): Promise<SourceFetchResult<T>> {
-  const policy = resolvePolicy(sourceName, stage);
+  const policy = resolvePolicyForKey(sourceName, stage);
   const circuitKey = sourceName;
 
   if (isCancelled(ctx)) {
@@ -206,6 +206,15 @@ export async function executeWithResilienceResult<T>(
     // that already said no.
     if (result.outcome === "blocked") {
       console.warn(`🚫 [ResilientEngine] ${sourceName}: deny definitivo — no se reintenta.`);
+      reportOutcomeSignal(result);
+      await applyCircuitEffect(circuitKey, result, policy);
+      return result;
+    }
+
+    // GOOGLE-JOBS F3: a source whose policy says so gets one 429 per call.
+    // The caller stops that source on it; the circuit effect is applied once,
+    // exactly as on the exhausted-retries path below.
+    if (result.outcome === "rate_limited" && !policy.retryRateLimited) {
       reportOutcomeSignal(result);
       await applyCircuitEffect(circuitKey, result, policy);
       return result;

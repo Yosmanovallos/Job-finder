@@ -136,6 +136,50 @@ await check("SRC-003: a real success still clears accumulated failures", async (
 });
 
 // ---------------------------------------------------------------------------
+// GOOGLE-JOBS F3 — one 429 per call on the paced sources' detail stage
+// ---------------------------------------------------------------------------
+
+await check("F3: a 429 on LinkedIn detail is not retried and counts once on the circuit", async () => {
+  const key = circuitKeyFor("LinkedIn", "detail");
+  await resetCircuit(key);
+  let calls = 0;
+  const result = await executeWithResilienceResult(
+    key,
+    "detail",
+    async () => {
+      calls += 1;
+      return failedResult("rate_limited", { class: "FetchRateLimitedError", retryAfterMs: 5 }, "exception");
+    },
+    3
+  );
+  assert.equal(result.outcome, "rate_limited");
+  assert.equal(calls, 1, "no in-call retry against a host that answered 429");
+  assert.equal((await circuitRow(key))?.failures, 1, "the circuit sees the 429 exactly once");
+  await resetCircuit(key);
+});
+
+await check("F3: a 429 on a listing (and on Magneto detail) keeps today's three attempts", async () => {
+  for (const key of [circuitKeyFor("LinkedIn", "listing"), circuitKeyFor("Magneto", "detail")]) {
+    const stage = key.endsWith("-detail") ? "detail" : "listing";
+    await resetCircuit(key);
+    let calls = 0;
+    const result = await executeWithResilienceResult(
+      key,
+      stage,
+      async () => {
+        calls += 1;
+        return failedResult("rate_limited", { class: "FetchRateLimitedError", retryAfterMs: 5 }, "exception");
+      },
+      3
+    );
+    assert.equal(result.outcome, "rate_limited", key);
+    assert.equal(calls, 3, `${key} still retries`);
+    assert.equal((await circuitRow(key))?.failures, 1, `${key}: one circuit effect after the retries`);
+    await resetCircuit(key);
+  }
+});
+
+// ---------------------------------------------------------------------------
 // SRC-004 — listing and detail circuits are independent
 // ---------------------------------------------------------------------------
 

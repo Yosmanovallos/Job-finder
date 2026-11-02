@@ -207,6 +207,61 @@ migración ni escritura en producción sin aprobación explícita del usuario.
 - Ampliar empleadores directos (ATS oficiales, iniciativa D1–D5): traen la
   descripción completa y son aptos al insertarse.
 - Criterio: más aptas nuevas por día sin más 429 ni más tiempo de tick.
+- **Registro (2026-11-02, rama `codex/google-jobs-f3-drain-priority`; PR
+  abierto, sin fusionar).** Solo toca el drain de detalle en Actions, nunca
+  la web.
+  - **Medición previa** (logs de los últimos 12 ticks CO, `gh run view`):
+    - Drain al final del tick: Magneto reclama 30 y completa de 0 a 22
+      (media 11). Lo corta el plazo en 12 de 12 ticks, y unas 19 filas por tick
+      quedaban con *lease* de 10 min sin que nadie las pidiera.
+    - Paso dedicado (420 s, 1/n por fuente): Magneto completa de 25 a 30
+      (media 27,8). Lo corta el plazo en 3 de 12.
+    - LinkedIn y Computrabajo gastan su parte en reintentos de 1 s y 3 s antes
+      de parar en el 429.
+  - Cuatro cambios. Ningún cupo por drain cambia (30/20/8/8), así que ninguna
+    fuente puede recibir más peticiones por drain:
+    1. **Orden.** `SourcePolicy.detailClaimOrder`. Magneto y Elempleo reclaman
+       con `created_at DESC`. LinkedIn y Computrabajo siguen con el orden
+       anterior, por vencimiento. Las filas viejas de Magneto quedan al final a
+       propósito: el conteo `pending` no baja aunque las nuevas lleguen antes.
+    2. **Sin reintentos en el 429 de detalle** de LinkedIn y Computrabajo (CO y
+       VE). `retryRateLimited: false` hace una petición por fila y aplica un
+       solo efecto al circuito. El listado conserva sus 3 intentos. El motor
+       resuelve ahora la política por la clave `X-detail` y antes caía siempre
+       en los valores por defecto. Es neutro: los umbrales declarados son los
+       mismos.
+    3. **Reparto del tiempo por cupo** (`drainSliceMs`) en vez de 1/n. En el
+       paso dedicado, Magneto recibe 30/66 de 420 s (191 s, antes 105–140 s).
+       En los ticks de `dispatch`, sin las fuentes protegidas, recibe 252 s.
+       El sobrante sigue pasando a la siguiente fuente.
+    4. **Liberación** (`releaseDetailClaims`): las filas reclamadas que no se
+       llegaron a pedir vuelven a la cola de inmediato y no esperan a que
+       venza el *lease*. Es solo una escritura en la base de datos. Sin esto,
+       el drain del tick habría bloqueado justo las más nuevas.
+  - **No se hizo una segunda pasada** que diera a Magneto más filas por
+    drain. Con el cron horario (desde el 2026-11-02) la capacidad es de ~24
+    ticks × ~39 completas, unas 900 al día, frente a ~151 llegadas al día. El
+    atraso de 1,385 se vacía en ~2 días sin subir cupos. Si a los 7 días
+    Magneto sigue atrasado, se mide y se decide aparte.
+  - **VE sigue sin paso de drain.** Sus únicas fuentes de detalle,
+    `LinkedIn-VE` y `Computrabajo-VE`, son las de ritmo protegido y las que
+    dan 429. Un paso más solo añadiría peticiones de detalle hacia esos hosts.
+    El drain al final del tick VE se queda como está.
+  - La guarda de ritmo (`source-pacing.ts`, ADR 0010) no cambia: mismo
+    archivo, mismas pruebas.
+  - **Medición a los 7 días (2026-11-09)**, solo con las filas creadas después
+    del despliegue:
+    - p50 creada → `complete` de Magneto, frente a 107–113 h en F0;
+    - aptas nuevas por día de Magneto y Elempleo;
+    - 429 por día de LinkedIn y Computrabajo, por fila: `Fallos:
+      FetchRateLimitedError×N` de las líneas «Detalle X» y `source_attempts`.
+      No sirven las líneas «Reintentando» del motor, que este cambio reduce
+      por construcción;
+    - duración del paso de drain, que no debe crecer (presupuesto fijo de
+      420 s).
+    - F3 coincide en fechas con el cron horario (ADR 0010). No se le atribuye
+      a F3 sola la mejora del volumen; el p50 de las nuevas sí depende del
+      orden.
 
 ### F4. Diferenciación de la página (PR #90)
 
