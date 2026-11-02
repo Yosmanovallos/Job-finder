@@ -13,7 +13,8 @@
  *   content   — a meaningful change of an already-ready job (priority 3)
  *   reconcile — self-heal / legacy rows (priority 4-5)
  *
- * Every lane is FIFO (oldest first) except where a config says otherwise.
+ * Every lane is FIFO (oldest first) except where a config says otherwise
+ * (`newestFirst` on a weighted config, or the `newest` kind).
  */
 export type QueueLane = "new" | "delete" | "content" | "reconcile";
 
@@ -28,7 +29,7 @@ export type LaneQueues<T extends Schedulable> = Record<QueueLane, T[]>;
 export type SchedulerConfig =
   | { kind: "strict"; order: QueueLane[] }
   | { kind: "fixed"; shares: Record<QueueLane, number> }
-  | { kind: "weighted"; shares: Record<QueueLane, number>; spillOrder: QueueLane[] }
+  | { kind: "weighted"; shares: Record<QueueLane, number>; spillOrder: QueueLane[]; newestFirst?: QueueLane[] }
   | { kind: "age"; targetHours: Record<QueueLane, number> }
   | { kind: "newest"; deleteShare: number };
 
@@ -100,10 +101,12 @@ export function planIndexingSends<T extends Schedulable>(
     case "fixed":
       for (const lane of LANES) take(lane, share(config.shares[lane]));
       break;
-    case "weighted":
-      for (const lane of LANES) take(lane, share(config.shares[lane]));
-      for (const lane of config.spillOrder) take(lane, budget);
+    case "weighted": {
+      const lifo = (lane: QueueLane) => config.newestFirst?.includes(lane) ?? false;
+      for (const lane of LANES) take(lane, share(config.shares[lane]), lifo(lane));
+      for (const lane of config.spillOrder) take(lane, budget, lifo(lane));
       break;
+    }
     case "age":
       while (plan.length < budget) {
         let best: QueueLane | null = null;
@@ -127,4 +130,48 @@ export function planIndexingSends<T extends Schedulable>(
   }
   compact();
   return plan;
+}
+
+/** Lanes a config drains newest-first: the caller must hand it the NEWEST pending rows of those lanes. */
+export function newestFirstLanes(config: SchedulerConfig): QueueLane[] {
+  if (config.kind === "weighted") return config.newestFirst ?? [];
+  if (config.kind === "newest") return ["new"];
+  return [];
+}
+
+/**
+ * How much of the rolling 24 h budget one tick may spend (GOOGLE-JOBS F2).
+ *
+ * The cron fires ~5 times a day at drifting hours. Spending the whole rolling
+ * budget in the first run of each window sends the day's 200 at once, at a
+ * later hour every day (F0 even saw a Bogotá day with no sends). Pacing lets a
+ * run spend headroom × quota/24 per hour since the last attempt, so the quota
+ * is spread over the day's runs whatever their cadence; never above
+ * `remaining`, so the rolling 24 h cap still holds.
+ *
+ * The gap is capped at PACE_MAX_GAP_HOURS: after a burst (the old behavior, or
+ * a quiet day) the next attempt comes ~24 h later, and an uncapped gap would
+ * hand it the whole quota again, so the burst would repeat forever.
+ *
+ * Replayed over the 300 real gaps between runs (2026-09-06 … 11-02, see the
+ * scheduler tests): 177 sends/day against 181.5 for the burst (a rolling
+ * window cannot reuse a freed slot before the next run, whatever the policy),
+ * at most 74 per run against 200, and 94 % of runs send against 17 %.
+ *
+ * @param hoursSinceLastAttempt hours since the last sent/failed attempt; 24 or
+ *   more when there was none in the rolling window.
+ */
+export const PACE_MAX_GAP_HOURS = 8;
+export const PACE_HEADROOM = 1.1;
+
+export function pacedSendAllowance(
+  quota: number,
+  remaining: number,
+  hoursSinceLastAttempt: number,
+  maxGapHours = PACE_MAX_GAP_HOURS,
+  headroom = PACE_HEADROOM
+): number {
+  if (remaining <= 0) return 0;
+  const gap = Math.min(Math.max(0, hoursSinceLastAttempt), maxGapHours);
+  return Math.min(remaining, Math.ceil((headroom * quota * gap) / 24));
 }

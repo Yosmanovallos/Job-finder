@@ -4,14 +4,18 @@
  */
 import assert from "node:assert/strict";
 import test from "node:test";
+import { readFileSync } from "node:fs";
 import {
   DEFAULT_SCHEDULER,
+  newestFirstLanes,
+  pacedSendAllowance,
   planIndexingSends,
   type LaneQueues,
   type QueueLane,
-  type Schedulable
+  type Schedulable,
+  type SchedulerConfig
 } from "../src/lib/indexing-scheduler.js";
-import { simulate, type SimData } from "../scripts/simulate-indexing-queue.js";
+import { simDataFromFunnel, simulate, type FunnelExport, type SimData, type SimParams } from "../scripts/simulate-indexing-queue.js";
 
 interface Row extends Schedulable { id: string }
 
@@ -86,4 +90,75 @@ test("under 5× overload the queue stays bounded by the API window, and new jobs
   assert.ok(bounded.sends.new > 0 && bounded.sends.delete > 0, "both lanes are served");
   const unbounded = simulate(data, { policy: "D2", scheduler: "S2", quota: 200, windowDays: null, replayDays: 14 });
   assert.ok(unbounded.queue.d90 > 3 * bounded.queue.d90, "without the window the backlog holds weeks-old notifications");
+});
+
+test("newestFirst lanes drain the newest rows first; the other lanes stay FIFO", () => {
+  const config: SchedulerConfig = {
+    kind: "weighted",
+    shares: { new: 0.5, delete: 0.5, content: 0, reconcile: 0 },
+    spillOrder: ["new", "delete", "content", "reconcile"],
+    newestFirst: ["new"]
+  };
+  const queues = lanes({ new: 300, delete: 300 });
+  const plan = planIndexingSends(queues, 10, config, 0);
+  assert.deepEqual(plan.filter((row) => row.lane === "new").map((row) => row.id), ["new-299", "new-298", "new-297", "new-296", "new-295"]);
+  assert.deepEqual(plan.filter((row) => row.lane === "delete").map((row) => row.id), ["delete-0", "delete-1", "delete-2", "delete-3", "delete-4"]);
+  assert.deepEqual(newestFirstLanes(config), ["new"]);
+  assert.deepEqual(newestFirstLanes({ kind: "strict", order: ["new"] }), []);
+});
+
+// The 300 real gaps between indexing-tick runs (2026-09-06 … 2026-11-02).
+const tickGaps = JSON.parse(readFileSync(new URL("../docs/seo-baseline/2026-11-02-indexing-tick-gaps.json", import.meta.url), "utf8")) as { gapsH: number[] };
+
+/** Replays the real cadence with always-full lanes; returns each run's sends and time. */
+function replayPacing(allowance: (remaining: number, sinceLast: number) => number) {
+  const runs: { t: number; sent: number }[] = [];
+  let t = 0;
+  for (const gap of [...tickGaps.gapsH, ...tickGaps.gapsH]) {
+    t += gap;
+    const inWindow = runs.filter((run) => run.t > t - 24 && run.sent > 0);
+    const remaining = 200 - inWindow.reduce((sum, run) => sum + run.sent, 0);
+    const sinceLast = inWindow.length > 0 ? t - inWindow[inWindow.length - 1].t : 24;
+    runs.push({ t, sent: allowance(remaining, sinceLast) });
+  }
+  return runs;
+}
+
+test("pacing spreads the quota over the real tick runs at almost no cost", () => {
+  const paced = replayPacing((remaining, sinceLast) => pacedSendAllowance(200, remaining, sinceLast));
+  const burst = replayPacing((remaining) => remaining);
+  const days = paced[paced.length - 1].t / 24;
+  for (const run of paced) {
+    const window = paced.filter((other) => other.t > run.t - 24 && other.t <= run.t);
+    assert.ok(window.reduce((sum, other) => sum + other.sent, 0) <= 200, "never more than the quota in any rolling 24 h");
+  }
+  const perDay = (runs: typeof paced) => runs.reduce((sum, run) => sum + run.sent, 0) / days;
+  const settled = paced.slice(30);
+  assert.ok(Math.max(...settled.map((run) => run.sent)) <= 80, "one run sends well under half the quota");
+  assert.equal(Math.max(...burst.map((run) => run.sent)), 200, "contrast: the burst sends the whole quota at once");
+  assert.ok(settled.filter((run) => run.sent === 0).length <= 0.1 * settled.length, "nearly every run sends");
+  assert.ok(burst.slice(30).filter((run) => run.sent === 0).length >= 0.75 * settled.length, "contrast: most burst runs send nothing");
+  assert.ok(perDay(paced) >= 0.97 * perDay(burst), `pacing costs ≤3 % of the quota: ${perDay(paced).toFixed(1)} vs ${perDay(burst).toFixed(1)}/day`);
+});
+
+test("pacedSendAllowance: rolling cap, gap cap, and a delayed cron still gets its share", () => {
+  assert.equal(pacedSendAllowance(200, 0, 5), 0, "quota spent in the last 24 h");
+  assert.equal(pacedSendAllowance(200, 10, 5), 10, "never above the rolling remaining budget");
+  assert.equal(pacedSendAllowance(200, 200, 24), Math.ceil((1.1 * 200 * 8) / 24), "after a quiet day: capped, not a new burst");
+  assert.ok(pacedSendAllowance(200, 200, 10) >= Math.ceil((200 * 8) / 24), "the longest real gap gets at least its capped share");
+  assert.equal(pacedSendAllowance(200, 200, 0), 0);
+});
+
+// F0 reconstruction (GOOGLE-JOBS F2): the simulator must reproduce what F0 measured before it is trusted.
+const funnel = JSON.parse(readFileSync(new URL("../docs/seo-baseline/2026-11-01-google-jobs-funnel.json", import.meta.url), "utf8")) as FunnelExport;
+const f0 = simDataFromFunnel(funnel, tickGaps.gapsH);
+const f0Base: SimParams = { policy: "D2", scheduler: "S2", quota: 200, windowDays: 7, replayDays: 13, legacyReconcile: false, newShare: 0.5, sendMode: "burst" };
+
+test("the F0 reconstruction reproduces the measured FIFO funnel", () => {
+  const today = simulate(f0, f0Base);
+  assert.ok(today.newSentP50h >= 6 * 24, `FIFO sends a week late (F0: 158-167 h): ${today.newSentP50h} h`);
+  assert.ok(today.newWithin24hPct < 2, `almost nothing within 24 h: ${today.newWithin24hPct}%`);
+  assert.ok(today.newSentPct >= 25 && today.newSentPct <= 40, `about a third notified (F0: 30 %): ${today.newSentPct}%`);
+  assert.ok(today.sendsPerDay >= 180 && today.sendsPerDay <= 190, `burst sends ~187/day (F0): ${today.sendsPerDay}`);
+  assert.ok(today.deleteLaneEnd > 8_000, `the delete backlog does not drain (F0: 8,850): ${today.deleteLaneEnd}`);
 });
