@@ -1,3 +1,4 @@
+import { coDepartmentFor } from "../../lib/co-departments.js";
 import { decodeEntities, htmlToText } from "../text.js";
 import type { BoardListing, HttpGet, ListOptions, RawAtsPosting } from "../types.js";
 import { allowedUrl, innerHtmlAt, readRobots } from "./site.js";
@@ -10,6 +11,11 @@ const CITIES = new Set([
   "bogota d c", "bucaramanga", "cali", "funza", "fusagasuga", "girardota", "jamundi",
   "medellin", "monteria", "neiva", "palmira", "pereira", "villavicencio", "yopal", "yumbo"
 ]);
+// A city the portal states but no closed table knows (2026-11-01: TUMACO and
+// ACACÍAS took the whole board down) is still a place name: letters and
+// punctuation only. Anything else (digits, markup, long text) is not a city.
+const PLACE = /^[\p{L}][\p{L} .,'-]{1,59}$/u;
+const LABELS = ["Ciudad", "Publicado en", "Fecha Fin de Postulación"];
 
 function fold(value: string): string {
   return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
@@ -52,6 +58,11 @@ export function parseAltipalPage(html: string): BoardListing {
   if (cards.length === 0 || cards.length > 500 || cards.length !== links.length) {
     return { kind: "error", detail: "listado Altipal vacío, truncado o inconsistente" };
   }
+  // One card without a field gets null; no card with it means the labels
+  // changed, which must fail rather than silently empty every posting.
+  if (LABELS.some((label) => !new RegExp(`${label}:\\s*<b>`, "i").test(html))) {
+    return { kind: "error", detail: "listado Altipal sin ciudad o fechas" };
+  }
   const postings: RawAtsPosting[] = [];
   for (const card of cards) {
     const body = innerHtmlAt(html, card.index, "div", 20_000);
@@ -62,17 +73,20 @@ export function parseAltipalPage(html: string): BoardListing {
     const link = body ? LINK.exec(body) : null;
     const publishedAt = published ? localPublishedAt(published) : null;
     const validThrough = end ? localEndOfDay(end) : null;
-    if (!body || !body.includes("Vacante Disponible") || !title || !city || !CITIES.has(fold(city)) ||
-        !publishedAt || !validThrough || !link) {
+    if (!body || !body.includes("Vacante Disponible") || !title || !link ||
+        (city && !PLACE.test(city)) || (published && !publishedAt) || (end && !validThrough)) {
       return { kind: "error", detail: "vacante Altipal con forma, fecha o ciudad inesperada" };
     }
+    // Only a city some closed table knows becomes the structured city; an
+    // unknown one keeps the portal's text and lets the eligibility gate decide.
+    const knownCity = city && (CITIES.has(fold(city)) || coDepartmentFor(city)) ? city : null;
     postings.push({
       externalId: link[2],
       title,
       applyUrl: link[1],
-      locationTexts: [city],
+      locationTexts: city ? [city] : [],
       countryCodes: ["CO"],
-      structuredCity: city,
+      structuredCity: knownCity,
       workplace: null,
       descriptionText: null,
       department: field(body, "Área de Trabajo"),
@@ -93,7 +107,7 @@ export function altipalDescription(html: string, posting: RawAtsPosting): string
   if (!html.includes("Vacante Disponible")) return null;
   const title = htmlToText(/<div\s+class="card-header-interna"[^>]*>[\s\S]*?<h2\b[^>]*>([\s\S]*?)<\/h2>/i.exec(html)?.[1] ?? "");
   const published = field(html, "Publicado en");
-  if (title !== posting.title || !published || localPublishedAt(published) !== posting.publishedAt) return null;
+  if (title !== posting.title || (published ? localPublishedAt(published) : null) !== posting.publishedAt) return null;
   const start = /<h4\s+class="subtitle">Descripción del Cargo<\/h4>/i.exec(html);
   if (!start) return null;
   const end = html.indexOf("<!-- Formularios -->", start.index);
