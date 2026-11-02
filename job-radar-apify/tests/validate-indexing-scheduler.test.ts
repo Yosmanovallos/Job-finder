@@ -199,3 +199,14 @@ test("change 2 — the delete lane: 25 % newest-first inside a 7-day window (F0 
   const half = simulate(f0, { ...f0Base, scheduler: "S2NB", newShare: 0.5, deleteWindowDays: 7 });
   assert.ok(half.delWithin7dPct > f2.delWithin7dPct && half.newWithin24hPct < f2.newWithin24hPct, "the share is the trade-off between the two lanes");
 });
+
+test("change 3 — pacing spreads each day's sends over the runs at almost no cost (F0 arrivals, real tick runs)", () => {
+  const shipped = { ...f0Base, scheduler: "S2NB" as const, newShare: 0.75, deleteWindowDays: 7 };
+  const burst = simulate(f0, shipped);
+  const paced = simulate(f0, { ...shipped, sendMode: "paced" });
+  assert.equal(burst.maxSendsPerRun, 200, "today: the whole quota in one run");
+  assert.ok(paced.maxSendsPerRun <= 80, `paced: at most ${paced.maxSendsPerRun} per run`);
+  assert.ok(paced.sendsPerDay >= 0.95 * burst.sendsPerDay, `quota kept: ${paced.sendsPerDay} vs ${burst.sendsPerDay}/day`);
+  assert.ok(paced.newWithin24hPct >= burst.newWithin24hPct - 3, `≤24 h: ${paced.newWithin24hPct}% vs ${burst.newWithin24hPct}%`);
+  assert.ok(paced.newSentP50h <= burst.newSentP50h, `notified sooner after readiness: ${paced.newSentP50h} h vs ${burst.newSentP50h} h`);
+});

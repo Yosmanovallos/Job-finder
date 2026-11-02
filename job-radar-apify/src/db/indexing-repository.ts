@@ -167,6 +167,28 @@ export async function getIndexingBudgetRemaining(): Promise<number> {
   return Math.max(0, DAILY_INDEXING_QUOTA - attemptedToday);
 }
 
+/**
+ * The rolling 24 h budget plus what pacing needs (GOOGLE-JOBS F2): hours since
+ * the last attempt inside the window, 24 when there was none. Same predicate as
+ * getIndexingBudgetRemaining(); pacedSendAllowance() turns it into this run's
+ * allowance.
+ */
+export async function getIndexingSendWindowWith(db: Queryable): Promise<{ remaining: number; hoursSinceLastAttempt: number }> {
+  const result = await db.query<{ attempted: string | number; hours_since_last: string | number | null }>(
+    `SELECT COUNT(*) AS attempted, EXTRACT(EPOCH FROM (NOW() - MAX(sent_at))) / 3600 AS hours_since_last
+     FROM indexing_queue
+     WHERE status IN ('sent', 'failed') AND sent_at > NOW() - INTERVAL '24 hours'`
+  );
+  const row = result.rows[0];
+  const attempted = Number(row?.attempted ?? 0);
+  const hours = row?.hours_since_last == null ? 24 : Number(row.hours_since_last);
+  return { remaining: Math.max(0, DAILY_INDEXING_QUOTA - attempted), hoursSinceLastAttempt: hours };
+}
+
+export async function getIndexingSendWindow(): Promise<{ remaining: number; hoursSinceLastAttempt: number }> {
+  return getIndexingSendWindowWith(pool);
+}
+
 export interface PendingIndexingRow {
   id: string;
   url: string;

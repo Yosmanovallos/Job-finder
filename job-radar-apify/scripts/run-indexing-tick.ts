@@ -7,12 +7,15 @@
  *
  * The budget check is stateful (DB-backed, see indexing-repository.ts), so
  * running this more or less often than the cron's actual cadence never
- * over-sends — it just changes how evenly the day's 200 are paced.
+ * over-sends. GOOGLE-JOBS F2: each run spends only its paced share of the
+ * rolling budget (pacedSendAllowance), so the day's 200 go out across the
+ * ~5 daily runs instead of all in the first run of each 24 h window.
  */
 import dotenv from "dotenv";
 import { pool } from "../src/db/client.js";
 import {
-  getIndexingBudgetRemaining,
+  DAILY_INDEXING_QUOTA,
+  getIndexingSendWindow,
   getPendingIndexingLanes,
   markIndexingSent,
   markIndexingFailed,
@@ -20,7 +23,7 @@ import {
   checkIndexingTarget
 } from "../src/db/indexing-repository.js";
 import { publishUrlNotification } from "../src/lib/google-indexing.js";
-import { DEFAULT_SCHEDULER, planIndexingSends } from "../src/lib/indexing-scheduler.js";
+import { DEFAULT_SCHEDULER, pacedSendAllowance, planIndexingSends } from "../src/lib/indexing-scheduler.js";
 
 dotenv.config();
 
@@ -34,11 +37,15 @@ async function main() {
     return;
   }
 
-  const budget = await getIndexingBudgetRemaining();
-  console.log(`📊 [indexing-tick] Budget remaining today: ${budget}`);
+  const sendWindow = await getIndexingSendWindow();
+  const budget = pacedSendAllowance(DAILY_INDEXING_QUOTA, sendWindow.remaining, sendWindow.hoursSinceLastAttempt);
+  console.log(
+    `📊 [indexing-tick] Budget remaining in the rolling 24 h: ${sendWindow.remaining}. ` +
+      `This run (paced, ${sendWindow.hoursSinceLastAttempt.toFixed(1)} h since the last attempt): ${budget}`
+  );
 
   if (budget <= 0) {
-    console.log("   Nothing to do — daily quota already spent.");
+    console.log("   Nothing to do — the rolling quota is spent or this run's paced share is empty.");
     await pool.end();
     return;
   }
