@@ -66,10 +66,16 @@ del censo): Glassdoor 54 CO + 8 VE, Indeed 13 CO + 1 VE vacantes nuevas.
 - **Venezuela**: el directorio excluye `country = 'VE'` y §7.1/§13 exigen una
   vacante en Colombia. Las empresas venezolanas se reportan aparte; sumarlas
   requiere enmendar el ADR 0006.
-- **"333 pendientes"**: la cifra del brief coincide en forma con
+- **"333 pendientes"**: el origen de esa cifra del brief no está verificado
+  en el repositorio. Ojo: el código tiene dos "pendientes" distintos — el
   `pending_review` del libro de revisión manual de Computrabajo
-  (`direct-computrabajo-coverage.ts --all`), que no es la cola automática que
-  lee `pickDue*`. No se mezclan.
+  (`direct-computrabajo-coverage.ts --all`) y la cola automática que lee
+  `pickDue*`. El censo da las cifras reales de la cola (`dueNow`,
+  `inBackoff`); no se mezclan.
+- **Consulta generalizada**: el censo de Computrabajo pasó de
+  `sources @> '["Computrabajo"]'` a `sources ?| $1`; ambos usan el índice
+  GIN por defecto (`jsonb_ops`, `idx_jobs_sources`) y la prueba de
+  integración comprueba que el resultado de Computrabajo no cambia.
 - **Rendimiento esperado bajo**: §7 midió ~3 % de aciertos por nombre. Con
   decenas de empresas, se esperan pocos tableros nuevos. Cada uno, en cambio,
   trae todas sus vacantes, no solo las que Indeed/Glassdoor muestran.
