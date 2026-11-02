@@ -154,6 +154,41 @@ migración ni escritura en producción sin aprobación explícita del usuario.
 - Si mejora la proporción de nuevas notificadas a tiempo: enmienda del ADR
   0004 + cambio de `DEFAULT_SCHEDULER` + pruebas del planificador.
 - Solo toca el tick de Actions, nunca la web.
+- **Registro (2026-11-02, hecho en rama; sin push ni despliegue).**
+  - Rama `codex/google-jobs-f2-scheduling`.
+  - Simulación: `docs/seo-baseline/2026-11-02-indexing-f2-simulation.md`.
+    Reconstruye las llegadas desde los agregados de F0 sin consultar
+    producción y reproduce las 300 ejecuciones reales del tick. Calibrada:
+    FIFO reproduce los 158–167 h de F0.
+  - Enmienda: ADR 0004, «Enmienda F2».
+  - Resultado con 200/día:
+
+    | Indicador | Antes | Después |
+    |---|---|---|
+    | Nuevas aptas notificadas en ≤24 h | 0.4 % | ~46 % |
+    | p50 apta → envío | 6.8 d | 1 h |
+    | Retiros enviados en ≤7 d | ~0 % | ~36 % |
+    | `URL_DELETED` pendientes | ~8,800 | <700 |
+    | Envíos/día | 184 | 180 |
+
+  - Tres cambios, cada uno con su commit y sus pruebas:
+    1. **Orden.** Nuevas newest-first. `age` no ayuda.
+       `getPendingIndexingLanes` trae las filas más nuevas de ese carril.
+    2. **Retiros.** Newest-first, ventana de 7 días
+       (`delete_window_expired`, sin borrar filas, el 410 intacto) y reparto
+       75/25 en vez de 50/50.
+    3. **Reparto en el día.** `pacedSendAllowance` limita cada ejecución a 74
+       envíos como máximo, frente a 200, con el mismo presupuesto rodante.
+  - Validación:
+    - `npx tsc --noEmit` y `npm run test:unit` en verde.
+    - El SQL nuevo se probó en un Postgres embebido (PGlite), fuera del repo.
+    - `test:job-seo`/`test:integration` no se corrieron: no hay Docker en el
+      equipo.
+  - **Pendiente de aprobación del usuario:** push, merge y despliegue.
+    - El primer reconcile tras el despliegue cierra unas 8,400 filas
+      `URL_DELETED` viejas (solo cambio de estado).
+    - Antes de desplegar, ver el conteo con
+      `npx tsx scripts/backfill-indexing-queue.ts --dry-run`.
 
 ### F3. Más vacantes nuevas aptas (sesión)
 

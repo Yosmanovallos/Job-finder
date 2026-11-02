@@ -1,7 +1,8 @@
 # ADR 0004 — Política de notificaciones a la Google Indexing API
 
 **Fecha:** 2026-09-18
-**Estado:** aceptado localmente en `feat/job-seo-v2` · no desplegado · cambia
+**Estado:** aceptado y desplegado; enmienda F2 del 2026-11-02 al final
+(rama `codex/google-jobs-f2-scheduling`, sin desplegar) · cambia
 `docs/JOBPOSTING-GOOGLE-CONTRACT.md` §2 (`validThrough`) y §6
 **Contexto:** análisis de inflow de la cola (2026-09-18, solo lectura en
 producción), `docs/JOB-SEO-ARCHITECTURE-V2.md` F7,
@@ -234,6 +235,81 @@ una fila `sent` **o** `api_window_expired` ya está resuelto:
 4. **La mezcla pico podría repetirse** (fuente nueva, reclasificación).
    Mitigación: la ventana acota la cola con cualquier cuota.
 
+## Enmienda F2 (2026-11-02): orden, retiros y reparto con 200/día
+
+**Contexto.** La cuota no se puede ampliar sin facturación (F1 en pausa). F0
+(`docs/seo-baseline/2026-11-google-jobs-funnel.md`) midió lo siguiente:
+
+- Con S2 FIFO y la cola llena, cada `URL_UPDATED` sale entre 158 y 167 h
+  después de pasar a apta, justo antes de caducar.
+- El 100 % de las enviadas tenía más de 48 h.
+- 8,850 `URL_DELETED` pendientes, con una mediana de 44 días.
+- El tick gasta los 200 de una vez en la primera ejecución de cada ventana.
+
+Simulación: `docs/seo-baseline/2026-11-02-indexing-f2-simulation.md`
+(`--grid=f2`). Usa las llegadas de F0 y las 300 ejecuciones reales del tick.
+
+**Decisiones**, que sustituyen lo indicado más arriba:
+
+1. **Los carriles de nuevas y de retiros se vacían newest-first**
+   (`newestFirst: ["new", "delete"]`). Contenido y reconcile siguen FIFO.
+   `getPendingIndexingLanes` entrega las filas más nuevas de esos carriles.
+   - Nuevas notificadas en ≤24 h: de 0.4 % a ~30 % con el mismo 50/50.
+   - Se envía la misma cantidad, pero en horas y no en una semana.
+2. **Reparto de 75/25** (antes 50/50), con desborde en el orden nuevas →
+   retiros → contenido → reconcile.
+   - Cada carril conserva su parte garantizada.
+   - Nuevas en ≤24 h: ~46 %. Retiros enviados en ≤7 días desde la purga:
+     ~36 % (hoy ~0 %).
+3. **Ventana de retiros de 7 días** (`DELETE_WINDOW_DAYS`).
+   - Un `URL_DELETED` con más de 7 días no se entrega al planificador.
+   - El reconcile lo cierra como `superseded` con
+     `superseded_reason='delete_window_expired'`.
+   - Es terminal y conserva el historial. La fila sigue respaldando el 410,
+     porque `wasJobPurged` lee cualquier estado.
+   - `enqueueIndexingNotificationsWith` no lo resucita.
+4. **Reparto en el día** (`pacedSendAllowance`).
+   - Cada ejecución gasta 1.1 × cuota/24 por cada hora desde el último
+     intento, con el intervalo limitado a 8 h. Nunca supera lo que queda del
+     mismo presupuesto rodante de 24 h.
+   - Como máximo 74 envíos por ejecución, frente a 200.
+   - Envían el 94 % de las ejecuciones, frente al 17 %.
+   - Cuesta un ~2 % de la cuota (180 frente a 184 envíos/día): con la ventana
+     rodante, un cupo liberado espera a la siguiente ejecución con cualquier
+     política.
+
+**Por qué ya no aplican los dos motivos para descartar S4** (Decisión 2):
+
+- **La mezcla pico a 1,000/día.** S4 perdía allí frente a S2 (93 % frente a
+  100 % de nuevas enviadas). A 200/día ninguna política envía todo, y
+  newest-first notifica la misma cantidad, pero cuando aún sirve.
+- **La lección LIFO del 2026-08-10** (`SEO-IMPROVEMENT-PLAN.md` §1.20). Las
+  filas viejas esperaban sin límite porque no había ventana.
+  - Desde la Decisión 3, una `URL_UPDATED` que no se envía en 7 días pasa a
+    `api_window_expired` y la cubre el sitemap.
+  - Con la enmienda, un retiro que no se envía en 7 días pasa a
+    `delete_window_expired` y lo cubre el 410.
+  - Nada espera indefinidamente: lo que newest-first no alcanza se cierra.
+
+**Por qué 75/25 y no 50/50.**
+
+- Una vacante nueva solo tiene el sitemap como respaldo: Google tardó entre 1
+  y 4 días en rastrear la muestra de F0.
+- Un retiro tiene tres respaldos: el 410, la salida del sitemap y
+  `validThrough` = `datePosted` + 30 d, la misma fecha de la purga (ADR 0008).
+  Google conoce el fin de la oferta desde el primer rastreo.
+- Es un juicio sobre el valor relativo, no una medida. La tabla de la
+  simulación da la curva completa: 50/50 → 33 % / 85 %, 60/40 → 38 % / 64 %,
+  75/25 → 46 % / 36 %, 90/10 → 55 % / 11 % (nuevas en ≤24 h / retiros en
+  ≤7 d).
+
+**Escritura en producción.** El primer reconcile tras el despliegue cierra
+el atasco heredado: unos 8,400 `URL_DELETED` con más de 7 días. Va acotado a
+`RECONCILE_CLOSE_LIMIT` por ejecución y solo cambia el estado; no borra
+filas. Antes de desplegar hay que ver el conteo con
+`npx tsx scripts/backfill-indexing-queue.ts --dry-run`, y el despliegue
+necesita aprobación explícita.
+
 ## Reproducir
 
 ```bash
@@ -243,4 +319,7 @@ npx tsx scripts/simulate-indexing-queue.ts simdata.json --grid=final --replay=30
 npx tsx scripts/simulate-indexing-queue.ts simdata.json --grid=minquota
 npx tsx scripts/simulate-indexing-queue.ts simdata.json --grid=window
 npx tsx scripts/simulate-indexing-queue.ts simdata.json --grid=shares
+# Enmienda F2: reconstrucción desde los agregados de F0 + ejecuciones reales del tick
+npx tsx scripts/simulate-indexing-queue.ts --funnel=docs/seo-baseline/2026-11-01-google-jobs-funnel.json \
+  --ticks=docs/seo-baseline/2026-11-02-indexing-tick-gaps.json --grid=f2
 ```
