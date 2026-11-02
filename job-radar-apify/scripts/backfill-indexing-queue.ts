@@ -17,6 +17,10 @@
  *      'api_window_expired' (the page stays ready/indexable/in the sitemap);
  *  0c. pending URL_DELETED for URLs never notified through the API → closed
  *      'delete_not_api_notified' (the 410 tombstone is kept);
+ *  0d. (GOOGLE-JOBS F2) pending URL_DELETED older than the 7-day delete window
+ *      → closed 'delete_window_expired' (the 410 tombstone is kept: any status
+ *      backs it). The first run after deploy closes the F0 backlog of ~8,850;
+ *      run with --dry-run first to see the count.
  *  2. only versions inside the window are (re)queued, and a version whose
  *     window already expired is never resurrected.
  *
@@ -32,7 +36,9 @@ import { refreshGoogleReadiness } from "../src/db/job-readiness-repository.js";
 import {
   API_WINDOW_EXPIRED,
   DELETE_NOT_API_NOTIFIED,
+  DELETE_WINDOW_EXPIRED,
   enqueueIndexingNotifications,
+  expiredDeleteIdsSql,
   INDEXING_PRIORITY,
   withinApiWindowSql
 } from "../src/db/indexing-repository.js";
@@ -71,7 +77,7 @@ async function main() {
     console.log(`🔧 [reconcile] ${superseded.rowCount ?? 0} URL_UPDATED pendientes superseded (destino ya no apto).`);
   }
 
-  // 0b/0c (ADR 0004): close what the Indexing API should no longer spend
+  // 0b/0c/0d (ADR 0004): close what the Indexing API should no longer spend
   // quota on. Terminal, history kept, never deleted; bounded per run.
   const closers: Array<{ label: string; reason: string; sql: string }> = [
     {
@@ -91,6 +97,11 @@ async function main() {
                 WHERE s.notification_type = 'URL_UPDATED' AND s.status = 'sent'
                   AND (s.url = q.url OR (q.job_id IS NOT NULL AND s.job_id = q.job_id)))
             LIMIT ${RECONCILE_CLOSE_LIMIT}`
+    },
+    {
+      label: "URL_DELETED fuera de la ventana de retiros",
+      reason: DELETE_WINDOW_EXPIRED,
+      sql: expiredDeleteIdsSql(RECONCILE_CLOSE_LIMIT)
     }
   ];
   for (const closer of closers) {

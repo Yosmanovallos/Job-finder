@@ -33,18 +33,23 @@ test("a delete backlog cannot starve new ready jobs, day after day", () => {
     queues.new.push(...Array.from({ length: 400 }, (_, i) => ({ id: `n${day}-${i}`, lane: "new" as const, arrival: day * 24 })));
     const plan = planIndexingSends(queues, 200, DEFAULT_SCHEDULER, day * 24);
     assert.equal(plan.length, 200);
-    assert.equal(count(plan, "new"), 100, `day ${day}: new jobs keep their half`);
+    assert.equal(count(plan, "new"), 150, `day ${day}: new jobs keep their 75 %`);
   }
 });
 
 test("a stream of new jobs cannot starve API-notified deletes", () => {
   const queues = lanes({ delete: 1_000 });
-  for (let day = 0; day < 10; day++) {
+  for (let day = 0; day < 20; day++) {
     queues.new.push(...Array.from({ length: 5_000 }, (_, i) => ({ id: `n${day}-${i}`, lane: "new" as const, arrival: day * 24 })));
     const plan = planIndexingSends(queues, 200, DEFAULT_SCHEDULER, day * 24);
-    assert.equal(count(plan, "delete"), 100, `day ${day}: deletes keep their half`);
+    assert.equal(count(plan, "delete"), 50, `day ${day}: deletes keep their 25 %`);
   }
-  assert.equal(queues.delete.length, 0, "the delete backlog drains in 10 days at 100/day");
+  assert.equal(queues.delete.length, 0, "the delete backlog drains in 20 days at 50/day");
+});
+
+test("deletes are newest-first too (GOOGLE-JOBS F2): a fresh purge is sent before an old one", () => {
+  const plan = planIndexingSends(lanes({ new: 500, delete: 500 }), 200, DEFAULT_SCHEDULER, 0);
+  assert.deepEqual(plan.filter((row) => row.lane === "delete").slice(0, 2).map((row) => row.id), ["delete-499", "delete-498"]);
 });
 
 test("unused share spills over: new → delete → content → reconcile", () => {
@@ -180,4 +185,17 @@ test("change 1 — newest-first notifies new jobs within 24 h instead of a week 
   assert.ok(newest.newSentP50h <= 12, `sent within hours of readiness: ${newest.newSentP50h} h`);
   assert.ok(newest.newSentPct >= fifo.newSentPct - 5, "about as many new jobs notified overall");
   assert.equal(newest.sends.delete, fifo.sends.delete, "the delete lane keeps its share");
+});
+
+test("change 2 — the delete lane: 25 % newest-first inside a 7-day window (F0 arrivals, 200/day)", () => {
+  const today = simulate(f0, f0Base);
+  const f2 = simulate(f0, { ...f0Base, scheduler: "S2NB", newShare: 0.75, deleteWindowDays: 7 });
+  assert.ok(today.delWithin7dPct < 1, `today almost no delete goes out within 7 days of the purge: ${today.delWithin7dPct}%`);
+  assert.ok(today.deleteLaneEnd > 8_000, "today the delete backlog never drains");
+  assert.ok(f2.delWithin7dPct >= 30, `deletes sent within 7 days: ${f2.delWithin7dPct}%`);
+  assert.ok(f2.delP50h === Infinity || f2.delP50h <= 7 * 24, "a delete is sent within its window or closed");
+  assert.ok(f2.deleteLaneEnd < 1_000, `the delete lane is bounded by its window: ${f2.deleteLaneEnd}`);
+  assert.ok(f2.newWithin24hPct >= 40, `new-ready notified within 24 h: ${f2.newWithin24hPct}%`);
+  const half = simulate(f0, { ...f0Base, scheduler: "S2NB", newShare: 0.5, deleteWindowDays: 7 });
+  assert.ok(half.delWithin7dPct > f2.delWithin7dPct && half.newWithin24hPct < f2.newWithin24hPct, "the share is the trade-off between the two lanes");
 });

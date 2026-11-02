@@ -57,10 +57,11 @@ async function main() {
   const CONSECUTIVE_FAILURE_LIMIT = 5;
   let stop = false;
 
-  // ADR 0004: the day's budget is shared by lane (new-ready 50% / API-notified
-  // deletes 50%, unused share spills new → delete → content → reconcile), so
-  // neither new jobs nor deletes can starve the other. Rows the pre-send check
-  // closes free their slot, so the remaining budget is planned again.
+  // ADR 0004 (+ F2 amendment): the budget is shared by lane (new-ready 75% /
+  // API-notified deletes 25%, both newest-first; unused share spills new →
+  // delete → content → reconcile), so neither new jobs nor deletes can starve
+  // the other. Rows the pre-send check closes free their slot, so the
+  // remaining budget is planned again.
   while (!stop && sent + failed < budget && scanned < MAX_SCANNED_PER_RUN) {
     const lanes = await getPendingIndexingLanes(Math.min(500, MAX_SCANNED_PER_RUN - scanned));
     const batch = planIndexingSends(lanes, budget - sent - failed, DEFAULT_SCHEDULER, Date.now() / 3_600_000);
