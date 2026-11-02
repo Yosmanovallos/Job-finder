@@ -1,9 +1,15 @@
 # Altipal: vacantes del portal CreeSer
 
-Revisión: 2026-10-27. La [página «Trabaja con nosotros» de Altipal](https://altipal.co/trabaja-con-nosotros/) enlaza el [listado público CreeSer](https://creeser.hr-suite.app/vacantes.php). La fuente corresponde al portal de empleabilidad elegido por la empresa; las vacantes no se obtienen de Computrabajo.
+Revisión: 2026-10-27; reparación de ciudades: 2026-11-02. La [página «Trabaja con nosotros» de Altipal](https://altipal.co/trabaja-con-nosotros/) enlaza el [listado público CreeSer](https://creeser.hr-suite.app/vacantes.php). La fuente corresponde al portal de empleabilidad elegido por la empresa; las vacantes no se obtienen de Computrabajo.
 
 El listado respondió HTTP 200 con el identificador `BuscoTrabajoBot/1.0`. Se observaron 51 tarjetas, 51 enlaces de aplicación e identificadores únicos, sin paginación. `robots.txt` permite listado y detalle. El canario local, de solo lectura, obtuvo 3/3 fichas con descripción y fecha declarada. No se inició sesión ni se envió una postulación.
 
 El conector exige el marcador y la estructura del listado, un enlace único por tarjeta, ciudad colombiana conocida, fechas válidas y ausencia de paginación. Interpreta «Publicado en» como hora local de Colombia (`UTC−05:00`) y «Fecha Fin de Postulación» hasta el final de ese día local. Si una ficha nueva no está disponible, su detalle no coincide o el sitio cambia de forma, falla el listado sin guardar ni cerrar ofertas. El presupuesto es 25 fichas nuevas por tick; las restantes se difieren a la próxima lectura.
+
+## Reparación del 2026-11-02
+
+Desde el 2026-10-28, cada tick falló con «vacante Altipal con forma, fecha o ciudad inesperada». Con aprobación del usuario se hizo una lectura local de solo lectura (`robots.txt` y el listado, sin fichas de detalle). El listado tenía 37 tarjetas con la estructura y las fechas esperadas. La causa fueron dos ciudades nuevas, TUMACO y ACACÍAS, que faltaban en la lista fija; bastaba una para descartar el tablero completo. La forma nueva solo agrega «Fecha de Apertura», una imagen y bloques anidados, y no rompe el parser.
+
+Desde esta reparación, el conector reconoce una ciudad si está en la lista propia o en la tabla cerrada de municipios con departamento único (`src/lib/co-departments.ts`, DANE). Una ciudad desconocida pero con forma de nombre de lugar (solo letras y `. , ' -`, máximo 60 caracteres) se conserva como texto de ubicación, con `structuredCity: null`; la puerta de aptitud decide si se publica. Si una tarjeta no trae ciudad o fecha, el campo queda en `null`. Sigue fallando todo el listado si una ciudad trae dígitos, separadores o texto largo, si una fecha presente no es válida, si falta título o enlace, si hay ids repetidos o paginación, o si ninguna tarjeta trae la etiqueta «Ciudad», «Publicado en» o «Fecha Fin de Postulación» (eso indica un cambio de forma). Las fichas de detalle no se volvieron a leer en vivo en esta reparación.
 
 El [canario en GitHub Actions](https://github.com/Yosmanovallos/Job-finder/actions/runs/40523428776) leyó 51 tarjetas y 3/3 detalles desde el mismo entorno del tick de producción, sin escrituras. Tras esa comprobación, el seed queda `enabled: true`. Una vacante oficial no equivale automáticamente a cada anuncio de Computrabajo; la proyección reemplaza copias solo cuando las reglas de coincidencia lo respaldan.

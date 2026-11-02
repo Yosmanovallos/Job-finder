@@ -9,7 +9,8 @@ import type { HttpGet } from "../src/direct/types.js";
 const origin = "https://creeser.hr-suite.app";
 const ref = { atsType: "altipal" as const, atsRef: "creeser" };
 const listingHtml = await readFile(new URL("./fixtures/direct/altipal/listing.html", import.meta.url), "utf8");
-const detailHtml = await readFile(new URL("./fixtures/direct/altipal/detail.html", import.meta.url), "utf8");
+const newListingHtml = await readFile(new URL("./fixtures/direct/altipal/listing-2026-11.html", import.meta.url), "utf8");
+const detailHtml =await readFile(new URL("./fixtures/direct/altipal/detail.html", import.meta.url), "utf8");
 
 function http(robots = "User-agent: *\nDisallow: /admin/\n", detailStatus = 200): HttpGet {
   return async (url) => url === `${origin}/robots.txt`
@@ -57,6 +58,49 @@ test("Altipal: malformed pages, duplicate ids, unexpected dates and pagination f
   assert.equal(parseAltipalPage(listingHtml.replace("2026-11-20", "2026-02-30")).kind, "error");
   assert.equal(parseAltipalPage(listingHtml.replace("</body>", '<a href="?page=2">2</a></body>')).kind, "error");
   assert.equal(parseAltipalPage(listingHtml.replace("v=5097", "v=5097&next=1")).kind, "error");
+});
+
+test("Altipal: 2026-11 layout with cities outside the original list", () => {
+  // Sanitized from the live listing (CRLF, image, "Fecha de Apertura", nested
+  // apply block); titles and ids are synthetic.
+  const listing = parseAltipalPage(newListingHtml);
+  assert.equal(listing.kind, "complete");
+  if (listing.kind !== "complete") return;
+  assert.deepEqual(listing.postings.map((posting) => posting.externalId), ["9103", "9102", "9101"]);
+  assert.deepEqual(listing.postings.map((posting) => posting.structuredCity), ["BOGOTÁ D.C.", "ACACÍAS", null]);
+  assert.deepEqual(listing.postings[2].locationTexts, ["PUERTO GAITÁN"]);
+  assert.equal(listing.postings[0].publishedAt, "2026-10-30T17:56:36.000Z");
+  assert.equal(listing.postings[0].validThrough, "2026-12-01T04:59:59.999Z");
+  assert.equal(listing.postings[1].department, "Ventas");
+  const selected = selectColombianPostings(listing.postings, new Date("2026-11-02T12:00:00Z"));
+  assert.equal(selected.stats.notColombia, 0);
+  assert.equal(selected.postings.length, 3);
+  assert.equal(parseAltipalPage(newListingHtml.replace("ACACÍAS", "TUMACO")).kind, "complete");
+});
+
+test("Altipal: missing fields become null, unexpected values still fail the board", () => {
+  const noCity = parseAltipalPage(newListingHtml.replace("Ciudad: <b>ACACÍAS</b><br>", ""));
+  assert.equal(noCity.kind, "complete");
+  if (noCity.kind === "complete") {
+    assert.equal(noCity.postings[1].structuredCity, null);
+    assert.deepEqual(noCity.postings[1].locationTexts, []);
+  }
+  const noDates = parseAltipalPage(newListingHtml
+    .replace("Publicado en: <b>2026-10-29 08:05:00</b><br>", "")
+    .replace("Fecha Fin de Postulación: <b>2026-11-15</b><br>", ""));
+  assert.equal(noDates.kind, "complete");
+  if (noDates.kind === "complete") {
+    assert.equal(noDates.postings[1].publishedAt, null);
+    assert.equal(noDates.postings[1].validThrough, null);
+  }
+  for (const city of ["ACACÍAS 2", "ACACÍAS<br>VILLAVICENCIO", "BOGOTÁ; MEDELLÍN", "A".repeat(61)]) {
+    assert.equal(parseAltipalPage(newListingHtml.replace("ACACÍAS", city)).kind, "error", city);
+  }
+  assert.equal(parseAltipalPage(newListingHtml.replace(/Ciudad:/g, "Ubicación:")).kind, "error");
+  assert.equal(parseAltipalPage(newListingHtml.replace(/Publicado en:/g, "Creada:")).kind, "error");
+  assert.equal(parseAltipalPage(newListingHtml.replace(/Fecha Fin de Postulación:/g, "Cierre:")).kind, "error");
+  assert.equal(parseAltipalPage(newListingHtml.replace("2026-10-29 08:05:00", "29/10/2026")).kind, "error");
+  assert.equal(parseAltipalPage(newListingHtml.replace("v=9102", "v=9103")).kind, "error");
 });
 
 test("Altipal: robots denial and unavailable new detail do not produce listings", async () => {
