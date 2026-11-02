@@ -46,20 +46,44 @@ No se agrega scraping ni evasión anti-bot (AGENTS.md regla 8).
 
 ## 4. Cifras
 
-Pendiente: el censo corre contra producción y requiere aprobación del dueño
-(`Direct Employers Tick`, `mode=browser-boards-coverage`, solo lectura).
-Datos que entrega:
+Censo de producción, solo lectura, aprobado por el dueño: `Direct Employers
+Tick`, `mode=browser-boards-coverage`, run
+[41449161057](https://github.com/Yosmanovallos/Job-finder/actions/runs/41449161057)
+(2026-11-02, rama `codex/bolsas-a-empleadores-directos`). Cuenta todas las
+filas vigentes de Indeed + Glassdoor, no solo las nuevas de la última
+corrida (esas fueron Glassdoor 54 CO + 8 VE, Indeed 13 CO + 1 VE).
 
-- empresas distintas de Indeed + Glassdoor en Colombia, Venezuela y sin país;
-- cuántas ya tienen tablero oficial habilitado ("ya en el seed") y cuántas
-  tienen vacantes oficiales vigentes;
-- agencias; empresas objetivo; cuántas ya están también en Computrabajo (la
-  programación actual ya las alcanza);
-- distribución de `employer_discovery.decision`, listas para sondeo frente a
-  en backoff, y **candidatas nuevas reales** = listas y fuera de Computrabajo.
+| Medida | Valor |
+|---|---|
+| Empresas distintas con vacantes vigentes | Colombia **1.005** · Venezuela 95 · sin país 0 |
+| Vacantes de Indeed + Glassdoor en Colombia | 2.251 |
+| Agencias conocidas | 5 |
+| Ya con tablero oficial habilitado ("ya en el seed") | **20** (18 con ≥ 1 vacante oficial vigente) |
+| Objetivo (sin tablero, no agencia) | **980** |
+| …también en Computrabajo (la programación ya las alcanza) | 32 |
+| Decisión en la cola | pending 560 · not_found 416 · known 2 · unsupported_ats 1 · needs_review 1 |
+| Abiertas y listas para sondeo | **562** |
+| Abiertas en backoff | 415 |
+| **Candidatas nuevas frente a la programación actual** (listas y fuera de Computrabajo) | **562** |
 
-Línea de referencia de la última corrida del navegador (dato del brief, no
-del censo): Glassdoor 54 CO + 8 VE, Indeed 13 CO + 1 VE vacantes nuevas.
+Lectura:
+
+- Las empresas con más vacantes ya se sondearon por nombre y salieron
+  `not_found` (Bayport 290, Prosegur 33, Cargill 23, Seguros Bolívar 20,
+  Essity 16, Coca-Cola FEMSA 10, Marriott 6…). Hoy están en backoff. El
+  foco no les cambia nada: para ellas, la vía útil es la del sitio propio o el
+  inventario ATS (D5, §13), no el nombre.
+- Las 562 candidatas nuevas son la cola larga: cada una tiene ≤ 8 vacantes en
+  esas bolsas (la mayoría 1-2). Ninguna se había sondeado porque el foco
+  programado es Computrabajo y solo 32 de las 980 se solapan con él.
+- Con el ~3 % de aciertos de §7, se esperan del orden de 15 tableros nuevos
+  en total, insert-only y con tope de 10 por corrida.
+- "known 2" sin tablero habilitado: empresas cuyo tablero existe pero está
+  apagado (p. ej. un rechazo previo). No se reactivan.
+
+Recomendación: no cambiar la programación. Basta con unas pocas corridas
+manuales `focus=browser-boards` (ensayo en seco primero) para vaciar las 562;
+después el backoff las espacia solo.
 
 ## 5. Cautelas
 
