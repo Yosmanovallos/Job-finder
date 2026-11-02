@@ -42,6 +42,7 @@ const Pricing = lazy(() => import("./sections/Pricing.js"));
 const Legal = lazy(() => import("./sections/Legal.js"));
 const Account = lazy(() => import("./sections/Account.js"));
 const PublicInfoPage = lazy(() => import("./sections/PublicInfoPage.js"));
+const Opiniones = lazy(() => import("./sections/Opiniones.js"));
 
 function Landing() {
   // "/" (Colombia, default) vs "/ve" (Venezuela) — same pattern as
@@ -175,6 +176,15 @@ function AppRoutes() {
           <>
             <PageMeta {...ROUTE_META["/preguntas"]!} />
             <Faq />
+          </>
+        }
+      />
+      <Route
+        path="/opiniones"
+        element={
+          <>
+            <PageMeta {...ROUTE_META["/opiniones"]!} />
+            <Opiniones />
           </>
         }
       />
