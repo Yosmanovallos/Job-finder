@@ -1,10 +1,21 @@
 # Indexing API — material para solicitar más cuota
 
-**Estado:** preparado 2026-09-18 · cifras actualizadas con producción el
-2026-11-01 (F0 de `GOOGLE-JOBS-INDEXING-PLAN-2026-11.md`) · **NO enviado**
-(confirmado por el usuario el 2026-11-01). Lo envía el dueño del proyecto de
-Google Cloud: es la fase F1 del plan. La v2 lleva en producción más de 7 días,
-así que la condición de "Cuándo enviarlo" ya se cumple.
+**Estado (2026-11-01): EN PAUSA, no es un paso listo para enviar.**
+
+- Preparado el 2026-09-18; cifras actualizadas con producción el 2026-11-01
+  (F0 de `GOOGLE-JOBS-INDEXING-PLAN-2026-11.md`). Nunca se ha enviado.
+- Comprobado en la consola el 2026-11-01. En el proyecto `job-finder-503421`,
+  «Publish requests per day» está en 200, con uso al 100 %, y aparece como
+  ajustable. Pero el panel «Editar cuota» solo admite valores entre 0 y 200:
+  desde ahí no se puede pedir más.
+- Probablemente hace falta asociar una cuenta de facturación. Esto no está
+  confirmado.
+- El usuario no puede asumir costos, así que F1 queda en pausa. Las palancas
+  principales con 200/día son F2 (orden de envío) y F3 (más aptas nuevas).
+- Este documento se conserva como material listo por si cambia esa
+  condición.
+
+
 Base: `docs/adr/0004-indexing-api-notification-policy.md`.
 
 No incluye claves, tokens ni credenciales. Nunca pegar la clave privada de la
@@ -74,9 +85,9 @@ Fuente de las cifras: `docs/seo-baseline/2026-11-google-jobs-funnel.md`
 
 ## 4. Cuándo enviarlo
 
-Ya: la v2 lleva más de 7 días enviando `URL_UPDATED` solo para vacantes
-aptas, y las cifras de la sección 2 son de producción (2026-11-01). Si se
-envía después del 2026-11-15, volver a medir en solo lectura con
+Hoy no se puede (ver «Estado»): la consola no permite pasar de 200 sin otra
+condición, probablemente facturación, y el usuario no asume costos. Si eso
+cambia, antes de enviarlo hay que volver a medir en solo lectura con
 `docs/seo-baseline/google-jobs-funnel-queries.mjs`:
 
 - nuevos aptos/día;

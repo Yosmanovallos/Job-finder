@@ -139,6 +139,12 @@ migración ni escritura en producción sin aprobación explícita del usuario.
   Nunca se pega la clave privada; nunca se reparte entre proyectos.
 - Salida: cuota vigente registrada. No requiere código: el tick lee el
   presupuesto restante.
+- **Estado (2026-11-01): EN PAUSA.**
+  - En la consola del proyecto, la cuota «Publish requests per day» aparece
+    como ajustable, pero el panel solo admite valores entre 0 y 200.
+  - Probablemente exige una cuenta de facturación, y el usuario no puede
+    asumir costos.
+  - Las palancas principales pasan a ser F2 y F3, con 200/día.
 
 ### F2. Orden de envío (sesión, solo si F0 lo justifica)
 

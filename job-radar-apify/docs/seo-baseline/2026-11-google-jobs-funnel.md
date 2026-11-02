@@ -220,6 +220,11 @@ notificaran todas las nuevas, la demanda estable sería de ~310 nuevas + ~310
 retiros = **~620/día**, frente a los 200/día actuales. El usuario
 confirmó que la solicitud nunca se envió.
 
+**F1 está en pausa (2026-11-01).** En la consola, el panel de la cuota solo
+admite valores entre 0 y 200; probablemente hace falta facturación, y el
+usuario no puede asumir costos. Con 200/día, **F2 y F3 son las palancas
+principales**. Las cifras quedan en la solicitud por si eso cambia.
+
 **F2, orden de envío: los datos lo justifican.**
 
 - Con FIFO y la cola llena, cada `URL_UPDATED` sale entre 158 y 167 h después
