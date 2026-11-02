@@ -5,6 +5,7 @@ import {
   coverageBuckets,
   getCandidate,
   loadComputrabajoCoverage,
+  loadSourceCoverage,
   loadDirectoryCandidates,
   pickDueCandidates,
   pickDueComputrabajoCandidates,
@@ -86,7 +87,26 @@ async function run(): Promise<void> {
        (md5(random()::text), 'Cargo VE', 'Solo Venezuela', 'Caracas', 'https://example.com/ve', 'Computrabajo', '[]', 'VE', NOW()),
        (md5(random()::text), 'Cargo anónimo', 'Confidencial', 'Bogotá', 'https://example.com/anonymous', 'Computrabajo', '[]', 'CO', NOW())`
   );
+  await pool.query(
+    `INSERT INTO jobs (url_hash, title, company, location, url, source, sources, country, published_at)
+     VALUES
+       (md5(random()::text), 'Cargo Indeed', 'Radar Indeed', 'Bogotá', 'https://example.com/in', 'Indeed', '[]', 'CO', NOW()),
+       (md5(random()::text), 'Cargo GD dedupe', 'Otra Prueba', 'Bogotá', 'https://example.com/gd', 'LinkedIn', '["Glassdoor"]', 'CO', NOW()),
+       (md5(random()::text), 'Cargo GD VE', 'Radar VE', 'Caracas', 'https://example.com/gdve', 'Glassdoor', '[]', 'VE', NOW()),
+       (md5(random()::text), 'Cargo remoto', 'Radar Remoto', 'Remoto', 'https://example.com/rem', 'Indeed', '[]', NULL, NOW())`
+  );
   const jobsBefore = await jobsFingerprint();
+  const browserCo = await loadSourceCoverage(["Indeed", "Glassdoor"]);
+  const browserVe = await loadSourceCoverage(["Indeed", "Glassdoor"], "VE");
+  const browserNone = await loadSourceCoverage(["Indeed", "Glassdoor"], "none");
+  check(
+    browserCo.map((row) => row.companyKey).sort().join(",") === "otraprueba,radarindeed" &&
+      browserCo.every((row) => row.probeDue === null) &&
+      browserVe.map((row) => row.companyKey).join(",") === "radarve" &&
+      browserNone.map((row) => row.companyKey).join(",") === "radarremoto",
+    "El censo por fuente (Indeed + Glassdoor) cuenta fuente primaria y deduplicada y separa CO, VE y sin país.",
+    `Censo por fuente: ${JSON.stringify({ browserCo, browserVe, browserNone })}`
+  );
   const computrabajo = await loadComputrabajoCoverage();
   check(
     computrabajo.length === 2 &&

@@ -58,12 +58,31 @@ export interface ComputrabajoCoverageRow extends DirectoryCandidateRow {
   liveOfficialJobs: number;
 }
 
+/** Same census for any job board, plus whether the discovery queue would pick the company now. */
+export interface SourceCoverageRow extends ComputrabajoCoverageRow {
+  /** Open decision whose retry time came; null without a discovery row. */
+  probeDue: boolean | null;
+}
+
+/** Country slice of a source census: Colombia, Venezuela or rows without country. */
+export type CoverageCountry = "CO" | "VE" | "none";
+
 /**
  * Colombia-only Computrabajo companies, including jobs whose primary source
  * changed during deduplication. Read-only: this is the target census for
  * finding those companies' own employment portals, not a job import.
  */
 export async function loadComputrabajoCoverage(): Promise<ComputrabajoCoverageRow[]> {
+  return loadSourceCoverage(["Computrabajo"]);
+}
+
+/**
+ * Companies with live rows from the given job boards (primary source or
+ * kept after deduplication) in one country slice, with their board and
+ * discovery state. Read-only, one snapshot; nothing is imported or probed.
+ */
+export async function loadSourceCoverage(sources: string[], country: CoverageCountry = "CO"): Promise<SourceCoverageRow[]> {
+  if (sources.length === 0) return [];
   const client = await pool.connect();
   try {
     await client.query("BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY");
@@ -73,8 +92,8 @@ export async function loadComputrabajoCoverage(): Promise<ComputrabajoCoverageRo
          SELECT ${storedCompanyKeySql()} AS company_key, company
          FROM jobs
          WHERE is_active = TRUE AND direct_job_id IS NULL AND ${liveJobSql()}
-           AND country = 'CO'
-           AND (source = 'Computrabajo' OR sources @> '["Computrabajo"]'::jsonb)
+           AND (CASE WHEN $2::text = 'none' THEN country IS NULL ELSE country = $2::text END)
+           AND (source = ANY($1::text[]) OR sources ?| $1::text[])
        ), spellings AS (
          SELECT company_key, company, COUNT(*)::int AS n
          FROM keyed
@@ -82,7 +101,8 @@ export async function loadComputrabajoCoverage(): Promise<ComputrabajoCoverageRo
          GROUP BY company_key, company
        )
        SELECT company_key, (array_agg(company ORDER BY n DESC, length(company), company))[1] AS company, SUM(n)::int AS n
-       FROM spellings GROUP BY company_key ORDER BY n DESC, company_key`
+       FROM spellings GROUP BY company_key ORDER BY n DESC, company_key`,
+      [sources, country]
     );
     const boards = await client.query<{ company_key: string; n: number }>(
       `SELECT a.company_key, COUNT(*)::int AS n
@@ -97,8 +117,10 @@ export async function loadComputrabajoCoverage(): Promise<ComputrabajoCoverageRo
        WHERE ${liveDirectJobSql("dj")}
        GROUP BY a.company_key`
     );
-    const discovery = await client.query<{ company_key: string; decision: string; website_domain: string | null }>(
-      `SELECT company_key, decision, website_domain FROM employer_discovery`
+    const discovery = await client.query<{ company_key: string; decision: string; website_domain: string | null; due: boolean }>(
+      `SELECT company_key, decision, website_domain,
+              (decision IN ('pending', 'not_found', 'unsupported_ats', 'magneto') AND (next_probe_at IS NULL OR next_probe_at <= NOW())) AS due
+       FROM employer_discovery`
     );
     await client.query("COMMIT");
     const boardCounts = new Map(boards.rows.map((row) => [row.company_key, row.n]));
@@ -111,7 +133,8 @@ export async function loadComputrabajoCoverage(): Promise<ComputrabajoCoverageRo
       decision: decisions.get(row.company_key)?.decision ?? null,
       websiteDomain: decisions.get(row.company_key)?.website_domain ?? null,
       enabledBoards: boardCounts.get(row.company_key) ?? 0,
-      liveOfficialJobs: officialCounts.get(row.company_key) ?? 0
+      liveOfficialJobs: officialCounts.get(row.company_key) ?? 0,
+      probeDue: decisions.get(row.company_key)?.due ?? null
     }));
   } catch (error) {
     await client.query("ROLLBACK").catch(() => undefined);
@@ -218,9 +241,10 @@ export async function pickDueCandidates(limit: number, minCount: number): Promis
   }));
 }
 
-/** Due candidates ordered by current Computrabajo Colombia vacancies. The
- * caller supplies a fresh read-only census; no source-specific state is saved. */
-export async function pickDueComputrabajoCandidates(
+/** Due candidates ordered by the focus census's vacancies (Computrabajo or any
+ * other job board). The caller supplies a fresh read-only census; no
+ * source-specific state is saved. */
+export async function pickDueFocusedCandidates(
   focus: DirectoryCandidateRow[],
   limit: number,
   minCount: number
@@ -228,14 +252,14 @@ export async function pickDueComputrabajoCandidates(
   if (focus.length === 0) return [];
   const result = await pool.query(
     `WITH focused AS (
-       SELECT * FROM unnest($1::text[], $2::int[]) AS f(company_key, computrabajo_count)
+       SELECT * FROM unnest($1::text[], $2::int[]) AS f(company_key, focus_count)
      )
      SELECT d.company_key, d.company_name, d.directory_count, d.website_domain, d.attempts
      FROM employer_discovery d JOIN focused f ON f.company_key = d.company_key
      WHERE d.decision IN ('pending', 'not_found', 'unsupported_ats', 'magneto')
        AND (d.next_probe_at IS NULL OR d.next_probe_at <= NOW())
        AND d.directory_count >= $4
-     ORDER BY f.computrabajo_count DESC, d.company_key
+     ORDER BY f.focus_count DESC, d.company_key
      LIMIT $3`,
     [focus.map((row) => row.companyKey), focus.map((row) => row.directoryCount), limit, minCount]
   );
@@ -247,6 +271,9 @@ export async function pickDueComputrabajoCandidates(
     attempts: row.attempts
   }));
 }
+
+/** Name kept for the Computrabajo focus callers. */
+export const pickDueComputrabajoCandidates = pickDueFocusedCandidates;
 
 /** The evidence column: board checks plus what the site probe read (URLs only, never HTML). */
 export interface EvidenceDocument {

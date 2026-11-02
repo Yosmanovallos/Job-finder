@@ -10,6 +10,9 @@
  *       Probes and prints decisions. Writes nothing (reads the directory
  *       from the database only when no file is given).
  *   npx tsx scripts/discover-direct-employers.ts [--limit N] [--min-count N] [--max-enables N]
+ *       [--focus-computrabajo | --focus-sources Indeed,Glassdoor]
+ *       The focus only reorders the same queue: companies seen on those job
+ *       boards (Colombia) go first, with the same budgets and rules.
  *       Local database only unless --allow-remote-db (src/direct/db-guard.ts).
  *
  * Budgets (AGENTS.md rule 12): --limit candidates per run (default 100,
@@ -26,6 +29,7 @@ import { curatedDomains, parseAgencyKeys, parseDirectorySnapshot, toCandidates, 
 import { boundedSiteGet } from "../src/direct/discovery/html-http.js";
 import { probeCandidate, verifiedBoards, type DiscoveryCandidate, type ProbeOutcome } from "../src/direct/discovery/probe.js";
 import { probeSite } from "../src/direct/discovery/site-probe.js";
+import { focusFromArgs } from "../src/direct/discovery/source-focus.js";
 
 dotenv.config();
 
@@ -62,8 +66,7 @@ async function main() {
   const maxEnables = intArg("--max-enables", 20, 200);
   const deadlineAt = Date.now() + intArg("--deadline-min", 15, 60) * 60_000;
   const candidatesFile = argValue("--candidates-file");
-  const focusComputrabajo = process.argv.includes("--focus-computrabajo");
-  if (focusComputrabajo && candidatesFile) throw new Error("--focus-computrabajo requiere el directorio vivo, no --candidates-file");
+  const focusSources = focusFromArgs(process.argv);
 
   const agencyKeys = parseAgencyKeys(JSON.parse(await readFile(new URL("../data/direct-discovery-agencies.json", import.meta.url), "utf8")));
   const domains = curatedDomains();
@@ -83,8 +86,8 @@ async function main() {
   try {
     const entries = fileEntries ?? (await repo!.loadDirectoryCandidates(DIRECTORY_LIMIT));
     const all = toCandidates(entries, agencyKeys, domains);
-    const computrabajoRows = focusComputrabajo ? await repo!.loadComputrabajoCoverage() : [];
-    const computrabajoCounts = new Map(computrabajoRows.map((row) => [row.companyKey, row.directoryCount]));
+    const focusRows = focusSources ? await repo!.loadSourceCoverage(focusSources) : [];
+    const focusCounts = new Map(focusRows.map((row) => [row.companyKey, row.directoryCount]));
     console.log(
       `[discover] Directorio: ${all.length} empresas (${all.filter((candidate) => candidate.websiteDomain).length} con dominio curado, ` +
         `${all.filter((candidate) => candidate.isAgency).length} agencias).`
@@ -93,9 +96,9 @@ async function main() {
     let queue: (DiscoveryCandidate & { attempts: number })[];
     if (dryRun) {
       queue = all
-        .filter((candidate) => candidate.directoryCount >= minCount && (!focusComputrabajo || computrabajoCounts.has(candidate.companyKey)))
-        .sort((a, b) => focusComputrabajo
-          ? (computrabajoCounts.get(b.companyKey)! - computrabajoCounts.get(a.companyKey)!) || a.companyKey.localeCompare(b.companyKey)
+        .filter((candidate) => candidate.directoryCount >= minCount && (!focusSources || focusCounts.has(candidate.companyKey)))
+        .sort((a, b) => focusSources
+          ? (focusCounts.get(b.companyKey)! - focusCounts.get(a.companyKey)!) || a.companyKey.localeCompare(b.companyKey)
           : b.directoryCount - a.directoryCount)
         .slice(0, limit)
         .map((candidate) => ({ ...candidate, attempts: 0 }));
@@ -108,12 +111,12 @@ async function main() {
       } else {
         console.log("[discover] No se retiran candidatos: snapshot vacío, parcial o al límite.");
       }
-      const due = focusComputrabajo
-        ? await repo!.pickDueComputrabajoCandidates(computrabajoRows, limit, minCount)
+      const due = focusSources
+        ? await repo!.pickDueFocusedCandidates(focusRows, limit, minCount)
         : await repo!.pickDueCandidates(limit, minCount);
       queue = due.map((row) => ({ ...row, isAgency: agencyKeys.has(row.companyKey) }));
     }
-    console.log(`[discover] A revisar en esta corrida: ${queue.length} (mínimo ${minCount} vacantes en bolsas; foco: ${focusComputrabajo ? "Computrabajo Colombia" : "todas las fuentes"}).${dryRun ? " --dry-run: no se escribe nada." : ""}\n`);
+    console.log(`[discover] A revisar en esta corrida: ${queue.length} (mínimo ${minCount} vacantes en bolsas; foco: ${focusSources ? `${focusSources.join(" + ")} Colombia (${focusRows.length} empresas)` : "todas las fuentes"}).${dryRun ? " --dry-run: no se escribe nada." : ""}\n`);
 
     const tally: Record<string, number> = {};
     let enabled = 0;

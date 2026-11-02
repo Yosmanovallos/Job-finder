@@ -16,12 +16,13 @@ on:
           - dry-run
           - execute
       focus:
-        description: "computrabajo (Colombia) | all (todas las bolsas)"
+        description: "computrabajo (Colombia) | browser-boards (Indeed + Glassdoor, Colombia) | all (todas las bolsas)"
         required: true
         default: computrabajo
         type: choice
         options:
           - computrabajo
+          - browser-boards
           - all
 
 permissions:
@@ -71,6 +72,10 @@ jobs:
         run: |
           if [ "$FOCUS" = computrabajo ]; then
             focus_arg="--focus-computrabajo"
+          elif [ "$FOCUS" = browser-boards ]; then
+            # Same queue and budgets; Indeed/Glassdoor companies go first.
+            # The schedule keeps the Computrabajo focus (user decision).
+            focus_arg="--focus-sources Indeed,Glassdoor"
           elif [ "$FOCUS" = all ]; then
             focus_arg=""
           else
