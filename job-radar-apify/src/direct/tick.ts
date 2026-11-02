@@ -27,12 +27,14 @@ export const DETAIL_BUDGET = 25;
 const MAX_CLOSURE_CONFIRMATIONS = 25;
 
 /**
- * Minimum hours between two reads of the same board. The workflow runs every
- * hour and each run reads the oldest due boards until its deadline, so a
- * board is re-read every 5-6 h as long as one day of runs can read every
- * board 4 times (the report prints the oldest last_ok_at to prove it).
+ * Minimum hours between two reads of the same board. The cron asks for every
+ * hour, but GitHub fires only ~5 scheduled runs a day, 3.5-8 h apart (ADR
+ * 0006 §14). Each run reads the oldest due boards until its deadline; at 5 h
+ * the runs landing ~4 h after the previous one read 0 boards, so 3 h lets
+ * every run that fires read the whole due set (the report prints the oldest
+ * last_ok_at to prove it).
  */
-export const MIN_INTERVAL_HOURS = 5;
+export const MIN_INTERVAL_HOURS = 3;
 
 export interface SourceReport {
   employer: string;

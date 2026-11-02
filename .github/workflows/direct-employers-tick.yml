@@ -6,10 +6,11 @@ name: Direct Employers Tick
 # until phase D4. The web server never imports this code.
 on:
   schedule:
-    # Every hour, off the hour to avoid the other ticks. Each run reads the
-    # oldest due boards until its deadline (--deadline-min); a board is re-read
-    # once 5 h passed (MIN_INTERVAL_HOURS in src/direct/tick.ts), so each one is
-    # read every 5-6 h however many boards there are, up to what 24 runs fit.
+    # Every hour, off the hour to avoid the other ticks. GitHub fires only ~5
+    # of these a day, 3.5-8 h apart (ADR 0006 §14). Each run reads the oldest
+    # due boards until its deadline (--deadline-min); a board is re-read once
+    # 3 h passed (MIN_INTERVAL_HOURS in src/direct/tick.ts), so every run that
+    # fires reads the due set and a board waits about one gap between runs.
     - cron: "17 * * * *"
     # Employer discovery has its own workflow and concurrency group so a
     # long-running tick cannot displace a scheduled discovery run.
