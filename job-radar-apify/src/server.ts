@@ -221,10 +221,6 @@ async function opinionsPageSections(): Promise<Array<{ heading: string; paragrap
   }
   return [
     {
-      heading: "Lo que mejoramos",
-      paragraphs: SITE_CHANGELOG.slice(0, 6).map((entry) => `${formatChangelogDate(entry.date)}: ${entry.text}`)
-    },
-    {
       heading: "Opiniones publicadas",
       paragraphs: opinions.length
         ? opinions.map(
@@ -233,6 +229,10 @@ async function opinionsPageSections(): Promise<Array<{ heading: string; paragrap
               (o.teamReply ? ` Respuesta del equipo: ${o.teamReply}` : "")
           )
         : ["Todavía no hay opiniones publicadas. Puedes escribir la primera desde esta página."]
+    },
+    {
+      heading: "Lo que mejoramos",
+      paragraphs: SITE_CHANGELOG.slice(0, 6).map((entry) => `${formatChangelogDate(entry.date)}: ${entry.text}`)
     }
   ];
 }

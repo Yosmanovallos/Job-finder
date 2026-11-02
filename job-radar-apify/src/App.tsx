@@ -8,6 +8,7 @@ import Faq from "./sections/Faq.js";
 import Footer from "./sections/Footer.js";
 import ScrollToTop from "./components/ScrollToTop.js";
 import BottomNav from "./components/BottomNav.js";
+import FeedbackButton from "./components/FeedbackButton.js";
 import { usePageMeta, PageMeta } from "./lib/use-page-meta.js";
 import { ROUTE_META } from "./lib/page-meta.js";
 import { getHomeContent } from "./lib/agent-readiness.js";
@@ -246,6 +247,7 @@ export default function App() {
           </RevealMain>
           <Footer />
           <BottomNav />
+          <FeedbackButton />
         </div>
         </SavedJobsProvider>
       </BrowserRouter>

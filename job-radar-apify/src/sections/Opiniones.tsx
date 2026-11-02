@@ -313,7 +313,7 @@ function FeedbackForm({
 function OpinionCard({ opinion }: { opinion: PublishedOpinion }) {
   const date = new Date(opinion.publishedAt).toLocaleDateString("es-CO", { day: "numeric", month: "long", year: "numeric" });
   return (
-    <article className="sr ink-card-sm rounded-2xl bg-white p-5 md:p-6 flex flex-col gap-3">
+    <article className="rounded-2xl border-2 border-foreground bg-white p-5 flex flex-col gap-3">
       <span className="self-start rounded-full border-2 border-foreground px-3 py-0.5 text-xs font-bold" style={{ backgroundColor: TINTS[0]!.bg }}>
         {opinionCategoryLabel(opinion.category)}
       </span>
@@ -360,45 +360,58 @@ export default function Opiniones() {
         <p>{meta.introduction}</p>
       </PageHero>
 
+      {/* Opinions first, full width, in their own scroll box so a long
+          list never pushes the rest of the page down; "Lo que mejoramos"
+          below as a short list. */}
       <ContentSection>
-        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] gap-8 lg:gap-12 items-start">
-          <div>
-            <SectionHeading>Lo que mejoramos</SectionHeading>
-            <ol className="sr ink-card-sm rounded-2xl bg-white divide-y-2 divide-foreground">
-              {SITE_CHANGELOG.slice(0, 6).map((entry) => (
-                <li key={`${entry.date}-${entry.text}`} className="px-5 py-4 flex flex-col gap-1">
-                  <time dateTime={entry.date} className="font-mono text-xs font-semibold tracking-wide text-primary">
-                    {formatChangelogDate(entry.date)}
-                  </time>
-                  <span className="text-[15px] leading-relaxed">{entry.text}</span>
-                </li>
-              ))}
-            </ol>
-          </div>
-
-          <div>
-            <SectionHeading>Opiniones publicadas</SectionHeading>
-            {opinions === null ? (
-              <div aria-hidden="true" className="h-40 rounded-2xl border-2 border-dashed border-foreground/30" />
-            ) : opinions.length ? (
-              <div className="sr-stagger grid grid-cols-1 md:grid-cols-2 gap-4">
-                {opinions.map((opinion) => (
-                  <OpinionCard key={opinion.id} opinion={opinion} />
-                ))}
-              </div>
-            ) : (
-              <div className="sr ink-card-sm rounded-2xl p-5 md:p-7" style={{ backgroundColor: TINTS[0]!.bg, color: TINTS[0]!.fg }}>
-                <p className="font-heading font-bold text-xl md:text-2xl">Todavía no hay opiniones publicadas</p>
-                <p className="mt-2 text-[15px] leading-relaxed">
-                  ¿BuscoTrabajo te sirvió o encontraste trabajo? Cuéntalo y sé la primera persona en aparecer aquí. Publicamos también las críticas.
-                </p>
-                <a href="#escribir" onClick={() => setKind("opinion")} className="mt-4 inline-flex min-h-[44px] items-center rounded-xl border-2 border-foreground bg-white px-5 font-bold text-foreground no-underline">
-                  Dejar mi opinión
-                </a>
-              </div>
-            )}
-          </div>
+        <div className="flex flex-wrap items-end justify-between gap-3 mb-4 md:mb-6">
+          <SectionHeading>Opiniones publicadas</SectionHeading>
+          {opinions && opinions.length ? (
+            <a href="#escribir" onClick={() => setKind("opinion")} className="mb-4 md:mb-8 text-sm font-bold">
+              Escribir la mía →
+            </a>
+          ) : null}
         </div>
+        {opinions === null ? (
+          <div aria-hidden="true" className="h-40 rounded-2xl border-2 border-dashed border-foreground/30" />
+        ) : opinions.length ? (
+          <div
+            role="region"
+            aria-label={`Opiniones publicadas (${opinions.length})`}
+            tabIndex={0}
+            className="sr ink-card-sm rounded-2xl bg-[#fbfaf6] p-3 md:p-4 max-h-[560px] md:max-h-[620px] overflow-y-auto overscroll-contain focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 md:gap-4 items-start">
+              {opinions.map((opinion) => (
+                <OpinionCard key={opinion.id} opinion={opinion} />
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="sr ink-card-sm rounded-2xl p-5 md:p-7 max-w-[880px]" style={{ backgroundColor: TINTS[0]!.bg, color: TINTS[0]!.fg }}>
+            <p className="font-heading font-bold text-xl md:text-2xl">Todavía no hay opiniones publicadas</p>
+            <p className="mt-2 text-[15px] leading-relaxed">
+              ¿BuscoTrabajo te sirvió o encontraste trabajo? Cuéntalo y sé la primera persona en aparecer aquí. Publicamos también las críticas.
+            </p>
+            <a href="#escribir" onClick={() => setKind("opinion")} className="mt-4 inline-flex min-h-[44px] items-center rounded-xl border-2 border-foreground bg-white px-5 font-bold text-foreground no-underline">
+              Dejar mi opinión
+            </a>
+          </div>
+        )}
+      </ContentSection>
+
+      <ContentSection className="pt-0 md:pt-0">
+        <SectionHeading>Lo que mejoramos</SectionHeading>
+        <ol className="sr-stagger grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
+          {SITE_CHANGELOG.slice(0, 6).map((entry) => (
+            <li key={`${entry.date}-${entry.text}`} className="sr rounded-2xl border-2 border-foreground bg-white px-5 py-4 flex flex-col gap-1.5">
+              <time dateTime={entry.date} className="font-mono text-xs font-semibold tracking-wide text-primary">
+                {formatChangelogDate(entry.date)}
+              </time>
+              <span className="text-[15px] leading-relaxed">{entry.text}</span>
+            </li>
+          ))}
+        </ol>
       </ContentSection>
 
       <ContentCta />
