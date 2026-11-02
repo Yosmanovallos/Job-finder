@@ -5,7 +5,7 @@ import { Job } from "../sources/types.js";
 import { getSourceColor } from "../lib/source-colors.js";
 import { getModalityLabel } from "../lib/job-filters.js";
 import { extractTechnologies } from "../lib/extract-technologies.js";
-import { buildCompanyPath } from "../lib/job-seo.js";
+import { buildCompanyPath, officialCareersLink, officialEmployerSource } from "../lib/job-seo.js";
 import { isPlaceholderEmployer } from "../lib/company-key.js";
 import { buildLocationLabel } from "../countries/index.js";
 import { useAuth } from "../auth/auth-provider.js";
@@ -119,6 +119,8 @@ export const JobDetailPanel: React.FC<JobDetailPanelProps> = ({
   );
   const technologies =
     extractedTechnologies.length > 0 ? extractedTechnologies : job.technologies || [];
+  const officialSource = officialEmployerSource(job);
+  const careers = officialCareersLink(job);
 
   // Reused as-is in both layouts below: standalone near the bottom of the
   // panel when there's no description (today's default for every real
@@ -128,7 +130,16 @@ export const JobDetailPanel: React.FC<JobDetailPanelProps> = ({
     <div className="space-y-3 text-sm">
       <div className="flex justify-between gap-4">
         <span className="text-muted-foreground">Fuente</span>
-        <span className="text-foreground text-right">{job.source}</span>
+        {officialSource ? (
+          // Same fact and link as the server-rendered page (buildJobPageBody).
+          <span data-official-source className="text-foreground text-right">
+            <a href={officialSource.href} target="_blank" rel="nofollow noopener" className="underline hover:text-primary">
+              {officialSource.label}
+            </a>
+          </span>
+        ) : (
+          <span className="text-foreground text-right">{job.source}</span>
+        )}
       </div>
       <div className="flex justify-between gap-4">
         <span className="text-muted-foreground">{isAvailabilityUnverified(job.source) ? "Fecha según fuente" : "Publicada"}</span>
@@ -276,6 +287,14 @@ export const JobDetailPanel: React.FC<JobDetailPanelProps> = ({
           <div className="mt-5">
             <ReputationBadges entries={job.reputation} />
           </div>
+        )}
+
+        {careers && (
+          <p data-official-careers className="text-sm mt-5">
+            <a href={careers.href} target="_blank" rel="nofollow noopener" className="font-semibold underline hover:text-primary">
+              {careers.label}
+            </a>
+          </p>
         )}
 
         <p className="text-xs text-muted-foreground mt-5">

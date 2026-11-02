@@ -21,6 +21,7 @@ const suites: Record<string, string[]> = {
     "validate-test-safety.test.ts",
     "validate-stale-cache.test.ts",
     "validate-job-internal-links.test.ts",
+    "validate-job-page-blocks.test.ts",
     "validate-city-hub-stats.test.ts",
     "validate-dashboard-filters.ts",
     "validate-role-matching.ts",
@@ -67,6 +68,7 @@ const suites: Record<string, string[]> = {
     "validate-isolated-database.ts",
     "validate-job-pagination.ts",
     "validate-seo-job-pages.ts",
+    "validate-job-page-blocks.ts",
     "validate-companies-search.ts",
     "validate-home-stats.ts",
     "validate-sitemap-streaming.ts",
@@ -90,7 +92,8 @@ const suites: Record<string, string[]> = {
   sitemap: ["validate-sitemap-streaming.ts"],
   observability: ["validate-run-observability.ts"],
   pagination: ["validate-job-pagination.ts"],
-  seo: ["validate-seo-job-pages.ts"],
+  seo: ["validate-seo-job-pages.ts", "validate-job-page-blocks.ts"],
+  "job-page-blocks": ["validate-job-page-blocks.ts", "validate-job-page-blocks.test.ts"],
   companies: ["validate-company-identity.test.ts", "validate-companies-search.ts"],
   home: ["validate-home-stats.ts"],
   "saved-jobs": ["validate-saved-jobs.ts"],
@@ -106,7 +109,7 @@ const selection = process.argv[2] || "unit";
 const offline = selection === "unit" || selection === "job-render";
 if (!Object.hasOwn(suites, selection) || process.argv.slice(3).some((arg) => arg !== "--dry-run")) {
   throw new Error(
-    "[P0] Suite inválida. Usa unit, integration, job-render, sitemap, observability, pagination, seo, companies, home, baseline, agent-readiness, job-seo, source-closure, job-freshness o direct; --dry-run es opcional."
+    "[P0] Suite inválida. Usa unit, integration, job-render, sitemap, observability, pagination, seo, companies, home, baseline, agent-readiness, job-seo, job-page-blocks, source-closure, job-freshness o direct; --dry-run es opcional."
   );
 }
 

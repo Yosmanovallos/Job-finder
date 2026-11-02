@@ -60,7 +60,7 @@ export function cityHubFilters(hub: ResolvedCategory): { cities: string[]; count
 }
 
 // FNV-1a: a stable, cheap spread so each job links a different slice of its hub.
-function stableHash(value: string): number {
+export function stableHash(value: string): number {
   let hash = 0x811c9dc5;
   for (let i = 0; i < value.length; i++) {
     hash ^= value.charCodeAt(i);

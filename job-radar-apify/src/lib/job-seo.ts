@@ -5,6 +5,8 @@ import { getCountryConfig, DEFAULT_COUNTRY } from "../countries/index.js";
 import { isGoogleReadyNow, resolveGoogleLocation } from "./google-job-readiness.js";
 import { countryNameFor } from "./country-codes.js";
 import { isPlaceholderEmployer } from "./company-key.js";
+import { getOfficialCareersUrl } from "../data/official-careers-links.js";
+import { reputationLabel, reputationReviewText, reputationScoreText } from "./reputation-labels.js";
 
 export const SITE_URL = "https://buscotrabajo.co";
 // Job SEO V2 (docs/JOBPOSTING-GOOGLE-CONTRACT.md): there is deliberately no
@@ -238,7 +240,12 @@ export function buildJobPageBody(job: SeoJob): string {
   if (published) facts.push(`<li>Publicada: ${escapeHtml(published)}</li>`);
   if (job.employmentType) facts.push(`<li>Tipo de empleo: ${escapeHtml(job.employmentType)}</li>`);
   if (job.salary) facts.push(`<li>Salario: ${escapeHtml(String(job.salary))}</li>`);
-  facts.push(`<li>Fuente: ${escapeHtml(job.source)}</li>`);
+  const official = officialEmployerSource(job);
+  facts.push(
+    official
+      ? `<li data-official-source>Fuente: <a href="${escapeHtml(official.href)}" target="_blank" rel="nofollow noopener">${escapeHtml(official.label)}</a></li>`
+      : `<li>Fuente: ${escapeHtml(job.source)}</li>`
+  );
 
   const description = renderJobDescriptionHtml(job);
   const descriptionBlock = description
@@ -250,7 +257,49 @@ export function buildJobPageBody(job: SeoJob): string {
     ? `<p><a data-apply-link href="${escapeHtml(safeHttpUrl(job.url)!)}" target="_blank" rel="nofollow noopener noreferrer">Ver la oferta original y aplicar en ${escapeHtml(job.source)}</a></p>`
     : "";
 
-  return `<article><h1>${escapeHtml(job.title)}</h1>\n<ul>${facts.join("")}</ul>\n${apply}\n${descriptionBlock}\n${apply}</article>`;
+  return `<article><h1>${escapeHtml(job.title)}</h1>\n<ul>${facts.join("")}</ul>\n${apply}\n${descriptionBlock}\n${apply}</article>${renderReputationHtml(job.reputation)}${renderOfficialCareersHtml(job)}`;
+}
+
+// --- Blocks around the description (openspec job-page-differentiation) -------
+//
+// Real data the source page doesn't show, outside <section data-job-description>
+// and never in JSON-LD. JobDetailPanel.tsx renders the same from the payload.
+
+/** B3: an official vacancy names its employer and links the careers site it came from. */
+export function officialEmployerSource(job: Pick<SeoJob, "source" | "company" | "url">): { label: string; href: string } | null {
+  if (job.source !== "Portal oficial" || !job.company || isPlaceholderEmployer(job.company)) return null;
+  const url = safeHttpUrl(job.url);
+  if (!url) return null;
+  return { label: `Portal oficial de empleo de ${job.company}`, href: `${new URL(url).origin}/` };
+}
+
+/** B3: the employer's own careers search from the curated list, for any of its jobs. */
+export function officialCareersLink(job: Pick<SeoJob, "company">): { label: string; href: string } | null {
+  if (!job.company || isPlaceholderEmployer(job.company)) return null;
+  const href = getOfficialCareersUrl([job.company]);
+  return href ? { label: `Portal de empleo de ${job.company}`, href } : null;
+}
+
+function renderOfficialCareersHtml(job: SeoJob): string {
+  const link = officialCareersLink(job);
+  return link
+    ? `<p data-official-careers><a href="${escapeHtml(link.href)}" target="_blank" rel="nofollow noopener">${escapeHtml(link.label)}</a></p>`
+    : "";
+}
+
+/** B2: the reputation already sent to hydration, as text in the raw HTML. Never a logo. */
+function renderReputationHtml(entries: SeoJob["reputation"]): string {
+  if (!entries || entries.length === 0) return "";
+  const items = entries
+    .map((entry) => {
+      // Curated rows; the original string is emitted so the hydrated link matches.
+      const source = safeHttpUrl(entry.sourceUrl)
+        ? ` <a href="${escapeHtml(entry.sourceUrl)}" target="_blank" rel="nofollow noopener">Ver fuente</a>`
+        : "";
+      return `<li>${escapeHtml(reputationLabel(entry.source))}: ${escapeHtml(reputationScoreText(entry))}${escapeHtml(reputationReviewText(entry))}${source}</li>`;
+    })
+    .join("");
+  return `<section data-company-reputation><h2>Reputación como empleador</h2><ul aria-label="Reputación">${items}</ul></section>`;
 }
 
 /** Public fields only. Never serialize an entire repository/session object. */

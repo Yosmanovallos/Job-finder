@@ -1,5 +1,6 @@
 import React from "react";
 import { ExternalLink } from "lucide-react";
+import { REPUTATION_SOURCE_LABELS } from "../lib/reputation-labels.js";
 
 export interface ReputationEntryProps {
   source: string;
@@ -12,12 +13,9 @@ export interface ReputationEntryProps {
 // Text attribution only, never a source's logo — none of the reputation
 // sources with real data authorize logo reuse by a third party (see
 // docs/COMPANY-REPUTATION-PLAN.md's research summary), so this is the
-// deliberate, permanent design, not a placeholder for a future logo.
-const SOURCE_LABELS: Record<string, string> = {
-  merco: "Merco Talento",
-  gptw: "Great Place to Work",
-  computrabajo: "Computrabajo"
-};
+// deliberate, permanent design, not a placeholder for a future logo. The
+// labels are shared with the server-rendered pages (reputation-labels.ts).
+const SOURCE_LABELS = REPUTATION_SOURCE_LABELS;
 
 // Per-source accent color for the badge chip, same spirit as
 // lib/source-colors.ts for job-portal badges — distinguishes reputation
@@ -42,7 +40,7 @@ export const ReputationBadges: React.FC<ReputationBadgesProps> = ({ entries }) =
   if (!entries || entries.length === 0) return null;
 
   return (
-    <div className="rounded-lg border border-border bg-card p-4">
+    <div data-company-reputation className="rounded-lg border border-border bg-card p-4">
       <h3 className="font-heading font-semibold text-sm text-foreground mb-3">
         Reputación como empleador
       </h3>
