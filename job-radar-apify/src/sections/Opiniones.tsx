@@ -12,7 +12,9 @@ import {
   opinionCategoryLabel,
   type FeedbackKind,
   type FeedbackLinkState,
-  type PublishedOpinion
+  type OpinionsSummary,
+  type PublishedOpinion,
+  formatRating
 } from "../lib/site-feedback.js";
 
 // /opiniones — "Opiniones y ayuda". Same frame as the other content pages
@@ -35,6 +37,52 @@ function referrerPath(): string | null {
   }
 }
 
+const STAR_PATH = "M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4l-5.9 3.1 1.2-6.5-4.8-4.6 6.6-.9z";
+const RATING_WORDS = ["", "Muy mala", "Mala", "Regular", "Buena", "Excelente"];
+
+// Read-only stars; fractional values fill the last star partially.
+function Stars({ value, size = 18 }: { value: number; size?: number }) {
+  const row = (className: string) => (
+    <span className={`flex gap-0.5 ${className}`}>
+      {[0, 1, 2, 3, 4].map((i) => (
+        <svg key={i} width={size} height={size} viewBox="0 0 24 24" className="shrink-0" fill="currentColor" stroke="hsl(var(--foreground))" strokeWidth={1.4} strokeLinejoin="round">
+          <path d={STAR_PATH} />
+        </svg>
+      ))}
+    </span>
+  );
+  return (
+    // w-max + self-start: never stretched by a flex parent, so the gold
+    // overlay's percentage width matches the stars exactly.
+    <span role="img" aria-label={`${formatRating(value)} de 5 estrellas`} className="relative inline-flex w-max self-start shrink-0">
+      {row("text-white")}
+      <span className="absolute inset-y-0 left-0 overflow-hidden" style={{ width: `${(value / 5) * 100}%` }}>
+        {row("text-gold-2")}
+      </span>
+    </span>
+  );
+}
+
+// 1–5 radio group drawn as stars (arrow keys move within the group).
+function StarInput({ name, value, onChange }: { name: string; value: number; onChange: (value: number) => void }) {
+  return (
+    <div className="flex items-center gap-3 flex-wrap">
+      <div className="flex">
+        {[1, 2, 3, 4, 5].map((n) => (
+          <label key={n} className="cursor-pointer p-1 rounded-md has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-primary">
+            <input type="radio" name={name} value={n} checked={value === n} onChange={() => onChange(n)} className="sr-only" />
+            <span className="sr-only">{`${n} ${n === 1 ? "estrella" : "estrellas"} (${RATING_WORDS[n]})`}</span>
+            <svg aria-hidden="true" width="34" height="34" viewBox="0 0 24 24" fill="currentColor" stroke="hsl(var(--foreground))" strokeWidth={1.4} strokeLinejoin="round" className={n <= value ? "text-gold-2" : "text-white"}>
+              <path d={STAR_PATH} />
+            </svg>
+          </label>
+        ))}
+      </div>
+      <span aria-hidden="true" className="text-sm font-semibold text-[#3d413e]">{value ? RATING_WORDS[value] : ""}</span>
+    </div>
+  );
+}
+
 function FeedbackForm({
   linkState,
   kind,
@@ -48,6 +96,8 @@ function FeedbackForm({
     PROBLEM_CATEGORIES.some((c) => c.id === linkState?.category) ? linkState!.category! : ""
   );
   const [opinionCategory, setOpinionCategory] = useState("");
+  const [opinionRating, setOpinionRating] = useState(0);
+  const [problemRating, setProblemRating] = useState(0);
   const [message, setMessage] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [city, setCity] = useState("");
@@ -74,6 +124,10 @@ function FeedbackForm({
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
+    if (kind === "opinion" && !opinionRating) {
+      setError("Elige una calificación de 1 a 5 estrellas.");
+      return;
+    }
     if (!category) {
       setError(kind === "problem" ? "Elige qué falló." : "Elige cómo te fue.");
       return;
@@ -89,6 +143,7 @@ function FeedbackForm({
           kind,
           category,
           message,
+          rating: (kind === "opinion" ? opinionRating : problemRating) || undefined,
           displayName: kind === "opinion" ? displayName : undefined,
           city: kind === "opinion" ? city : undefined,
           consentPublish: kind === "opinion" ? consentPublish : undefined,
@@ -125,6 +180,8 @@ function FeedbackForm({
     setDisplayName("");
     setCity("");
     setConsentPublish(false);
+    setOpinionRating(0);
+    setProblemRating(0);
     setAttachContext(false);
   };
 
@@ -176,6 +233,12 @@ function FeedbackForm({
         </div>
       ) : (
         <form onSubmit={submit} noValidate className="mt-5 flex flex-col gap-4">
+          {kind === "opinion" ? (
+            <fieldset>
+              <legend className="font-bold text-[15px] mb-1">¿Qué calificación le das a BuscoTrabajo?</legend>
+              <StarInput name="calificacion-opinion" value={opinionRating} onChange={setOpinionRating} />
+            </fieldset>
+          ) : null}
           <fieldset>
             <legend className="font-bold text-[15px] mb-2.5">{kind === "problem" ? "¿Qué falló?" : "¿Cómo te fue?"}</legend>
             <div className="flex flex-wrap gap-2">
@@ -214,6 +277,13 @@ function FeedbackForm({
               className={`${inputClass} font-normal resize-y`}
             />
           </label>
+
+          {kind === "problem" ? (
+            <fieldset>
+              <legend className="font-bold text-[15px] mb-1">¿Cómo calificarías tu experiencia hoy? (opcional)</legend>
+              <StarInput name="calificacion-reporte" value={problemRating} onChange={setProblemRating} />
+            </fieldset>
+          ) : null}
 
           {kind === "opinion" ? (
             <>
@@ -314,9 +384,12 @@ function OpinionCard({ opinion }: { opinion: PublishedOpinion }) {
   const date = new Date(opinion.publishedAt).toLocaleDateString("es-CO", { day: "numeric", month: "long", year: "numeric" });
   return (
     <article className="rounded-2xl border-2 border-foreground bg-white p-5 flex flex-col gap-3">
-      <span className="self-start rounded-full border-2 border-foreground px-3 py-0.5 text-xs font-bold" style={{ backgroundColor: TINTS[0]!.bg }}>
-        {opinionCategoryLabel(opinion.category)}
-      </span>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Stars value={opinion.rating} />
+        <span className="rounded-full border-2 border-foreground px-3 py-0.5 text-xs font-bold" style={{ backgroundColor: TINTS[0]!.bg }}>
+          {opinionCategoryLabel(opinion.category)}
+        </span>
+      </div>
       <p className="text-[15px] md:text-base leading-relaxed">«{opinion.message}»</p>
       <p className="text-sm text-muted-foreground">
         <strong className="text-foreground">{opinion.displayName}</strong>
@@ -332,19 +405,54 @@ function OpinionCard({ opinion }: { opinion: PublishedOpinion }) {
   );
 }
 
+// Average, count and the 5→1 distribution of every published opinion.
+// Visible only; no Review/AggregateRating markup (see server.ts).
+function RatingSummary({ summary }: { summary: OpinionsSummary }) {
+  const max = Math.max(...summary.distribution, 1);
+  return (
+    <div className="sr ink-card-sm rounded-2xl bg-white p-5 md:p-6 mb-4 md:mb-5 flex flex-wrap items-center gap-6 md:gap-10">
+      <div className="flex items-center gap-4">
+        <span className="font-heading font-bold text-[44px] md:text-[56px] leading-none tracking-[-0.03em]">{formatRating(summary.average!)}</span>
+        <div className="flex flex-col gap-1.5">
+          <Stars value={summary.average!} size={22} />
+          <span className="text-sm text-muted-foreground">
+            {summary.count} {summary.count === 1 ? "opinión publicada" : "opiniones publicadas"}
+          </span>
+        </div>
+      </div>
+      <ul className="flex-[1_1_260px] max-w-[460px] flex flex-col gap-1.5" aria-label="Opiniones por número de estrellas">
+        {summary.distribution.map((n, i) => (
+          <li key={i} className="flex items-center gap-2.5 text-sm">
+            <span className="w-[74px] shrink-0 font-semibold">
+              {5 - i} {5 - i === 1 ? "estrella" : "estrellas"}
+            </span>
+            <span aria-hidden="true" className="flex-1 h-2.5 rounded-full border border-foreground bg-[#f4f5f2] overflow-hidden">
+              <span className="block h-full bg-gold-2" style={{ width: `${(n / max) * 100}%` }} />
+            </span>
+            <span className="w-7 text-right tabular-nums text-muted-foreground">{n}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export default function Opiniones() {
   const meta = ROUTE_META["/opiniones"]!;
   const location = useLocation();
   const linkState = (location.state as FeedbackLinkState | null)?.feedback;
   const [opinions, setOpinions] = useState<PublishedOpinion[] | null>(null);
+  const [summary, setSummary] = useState<OpinionsSummary | null>(null);
   const [kind, setKind] = useState<FeedbackKind>(linkState?.kind === "opinion" ? "opinion" : "problem");
 
   useEffect(() => {
     let cancelled = false;
     fetch("/api/opinions")
       .then((res) => (res.ok ? res.json() : { opinions: [] }))
-      .then((body: { opinions?: PublishedOpinion[] }) => {
-        if (!cancelled) setOpinions(Array.isArray(body.opinions) ? body.opinions : []);
+      .then((body: { opinions?: PublishedOpinion[]; summary?: OpinionsSummary }) => {
+        if (cancelled) return;
+        setOpinions(Array.isArray(body.opinions) ? body.opinions : []);
+        setSummary(body.summary && body.summary.count > 0 ? body.summary : null);
       })
       .catch(() => {
         if (!cancelled) setOpinions([]);
@@ -375,6 +483,8 @@ export default function Opiniones() {
         {opinions === null ? (
           <div aria-hidden="true" className="h-40 rounded-2xl border-2 border-dashed border-foreground/30" />
         ) : opinions.length ? (
+          <>
+          {summary && summary.average !== null ? <RatingSummary summary={summary} /> : null}
           <div
             role="region"
             aria-label={`Opiniones publicadas (${opinions.length})`}
@@ -387,6 +497,7 @@ export default function Opiniones() {
               ))}
             </div>
           </div>
+          </>
         ) : (
           <div className="sr ink-card-sm rounded-2xl p-5 md:p-7 max-w-[880px]" style={{ backgroundColor: TINTS[0]!.bg, color: TINTS[0]!.fg }}>
             <p className="font-heading font-bold text-xl md:text-2xl">Todavía no hay opiniones publicadas</p>

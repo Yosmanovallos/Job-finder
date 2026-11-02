@@ -95,18 +95,23 @@ async function main() {
       201
     );
     assert.equal(
-      (await post({ kind: "opinion", category: "me-sirvio", message: `${MARK}: <b>me ahorra tiempo</b>`, displayName: "Ana M.", city: "Medellín", consentPublish: true })).status,
+      (await post({ kind: "opinion", category: "me-sirvio", message: `${MARK}: <b>me ahorra tiempo</b>`, displayName: "Ana M.", city: "Medellín", consentPublish: true, rating: 4 })).status,
       201
     );
     const invalid = await post({ kind: "opinion", category: "me-sirvio", message: "Sin permiso para publicar", displayName: "Ana" });
     assert.equal(invalid.status, 400);
     const rows = await pool.query(
-      `SELECT kind, page_path, search_text, user_agent, status FROM site_feedback WHERE message LIKE $1 ORDER BY kind DESC`,
+      `SELECT kind, page_path, search_text, user_agent, status, rating FROM site_feedback WHERE message LIKE $1 ORDER BY kind DESC`,
       [`${MARK}%`]
     );
     assert.equal(rows.rowCount, 2);
-    assert.deepEqual(rows.rows[0], { kind: "problem", page_path: "/dashboard", search_text: "contador", user_agent: `${MARK}-agent`, status: "pending" });
-    assert.deepEqual(rows.rows[1], { kind: "opinion", page_path: null, search_text: null, user_agent: null, status: "pending" });
+    assert.deepEqual(rows.rows[0], { kind: "problem", page_path: "/dashboard", search_text: "contador", user_agent: `${MARK}-agent`, status: "pending", rating: null });
+    assert.deepEqual(rows.rows[1], { kind: "opinion", page_path: null, search_text: null, user_agent: null, status: "pending", rating: 4 });
+    await assert.rejects(
+      pool.query(`INSERT INTO site_feedback (kind, category, message, display_name) VALUES ('opinion', 'me-sirvio', $1, 'X')`, [`${MARK} sin estrellas`]),
+      /check/i,
+      "la tabla no acepta opiniones sin estrellas"
+    );
     console.log("✅ [PASSED] Reporte con contexto sin query; opinión pendiente; inválida = 400.");
 
     // 5. Its own rate limit: 5 POSTs per IP every 10 minutes.
@@ -121,6 +126,12 @@ async function main() {
       `UPDATE site_feedback SET status = 'published', published_at = NOW(), team_reply = 'Gracias.' WHERE kind = 'opinion' AND message LIKE $1`,
       [`${MARK}%`]
     );
+    // A published 2-star opinion counts the same as a 4-star one (no gating).
+    await pool.query(
+      `INSERT INTO site_feedback (kind, category, message, rating, display_name, status, published_at)
+       VALUES ('opinion', 'no-me-sirvio', $1, 2, 'Luis P.', 'published', NOW() - INTERVAL '1 day')`,
+      [`${MARK}: pocas ofertas en mi ciudad`]
+    );
     const page = await fetch(`${BASE_URL}/opiniones`);
     assert.equal(page.status, 200);
     const html = await page.text();
@@ -129,13 +140,19 @@ async function main() {
     assert.match(html, /Lo que mejoramos/);
     assert.ok(html.includes("&lt;b&gt;me ahorra tiempo&lt;/b&gt;"), "el texto del usuario va escapado");
     assert.ok(!/noindex|AggregateRating/.test(html));
+    assert.match(html, /Calificación promedio: 3,0 de 5, con 2 opiniones publicadas\./);
+    assert.match(html, /4 de 5 estrellas/);
     assert.ok(!html.includes(`${MARK} no carga`), "los reportes nunca son públicos");
     assert.equal((await fetch(`${BASE_URL}/ve/opiniones`)).status, 404);
     const api = await fetch(`${BASE_URL}/api/opinions`);
     assert.equal(api.headers.get("cache-control"), "public, max-age=300");
-    const { opinions } = (await api.json()) as { opinions: Array<{ displayName: string; teamReply: string | null }> };
-    assert.deepEqual(opinions.map((o) => [o.displayName, o.teamReply]), [["Ana M.", "Gracias."]]);
-    console.log("✅ [PASSED] /opiniones: HTML propio, opinión publicada escapada, reportes privados, /ve 404.");
+    const { opinions, summary } = (await api.json()) as {
+      opinions: Array<{ displayName: string; teamReply: string | null; rating: number }>;
+      summary: { count: number; average: number; distribution: number[] };
+    };
+    assert.deepEqual(opinions.map((o) => [o.displayName, o.teamReply, o.rating]), [["Ana M.", "Gracias.", 4], ["Luis P.", null, 2]]);
+    assert.deepEqual(summary, { count: 2, average: 3, distribution: [0, 1, 0, 1, 0] });
+    console.log("✅ [PASSED] /opiniones: HTML propio, opinión publicada escapada, promedio 3,0 de 2 opiniones, reportes privados, /ve 404.");
 
     // 7. The production migration script itself (dry-run, then a re-run).
     for (const args of [["--dry-run"], []]) {

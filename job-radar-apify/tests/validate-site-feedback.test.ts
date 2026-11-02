@@ -8,8 +8,25 @@ test("feedback: a quick problem report needs only a valid category", () => {
   const result = validateFeedback({ kind: "problem", category: "no-carga" });
   assert.deepEqual(result, {
     ok: true,
-    value: { kind: "problem", category: "no-carga", message: "", displayName: null, city: null, pagePath: null, search: null }
+    value: { kind: "problem", category: "no-carga", message: "", displayName: null, city: null, pagePath: null, search: null, rating: null }
   });
+});
+
+test("feedback: stars are 1–5 integers, required for opinions, optional for reports", () => {
+  const report = validateFeedback({ kind: "problem", category: "otro", rating: 2 });
+  assert.ok(report.ok && !("spam" in report));
+  assert.equal(report.value.rating, 2);
+  for (const rating of [0, 6, 4.5, "5", null]) {
+    const r = validateFeedback({ kind: "problem", category: "otro", rating });
+    assert.ok(r.ok && !("spam" in r));
+    assert.equal(r.value.rating, null, String(rating));
+  }
+  const opinion = { kind: "opinion", category: "me-sirvio", message: "Me ahorra tiempo cada mañana.", displayName: "Ana M.", consentPublish: true };
+  assert.equal(validateFeedback(opinion).ok, false, "opinión sin estrellas");
+  assert.equal(validateFeedback({ ...opinion, rating: 7 }).ok, false, "fuera de rango");
+  const ok = validateFeedback({ ...opinion, rating: 1 });
+  assert.ok(ok.ok && !("spam" in ok));
+  assert.equal(ok.value.rating, 1, "una estrella también se acepta");
 });
 
 test("feedback: technical context is kept only with the box ticked, without query or hash", () => {
@@ -38,7 +55,7 @@ test("feedback: unknown kinds and categories are rejected", () => {
 });
 
 test("feedback: an opinion needs consent, a name and a real message", () => {
-  const base = { kind: "opinion", category: "me-sirvio", message: "Me ahorra tiempo cada mañana.", displayName: "Ana M.", city: " Medellín " };
+  const base = { kind: "opinion", category: "me-sirvio", message: "Me ahorra tiempo cada mañana.", displayName: "Ana M.", city: " Medellín ", rating: 4 };
   assert.equal(validateFeedback(base).ok, false, "sin consentimiento");
   assert.equal(validateFeedback({ ...base, consentPublish: true, message: "ok" }).ok, false, "mensaje corto");
   assert.equal(validateFeedback({ ...base, consentPublish: true, displayName: " " }).ok, false, "sin nombre");

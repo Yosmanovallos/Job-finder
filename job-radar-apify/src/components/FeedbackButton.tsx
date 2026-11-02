@@ -16,14 +16,14 @@ export default function FeedbackButton() {
     <Link
       to="/opiniones"
       state={state}
-      aria-label="Danos tu opinión sobre BuscoTrabajo"
+      aria-label="Califica BuscoTrabajo y danos tu opinión"
       className="ink-card-sm ink-lift fixed z-30 right-3 md:right-6 bottom-[calc(76px+env(safe-area-inset-bottom))] md:bottom-6 inline-flex items-center gap-2 h-11 rounded-full bg-white px-4 text-sm font-bold text-foreground no-underline"
     >
-      <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
-        <path d="M21 12a8 8 0 01-11.6 7.1L4 20l1-4.6A8 8 0 1121 12z" />
+      <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" className="text-gold-2" fill="currentColor" stroke="hsl(var(--foreground))" strokeWidth={1.6} strokeLinejoin="round">
+        <path d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4l-5.9 3.1 1.2-6.5-4.8-4.6 6.6-.9z" />
       </svg>
-      <span className="md:hidden">Opinar</span>
-      <span className="hidden md:inline">Danos tu opinión</span>
+      <span className="md:hidden">Califícanos</span>
+      <span className="hidden md:inline">Califícanos y opina</span>
     </Link>
   );
 }

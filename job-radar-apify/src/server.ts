@@ -32,9 +32,9 @@ import {
   SavedJobsUnavailableError,
   SAVED_JOBS_LIMIT
 } from "./db/saved-jobs-repository.js";
-import { insertFeedback, listPublishedOpinions, SiteFeedbackUnavailableError } from "./db/site-feedback-repository.js";
-import { FEEDBACK_BODY_MAX_BYTES, FEEDBACK_LIMITS, opinionCategoryLabel, validateFeedback } from "./lib/site-feedback.js";
-import type { PublishedOpinion } from "./lib/site-feedback.js";
+import { getOpinionsSummary, insertFeedback, listPublishedOpinions, SiteFeedbackUnavailableError } from "./db/site-feedback-repository.js";
+import { FEEDBACK_BODY_MAX_BYTES, FEEDBACK_LIMITS, formatRating, opinionCategoryLabel, validateFeedback } from "./lib/site-feedback.js";
+import type { OpinionsSummary, PublishedOpinion } from "./lib/site-feedback.js";
 import { SITE_CHANGELOG, formatChangelogDate } from "./lib/site-changelog.js";
 import { wasJobPurged } from "./db/indexing-repository.js";
 import { wasJobArchived } from "./db/job-archive-repository.js";
@@ -187,47 +187,56 @@ const SPA_ROUTES = new Set([
 const FEEDBACK_RATE_LIMIT = 5;
 const FEEDBACK_RATE_WINDOW_MS = 10 * 60 * 1000;
 const OPINIONS_CACHE_TTL_MS = 5 * 60 * 1000;
-let opinionsCache: { at: number; value: PublishedOpinion[] } | null = null;
+type OpinionsPayload = { opinions: PublishedOpinion[]; summary: OpinionsSummary };
+const EMPTY_OPINIONS: OpinionsPayload = { opinions: [], summary: { count: 0, average: null, distribution: [0, 0, 0, 0, 0] } };
+let opinionsCache: { at: number; value: OpinionsPayload } | null = null;
 
 // Published opinions change only when someone publishes one by hand, so a
 // 5-minute copy serves both /api/opinions and the /opiniones server HTML.
 // Before the migration (or on a DB error) the page renders with none.
-async function getPublishedOpinionsCached(): Promise<PublishedOpinion[]> {
+async function getPublishedOpinionsCached(): Promise<OpinionsPayload> {
   if (opinionsCache && Date.now() - opinionsCache.at < OPINIONS_CACHE_TTL_MS) return opinionsCache.value;
   try {
-    const value = await listPublishedOpinions();
+    const [opinions, summary] = await Promise.all([listPublishedOpinions(), getOpinionsSummary()]);
+    const value = { opinions, summary };
     opinionsCache = { at: Date.now(), value };
     return value;
   } catch (error) {
     if (error instanceof SiteFeedbackUnavailableError) {
-      opinionsCache = { at: Date.now(), value: [] };
-      return [];
+      opinionsCache = { at: Date.now(), value: EMPTY_OPINIONS };
+      return EMPTY_OPINIONS;
     }
     throw error;
   }
 }
 
-// Server HTML of /opiniones beyond its H1/intro: the changelog and the
-// published opinions as plain text (escaped by renderContentHtml), so
-// crawlers read the same content the React page shows. No Review or
-// AggregateRating markup: opinions about BuscoTrabajo on its own site are
-// self-serving reviews in Google's terms.
+// Server HTML of /opiniones beyond its H1/intro: the rating summary, the
+// published opinions and the changelog as plain text (escaped by
+// renderContentHtml), so crawlers read what the React page shows. No
+// Review or AggregateRating markup: Google shows no review stars for
+// reviews of an Organization placed on its own site ("self-serving").
 async function opinionsPageSections(): Promise<Array<{ heading: string; paragraphs: string[] }>> {
-  let opinions: PublishedOpinion[] = [];
+  let payload = EMPTY_OPINIONS;
   try {
-    opinions = await getPublishedOpinionsCached();
+    payload = await getPublishedOpinionsCached();
   } catch {
-    opinions = [];
+    payload = EMPTY_OPINIONS;
   }
+  const { opinions, summary } = payload;
   return [
     {
       heading: "Opiniones publicadas",
       paragraphs: opinions.length
-        ? opinions.map(
-            (o) =>
-              `${opinionCategoryLabel(o.category)} — «${o.message}» ${o.displayName}${o.city ? `, ${o.city}` : ""}.` +
-              (o.teamReply ? ` Respuesta del equipo: ${o.teamReply}` : "")
-          )
+        ? [
+            ...(summary.average !== null
+              ? [`Calificación promedio: ${formatRating(summary.average)} de 5, con ${summary.count} ${summary.count === 1 ? "opinión" : "opiniones"} publicadas.`]
+              : []),
+            ...opinions.map(
+              (o) =>
+                `${o.rating} de 5 estrellas · ${opinionCategoryLabel(o.category)} — «${o.message}» ${o.displayName}${o.city ? `, ${o.city}` : ""}.` +
+                (o.teamReply ? ` Respuesta del equipo: ${o.teamReply}` : "")
+            )
+          ]
         : ["Todavía no hay opiniones publicadas. Puedes escribir la primera desde esta página."]
     },
     {
@@ -1024,7 +1033,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     try {
       if (pathname === "/api/opinions") {
         if (method !== "GET") return json(405, { error: "Método no permitido" });
-        return json(200, { opinions: await getPublishedOpinionsCached() }, "public, max-age=300");
+        return json(200, await getPublishedOpinionsCached(), "public, max-age=300");
       }
       if (method !== "POST") return json(405, { error: "Método no permitido" });
       if (!checkRateLimit(clientIp, FEEDBACK_RATE_LIMIT, FEEDBACK_RATE_WINDOW_MS, "feedback")) {

@@ -988,6 +988,7 @@ CREATE TABLE IF NOT EXISTS site_feedback (
     kind          VARCHAR(16) NOT NULL CHECK (kind IN ('problem', 'opinion')),
     category      VARCHAR(32) NOT NULL,
     message       VARCHAR(2000) NOT NULL DEFAULT '',
+    rating        SMALLINT CHECK (rating BETWEEN 1 AND 5),
     display_name  VARCHAR(60),
     city          VARCHAR(60),
     page_path     VARCHAR(300),
@@ -997,7 +998,9 @@ CREATE TABLE IF NOT EXISTS site_feedback (
                   CHECK (status IN ('pending', 'published', 'rejected', 'resolved')),
     team_reply    VARCHAR(1000),
     created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    published_at  TIMESTAMPTZ
+    published_at  TIMESTAMPTZ,
+    -- Una opinión publicada siempre tiene estrellas (la API las exige).
+    CHECK (kind <> 'opinion' OR rating IS NOT NULL)
 );
 CREATE INDEX IF NOT EXISTS idx_site_feedback_created
     ON site_feedback (created_at DESC);

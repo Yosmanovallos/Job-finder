@@ -48,6 +48,8 @@ export interface FeedbackInput {
   city: string | null;
   pagePath: string | null;
   search: string | null;
+  /** 1–5 stars. Required for an opinion, optional for a problem report. */
+  rating: number | null;
 }
 
 export type FeedbackValidation =
@@ -61,6 +63,10 @@ function clean(value: unknown, max: number): string {
   // Control characters out (newlines and tabs stay), then trim and clip.
   // eslint-disable-next-line no-control-regex
   return value.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "").trim().slice(0, max);
+}
+
+function cleanRating(value: unknown): number | null {
+  return typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= 5 ? value : null;
 }
 
 function cleanPath(value: unknown): string | null {
@@ -83,6 +89,7 @@ export function validateFeedback(body: unknown): FeedbackValidation {
 
   const message = clean(input.message, FEEDBACK_LIMITS.message);
   const withContext = input.attachContext === true;
+  const rating = cleanRating(input.rating);
 
   if (kind === "problem") {
     return {
@@ -94,10 +101,13 @@ export function validateFeedback(body: unknown): FeedbackValidation {
         displayName: null,
         city: null,
         pagePath: withContext ? cleanPath(input.pagePath) : null,
-        search: withContext ? clean(input.search, FEEDBACK_LIMITS.search) || null : null
+        search: withContext ? clean(input.search, FEEDBACK_LIMITS.search) || null : null,
+        rating
       }
     };
   }
+
+  if (rating === null) return { ok: false, error: "Elige una calificación de 1 a 5 estrellas." };
 
   if (input.consentPublish !== true) {
     return { ok: false, error: "Para publicar tu opinión necesitamos tu autorización." };
@@ -116,7 +126,8 @@ export function validateFeedback(body: unknown): FeedbackValidation {
       displayName,
       city: clean(input.city, FEEDBACK_LIMITS.city) || null,
       pagePath: null,
-      search: null
+      search: null,
+      rating
     }
   };
 }
@@ -134,6 +145,21 @@ export interface PublishedOpinion {
   city: string | null;
   publishedAt: string;
   teamReply: string | null;
+  rating: number;
+}
+
+// Average over ALL published opinions (not only the 30 listed). Opinions
+// are published by hand, and the rule is: publish every genuine opinion
+// whatever its stars; reject only spam, abuse or personal data.
+export interface OpinionsSummary {
+  count: number;
+  average: number | null;
+  /** distribution[0] = 5 stars … distribution[4] = 1 star. */
+  distribution: [number, number, number, number, number];
+}
+
+export function formatRating(value: number): string {
+  return value.toLocaleString("es-CO", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 }
 
 // Router state the dashboard passes when someone taps "Repórtalo" on an
