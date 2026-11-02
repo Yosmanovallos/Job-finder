@@ -82,7 +82,7 @@ Lectura:
 - "known 2" sin tablero habilitado: tienen alias de empleador pero ningún
   tablero encendido; la causa no se verificó en este censo. No se reactivan.
 
-Recomendación: no cambiar la programación. Basta con unas pocas corridas
+Recomendación (confirmada por §4.2): no cambiar la programación. Basta con unas pocas corridas
 manuales `focus=browser-boards` (ensayo en seco primero) para vaciar las 562;
 después el backoff las espacia solo.
 
@@ -109,6 +109,27 @@ backoff y unas pocas `needs_review`, y casi ningún tablero habilitado solo.
 
 El paso previo del mismo workflow (sondeo del inventario ATS, ensayo)
 revisó 110 de 278 tableros antes del plazo; no habilitaría ninguno.
+
+### 4.2 Ejecución `focus=browser-boards` (2026-11-02)
+
+Run [41451338051](https://github.com/Yosmanovallos/Job-finder/actions/runs/41451338051),
+`mode=execute`, aprobado explícitamente por el dueño. Insert-only, tope
+`--max-enables 10`.
+
+| Medida | Valor |
+|---|---|
+| Sincronización del directorio | 27 candidatos nuevos, 8.372 actualizados; 5 fuera del directorio activo (contador 0, evidencia conservada) |
+| Revisadas | **562 de 562** (cola de Indeed + Glassdoor vaciada en una corrida) |
+| `not_found` (ahora en backoff) | 545 |
+| Error de red; siguen `pending` | 15 |
+| `needs_review` | 1 — 5CA, `greenhouse:5ca` (1 vacante en Colombia) |
+| **`verified` y habilitado** | **1 — Five9, `greenhouse:five9`** (1 vacante en Colombia) |
+| Sondeo de inventario ATS (paso previo, `--execute`) | 108 de 278, 0 habilitados |
+
+Resultado: 2 aciertos en 562 (0,36 %). La vía por nombre ya no da más con
+estas empresas. Para Indeed/Glassdoor, el siguiente rendimiento vendría de la
+vía del sitio propio o del inventario ATS (D5, §13), no de repetir el foco.
+El backoff evita volver a sondear las 545 antes de su fecha.
 
 ## 5. Cautelas
 
