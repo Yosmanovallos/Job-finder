@@ -335,7 +335,10 @@ migración ni escritura en producción sin aprobación explícita del usuario.
   - En el HTML real de producción de esas 5 vacantes, el nuevo `<head>` solo
     cambia 6 etiquetas: title, description, og:title, og:description,
     twitter:title y twitter:description.
-  - Es cálculo puro, sin consultas nuevas.
+  - Es cálculo puro, sin consultas nuevas: unos 0,07 ms por llamada en local.
+  - **TTFB MISS en producción antes del cambio** (2026-11-02, script de F4):
+    5 vacantes × 3 URL únicas, 15/15 `MISS`. Mediana de 274 ms y rango de 238
+    a 414 ms.
   - **Tras desplegar:**
     - Correr `/seo drift compare` contra los baselines 31 a 35.
     - Medir el TTFB MISS de las mismas 5 vacantes; el límite es +10 % sobre la

@@ -380,9 +380,10 @@ function firstSentence(line: string): string {
  * leading copy of the job title are skipped; emoji and stray markup removed.
  */
 export function firstSourceSentence(description: string | null | undefined, title: string): string | null {
-  const cleanTitle = collapseSpaces(title.replace(EMOJI, " "));
+  // NFC on both sides: the title copy is sliced off by length below.
+  const cleanTitle = collapseSpaces(title.normalize("NFC").replace(EMOJI, " "));
   for (const raw of (description || "").split("\n")) {
-    let line = collapseSpaces(raw.replace(/<[^>]*>/g, " ").replace(EMOJI, " "));
+    let line = collapseSpaces(raw.normalize("NFC").replace(/<[^>]*>/g, " ").replace(EMOJI, " "));
     if (cleanTitle && foldForCompare(line).startsWith(foldForCompare(cleanTitle))) {
       // ...and the title's own parenthetical, "(Gestión de Proveedores)".
       line = line.slice(cleanTitle.length).trim().replace(/^\([^)]*\)\s*/, "");
@@ -401,8 +402,11 @@ function titleCity(job: SeoJob): string | null {
   const { location } = resolveGoogleLocation(job);
   if (location?.kind !== "physical") return null;
   const city = collapseSpaces(location.locality);
-  // "Auxiliar de bodega - Girardota en Girardota" says nothing new.
-  return city && !foldForCompare(job.title).includes(foldForCompare(city)) ? city : null;
+  // "Auxiliar de bodega - Girardota en Girardota" says nothing new. Whole
+  // words only: "Inspector de Calidad" still gets "en Cali".
+  const folded = foldForCompare(city).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const named = new RegExp(`(^|[^\\p{L}\\p{N}])${folded}($|[^\\p{L}\\p{N}])`, "u").test(foldForCompare(job.title));
+  return city && !named ? city : null;
 }
 
 function realCompany(job: SeoJob): string | null {

@@ -96,6 +96,11 @@ test("JMT-003 a missing city or company is left out, never filled", () => {
     assert.ok(meta.description.startsWith("Oracle DBA, Bogota, D.C., Capital District, Colombia. "), job.jobId);
     assert.doesNotMatch(`${meta.title} ${meta.description}`, /confidencial/i);
   }
+  assert.equal(
+    buildJobMeta({ ...fullJob, title: "Inspector de Calidad", company: "Ejemplo", location: "Cali" }).title,
+    "Inspector de Calidad en Cali – Ejemplo | BuscoTrabajo",
+    "a city inside another word is not 'already in the title'"
+  );
   assert.equal(buildJobMeta(remoteJob).title, "Oracle DBA – Amaris Consulting | BuscoTrabajo", "a remote job gets no city");
   assert.equal(buildJobMeta(bareJob).description, "Oracle DBA en Amaris Consulting, Bogota, D.C., Capital District, Colombia.");
 });
