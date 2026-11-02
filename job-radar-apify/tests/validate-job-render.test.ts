@@ -260,22 +260,33 @@ const parityCases = [
   { name: "cold B1 + official employer", job: officialJob, snapshot: undefined }
 ];
 
-function readBlocks() {
-  const links = (selector: string) =>
+// A string, not a function: tsx's keepNames would inject a __name helper
+// that doesn't exist inside the page.
+const READ_BLOCKS = `(() => {
+  const links = (selector) =>
     [...document.querySelectorAll(selector)].map((a) => [
       a.getAttribute("href"),
-      (a.textContent || "").replace(/\s+/g, " ").trim(),
+      (a.textContent || "").replace(/\\s+/g, " ").trim(),
       a.getAttribute("rel") || ""
     ]);
   const reputation = document.querySelector("[data-company-reputation]");
   return {
     company: links("[data-company-jobs] a").map(([href, text]) => [href, text]),
-    reputationLinks: [...(reputation?.querySelectorAll("a") || [])].map((a) => a.getAttribute("href")),
-    reputationText: (reputation?.textContent || "").replace(/\s+/g, " "),
+    reputationLinks: [...(reputation ? reputation.querySelectorAll("a") : [])].map((a) => a.getAttribute("href")),
+    reputationText: ((reputation && reputation.textContent) || "").replace(/\\s+/g, " "),
     careers: links("[data-official-careers] a"),
     officialSource: links("[data-official-source] a"),
     overflow: document.documentElement.scrollWidth - window.innerWidth
   };
+})()`;
+
+interface Blocks {
+  company: string[][];
+  reputationLinks: string[];
+  reputationText: string;
+  careers: string[][];
+  officialSource: string[][];
+  overflow: number;
 }
 
 for (const width of [390, 1440]) {
@@ -291,7 +302,7 @@ for (const width of [390, 1440]) {
             `<script>window.__SSR_JOB_LINKS__=${escapeJsonForScriptTag({ jobId: parity.job.jobId, related: [], company: block })};</script>` +
               `<script>window.__SSR_JOB__=${escapeJsonForScriptTag(buildJobPagePayload(parity.job))};</script></head>`
           );
-        const snapshots = [];
+        const snapshots: Blocks[] = [];
         for (const javaScriptEnabled of [false, true]) {
           const context = await browser.newContext({ viewport: { width, height: 900 }, serviceWorkers: "block", javaScriptEnabled });
           await context.route("**/*", async (route) => {
@@ -313,7 +324,7 @@ for (const width of [390, 1440]) {
             await page.waitForFunction(() => !document.querySelector("#app > article"), null, { timeout: 5000 });
             await page.screenshot({ path: path.join(process.cwd(), `job-blocks-${parity.snapshot ? "warm" : "cold"}-${width}.png`), fullPage: true });
           }
-          snapshots.push(await page.evaluate(readBlocks));
+          snapshots.push((await page.evaluate(READ_BLOCKS)) as Blocks);
           await context.close();
         }
         const [server, client] = snapshots;
@@ -323,7 +334,7 @@ for (const width of [390, 1440]) {
         for (const entry of parity.job.reputation || []) {
           for (const side of [server, client]) {
             assert.ok(side.reputationText.includes(String(entry.score)) && side.reputationText.includes(`(${entry.scoreScale})`), entry.source);
-            if (entry.reviewCount !== null) assert.ok(side.reputationText.includes(`${entry.reviewCount} reseñas`));
+            if (entry.reviewCount !== null) assert.ok(side.reputationText.includes(`${entry.reviewCount} reseñas`), side.reputationText);
           }
         }
         assert.deepEqual(client.careers, server.careers, "B3 careers link");

@@ -91,6 +91,14 @@ import {
   renderRelatedJobsHtml,
   resolveJobCityHub
 } from "./lib/job-internal-links.js";
+import {
+  buildCompanyJobsBlock,
+  companyJobsScope,
+  renderCompanyJobsHtml,
+  type CompanyJobsScope,
+  type CompanyJobsSnapshot
+} from "./lib/job-company-links.js";
+import { reputationLabel, reputationReviewText, reputationScoreText } from "./lib/reputation-labels.js";
 import { verifySession } from "./auth/verify-session.js";
 import { startPaymentCheckout } from "./payments/checkout.js";
 import { handleWompiWebhook } from "./payments/webhook.js";
@@ -376,16 +384,56 @@ function loadCompanyPage(slug: string, country: string | undefined): Promise<Com
   return companyPageCache.get(`${country?.toUpperCase() ?? ""}|${slug}`, () => queryCompanyPage(slug, country));
 }
 
-// Mirrors ReputationBadges.tsx's SOURCE_LABELS exactly (that file's own
-// comment: "Text attribution only, never a source's logo" — none of these
-// sources license logo reuse). Duplicated here, not imported, because the
-// canonical copy lives in a .tsx client component this server module has
-// no reason to depend on for one 3-entry map.
-const REPUTATION_SOURCE_LABELS: Record<string, string> = {
-  merco: "Merco Talento",
-  gptw: "Great Place to Work",
-  computrabajo: "Computrabajo"
-};
+// Block B1 of a job page (openspec/changes/job-page-differentiation): the
+// employer's other live vacancies. Its own small cache, never
+// companyPageCache (job traffic would evict real company pages) nor the
+// dashboard LRU (docs/DASHBOARD-PERFORMANCE-RUNBOOK.md), and no startup
+// warmup. The job route only peeks: a cold employer shows just its company
+// link while one background load fills the entry.
+const COMPANY_JOBS_SNAPSHOT_ROWS = 24;
+const companyJobsCache = new StaleWhileRevalidateCache<string, CompanyJobsSnapshot>({
+  freshForMs: 5 * 60_000,
+  staleForMs: 6 * 60 * 60_000,
+  maxEntries: 512,
+  clone: (value) => ({ total: value.total, jobs: value.jobs.map((job) => ({ ...job })) }),
+  onBackgroundRefreshError: (error) => {
+    if (error === COMPANY_JOBS_BUSY) return;
+    // The key holds an employer name; keep it out of the log.
+    console.warn("[company-jobs-cache] Background load failed; the job page shows only the company link.");
+  }
+});
+
+// A crawl touches thousands of employers. The pool has 5 connections and
+// the response's own queries must never queue behind these loads: at most
+// one runs at a time, and a load requested while it runs is dropped (the
+// next visit to that employer asks again).
+const COMPANY_JOBS_BUSY = new Error("company-jobs-cache busy");
+let companyJobsLoading = false;
+
+async function loadCompanyJobs(scope: CompanyJobsScope): Promise<CompanyJobsSnapshot> {
+  if (companyJobsLoading) throw COMPANY_JOBS_BUSY;
+  companyJobsLoading = true;
+  try {
+    // Same query and employer grouping as the /empresas/:slug page it links.
+    const page = await queryCompanyJobsPage(scope.name, scope.country, COMPANY_JOBS_SNAPSHOT_ROWS);
+    return {
+      total: page.total,
+      jobs: page.jobs.map((job) => ({
+        jobId: job.jobId,
+        title: job.title,
+        location: job.location,
+        url: job.url,
+        isLocked: job.isLocked
+      }))
+    };
+  } finally {
+    companyJobsLoading = false;
+  }
+}
+
+function peekCompanyJobs(scope: CompanyJobsScope): CompanyJobsSnapshot | undefined {
+  return companyJobsCache.peek(scope.key, () => loadCompanyJobs(scope));
+}
 
 // A route's own validation always returns its own specific, safe 400
 // before ever reaching a catch block — so whatever lands here is either a
@@ -1490,23 +1538,37 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     const related = hubPage
       ? pickRelatedJobs(visible.jobId, maskLockedFields(hubPage.jobs, "free").filter(isPubliclyDescribable))
       : [];
-    indexHtml = indexHtml.replace(
-      '<div id="app"></div>',
-      `<div id="app">${renderJobBreadcrumbHtml(visible, cityHub)}${buildJobPageBody(visible)}${renderRelatedJobsHtml(cityHub, related)}</div>`
-    );
-    indexHtml = indexHtml.replace(
-      "</head>",
-      `  <script>window.__SSR_JOB_LINKS__=${escapeJsonForScriptTag({ jobId: visible.jobId, related })};</script>\n` +
-        `  <script type="application/ld+json">${escapeJsonForScriptTag(buildJobBreadcrumbList(visible, cityHub))}</script>\n</head>`
+    // B1: the employer's other vacancies, peeked like the hub above — never
+    // a query this response waits for, never for a placeholder employer.
+    const companyScope = companyJobsScope(visible);
+    const companySnapshot = companyScope ? peekCompanyJobs(companyScope) : undefined;
+    const companyJobs = buildCompanyJobsBlock(
+      visible,
+      companySnapshot && {
+        total: companySnapshot.total,
+        jobs: maskLockedFields(companySnapshot.jobs, "free")
+      }
     );
     // Google blocks /api/jobs under robots.txt. Without this snapshot React
     // discarded a real SSR job and rendered a false "no longer available".
     // Only embed anonymous, already-public fields; authenticated clients refetch.
-    if (!session) {
-      // Preserve the public badges previously obtained by the detail API.
-      // One company lookup, never a corpus scan; optional enrichment may fail
-      // without making an otherwise healthy vacancy unavailable.
-      const [publicJob] = await attachReputation([visible]).catch(() => [visible]);
+    // Preserve the public badges previously obtained by the detail API (B2:
+    // now also in the raw HTML). One company lookup, never a corpus scan, and
+    // only for anonymous visitors — a session's page is rebuilt by the API;
+    // optional enrichment may fail without making an otherwise healthy
+    // vacancy unavailable.
+    const publicJob = session ? null : (await attachReputation([visible]).catch(() => [visible]))[0];
+    indexHtml = indexHtml.replace(
+      '<div id="app"></div>',
+      `<div id="app">${renderJobBreadcrumbHtml(visible, cityHub)}${buildJobPageBody(publicJob ?? visible)}` +
+        `${companyJobs ? renderCompanyJobsHtml(companyJobs) : ""}${renderRelatedJobsHtml(cityHub, related)}</div>`
+    );
+    indexHtml = indexHtml.replace(
+      "</head>",
+      `  <script>window.__SSR_JOB_LINKS__=${escapeJsonForScriptTag({ jobId: visible.jobId, related, ...(companyJobs ? { company: companyJobs } : {}) })};</script>\n` +
+        `  <script type="application/ld+json">${escapeJsonForScriptTag(buildJobBreadcrumbList(visible, cityHub))}</script>\n</head>`
+    );
+    if (publicJob) {
       indexHtml = indexHtml.replace(
         "</head>",
         `  <script>window.__SSR_JOB__=${escapeJsonForScriptTag(buildJobPagePayload(publicJob))};</script>\n</head>`
@@ -1816,14 +1878,9 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
 
     const reputationItems = reputation
       .map((r) => {
-        // Same source-label map and "score null -> Certificación" rule as
-        // ReputationBadges.tsx (the client component rendering this same
-        // data) — kept in sync manually since that map lives in a .tsx
-        // file this server module doesn't import from.
-        const label = REPUTATION_SOURCE_LABELS[r.source] || r.source;
-        const scoreText = r.score !== null ? `${r.score} (${r.scoreScale})` : "Certificación";
-        const reviewText = r.reviewCount !== null ? ` · ${r.reviewCount} reseñas` : "";
-        return `<li>${escapeHtml(label)}: ${escapeHtml(scoreText)}${reviewText}</li>`;
+        // Same labels and "score null -> Certificación" rule as
+        // ReputationBadges.tsx, from the shared reputation-labels.ts.
+        return `<li>${escapeHtml(reputationLabel(r.source))}: ${escapeHtml(reputationScoreText(r))}${reputationReviewText(r)}</li>`;
       })
       .join("\n");
     const jobItems = page

@@ -7,6 +7,7 @@ import { useAuth } from "../auth/auth-provider.js";
 import { usePageMeta } from "../lib/use-page-meta.js";
 import { buildCategoryPath, buildJobMeta } from "../lib/job-seo.js";
 import { cityHubHeading, readJobLinks, resolveJobCityHub } from "../lib/job-internal-links.js";
+import { companyJobsHeading, companyJobsLinkLabel, readCompanyJobs } from "../lib/job-company-links.js";
 import { Button } from "../components/ui/button.js";
 import { ArrowLeft } from "lucide-react";
 import { isVePrefixed } from "../lib/country-context.js";
@@ -118,6 +119,8 @@ export default function JobLanding() {
   const cityHub = job ? resolveJobCityHub(job) : null;
   const cityHubPath = cityHub ? buildCategoryPath(cityHub) : null;
   const related = readJobLinks(id, window.__SSR_JOB_LINKS__);
+  // B1, from the same payload the server rendered it from.
+  const companyJobs = readCompanyJobs(id, window.__SSR_JOB_LINKS__);
   const back = origin ?? (cityHub && cityHubPath ? { path: cityHubPath, label: cityHubHeading(cityHub) } : null);
 
   // Same page shell as the company and category pages: ink breadcrumb on a
@@ -196,6 +199,32 @@ export default function JobLanding() {
               variant="ink"
             />
           ))}
+
+        {(state === "found" || state === "error") && job && !job.isLocked && companyJobs && (
+          <section data-company-jobs aria-label={companyJobsHeading(companyJobs)} className="ink-card mt-8 rounded-3xl bg-white p-6 md:p-8">
+            {companyJobs.jobs.length > 0 && (
+              <>
+                <h2 className="font-heading font-bold text-xl md:text-2xl break-words">{companyJobsHeading(companyJobs)}</h2>
+                <ul className="mt-4 divide-y divide-foreground/10">
+                  {companyJobs.jobs.map((link) => (
+                    <li key={link.path} className="py-3">
+                      <Link to={link.path} className="font-semibold text-foreground hover:underline break-words">
+                        {link.title}
+                      </Link>
+                      <p className="text-sm text-[#3d413e]">{link.location}</p>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+            <Link
+              to={companyJobs.path}
+              className={`${companyJobs.jobs.length > 0 ? "mt-4 " : ""}inline-block font-semibold text-foreground underline break-words`}
+            >
+              {companyJobsLinkLabel(companyJobs)}
+            </Link>
+          </section>
+        )}
 
         {(state === "found" || state === "error") && job && cityHub && cityHubPath && related.length > 0 && (
           <section data-related-jobs aria-labelledby="related-jobs-heading" className="ink-card mt-8 rounded-3xl bg-white p-6 md:p-8">

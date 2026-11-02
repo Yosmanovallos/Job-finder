@@ -134,7 +134,7 @@ test("JPD-006 official employer mark and curated careers link", () => {
   const official = buildJobPageBody(officialJob);
   assert.ok(
     official.includes(
-      `<li>Fuente: <a href="https://careers.example.invalid/" target="_blank" rel="nofollow noopener">Portal oficial de empleo de Alpina</a></li>`
+      `<li data-official-source>Fuente: <a href="https://careers.example.invalid/" target="_blank" rel="nofollow noopener">Portal oficial de empleo de Alpina</a></li>`
     ),
     "official source fact names the employer and links its careers domain"
   );
