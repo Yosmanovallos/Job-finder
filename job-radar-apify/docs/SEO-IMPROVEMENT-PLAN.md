@@ -7,6 +7,10 @@ vez instalado el plugin [claude-seo](https://github.com/AgriciDaniel/claude-seo)
 (25 skills, 18 agentes, `/seo <comando>`, scope `local`, no comprometido
 al repo).
 
+Indexación de vacantes en Google Empleos (cuota de la Indexing API, aptitud de
+vacantes nuevas, diferenciación de la página): fases en
+`docs/GOOGLE-JOBS-INDEXING-PLAN-2026-11.md`.
+
 ## 0. Cómo usar este documento (léelo primero, siempre)
 
 **Regla no negociable:** antes de tocar cualquier cosa relacionada con
