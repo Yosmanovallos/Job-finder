@@ -58,6 +58,14 @@ export const ROUTE_META: Record<string, RouteMeta> = {
     introduction:
       "De qué portales vienen las vacantes, qué tan recientes son, cómo sabemos que una oferta sigue abierta, si necesitas cuenta y por qué BuscoTrabajo nunca aplica por ti."
   },
+  "/opiniones": {
+    title: "Opiniones de usuarios y reportar un error | BuscoTrabajo",
+    description:
+      "Lee lo que opinan quienes buscan empleo con BuscoTrabajo, deja tu opinión o repórtanos un error. También mostramos lo que mejoramos y cuándo.",
+    heading: "Opiniones sobre BuscoTrabajo",
+    introduction:
+      "Cuéntanos si BuscoTrabajo te sirvió, si encontraste trabajo o si algo falló. Los reportes de errores son privados; las opiniones se publican después de revisarlas."
+  },
   ...Object.fromEntries(
     Object.entries(LEGAL).map(([path, legal]) => [
       path,

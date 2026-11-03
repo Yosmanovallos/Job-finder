@@ -66,7 +66,8 @@ const suites: Record<string, string[]> = {
     "validate-detail-drain.test.ts",
     "validate-placeholder-employer.test.ts",
     "validate-auth-error-messages.test.ts",
-    "validate-email-typo.test.ts"
+    "validate-email-typo.test.ts",
+    "validate-site-feedback.test.ts"
   ],
   integration: [
     "validate-isolated-database.ts",
@@ -89,6 +90,7 @@ const suites: Record<string, string[]> = {
     "validate-direct-inventory.ts",
     "validate-direct-inventory-probe.ts",
     "validate-saved-jobs.ts",
+    "validate-site-feedback.ts",
     "validate-job-modality.ts",
     "validate-search-narrowing.ts"
   ],
@@ -104,6 +106,7 @@ const suites: Record<string, string[]> = {
   companies: ["validate-company-identity.test.ts", "validate-companies-search.ts"],
   home: ["validate-home-stats.ts"],
   "saved-jobs": ["validate-saved-jobs.ts"],
+  "site-feedback": ["validate-site-feedback.test.ts", "validate-site-feedback.ts"],
   baseline: ["validate-public-baseline.ts"],
   "agent-readiness": ["validate-agent-readiness.test.ts", "validate-agent-readiness.ts"],
   "job-seo": [

@@ -58,7 +58,10 @@ const UNCHANGED: Record<string, string> = {
   "efefefef-9999-4999-8999-999999999999": "805c3093a7ee901cb3f001a43a99dbd1f644c52b54856d0c28497e598369e268",
   "fafafafa-0000-4000-8000-000000000000": "6db90cbf42db58a18a81619d2b70e6d285e623d31037a7fdf03d0b6a1d0a18be"
 };
-const OTHER_PAGES_UNCHANGED = "306fc945966e687ab5799bbb22cc3723f654cd71d2e5f6eeb48b1d1ce9a6f03e";
+// 2026-11-02 (/opiniones): ROUTE_META gained the "/opiniones" entry. Without
+// that key the hash is still 306fc945…6f03e, so every existing page's meta is
+// byte-identical; only the new entry changes it.
+const OTHER_PAGES_UNCHANGED = "86bb8fd10f6676646608275e58ba9dfc33fa405b7283e39a9ffc4eeb4f0c4ce2";
 
 test("JMT-001 visible body, JobPosting, payload, canonical, robots verdict, sitemap and other pages' meta are unchanged", () => {
   for (const job of META_FIXTURES) {

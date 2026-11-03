@@ -975,3 +975,39 @@ CREATE INDEX IF NOT EXISTS idx_user_saved_jobs_user_saved
 ALTER TABLE user_saved_jobs ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON user_saved_jobs FROM anon, authenticated;
 -- END saved-jobs
+
+-- BEGIN site-feedback
+-- "Opiniones y ayuda" (/opiniones, 2026-11-02). Aditivo e idempotente; lo
+-- aplica scripts/migrate-site-feedback.ts. Una fila = un reporte privado
+-- (kind 'problem') o una opinión (kind 'opinion'). Las opiniones entran como
+-- 'pending' y solo se publican a mano (status 'published' + published_at).
+-- Sin correo ni IP. page_path / search_text / user_agent solo si la persona
+-- marcó "adjuntar datos técnicos".
+CREATE TABLE IF NOT EXISTS site_feedback (
+    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    kind          VARCHAR(16) NOT NULL CHECK (kind IN ('problem', 'opinion')),
+    category      VARCHAR(32) NOT NULL,
+    message       VARCHAR(2000) NOT NULL DEFAULT '',
+    rating        SMALLINT CHECK (rating BETWEEN 1 AND 5),
+    display_name  VARCHAR(60),
+    city          VARCHAR(60),
+    page_path     VARCHAR(300),
+    search_text   VARCHAR(200),
+    user_agent    VARCHAR(300),
+    status        VARCHAR(16) NOT NULL DEFAULT 'pending'
+                  CHECK (status IN ('pending', 'published', 'rejected', 'resolved')),
+    team_reply    VARCHAR(1000),
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    published_at  TIMESTAMPTZ,
+    -- Una opinión publicada siempre tiene estrellas (la API las exige).
+    CHECK (kind <> 'opinion' OR rating IS NOT NULL)
+);
+CREATE INDEX IF NOT EXISTS idx_site_feedback_created
+    ON site_feedback (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_site_feedback_published
+    ON site_feedback (published_at DESC)
+    WHERE kind = 'opinion' AND status = 'published';
+
+ALTER TABLE site_feedback ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON site_feedback FROM anon, authenticated;
+-- END site-feedback

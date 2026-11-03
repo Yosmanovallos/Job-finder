@@ -17,7 +17,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "tick | dry-run | dry-run-one | tick-one | migrate-dry-run | migrate | seed-dry-run | seed | seed-one-dry-run | seed-one | domain-census | discover-dry-run | discover | coverage | computrabajo-coverage | computrabajo-backlog | browser-boards-coverage | directory-export | frisby-canary | altipal-canary | identity-canary | copy-audit | copy-audit-all | db-size | cc-tenants | ats-inventory-dry-run | ats-inventory | ats-probe-dry-run | ats-probe | inventory-review-list | inventory-approve-dry-run | inventory-approve | inventory-revert-dry-run | inventory-revert | review-list | review-approve-dry-run | review-approve | cv-purge-dry-run | cv-purge | saved-jobs-migrate-dry-run | saved-jobs-migrate"
+        description: "tick | dry-run | dry-run-one | tick-one | migrate-dry-run | migrate | seed-dry-run | seed | seed-one-dry-run | seed-one | domain-census | discover-dry-run | discover | coverage | computrabajo-coverage | computrabajo-backlog | browser-boards-coverage | directory-export | frisby-canary | altipal-canary | identity-canary | copy-audit | copy-audit-all | db-size | cc-tenants | ats-inventory-dry-run | ats-inventory | ats-probe-dry-run | ats-probe | inventory-review-list | inventory-approve-dry-run | inventory-approve | inventory-revert-dry-run | inventory-revert | review-list | review-approve-dry-run | review-approve | cv-purge-dry-run | cv-purge | saved-jobs-migrate-dry-run | saved-jobs-migrate | site-feedback-migrate-dry-run | site-feedback-migrate"
         required: true
         default: "dry-run"
         type: choice
@@ -88,6 +88,11 @@ on:
           # new table, nothing existing altered; dry-run only reads.
           - saved-jobs-migrate-dry-run
           - saved-jobs-migrate
+          # Not direct-employer work either: creates the site_feedback table of
+          # /opiniones (scripts/migrate-site-feedback.ts, SQL approved by the
+          # owner 2026-11-02). One new table, nothing existing altered.
+          - site-feedback-migrate-dry-run
+          - site-feedback-migrate
       company_key:
         description: "review-approve: company_key del candidato"
         required: false
@@ -209,6 +214,8 @@ jobs:
             cv-purge)         cmd="npx tsx scripts/purge-cv-data.ts --execute --allow-remote-db" ;;
             saved-jobs-migrate-dry-run) cmd="npx tsx scripts/migrate-saved-jobs.ts --dry-run --allow-remote-db" ;;
             saved-jobs-migrate) cmd="npx tsx scripts/migrate-saved-jobs.ts --allow-remote-db" ;;
+            site-feedback-migrate-dry-run) cmd="npx tsx scripts/migrate-site-feedback.ts --dry-run --allow-remote-db" ;;
+            site-feedback-migrate) cmd="npx tsx scripts/migrate-site-feedback.ts --allow-remote-db" ;;
             *) echo "modo desconocido: $MODE"; exit 1 ;;
           esac
           echo "## Direct employers — $MODE" >> "$GITHUB_STEP_SUMMARY"
