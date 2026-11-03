@@ -423,6 +423,35 @@ What remains of a search:
 - `/dashboard` on unique URLs must stay at 250-330 ms. The Render log must
   show `dashboard_cache_warmed`.
 
+**Verified 2026-11-03** after PR #106 (`15feb3f`):
+
+- Deploy: merged 11:25 UTC; the process restarted at about 11:25:45 UTC
+  (`/api/health` uptime). No other restart followed in the next 9 minutes.
+- `/api/jobs` answers Cloudflare `BYPASS`, so every request reached Render.
+  "Cold" means an app-cache key nobody had requested.
+- Cold samples: before = the same day on the old code; after = varying
+  `limit` (11-20) on the new code, which gives new cache keys for the same
+  SQL work.
+
+| `/api/jobs?country=CO&search=…` | Before | After |
+| --- | ---: | ---: |
+| analista | 1.20 s | 0.72-0.75 s (6 samples) |
+| auxiliar / desarrollador | 1.19 / 1.17 s | 0.75 / 0.81 s |
+| contador | 2.30 s (2026-11-02: 1.03-1.39 s) | 0.81-0.92 s (5 samples), one 1.50 s |
+| vendedor | 1.47 s | 1.18 s |
+| colombia (16,529 results, broad path = old SQL) | 1.26 s | 1.21-1.34 s (5 samples), one 2.03 s |
+| Repeats (cached) | ~0.25 s | 0.23-0.32 s |
+
+- Selective searches lost about 0.35-0.5 s. A cached response, which is
+  mostly network and server overhead, takes ~0.25 s; so the database part of
+  `analista` went from ~0.95 s to ~0.48 s.
+- The broad search stays where it was, as designed.
+- `/dashboard` with Cloudflare `MISS`: 257, 266 and 312 ms. `/ve/dashboard`:
+  260, 276 and 284 ms. Both are inside the 250-330 ms baseline.
+- The Render deploy log was not read in this check, so `dashboard_cache_warmed`
+  is not confirmed from the log. The fast `MISS` responses of the SSR first
+  page are consistent with a successful warmup.
+
 ## Required regression check
 
 For any change that can affect this path:
