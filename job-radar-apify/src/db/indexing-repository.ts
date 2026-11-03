@@ -1,7 +1,7 @@
 import type { PoolClient } from "pg";
 import { pool } from "./client.js";
 import type { NotificationType } from "../lib/google-indexing.js";
-import { buildJobUrl, buildJobUrlPrefix } from "../lib/job-seo.js";
+import { buildJobUrl } from "../lib/job-seo.js";
 import { canonicalSql, seoReadySql } from "../lib/google-job-readiness.js";
 import { DEFAULT_SCHEDULER, newestFirstLanes, type LaneQueues, type QueueLane, type Schedulable } from "../lib/indexing-scheduler.js";
 
@@ -97,7 +97,9 @@ export async function enqueueIndexingNotificationsWith(db: Queryable, entries: I
   const urls = entries.map((entry) => entry.url);
   const types = entries.map((entry) => entry.type);
   const priorities = entries.map((entry) => entry.priority ?? INDEXING_PRIORITY.reconcile);
-  const jobIds = entries.map((entry) => entry.jobId ?? null);
+  // A URL_DELETED row is the 410 tombstone wasJobPurged() looks up by
+  // job_id, so it always carries one, even when the caller only had the URL.
+  const jobIds = entries.map((entry) => entry.jobId ?? (entry.type === "URL_DELETED" ? jobIdFromUrl(entry.url) : null));
   const hashes = entries.map((entry) => entry.contentHash ?? null);
   const result = await db.query<{ n: string }>(
     `WITH input AS (
@@ -358,10 +360,14 @@ export async function checkIndexingTarget(row: Pick<PendingIndexingRow, "url" | 
 // tell "this id existed and expired" apart from "this id never existed"
 // without a new table or column. Any status counts (a superseded duplicate
 // URL_DELETED still proves the job existed).
+// Looked up by job_id (idx_indexing_queue_job), never by URL: a leading-%
+// LIKE scanned the whole table on every expired-job visit and drained the
+// Disk IO budget (2026-11-03). Rows older than the job_id column are
+// backfilled by schema.sql's purged-lookup block.
 export async function wasJobPurged(jobId: string): Promise<boolean> {
   const result = await pool.query(
-    `SELECT 1 FROM indexing_queue WHERE notification_type = 'URL_DELETED' AND url LIKE $1 LIMIT 1`,
-    [`%${buildJobUrlPrefix(jobId)}%`]
+    `SELECT 1 FROM indexing_queue WHERE job_id = $1 AND notification_type = 'URL_DELETED' LIMIT 1`,
+    [jobId]
   );
   return (result.rowCount ?? 0) > 0;
 }

@@ -549,6 +549,21 @@ try {
   ]);
   assert.ok(await wasJobPurged(thinId));
   assert.equal((await fetch(`${BASE}${new URL(purgedUrl).pathname}`)).status, 410);
+  // A tombstone written before indexing_queue had job_id: invisible to the
+  // job_id lookup until the purged-lookup block backfills it from its URL.
+  const legacyId = crypto.randomUUID();
+  await pool.query(
+    `INSERT INTO indexing_queue (url, notification_type, status) VALUES ($1, 'URL_DELETED', 'sent')`,
+    [`https://buscotrabajo.co/ve/empleos/${legacyId}/vacante-antigua`]
+  );
+  assert.equal(await wasJobPurged(legacyId), false, "legacy row has no job_id yet");
+  const purgedBlock = /-- BEGIN purged-lookup\r?\n([\s\S]*?)-- END purged-lookup/.exec(await readFile(path.join(root, "src/db/schema.sql"), "utf8"))?.[1];
+  assert.ok(purgedBlock, "schema.sql must contain the purged-lookup block");
+  assert.doesNotMatch(purgedBlock!, /\bDROP\b|\bTRUNCATE\b|DELETE FROM|ALTER TABLE/i, "block only fills NULL job_id");
+  await pool.query(purgedBlock!);
+  await pool.query(purgedBlock!);
+  assert.ok(await wasJobPurged(legacyId), "backfilled legacy tombstone is found by job_id");
+  assert.equal((await fetch(`${BASE}/empleos/${legacyId}/vacante-antigua`)).status, 410);
   assert.ok(!(await sitemapLocs()).includes(purgedUrl), "expired job leaves the sitemap");
   console.log("✅ [expiry] never-API-notified purge: 410 tombstone + sitemap removal, no delete quota spent.");
 
