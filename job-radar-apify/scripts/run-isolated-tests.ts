@@ -91,14 +91,15 @@ const suites: Record<string, string[]> = {
     "validate-direct-inventory-probe.ts",
     "validate-saved-jobs.ts",
     "validate-site-feedback.ts",
-    "validate-job-modality.ts"
+    "validate-job-modality.ts",
+    "validate-search-narrowing.ts"
   ],
     direct: ["validate-direct-employers.test.ts", "validate-direct-discovery.test.ts", "validate-direct-d5.test.ts", "validate-direct-d5-workday.test.ts", "validate-direct-d5-phenom.test.ts", "validate-direct-d5-eightfold.test.ts", "validate-direct-d5-magneto.test.ts", "validate-direct-d5-google.test.ts", "validate-direct-tp.test.ts", "validate-direct-frisby.test.ts", "validate-direct-altipal.test.ts", "validate-direct-workeando.test.ts", "validate-direct-inventory.test.ts", "validate-direct-inventory-probe.test.ts", "validate-computrabajo-backlog.test.ts", "validate-source-focus.test.ts", "validate-direct-employers.ts", "validate-direct-discovery.ts", "validate-direct-projection.ts", "validate-direct-inventory.ts", "validate-direct-inventory-probe.ts"],
   "source-closure": ["validate-source-closure.test.ts", "validate-source-closure.ts"],
   "job-freshness": ["validate-job-freshness.test.ts", "validate-job-freshness.ts"],
   sitemap: ["validate-sitemap-streaming.ts"],
   observability: ["validate-run-observability.ts"],
-  pagination: ["validate-job-pagination.ts"],
+  pagination: ["validate-job-pagination.ts", "validate-search-narrowing.ts"],
   modality: ["validate-job-modality.test.ts", "validate-job-modality.ts"],
   seo: ["validate-seo-job-pages.ts", "validate-job-page-blocks.ts"],
   "job-page-blocks": ["validate-job-page-blocks.ts", "validate-job-page-blocks.test.ts"],
