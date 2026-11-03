@@ -1011,3 +1011,18 @@ CREATE INDEX IF NOT EXISTS idx_site_feedback_published
 ALTER TABLE site_feedback ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON site_feedback FROM anon, authenticated;
 -- END site-feedback
+
+-- BEGIN purged-lookup
+-- wasJobPurged() (src/db/indexing-repository.ts) busca la lápida 410 por
+-- job_id (idx_indexing_queue_job) en vez de un LIKE '%/empleos/<id>/%' que
+-- recorría toda indexing_queue en cada visita a una vacante vencida y agotaba
+-- el presupuesto de Disk IO de Supabase (2026-11-03). Las filas URL_DELETED
+-- anteriores a la columna job_id la reciben aquí, sacada de su propia URL.
+-- Solo rellena NULLs; re-ejecutarlo no cambia nada. Lo aplica
+-- scripts/migrate-purged-lookup.ts ANTES de desplegar el código que lo lee.
+UPDATE indexing_queue
+SET job_id = substring(url FROM '/empleos/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})/')::uuid
+WHERE notification_type = 'URL_DELETED'
+  AND job_id IS NULL
+  AND url ~ '/empleos/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/';
+-- END purged-lookup

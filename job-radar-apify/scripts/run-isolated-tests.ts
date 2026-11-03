@@ -360,6 +360,10 @@ async function main(): Promise<void> {
       const projectionBlock = /-- BEGIN direct-projection\r?\n([\s\S]*?)-- END direct-projection/.exec(schema)?.[1];
       if (!projectionBlock) throw new Error("[P0] schema.sql no contiene el bloque direct-projection.");
       await pool.query(projectionBlock);
+      // 410 tombstone lookup by job_id: backfilled before the code ships.
+      const purgedBlock = /-- BEGIN purged-lookup\r?\n([\s\S]*?)-- END purged-lookup/.exec(schema)?.[1];
+      if (!purgedBlock) throw new Error("[P0] schema.sql no contiene el bloque purged-lookup.");
+      await pool.query(purgedBlock);
       await pool.query("INSERT INTO test_sandbox (run_id) VALUES ($1)", [runId]);
       await pool.end();
       pool = undefined;
