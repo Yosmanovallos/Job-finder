@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { validateFeedback } from "../src/lib/site-feedback.js";
+import { publicDisplayName, validateFeedback } from "../src/lib/site-feedback.js";
 import { ROUTE_META } from "../src/lib/page-meta.js";
 import { injectRouteMeta } from "../src/lib/agent-readiness.js";
 
@@ -54,15 +54,24 @@ test("feedback: unknown kinds and categories are rejected", () => {
   }
 });
 
-test("feedback: an opinion needs consent, a name and a real message", () => {
-  const base = { kind: "opinion", category: "me-sirvio", message: "Me ahorra tiempo cada mañana.", displayName: "Ana M.", city: " Medellín ", rating: 4 };
+test("feedback: an opinion needs consent and a real message; a typed name or city is ignored", () => {
+  const base = { kind: "opinion", category: "me-sirvio", message: "Me ahorra tiempo cada mañana.", displayName: "Nombre inventado", city: " Medellín ", rating: 4 };
   assert.equal(validateFeedback(base).ok, false, "sin consentimiento");
   assert.equal(validateFeedback({ ...base, consentPublish: true, message: "ok" }).ok, false, "mensaje corto");
-  assert.equal(validateFeedback({ ...base, consentPublish: true, displayName: " " }).ok, false, "sin nombre");
   const ok = validateFeedback({ ...base, consentPublish: true, pagePath: "/dashboard", attachContext: true });
   assert.ok(ok.ok && !("spam" in ok));
-  assert.equal(ok.value.city, "Medellín");
+  assert.equal(ok.value.displayName, null, "el nombre público sale de la cuenta, nunca del formulario");
+  assert.equal(ok.value.city, null);
   assert.equal(ok.value.pagePath, null, "las opiniones nunca guardan contexto técnico");
+});
+
+test("feedback: public name from the account is first name + last initial, never the email", () => {
+  assert.equal(publicDisplayName("Ana María Pérez"), "Ana P.");
+  assert.equal(publicDisplayName("  carlos  "), "Carlos");
+  assert.equal(publicDisplayName("José Núñez"), "José N.");
+  assert.ok(!/[<>]/.test(publicDisplayName("José <b>Núñez</b>")), "sin markup");
+  assert.equal(publicDisplayName(null), "Persona registrada");
+  assert.equal(publicDisplayName("ana@example.com"), "Persona registrada", "nunca una parte del correo");
 });
 
 test("feedback: control characters are stripped and text is clipped", () => {

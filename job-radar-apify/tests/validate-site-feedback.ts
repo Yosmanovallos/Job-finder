@@ -5,7 +5,7 @@ import { readFile } from "node:fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
 import { pool } from "../src/db/client.js";
-import { listPublishedOpinions } from "../src/db/site-feedback-repository.js";
+import { insertFeedback, listPublishedOpinions } from "../src/db/site-feedback-repository.js";
 
 // "Opiniones y ayuda" (schema.sql's site-feedback block,
 // scripts/migrate-site-feedback.ts). The code ships before the table
@@ -16,6 +16,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TEST_PORT = Number(process.env.TEST_HTTP_PORT);
 const BASE_URL = `http://127.0.0.1:${TEST_PORT}`;
 const MARK = "ZzFeedback";
+const USER_A = "fee0b000-0000-4000-8000-00000000000a";
+const USER_B = "fee0b000-0000-4000-8000-00000000000b";
 
 async function waitForServer(server: ChildProcess, maxAttempts = 80, delayMs = 250): Promise<void> {
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
@@ -31,11 +33,26 @@ async function waitForServer(server: ChildProcess, maxAttempts = 80, delayMs = 2
   throw new Error(`El servidor no respondió en ${maxAttempts * delayMs}ms`);
 }
 
-async function applyBlock(): Promise<void> {
-  const schema = await readFile(path.join(__dirname, "..", "src", "db", "schema.sql"), "utf8");
-  const block = /-- BEGIN site-feedback\r?\n([\s\S]*?)-- END site-feedback/.exec(schema)?.[1];
+async function readSchema(): Promise<string> {
+  return readFile(path.join(__dirname, "..", "src", "db", "schema.sql"), "utf8");
+}
+
+async function readBlock(): Promise<string> {
+  const block = /-- BEGIN site-feedback\r?\n([\s\S]*?)-- END site-feedback/.exec(await readSchema())?.[1];
   assert.ok(block, "schema.sql no contiene el bloque site-feedback");
-  await pool.query(block);
+  return block;
+}
+
+async function applyBlock(): Promise<void> {
+  await pool.query(await readBlock());
+}
+
+// The isolated database has no `users` table (production does): create it
+// from schema.sql's own definition, as validate-saved-jobs.ts does.
+async function ensureUsersTable(): Promise<void> {
+  const statement = /CREATE TABLE IF NOT EXISTS users \([\s\S]*?\n\);/.exec(await readSchema())?.[0];
+  assert.ok(statement, "schema.sql no contiene la tabla users");
+  await pool.query(statement);
 }
 
 function post(body: unknown, contentType = "application/json") {
@@ -75,12 +92,23 @@ async function main() {
     assert.equal(before.headers.get("cache-control"), "private, no-store");
     console.log("✅ [PASSED] Sin tabla: 503 (la página ofrece el correo).");
 
-    // 3. The block is idempotent and locked down like every other table.
+    // 3. Production path: the table first existed WITHOUT accounts (PR #105)
+    // and may hold anonymous opinions. Re-applying the block adds user_id
+    // without touching them; it is idempotent and stays locked down.
     for (const role of ["anon", "authenticated"]) {
       await pool.query(`DO $$ BEGIN CREATE ROLE ${role} NOLOGIN; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`);
     }
+    await ensureUsersTable();
+    const block = await readBlock();
+    await pool.query(block.slice(0, block.indexOf("-- 2026-11-03")));
+    await pool.query(
+      `INSERT INTO site_feedback (kind, category, message, rating, display_name, status, published_at)
+       VALUES ('opinion', 'me-sirvio', $1, 5, 'Nombre inventado', 'published', NOW())`,
+      [`${MARK} anónima vieja`]
+    );
     await applyBlock();
     await applyBlock();
+    assert.equal((await pool.query(`SELECT 1 FROM site_feedback WHERE message = $1`, [`${MARK} anónima vieja`])).rowCount, 1, "la fila vieja sigue ahí");
     const rls = await pool.query(`SELECT relrowsecurity FROM pg_class WHERE relname = 'site_feedback'`);
     assert.equal(rls.rows[0]?.relrowsecurity, true, "RLS debe estar activo");
     const grants = await pool.query(
@@ -89,49 +117,64 @@ async function main() {
     assert.equal(grants.rowCount, 0, "anon/authenticated no deben tener permisos");
     console.log("✅ [PASSED] Bloque idempotente, RLS activo, 0 permisos públicos.");
 
-    // 4. A problem report with context; an opinion lands as pending.
+    // 4. Reports stay open to everyone (stars ignored without an account);
+    // opinions without a session are refused and not stored.
     assert.equal(
-      (await post({ kind: "problem", category: "busqueda", message: `${MARK} no carga`, attachContext: true, pagePath: "/dashboard?search=secreto", search: "contador" })).status,
+      (await post({ kind: "problem", category: "busqueda", message: `${MARK} no carga`, rating: 2, attachContext: true, pagePath: "/dashboard?search=secreto", search: "contador" })).status,
       201
     );
-    assert.equal(
-      (await post({ kind: "opinion", category: "me-sirvio", message: `${MARK}: <b>me ahorra tiempo</b>`, displayName: "Ana M.", city: "Medellín", consentPublish: true, rating: 4 })).status,
-      201
+    const anonymous = await post({ kind: "opinion", category: "me-sirvio", message: `${MARK}: opinión sin cuenta`, consentPublish: true, rating: 5 });
+    assert.equal(anonymous.status, 401);
+    const report = await pool.query(
+      `SELECT page_path, search_text, user_agent, status, rating, user_id FROM site_feedback WHERE message = $1`,
+      [`${MARK} no carga`]
     );
-    const invalid = await post({ kind: "opinion", category: "me-sirvio", message: "Sin permiso para publicar", displayName: "Ana" });
-    assert.equal(invalid.status, 400);
-    const rows = await pool.query(
-      `SELECT kind, page_path, search_text, user_agent, status, rating FROM site_feedback WHERE message LIKE $1 ORDER BY kind DESC`,
-      [`${MARK}%`]
-    );
-    assert.equal(rows.rowCount, 2);
-    assert.deepEqual(rows.rows[0], { kind: "problem", page_path: "/dashboard", search_text: "contador", user_agent: `${MARK}-agent`, status: "pending", rating: null });
-    assert.deepEqual(rows.rows[1], { kind: "opinion", page_path: null, search_text: null, user_agent: null, status: "pending", rating: 4 });
-    await assert.rejects(
-      pool.query(`INSERT INTO site_feedback (kind, category, message, display_name) VALUES ('opinion', 'me-sirvio', $1, 'X')`, [`${MARK} sin estrellas`]),
-      /check/i,
-      "la tabla no acepta opiniones sin estrellas"
-    );
-    console.log("✅ [PASSED] Reporte con contexto sin query; opinión pendiente; inválida = 400.");
+    assert.deepEqual(report.rows[0], { page_path: "/dashboard", search_text: "contador", user_agent: `${MARK}-agent`, status: "pending", rating: null, user_id: null });
+    assert.equal((await pool.query(`SELECT 1 FROM site_feedback WHERE message = $1`, [`${MARK}: opinión sin cuenta`])).rowCount, 0);
+    console.log("✅ [PASSED] Reporte anónimo sin estrellas; opinión sin cuenta = 401 y no se guarda.");
 
     // 5. Its own rate limit: 5 POSTs per IP every 10 minutes.
-    const limited = await post({ kind: "problem", category: "otro" });
-    assert.equal(limited.status, 429);
+    assert.equal((await post({ kind: "problem", category: "otro" })).status, 201);
+    assert.equal((await post({ kind: "problem", category: "otro" })).status, 429);
     console.log("✅ [PASSED] Límite de envíos por IP (429).");
 
-    // 6. Only published opinions are public, escaped in the server HTML.
-    // Checked in the DB, not via the API: the server keeps a 5-minute copy.
+    // 6. With an account: one opinion per account, editing sends it back to
+    // review, and the table itself refuses a new opinion without an account.
+    for (const [id, email] of [[USER_A, "zzfeedback-a@example.test"], [USER_B, "zzfeedback-b@example.test"]]) {
+      await pool.query(`INSERT INTO users (id, email) VALUES ($1, $2) ON CONFLICT (id) DO NOTHING`, [id, email]);
+    }
+    const opinion = (message: string, rating: number, displayName: string) => ({
+      kind: "opinion" as const,
+      category: "me-sirvio",
+      message,
+      rating,
+      displayName,
+      city: null,
+      pagePath: null,
+      search: null
+    });
+    await insertFeedback(opinion(`${MARK}: primera versión`, 3, "Ana P."), null, USER_A);
+    await insertFeedback(opinion(`${MARK}: <b>me ahorra tiempo</b>`, 5, "Ana P."), null, USER_A);
+    const own = await pool.query(`SELECT message, rating, status FROM site_feedback WHERE user_id = $1 AND kind = 'opinion'`, [USER_A]);
+    assert.deepEqual(own.rows, [{ message: `${MARK}: <b>me ahorra tiempo</b>`, rating: 5, status: "pending" }], "una sola opinión por cuenta");
     assert.deepEqual(await listPublishedOpinions(), [], "nada se publica solo");
-    await pool.query(
-      `UPDATE site_feedback SET status = 'published', published_at = NOW(), team_reply = 'Gracias.' WHERE kind = 'opinion' AND message LIKE $1`,
-      [`${MARK}%`]
+    await pool.query(`UPDATE site_feedback SET status = 'published', published_at = NOW(), team_reply = 'Gracias.' WHERE user_id = $1`, [USER_A]);
+    await insertFeedback(opinion(`${MARK}: <b>me ahorra tiempo</b>`, 5, "Ana P."), null, USER_A);
+    const edited = await pool.query(`SELECT status, published_at, team_reply FROM site_feedback WHERE user_id = $1`, [USER_A]);
+    assert.deepEqual(edited.rows[0], { status: "pending", published_at: null, team_reply: null }, "editar la vuelve a revisión");
+    await pool.query(`UPDATE site_feedback SET status = 'published', published_at = NOW(), team_reply = 'Gracias.' WHERE user_id = $1`, [USER_A]);
+    // A published 2-star opinion counts the same as a 5-star one (no gating).
+    await insertFeedback(opinion(`${MARK}: pocas ofertas en mi ciudad`, 2, "Luis P."), null, USER_B);
+    await pool.query(`UPDATE site_feedback SET status = 'published', published_at = NOW() - INTERVAL '1 day' WHERE user_id = $1`, [USER_B]);
+    await assert.rejects(
+      pool.query(`INSERT INTO site_feedback (kind, category, message, rating, display_name) VALUES ('opinion', 'me-sirvio', $1, 4, 'X')`, [`${MARK} sin cuenta`]),
+      /check/i,
+      "la tabla no acepta opiniones nuevas sin cuenta"
     );
-    // A published 2-star opinion counts the same as a 4-star one (no gating).
-    await pool.query(
-      `INSERT INTO site_feedback (kind, category, message, rating, display_name, status, published_at)
-       VALUES ('opinion', 'no-me-sirvio', $1, 2, 'Luis P.', 'published', NOW() - INTERVAL '1 day')`,
-      [`${MARK}: pocas ofertas en mi ciudad`]
-    );
+    console.log("✅ [PASSED] Una opinión por cuenta; editar la vuelve a revisión; la tabla exige cuenta.");
+
+    // 7. Only published opinions WITH an account are public (the old
+    // anonymous one, though marked published, never shows), escaped.
     const page = await fetch(`${BASE_URL}/opiniones`);
     assert.equal(page.status, 200);
     const html = await page.text();
@@ -140,8 +183,9 @@ async function main() {
     assert.match(html, /Lo que mejoramos/);
     assert.ok(html.includes("&lt;b&gt;me ahorra tiempo&lt;/b&gt;"), "el texto del usuario va escapado");
     assert.ok(!/noindex|AggregateRating/.test(html));
-    assert.match(html, /Calificación promedio: 3,0 de 5, con 2 opiniones publicadas\./);
-    assert.match(html, /4 de 5 estrellas/);
+    assert.match(html, /Calificación promedio: 3,5 de 5, con 2 opiniones publicadas\./);
+    assert.match(html, /5 de 5 estrellas · Me sirvió — .* Ana P\., cuenta registrada\./);
+    assert.ok(!html.includes("Nombre inventado"), "las opiniones anónimas viejas nunca se publican");
     assert.ok(!html.includes(`${MARK} no carga`), "los reportes nunca son públicos");
     assert.equal((await fetch(`${BASE_URL}/ve/opiniones`)).status, 404);
     const api = await fetch(`${BASE_URL}/api/opinions`);
@@ -150,11 +194,17 @@ async function main() {
       opinions: Array<{ displayName: string; teamReply: string | null; rating: number }>;
       summary: { count: number; average: number; distribution: number[] };
     };
-    assert.deepEqual(opinions.map((o) => [o.displayName, o.teamReply, o.rating]), [["Ana M.", "Gracias.", 4], ["Luis P.", null, 2]]);
-    assert.deepEqual(summary, { count: 2, average: 3, distribution: [0, 1, 0, 1, 0] });
-    console.log("✅ [PASSED] /opiniones: HTML propio, opinión publicada escapada, promedio 3,0 de 2 opiniones, reportes privados, /ve 404.");
+    assert.deepEqual(opinions.map((o) => [o.displayName, o.teamReply, o.rating]), [["Ana P.", "Gracias.", 5], ["Luis P.", null, 2]]);
+    assert.deepEqual(summary, { count: 2, average: 3.5, distribution: [1, 0, 0, 1, 0] });
+    console.log("✅ [PASSED] /opiniones: solo opiniones con cuenta, promedio 3,5, texto escapado, reportes privados, /ve 404.");
 
-    // 7. The production migration script itself (dry-run, then a re-run).
+    // 8. Deleting an account deletes its opinion (Ley 1581).
+    await pool.query(`DELETE FROM users WHERE id = $1`, [USER_B]);
+    assert.equal((await pool.query(`SELECT 1 FROM site_feedback WHERE message = $1`, [`${MARK}: pocas ofertas en mi ciudad`])).rowCount, 0);
+    assert.deepEqual((await listPublishedOpinions()).map((o) => o.displayName), ["Ana P."]);
+    console.log("✅ [PASSED] Borrar la cuenta borra su opinión.");
+
+    // 9. The production migration script itself (dry-run, then a re-run).
     for (const args of [["--dry-run"], []]) {
       const output = await new Promise<string>((resolve, reject) => {
         const child = spawn(process.execPath, [...process.execArgv, path.join(__dirname, "..", "scripts", "migrate-site-feedback.ts"), ...args], {
@@ -175,6 +225,7 @@ async function main() {
   } finally {
     server.kill("SIGTERM");
     await pool.query(`DELETE FROM site_feedback WHERE message LIKE $1`, [`${MARK}%`]).catch(() => {});
+    await pool.query(`DELETE FROM users WHERE id = ANY($1)`, [[USER_A, USER_B]]).catch(() => {});
     await pool.end();
   }
 }

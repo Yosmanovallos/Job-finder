@@ -16,19 +16,45 @@ export class SiteFeedbackUnavailableError extends Error {
 
 function rethrow(error: unknown): never {
   // 42P01 = undefined_table.
-  if ((error as { code?: string })?.code === "42P01") throw new SiteFeedbackUnavailableError();
+  if (isUnavailable(error)) throw new SiteFeedbackUnavailableError();
   throw error;
 }
 
-export async function insertFeedback(input: FeedbackInput, userAgent: string | null): Promise<void> {
+/** Not migrated yet: 42P01 (no table) or 42703 (no user_id column). */
+function isUnavailable(error: unknown): boolean {
+  const code = (error as { code?: string })?.code;
+  return code === "42P01" || code === "42703" || code === "42P10";
+}
+
+/**
+ * Stores a report or an opinion. `userId` is the account verifySession
+ * resolved from the JWT (never a value from the body). An opinion requires
+ * it and REPLACES that account's previous opinion, which goes back to
+ * review (status pending, unpublished) since its text or stars changed.
+ */
+export async function insertFeedback(input: FeedbackInput, userAgent: string | null, userId: string | null): Promise<void> {
   try {
+    if (input.kind === "opinion") {
+      if (!userId) throw new Error("An opinion needs a signed-in account.");
+      await pool.query(
+        `INSERT INTO site_feedback (kind, category, message, rating, display_name, user_id)
+         VALUES ('opinion', $1, $2, $3, $4, $5)
+         ON CONFLICT (user_id) WHERE kind = 'opinion' DO UPDATE SET
+           category = EXCLUDED.category, message = EXCLUDED.message, rating = EXCLUDED.rating,
+           display_name = EXCLUDED.display_name, status = 'pending', published_at = NULL,
+           team_reply = NULL, created_at = NOW()`,
+        [input.category, input.message, input.rating, input.displayName, userId]
+      );
+      return;
+    }
     await pool.query(
-      `INSERT INTO site_feedback (kind, category, message, rating, display_name, city, page_path, search_text, user_agent)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-      [input.kind, input.category, input.message, input.rating, input.displayName, input.city, input.pagePath, input.search, userAgent]
+      `INSERT INTO site_feedback (kind, category, message, rating, page_path, search_text, user_agent, user_id)
+       VALUES ('problem', $1, $2, $3, $4, $5, $6, $7)`,
+      [input.category, input.message, userId ? input.rating : null, input.pagePath, input.search, userAgent, userId]
     );
   } catch (error) {
-    rethrow(error);
+    if (isUnavailable(error)) throw new SiteFeedbackUnavailableError();
+    throw error;
   }
 }
 
@@ -43,7 +69,9 @@ interface OpinionRow {
   rating: number;
 }
 
-const PUBLISHED = `kind = 'opinion' AND status = 'published' AND published_at IS NOT NULL AND display_name IS NOT NULL AND rating IS NOT NULL`;
+// Only opinions tied to an account are ever public (rows sent anonymously
+// before 2026-11-03 stay private forever).
+const PUBLISHED = `kind = 'opinion' AND status = 'published' AND published_at IS NOT NULL AND display_name IS NOT NULL AND rating IS NOT NULL AND user_id IS NOT NULL`;
 
 export async function listPublishedOpinions(limit = PUBLISHED_OPINIONS_LIMIT): Promise<PublishedOpinion[]> {
   try {

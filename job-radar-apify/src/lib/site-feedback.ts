@@ -48,7 +48,8 @@ export interface FeedbackInput {
   city: string | null;
   pagePath: string | null;
   search: string | null;
-  /** 1–5 stars. Required for an opinion, optional for a problem report. */
+  /** 1–5 stars. Required for an opinion; on a problem report only kept
+   *  when the person is signed in (stars only count from accounts). */
   rating: number | null;
 }
 
@@ -115,21 +116,34 @@ export function validateFeedback(body: unknown): FeedbackValidation {
   if (message.length < FEEDBACK_LIMITS.opinionMessageMin) {
     return { ok: false, error: "Cuéntanos un poco más (al menos 10 caracteres)." };
   }
-  const displayName = clean(input.displayName, FEEDBACK_LIMITS.name);
-  if (displayName.length < 2) return { ok: false, error: "Escribe el nombre que quieres que se muestre." };
+  // The public name is never typed: the server fills it from the signed-in
+  // account (publicDisplayName). The API refuses opinions without a session.
   return {
     ok: true,
     value: {
       kind,
       category,
       message,
-      displayName,
-      city: clean(input.city, FEEDBACK_LIMITS.city) || null,
+      displayName: null,
+      city: null,
       pagePath: null,
       search: null,
       rating
     }
   };
+}
+
+// "Ana María Pérez" -> "Ana P."; one word -> that word; no name -> a neutral
+// label. Never the email. Used by the server (stored with the opinion) and
+// by the form ("Publicarás como …"), so both always agree.
+export function publicDisplayName(name: string | null | undefined): string {
+  // Some accounts carry their email as "name": never show any part of it.
+  if (!name || name.includes("@")) return "Persona registrada";
+  const words = name.replace(/[^\p{L}\p{M}' -]/gu, " ").trim().split(/\s+/).filter(Boolean);
+  if (!words.length) return "Persona registrada";
+  const first = words[0]!.slice(0, 30);
+  const last = words.length > 1 ? ` ${words[words.length - 1]!.charAt(0).toUpperCase()}.` : "";
+  return `${first.charAt(0).toUpperCase()}${first.slice(1)}${last}`;
 }
 
 export function opinionCategoryLabel(id: string): string {

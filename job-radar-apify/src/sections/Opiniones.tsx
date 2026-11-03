@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { useLocation } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
+import { useAuth } from "../auth/auth-provider.js";
 import { ROUTE_META } from "../lib/page-meta.js";
 import { CONTACT_EMAIL } from "../lib/agent-readiness.js";
 import { TINTS } from "../lib/brand-tints.js";
@@ -14,8 +15,69 @@ import {
   type FeedbackLinkState,
   type OpinionsSummary,
   type PublishedOpinion,
-  formatRating
+  formatRating,
+  publicDisplayName
 } from "../lib/site-feedback.js";
+
+// Survives the round trip through /login so the person lands back on the
+// opinion tab (no query string on /opiniones, see FeedbackLinkState).
+const RETURN_TAB_KEY = "opiniones:tab";
+const LOGIN_RETURN = encodeURIComponent("/opiniones");
+
+function rememberOpinionTab() {
+  try {
+    sessionStorage.setItem(RETURN_TAB_KEY, "opinion");
+  } catch {
+    // Private mode: they just land on the default tab.
+  }
+}
+
+function takeRememberedTab(): FeedbackKind | null {
+  try {
+    const value = sessionStorage.getItem(RETURN_TAB_KEY);
+    sessionStorage.removeItem(RETURN_TAB_KEY);
+    return value === "opinion" ? "opinion" : null;
+  } catch {
+    return null;
+  }
+}
+
+// Opinions and stars only come from registered accounts (owner decision
+// 2026-11-03): anyone signed out sees this instead of the opinion form.
+function SignInToReview() {
+  return (
+    <div className="mt-5 flex flex-col gap-4">
+      <div className="flex items-center gap-1" aria-hidden="true">
+        {[0, 1, 2, 3, 4].map((i) => (
+          <svg key={i} width="30" height="30" viewBox="0 0 24 24" className="text-gold-2" fill="currentColor" stroke="hsl(var(--foreground))" strokeWidth={1.4} strokeLinejoin="round">
+            <path d={STAR_PATH} />
+          </svg>
+        ))}
+      </div>
+      <p className="font-heading font-bold text-xl md:text-2xl leading-tight">Para calificar y opinar, entra con tu cuenta</p>
+      <p className="text-[15px] leading-relaxed text-[#3d413e]">
+        Así cada calificación es de una persona real. Crear tu cuenta es gratis y la misma te sirve para guardar vacantes.
+      </p>
+      <div className="flex flex-col sm:flex-row gap-3">
+        <Link
+          to={`/login?mode=signup&return_to=${LOGIN_RETURN}`}
+          onClick={rememberOpinionTab}
+          className="ink-card-sm ink-lift min-h-[52px] inline-flex items-center justify-center rounded-xl bg-primary px-6 font-bold text-white no-underline"
+        >
+          Crear cuenta gratis
+        </Link>
+        <Link
+          to={`/login?return_to=${LOGIN_RETURN}`}
+          onClick={rememberOpinionTab}
+          className="min-h-[52px] inline-flex items-center justify-center rounded-xl border-2 border-foreground bg-white px-6 font-bold text-foreground no-underline"
+        >
+          Ya tengo cuenta
+        </Link>
+      </div>
+      <p className="text-[13px] text-muted-foreground">¿Algo falló? Puedes reportarlo sin cuenta en la otra pestaña.</p>
+    </div>
+  );
+}
 
 // /opiniones — "Opiniones y ayuda". Same frame as the other content pages
 // (ContentPage.tsx). The form sits in the hero so reporting is above the
@@ -99,8 +161,8 @@ function FeedbackForm({
   const [opinionRating, setOpinionRating] = useState(0);
   const [problemRating, setProblemRating] = useState(0);
   const [message, setMessage] = useState("");
-  const [displayName, setDisplayName] = useState("");
-  const [city, setCity] = useState("");
+  const { isAuthenticated, loading: authLoading, accessToken, user } = useAuth();
+  const publicName = publicDisplayName(user?.name);
   const [attachContext, setAttachContext] = useState(false);
   const [consentPublish, setConsentPublish] = useState(false);
   const [status, setStatus] = useState<Status>("idle");
@@ -138,14 +200,12 @@ function FeedbackForm({
     try {
       const res = await fetch("/api/feedback", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}) },
         body: JSON.stringify({
           kind,
           category,
           message,
-          rating: (kind === "opinion" ? opinionRating : problemRating) || undefined,
-          displayName: kind === "opinion" ? displayName : undefined,
-          city: kind === "opinion" ? city : undefined,
+          rating: (kind === "opinion" ? opinionRating : isAuthenticated ? problemRating : 0) || undefined,
           consentPublish: kind === "opinion" ? consentPublish : undefined,
           attachContext: kind === "problem" && attachContext,
           pagePath: kind === "problem" && attachContext ? context.pagePath : undefined,
@@ -177,8 +237,6 @@ function FeedbackForm({
     setMessage("");
     setProblemCategory("");
     setOpinionCategory("");
-    setDisplayName("");
-    setCity("");
     setConsentPublish(false);
     setOpinionRating(0);
     setProblemRating(0);
@@ -220,7 +278,7 @@ function FeedbackForm({
           <p className="text-[15px] leading-relaxed text-[#3d413e]">
             {kind === "problem"
               ? "Lo lee una persona del equipo. Si necesitas respuesta, escríbenos también a "
-              : "La revisamos y, si cumple las normas, la publicamos en esta página con tu nombre y ciudad."}
+              : `La revisamos y, si cumple las normas, la publicamos en esta página como «${publicName}».`}
             {kind === "problem" ? (
               <a href={`mailto:${CONTACT_EMAIL}`} className="font-semibold break-all">
                 {CONTACT_EMAIL}
@@ -231,6 +289,10 @@ function FeedbackForm({
             Enviar otro mensaje
           </button>
         </div>
+      ) : kind === "opinion" && authLoading ? (
+        <div aria-hidden="true" className="mt-5 h-56 rounded-2xl border-2 border-dashed border-foreground/20" />
+      ) : kind === "opinion" && !isAuthenticated ? (
+        <SignInToReview />
       ) : (
         <form onSubmit={submit} noValidate className="mt-5 flex flex-col gap-4">
           {kind === "opinion" ? (
@@ -278,7 +340,7 @@ function FeedbackForm({
             />
           </label>
 
-          {kind === "problem" ? (
+          {kind === "problem" && isAuthenticated ? (
             <fieldset>
               <legend className="font-bold text-[15px] mb-1">¿Cómo calificarías tu experiencia hoy? (opcional)</legend>
               <StarInput name="calificacion-reporte" value={problemRating} onChange={setProblemRating} />
@@ -287,32 +349,10 @@ function FeedbackForm({
 
           {kind === "opinion" ? (
             <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <label className="flex flex-col gap-2 text-[15px] font-bold">
-                  Nombre que se mostrará
-                  <input
-                    type="text"
-                    value={displayName}
-                    maxLength={FEEDBACK_LIMITS.name}
-                    onChange={(e) => setDisplayName(e.target.value)}
-                    placeholder="Ej.: Ana M."
-                    autoComplete="off"
-                    className={`${inputClass} font-normal`}
-                  />
-                </label>
-                <label className="flex flex-col gap-2 text-[15px] font-bold">
-                  Ciudad (opcional)
-                  <input
-                    type="text"
-                    value={city}
-                    maxLength={FEEDBACK_LIMITS.city}
-                    onChange={(e) => setCity(e.target.value)}
-                    placeholder="Ej.: Medellín"
-                    autoComplete="off"
-                    className={`${inputClass} font-normal`}
-                  />
-                </label>
-              </div>
+              <p className="rounded-xl bg-[#f4f5f2] px-4 py-3 text-sm leading-relaxed text-[#3d413e]">
+                Publicarás como <strong className="text-foreground">{publicName}</strong>, el nombre de tu cuenta. Si ya dejaste una
+                opinión, esta la reemplaza.
+              </p>
               <label className="flex items-start gap-3 text-sm leading-relaxed text-[#3d413e]">
                 <input
                   type="checkbox"
@@ -320,7 +360,7 @@ function FeedbackForm({
                   onChange={(e) => setConsentPublish(e.target.checked)}
                   className="mt-0.5 w-5 h-5 shrink-0 accent-[hsl(var(--primary))]"
                 />
-                <span>Acepto que mi opinión se publique en esta página después de revisarla, con el nombre y la ciudad que escribí.</span>
+                <span>Acepto que mi calificación y mi opinión se publiquen en esta página después de revisarlas, con el nombre de mi cuenta.</span>
               </label>
             </>
           ) : context.pagePath || context.search ? (
@@ -393,7 +433,7 @@ function OpinionCard({ opinion }: { opinion: PublishedOpinion }) {
       <p className="text-[15px] md:text-base leading-relaxed">«{opinion.message}»</p>
       <p className="text-sm text-muted-foreground">
         <strong className="text-foreground">{opinion.displayName}</strong>
-        {opinion.city ? ` · ${opinion.city}` : ""} · {date}
+ · Cuenta registrada · {date}
       </p>
       {opinion.teamReply ? (
         <div className="border-t-2 border-foreground pt-3 text-sm leading-relaxed text-[#3d413e]">
@@ -443,7 +483,9 @@ export default function Opiniones() {
   const linkState = (location.state as FeedbackLinkState | null)?.feedback;
   const [opinions, setOpinions] = useState<PublishedOpinion[] | null>(null);
   const [summary, setSummary] = useState<OpinionsSummary | null>(null);
-  const [kind, setKind] = useState<FeedbackKind>(linkState?.kind === "opinion" ? "opinion" : "problem");
+  const [kind, setKind] = useState<FeedbackKind>(() =>
+    takeRememberedTab() ?? (linkState?.kind === "opinion" ? "opinion" : "problem")
+  );
 
   useEffect(() => {
     let cancelled = false;

@@ -1008,6 +1008,23 @@ CREATE INDEX IF NOT EXISTS idx_site_feedback_published
     ON site_feedback (published_at DESC)
     WHERE kind = 'opinion' AND status = 'published';
 
+-- 2026-11-03: opiniones y estrellas solo de cuentas registradas. Aditivo:
+-- user_id enlaza la fila con la cuenta (se borra con ella, Ley 1581); una
+-- opinión por cuenta (volver a escribir reemplaza la anterior). La regla
+-- "opinión ⇒ cuenta" es NOT VALID: no toca filas anónimas anteriores, que
+-- además nunca se publican (el listado exige user_id). Reportes de errores
+-- siguen abiertos a todos.
+ALTER TABLE site_feedback ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES users(id) ON DELETE CASCADE;
+CREATE INDEX IF NOT EXISTS idx_site_feedback_user
+    ON site_feedback (user_id) WHERE user_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_site_feedback_opinion_per_user
+    ON site_feedback (user_id) WHERE kind = 'opinion';
+DO $$ BEGIN
+    ALTER TABLE site_feedback ADD CONSTRAINT site_feedback_opinion_needs_user
+        CHECK (kind <> 'opinion' OR user_id IS NOT NULL) NOT VALID;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
 ALTER TABLE site_feedback ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON site_feedback FROM anon, authenticated;
 -- END site-feedback
