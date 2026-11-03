@@ -33,7 +33,7 @@ import {
   SAVED_JOBS_LIMIT
 } from "./db/saved-jobs-repository.js";
 import { getOpinionsSummary, insertFeedback, listPublishedOpinions, SiteFeedbackUnavailableError } from "./db/site-feedback-repository.js";
-import { FEEDBACK_BODY_MAX_BYTES, FEEDBACK_LIMITS, formatRating, opinionCategoryLabel, validateFeedback } from "./lib/site-feedback.js";
+import { FEEDBACK_BODY_MAX_BYTES, FEEDBACK_LIMITS, formatRating, opinionCategoryLabel, publicDisplayName, validateFeedback } from "./lib/site-feedback.js";
 import type { OpinionsSummary, PublishedOpinion } from "./lib/site-feedback.js";
 import { SITE_CHANGELOG, formatChangelogDate } from "./lib/site-changelog.js";
 import { wasJobPurged } from "./db/indexing-repository.js";
@@ -233,7 +233,7 @@ async function opinionsPageSections(): Promise<Array<{ heading: string; paragrap
               : []),
             ...opinions.map(
               (o) =>
-                `${o.rating} de 5 estrellas · ${opinionCategoryLabel(o.category)} — «${o.message}» ${o.displayName}${o.city ? `, ${o.city}` : ""}.` +
+                `${o.rating} de 5 estrellas · ${opinionCategoryLabel(o.category)} — «${o.message}» ${o.displayName}, cuenta registrada.` +
                 (o.teamReply ? ` Respuesta del equipo: ${o.teamReply}` : "")
             )
           ]
@@ -1056,11 +1056,20 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       const result = validateFeedback(parsed);
       if (!result.ok) return json(400, { error: result.error });
       if ("spam" in result) return json(201, { ok: true });
+      // Opinions and stars only from registered accounts (owner decision
+      // 2026-11-03): the account comes from the JWT, and the public name
+      // from that account, never from the body. Problem reports stay open
+      // to everyone (someone the app fails for may not be able to sign in);
+      // their stars are kept only when signed in.
+      const session = await verifySession(req);
+      if (result.value.kind === "opinion" && !session) {
+        return json(401, { error: "Inicia sesión o crea tu cuenta gratis para calificar y dejar tu opinión." });
+      }
+      const value =
+        result.value.kind === "opinion" ? { ...result.value, displayName: publicDisplayName(session!.name) } : result.value;
       const userAgent =
-        result.value.pagePath || result.value.search
-          ? String(req.headers["user-agent"] || "").slice(0, FEEDBACK_LIMITS.userAgent) || null
-          : null;
-      await insertFeedback(result.value, userAgent);
+        value.pagePath || value.search ? String(req.headers["user-agent"] || "").slice(0, FEEDBACK_LIMITS.userAgent) || null : null;
+      await insertFeedback(value, userAgent, session?.id ?? null);
       return json(201, { ok: true });
     } catch (e) {
       if (e instanceof SiteFeedbackUnavailableError) return json(503, { error: "Aún no podemos recibir mensajes aquí." });
