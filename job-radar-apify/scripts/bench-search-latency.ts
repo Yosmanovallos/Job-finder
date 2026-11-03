@@ -56,6 +56,10 @@ const CASES: QueryCase[] = [
   { name: "search=analista offset 24", filters: { country: "CO", search: "analista" }, offset: 24 },
   { name: "search=analista offset 120", filters: { country: "CO", search: "analista" }, offset: 120 },
   { name: "search=zzzz (none)", filters: { country: "CO", search: "zzzzqx" } },
+  // Broad searches: in this seed "empresa" matches nearly every board row.
+  { name: "search=empresa (broad)", filters: { country: "CO", search: "empresa" } },
+  { name: "search=bogota (broad)", filters: { country: "CO", search: "bogota" } },
+  { name: "search=colombia (broad)", filters: { country: "CO", search: "colombia" } },
   { name: "no search (dashboard)", filters: { country: "CO" } },
   { name: "modality only", filters: { country: "CO", modality: "remoto" } }
 ];
@@ -235,7 +239,8 @@ async function run(outFile?: string): Promise<void> {
   let mismatches = 0;
   console.log("| Consulta | Total | Antes mediana (rango) ms | Después mediana (rango) ms | Paridad (todas las páginas) |");
   console.log("| --- | ---: | ---: | ---: | --- |");
-  for (const testCase of CASES) {
+  const only = process.env.BENCH_ONLY;
+  for (const testCase of CASES.filter((item) => !only || item.name.includes(only))) {
     const before = await statementsFor(testCase, false);
     const after = await statementsFor(testCase, true);
     const beforeMs: number[] = [];

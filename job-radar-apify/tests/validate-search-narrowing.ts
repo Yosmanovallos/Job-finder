@@ -94,8 +94,12 @@ QUERIES.push(
   { name: "marketing + Medellín", filters: { search: "marketing", country: "CO", cities: ["Medellín"] } },
   { name: "marketing + 24h", filters: { search: "marketing", country: "CO", freshness: "24h" } },
   { name: "analista + rol", filters: { search: "analista", country: "CO", roles: ["Contador"] } },
-  { name: "zznarrow + empresa", filters: { search: "zznarrow", company: "ZzNarrow Retail" } }
+  { name: "zznarrow + empresa", filters: { search: "zznarrow", company: "ZzNarrow Retail" } },
+  // More hits than SEARCH_NARROW_MAX_HITS: the query reads every live row.
+  { name: "zzbroad (amplia)", filters: { search: "zzbroad", country: "CO" } },
+  { name: "zzbroad remoto (amplia)", filters: { search: "zzbroad", country: "CO", modality: "remoto" } }
 );
+const BROAD_ROWS = 10_050;
 
 async function seed(): Promise<void> {
   await pool.query("DELETE FROM jobs WHERE url LIKE $1", [`${PREFIX}%`]);
@@ -110,6 +114,15 @@ async function seed(): Promise<void> {
     );
   }
   await pool.query("UPDATE jobs SET is_active = FALSE WHERE url = $1", [`${PREFIX}old`]);
+  // Mostly pairs of board copies (same title/company/city, two sources), some remote.
+  await pool.query(
+    `INSERT INTO jobs (url_hash, title, company, location, country, url, source, sources, published_at, is_active)
+     SELECT md5($1 || g), 'Operario Zzbroad ' || (g / 2) || CASE WHEN g % 7 = 0 THEN ' Remoto' ELSE '' END,
+            'ZzBroad ' || ((g / 2) % 50), 'Cali', 'CO', $1 || g, CASE WHEN g % 2 = 0 THEN 'LinkedIn' ELSE 'Indeed' END,
+            jsonb_build_array(CASE WHEN g % 2 = 0 THEN 'LinkedIn' ELSE 'Indeed' END), NOW() - (g * INTERVAL '1 minute'), TRUE
+     FROM generate_series(1, $2::int) g`,
+    [`${PREFIX}broad-`, BROAD_ROWS]
+  );
 }
 
 async function pageIds(filters: Record<string, unknown>, narrow: boolean): Promise<{ ids: string[]; total: number }> {
@@ -151,8 +164,8 @@ async function run(): Promise<void> {
   await queryJobsPageForParity({ filters: { country: "CO" }, limit: 5 }, true);
   (pool as unknown as { query: unknown }).query = query;
   check(
-    captured[0]?.includes("search_groups") === true && captured[1]?.includes("search_groups") === false,
-    "Solo la consulta con búsqueda lee search_groups; sin búsqueda el SQL no cambia.",
+    captured[0]?.includes("search_hits") === true && captured[1]?.includes("search_hits") === false,
+    "Solo la consulta con búsqueda lee search_hits; sin búsqueda el SQL no cambia.",
     "El acotamiento no se aplicó como se esperaba."
   );
 

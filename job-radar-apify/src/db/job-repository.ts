@@ -880,6 +880,11 @@ function jobsBlockFor(offset: number, limit: number): number | null {
   return offset - block + limit <= JOBS_BLOCK_SIZE ? block : null;
 }
 
+// Matching rows above which a search skips the narrowing in queryJobsPage().
+// Measured on 50k synthetic rows: 5.7k hits still ran ~40 % faster narrowed,
+// ~33k hits (nearly every row) ran ~45 % slower.
+const SEARCH_NARROW_MAX_HITS = 10_000;
+
 /**
  * Test-only: queryJobsPage() without the cache and, with `narrowSearch:
  * false`, without the search narrowing below, so the integration suite can
@@ -913,22 +918,31 @@ async function queryJobsPage(options: JobsPageOptions, narrowSearch = true): Pro
   // Every row that decides a kept group's canonical row is in that group, so
   // the canonical rows, the WHERE below, the total and the order are exactly
   // the same as before (tests/validate-search-narrowing.ts).
+  // A broad search ("colombia" in the location) gains nothing from it, so
+  // once SEARCH_NARROW_MAX_HITS rows match, the scan for hits stops and the
+  // projection reads every live row as before. Below that, search_hits holds
+  // every matching row (the LIMIT was never reached).
   // Searches only: the dashboard, warmup, category and company pages keep
   // their exact previous SQL.
   const live = `is_active = TRUE AND ${liveJobSql()}`;
   const narrowToMatches = narrowSearch && Boolean(filters.search?.trim()) && where.length > 0;
   const groupKey = vacancyGroupKeySql();
+  const sourceWhere = narrowToMatches
+    ? `${live} AND ((SELECT COUNT(*) FROM search_hits) > ${SEARCH_NARROW_MAX_HITS} ` +
+      `OR (${groupKey}) IN (SELECT * FROM search_hits))`
+    : live;
 
   const result = await pool.query(
-    `WITH ${narrowToMatches ? `search_groups (identity_title, identity_company, identity_instance) AS MATERIALIZED (
-       SELECT DISTINCT ${groupKey} FROM jobs WHERE ${live} AND ${where.join(" AND ")}
+    `WITH ${narrowToMatches ? `search_hits (identity_title, identity_company, identity_instance) AS MATERIALIZED (
+       SELECT ${groupKey} FROM jobs WHERE ${live} AND ${where.join(" AND ")}
+       LIMIT ${SEARCH_NARROW_MAX_HITS + 1}
      ), ` : ""}canonical AS MATERIALIZED (
        SELECT DISTINCT ON (${VACANCY_IDENTITY_KEYS})
               id, title, company, company_key, location, url, source, sources, date_text, published_at,
               role_origin, country, employment_type, salary_min, salary_max,
               salary_currency, salary_raw, applicant_count, remote_type,
               (published_at > NOW() - INTERVAL '48 hours') AS is_locked
-       FROM ${vacancyIdentitySourceSql(narrowToMatches ? `${live} AND (${groupKey}) IN (SELECT * FROM search_groups)` : live)} jobs
+       FROM ${vacancyIdentitySourceSql(sourceWhere)} jobs
        ORDER BY ${VACANCY_IDENTITY_KEYS}, published_at DESC, id DESC
      ), filtered AS (
        SELECT canonical.*,

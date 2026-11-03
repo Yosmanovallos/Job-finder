@@ -336,7 +336,7 @@ Two tweaks were measured and discarded:
 
 What changed (`queryJobsPage`, searches only):
 
-- A `search_groups` CTE (`MATERIALIZED`, hash semi-join) collects the
+- A `search_hits` CTE (`MATERIALIZED`, hash semi-join) collects the
   `(identity_title, identity_company, identity_instance)` keys
   (`vacancyGroupKeySql`) of the live rows that pass the same WHERE.
 - The canonical projection then reads only the live rows of those groups.
@@ -345,11 +345,24 @@ What changed (`queryJobsPage`, searches only):
   same canonical row. The unchanged WHERE then gives the same rows, total
   and order.
 - None of the three keys can be NULL.
+- Broad searches skip the narrowing. `search_hits` stops at
+  `SEARCH_NARROW_MAX_HITS` + 1 rows (10,001). If it fills up, the projection
+  reads every live row as before. Otherwise it holds every match.
+  - Without this cutoff, `empresa`, which matches ~96 % of the synthetic
+    rows, went from 560 to 808 ms.
+  - With it, `empresa` takes 504 ms against 564 ms before.
 - `tests/validate-search-narrowing.ts` (`test:integration`, `test:job-pagination`)
-  compares every page of 89 queries with and without the narrowing. The
-  queries cover: a canonical row that fails while an older sibling passes,
-  country-only rows, official postings, confidential employers, NULL
-  company/location, the same title in CO and VE, and the modality filters.
+  compares every page of 91 queries with and without the narrowing. The
+  queries cover:
+  - a canonical row that fails while an older sibling passes;
+  - country-only rows;
+  - official postings;
+  - confidential employers;
+  - NULL company/location;
+  - the same title in CO and VE;
+  - the modality filters;
+  - a search with 10,050 hits (the broad branch).
+
   A naive pre-filter (rows instead of groups) fails it.
 - Queries without a search (dashboard, warmup, category and company pages,
   home stats) send exactly the same SQL as before. The job-page LRU, the
@@ -360,17 +373,20 @@ Local measurement, `scripts/bench-search-latency.ts`:
 - Setup: disposable PostgreSQL 16 in Docker with `--cpus 1` and 512 MB.
   56.5k synthetic rows, 49.9k active, including 1.5k official projections.
 - Method: old and new SQL timed alternately in the same process, 9 rounds,
-  median (range). Parity was identical on every page of all 25 queries.
+  median (range). Parity was identical on every page of all 28 queries.
+- The old SQL is bimodal (about 0.5 s or about 1.0 s per run, depending on
+  whether its sort spills), so look at both columns, not one number.
 
-| Query (`country=CO`, `limit=20`) | Before | After |
+| Query (`country=CO`, `limit=20`) | Before (median) | After (median) |
 | --- | ---: | ---: |
-| contador / analista / vendedor | 643 / 1,034 / 1,008 ms | 452 / 303 / 518 ms |
-| auxiliar / desarrollador | 587 / 624 ms | 312 / 390 ms |
-| AI Engineer / community manager / marketing | 666 / 528 / 538 ms | 438 / 318 / 319 ms |
-| markerting / zzzzqx (0 results) | 1,205 / 529 ms | 209 / 154 ms |
-| AI Engineer + remoto / marketing + hibrido | 759 / 637 ms | 540 / 345 ms |
-| analista offset 24 / 120 (blocks) | 1,223 / 1,060 ms | 326 / 312 ms |
-| No search (dashboard) / modality only | 515 / 803 ms | 494 / 817 ms (same SQL) |
+| contador / analista / vendedor | 635 / 999 / 827 ms | 417 / 296 / 426 ms |
+| auxiliar / desarrollador | 527 / 514 ms | 277 / 332 ms |
+| AI Engineer / community manager / marketing | 647 / 528 / 514 ms | 434 / 302 / 282 ms |
+| markerting / zzzzqx (0 results) | 1,026 / 519 ms | 213 / 194 ms |
+| AI Engineer + remoto / marketing + hibrido / contador + presencial | 580 / 525 / 603 ms | 377 / 262 / 318 ms |
+| analista offset 24 / 120 (blocks) | 1,105 / 1,186 ms | 298 / 328 ms |
+| Broad: empresa (33k hits) / colombia (4.6k) | 564 / 753 ms | 504 / 331 ms |
+| No search (dashboard) / modality only | 470 / 858 ms | 494 / 865 ms (same SQL) |
 
 Cold process, measured locally:
 
@@ -395,10 +411,13 @@ What remains of a search:
 
 **After deploy:**
 
-- Request `/api/jobs?country=CO&search=<term>&limit=20` for five terms
-  nobody has searched since the deploy: `contador`, `analista`, `vendedor`,
-  `auxiliar`, `desarrollador`. Add a unique `&coldcheck=<random>` so the edge
-  answers `MISS`. Then repeat each URL once.
+- Request `/api/jobs?country=CO&search=<term>&limit=20` for `contador`,
+  `analista`, `vendedor`, `auxiliar` and `desarrollador`, with a unique
+  `&coldcheck=<random>` so the edge answers `MISS`. Then repeat each URL once.
+- Keep `limit=20` exactly. The dashboard asks for 24, so visitors never warm
+  these app-cache keys. `coldcheck` only defeats the edge.
+- Also request one broad term, `search=colombia`, which matches most
+  production locations. It must not be slower than before (about 1-1.4 s).
 - Compare the first requests with the 2026-11-02 baseline of 1.03-1.39 s.
   The repeats should stay at about 0.25 s.
 - `/dashboard` on unique URLs must stay at 250-330 ms. The Render log must
