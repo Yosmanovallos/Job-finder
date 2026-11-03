@@ -32,6 +32,10 @@ import {
   SavedJobsUnavailableError,
   SAVED_JOBS_LIMIT
 } from "./db/saved-jobs-repository.js";
+import { getOpinionsSummary, insertFeedback, listPublishedOpinions, SiteFeedbackUnavailableError } from "./db/site-feedback-repository.js";
+import { FEEDBACK_BODY_MAX_BYTES, FEEDBACK_LIMITS, formatRating, opinionCategoryLabel, validateFeedback } from "./lib/site-feedback.js";
+import type { OpinionsSummary, PublishedOpinion } from "./lib/site-feedback.js";
+import { SITE_CHANGELOG, formatChangelogDate } from "./lib/site-changelog.js";
 import { wasJobPurged } from "./db/indexing-repository.js";
 import { wasJobArchived } from "./db/job-archive-repository.js";
 import {
@@ -174,8 +178,73 @@ const SPA_ROUTES = new Set([
   "/cuenta/ai/providers",
   "/como-funciona",
   "/fuentes",
-  "/preguntas"
+  "/preguntas",
+  "/opiniones"
 ]);
+
+// "Opiniones y ayuda": 5 messages per IP every 10 minutes is plenty for a
+// person and keeps a script from filling the table.
+const FEEDBACK_RATE_LIMIT = 5;
+const FEEDBACK_RATE_WINDOW_MS = 10 * 60 * 1000;
+const OPINIONS_CACHE_TTL_MS = 5 * 60 * 1000;
+type OpinionsPayload = { opinions: PublishedOpinion[]; summary: OpinionsSummary };
+const EMPTY_OPINIONS: OpinionsPayload = { opinions: [], summary: { count: 0, average: null, distribution: [0, 0, 0, 0, 0] } };
+let opinionsCache: { at: number; value: OpinionsPayload } | null = null;
+
+// Published opinions change only when someone publishes one by hand, so a
+// 5-minute copy serves both /api/opinions and the /opiniones server HTML.
+// Before the migration (or on a DB error) the page renders with none.
+async function getPublishedOpinionsCached(): Promise<OpinionsPayload> {
+  if (opinionsCache && Date.now() - opinionsCache.at < OPINIONS_CACHE_TTL_MS) return opinionsCache.value;
+  try {
+    const [opinions, summary] = await Promise.all([listPublishedOpinions(), getOpinionsSummary()]);
+    const value = { opinions, summary };
+    opinionsCache = { at: Date.now(), value };
+    return value;
+  } catch (error) {
+    if (error instanceof SiteFeedbackUnavailableError) {
+      opinionsCache = { at: Date.now(), value: EMPTY_OPINIONS };
+      return EMPTY_OPINIONS;
+    }
+    throw error;
+  }
+}
+
+// Server HTML of /opiniones beyond its H1/intro: the rating summary, the
+// published opinions and the changelog as plain text (escaped by
+// renderContentHtml), so crawlers read what the React page shows. No
+// Review or AggregateRating markup: Google shows no review stars for
+// reviews of an Organization placed on its own site ("self-serving").
+async function opinionsPageSections(): Promise<Array<{ heading: string; paragraphs: string[] }>> {
+  let payload = EMPTY_OPINIONS;
+  try {
+    payload = await getPublishedOpinionsCached();
+  } catch {
+    payload = EMPTY_OPINIONS;
+  }
+  const { opinions, summary } = payload;
+  return [
+    {
+      heading: "Opiniones publicadas",
+      paragraphs: opinions.length
+        ? [
+            ...(summary.average !== null
+              ? [`Calificación promedio: ${formatRating(summary.average)} de 5, con ${summary.count} ${summary.count === 1 ? "opinión" : "opiniones"} publicadas.`]
+              : []),
+            ...opinions.map(
+              (o) =>
+                `${o.rating} de 5 estrellas · ${opinionCategoryLabel(o.category)} — «${o.message}» ${o.displayName}${o.city ? `, ${o.city}` : ""}.` +
+                (o.teamReply ? ` Respuesta del equipo: ${o.teamReply}` : "")
+            )
+          ]
+        : ["Todavía no hay opiniones publicadas. Puedes escribir la primera desde esta página."]
+    },
+    {
+      heading: "Lo que mejoramos",
+      paragraphs: SITE_CHANGELOG.slice(0, 6).map((entry) => `${formatChangelogDate(entry.date)}: ${entry.text}`)
+    }
+  ];
+}
 
 const MIN_COMPRESSIBLE_BYTES = 1024;
 const COMPRESSIBLE_CONTENT_TYPE = /^(?:text\/|application\/(?:javascript|json|xml))/i;
@@ -944,6 +1013,58 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       if (e instanceof SavedJobsUnavailableError) return json(503, { error: "Las vacantes guardadas aún no están disponibles." });
       if (e instanceof SavedJobsLimitError) return json(409, { error: `Puedes guardar hasta ${SAVED_JOBS_LIMIT} vacantes.` });
       respondToUnexpectedError(res, e, "/api/me/saved-jobs", "No se pudieron actualizar tus vacantes guardadas.");
+      return;
+    }
+  }
+
+  // 4b-ter. /api/feedback and /api/opinions — "Opiniones y ayuda"
+  // (/opiniones). Outside /api/v1 on purpose: the public agent API stays
+  // read-only. POST is anonymous, so: its own rate limit, a JSON-only
+  // content type (a cross-site form can't send it without CORS, which this
+  // server never grants), a small body cap, a honeypot and allowlists
+  // (validateFeedback). Opinions are stored as pending; nothing is
+  // published automatically. Until scripts/migrate-site-feedback.ts runs,
+  // both answer 503 and the page falls back to the contact email.
+  if (pathname === "/api/feedback" || pathname === "/api/opinions") {
+    const json = (status: number, body: unknown, cacheControl = "private, no-store") => {
+      res.writeHead(status, { "Content-Type": "application/json", "Cache-Control": cacheControl });
+      res.end(JSON.stringify(body));
+    };
+    try {
+      if (pathname === "/api/opinions") {
+        if (method !== "GET") return json(405, { error: "Método no permitido" });
+        return json(200, await getPublishedOpinionsCached(), "public, max-age=300");
+      }
+      if (method !== "POST") return json(405, { error: "Método no permitido" });
+      if (!checkRateLimit(clientIp, FEEDBACK_RATE_LIMIT, FEEDBACK_RATE_WINDOW_MS, "feedback")) {
+        recordSuspiciousEvent(clientIp, "rate-limit POST /api/feedback");
+        res.writeHead(429, { "Content-Type": "application/json", "Retry-After": "600" });
+        res.end(JSON.stringify({ error: "Recibimos varios mensajes seguidos. Intenta de nuevo en unos minutos." }));
+        return;
+      }
+      if (!String(req.headers["content-type"] || "").toLowerCase().startsWith("application/json")) {
+        return json(415, { error: "Formato no soportado" });
+      }
+      const bodyText = await readSmallBody(req, FEEDBACK_BODY_MAX_BYTES);
+      if (bodyText === null) return json(413, { error: "Mensaje demasiado largo" });
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(bodyText || "{}");
+      } catch {
+        return json(400, { error: "JSON inválido" });
+      }
+      const result = validateFeedback(parsed);
+      if (!result.ok) return json(400, { error: result.error });
+      if ("spam" in result) return json(201, { ok: true });
+      const userAgent =
+        result.value.pagePath || result.value.search
+          ? String(req.headers["user-agent"] || "").slice(0, FEEDBACK_LIMITS.userAgent) || null
+          : null;
+      await insertFeedback(result.value, userAgent);
+      return json(201, { ok: true });
+    } catch (e) {
+      if (e instanceof SiteFeedbackUnavailableError) return json(503, { error: "Aún no podemos recibir mensajes aquí." });
+      respondToUnexpectedError(res, e, pathname, "No se pudo enviar tu mensaje.");
       return;
     }
   }
@@ -2433,7 +2554,11 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
         res,
         200,
         { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "private, no-store", Vary: "Accept" },
-        injectRouteMeta(indexHtml, pathname, routeMeta)
+        injectRouteMeta(
+          indexHtml,
+          pathname,
+          pathname === "/opiniones" ? { ...routeMeta, sections: await opinionsPageSections() } : routeMeta
+        )
       );
     } catch {
       res.writeHead(500, { "Content-Type": "text/plain" });

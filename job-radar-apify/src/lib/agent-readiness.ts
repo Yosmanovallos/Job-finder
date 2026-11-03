@@ -235,7 +235,14 @@ export function injectPublicContent(indexHtml: string, content: PublicContent): 
 export function injectRouteMeta(
   indexHtml: string,
   pathname: string,
-  meta: { title: string; description: string; heading?: string; introduction?: string; noindex?: boolean }
+  meta: {
+    title: string;
+    description: string;
+    heading?: string;
+    introduction?: string;
+    noindex?: boolean;
+    sections?: PublicContent["sections"];
+  }
 ): string {
   const content: PublicContent = {
     pathname,
@@ -243,7 +250,7 @@ export function injectRouteMeta(
     description: meta.description,
     heading: meta.heading ?? "",
     introduction: meta.introduction ? [meta.introduction] : [],
-    sections: []
+    sections: meta.sections ?? []
   };
   let html = injectPublicContent(indexHtml, content);
   if (!meta.heading) {
