@@ -1,6 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { ChevronDown, Check } from "lucide-react";
+// Per-icon modules, not the package root: Header is part of the server-
+// rendered homepage (src/server/home-ssr.tsx), and in Node the root resolves
+// to lucide's CommonJS bundle with every icon (~1 MB of code resident in the
+// web server). Same component and output; Vite tree-shook it either way.
+import ChevronDown from "lucide-react/dist/esm/icons/chevron-down.mjs";
+import Check from "lucide-react/dist/esm/icons/check.mjs";
 import { useAuth } from "../auth/auth-provider.js";
 import { PAYWALL_ENABLED } from "../config.js";
 import { FlagIcon } from "../components/FlagIcon.js";

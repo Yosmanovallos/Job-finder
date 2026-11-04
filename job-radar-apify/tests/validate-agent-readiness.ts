@@ -17,6 +17,13 @@ interface ApiErrorBody {
 }
 
 // Each caller states the response fields it asserts on.
+// Text of the page's single H1, tags stripped: the home H1 is server
+// rendered with classes and a <span> around its second half.
+function h1Text(html: string): string {
+  const match = html.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/);
+  return match ? match[1].replace(/<[^>]+>/g, "").replace(/<!-- -->/g, "").trim() : "";
+}
+
 async function json<T>(pathname: string, init?: RequestInit): Promise<{ response: Response; body: T }> {
   const response = await fetch(`${base}${pathname}`, { signal: AbortSignal.timeout(10000), ...init, headers: { ...init?.headers, "X-Forwarded-For": pathname === "/api/v1/countries" ? "192.0.2.2" : pathname === "/mcp" ? "192.0.2.3" : pathname === "/a2a" ? "192.0.2.4" : "192.0.2.1" } });
   return { response, body: (await response.json()) as T };
@@ -54,7 +61,15 @@ async function main(): Promise<void> {
     assert.ok(textLength(homeHtml) >= 500);
     assert.equal((homeHtml.match(/<h1\b/g) || []).length, 1);
     assert.match(homeHtml, /<title>Busco trabajo en Colombia: ofertas de empleo \| BuscoTrabajo<\/title>/);
-    assert.match(homeHtml, /<h1>Busco trabajo en Colombia: todas las ofertas de empleo en un solo lugar<\/h1>/);
+    assert.equal(h1Text(homeHtml), "Busco trabajo en Colombia: todas las ofertas de empleo en un solo lugar");
+    // Server-rendered home (src/server/home-ssr.tsx): the real page, not the
+    // plain snippet React used to replace, and its descriptive copy is a
+    // visible section with the agent discovery links.
+    assert.match(homeHtml, /<div id="app" data-ssr="home">/);
+    assert.match(homeHtml, /window\.__SSR_HOME__=/);
+    assert.doesNotMatch(homeHtml, /data-public-content/);
+    assert.match(homeHtml, /aria-label="Sobre BuscoTrabajo"/);
+    for (const href of ["/llms.txt", "/sitemap.xml"]) assert.ok(homeHtml.includes(`href="${href}"`), href);
     assert.match(homeHtml, /"alternateName": \["Busco Trabajo", "BuscoTrabajo\.co"\]/);
     assert.match(homeHtml, /https:\/\/x\.com\/Buscotrabajoco/);
     assert.match(homeHtml, /href="\/docs"/);
@@ -68,7 +83,8 @@ async function main(): Promise<void> {
     const veHomeHtml = await veHome.text();
     assert.equal(veHome.status, 200);
     assert.match(veHomeHtml, /<title>Busco trabajo en Venezuela: ofertas de empleo \| BuscoTrabajo<\/title>/);
-    assert.match(veHomeHtml, /<h1>Busco trabajo en Venezuela: todas las ofertas de empleo en un solo lugar<\/h1>/);
+    assert.equal(h1Text(veHomeHtml), "Busco trabajo en Venezuela: todas las ofertas de empleo en un solo lugar");
+    assert.equal((veHomeHtml.match(/<h1\b/g) || []).length, 1);
     assert.match(veHomeHtml, /<meta property="og:locale" content="es_VE" \/>/);
 
     const sourcesPage = await fetch(`${base}/fuentes`, { headers: { Accept: "text/html" } });
