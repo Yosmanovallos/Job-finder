@@ -694,7 +694,8 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       JSON.stringify({
         status: "ok",
         uptime: process.uptime(),
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        memory: process.memoryUsage()
       })
     );
     return;
