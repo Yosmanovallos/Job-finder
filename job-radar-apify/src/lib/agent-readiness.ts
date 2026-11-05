@@ -171,7 +171,7 @@ export const PUBLIC_PAGES: Record<string, PublicContent> = {
       {
         heading: "Datos que no procesa directamente BuscoTrabajo",
         paragraphs: [
-          "BuscoTrabajo no almacena directamente datos de tarjetas de crédito ni información financiera; Wompi procesa esos datos bajo sus propios controles. La política publicada indica que la información de usuarios no se vende ni se comparte con terceros con fines publicitarios.",
+          "BuscoTrabajo no almacena directamente datos de tarjetas de crédito ni información financiera; Wompi procesa esos datos bajo sus propios controles. La información de las cuentas no se vende ni se comparte con anunciantes; el sitio muestra anuncios de Google AdSense, que usa cookies según se explica en /legal/privacidad y /legal/cookies.",
           "Los datos de las vacantes proceden de publicaciones de terceros. El enlace a la fuente original permite revisar el contexto y sus propias políticas antes de abrir o completar un formulario externo."
         ]
       },
