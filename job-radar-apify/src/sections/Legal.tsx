@@ -41,7 +41,7 @@ const content: Record<LegalPageType, { title: string; updated: string; sections:
   },
   privacidad: {
     title: "Política de privacidad",
-    updated: "octubre de 2026",
+    updated: "noviembre de 2026",
     sections: [
       {
         title: "Qué datos recolectamos",
@@ -54,7 +54,16 @@ const content: Record<LegalPageType, { title: string; updated: string; sections:
         title: "Qué NO recolectamos",
         paragraphs: [
           "Hoy no procesamos pagos: no recibimos ni almacenamos datos de tarjetas de crédito ni otra información financiera.",
-          "No vendemos ni compartimos tu información con terceros con fines publicitarios.",
+          "No vendemos tu correo, tus credenciales ni las vacantes que guardas o marcas como aplicadas, y no los compartimos con anunciantes.",
+        ],
+      },
+      {
+        title: "Publicidad y medición",
+        paragraphs: [
+          "BuscoTrabajo muestra anuncios de Google AdSense para mantener el servicio gratuito. Proveedores externos, incluido Google, usan cookies para mostrar anuncios basados en las visitas anteriores de un usuario a este sitio web o a otros sitios web.",
+          "Las cookies de publicidad de Google permiten que Google y sus socios muestren anuncios a los usuarios basados en sus visitas a este sitio o a otros sitios de Internet. Puedes inhabilitar la publicidad personalizada en la Configuración de anuncios de Google (https://adssettings.google.com) o desactivar las cookies de proveedores externos para publicidad personalizada en https://www.aboutads.info.",
+          "Más información sobre cómo Google usa los datos de los sitios que usan sus servicios: https://policies.google.com/technologies/partner-sites.",
+          "También usamos Google Analytics para medir de forma agregada qué páginas se visitan. No enviamos a Google tu correo ni datos de tu cuenta.",
         ],
       },
       {
@@ -94,19 +103,21 @@ const content: Record<LegalPageType, { title: string; updated: string; sections:
   },
   cookies: {
     title: "Política de cookies",
-    updated: "julio de 2026",
+    updated: "noviembre de 2026",
     sections: [
       {
         title: "Qué cookies usamos",
         paragraphs: [
           "Una cookie/token de sesión gestionado por Supabase Auth para mantenerte conectado entre visitas. Es estrictamente necesaria para que el inicio de sesión funcione.",
-          "Hoy no usamos cookies de publicidad ni de rastreo de terceros.",
+          "Cookies de Google Analytics para medir de forma agregada el uso del sitio (páginas visitadas, origen de las visitas).",
+          "Cookies de publicidad de Google AdSense: Google y sus socios las usan para mostrar anuncios, incluidos anuncios personalizados basados en tus visitas a este y otros sitios, y para limitar la frecuencia y medir su rendimiento.",
         ],
       },
       {
         title: "Cómo controlarlas",
         paragraphs: [
           "Puedes borrar las cookies del sitio desde la configuración de tu navegador en cualquier momento; esto cerrará tu sesión.",
+          "Puedes desactivar los anuncios personalizados en https://adssettings.google.com. Si visitas el sitio desde una región que lo exige, te pediremos tu consentimiento antes de usar cookies de publicidad.",
         ],
       },
     ],
