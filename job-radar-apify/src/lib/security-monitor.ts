@@ -7,23 +7,74 @@
 // becomes "120/min per instance" behind a load balancer. Fine for one
 // instance, a known limitation worth revisiting before horizontal scaling.
 //
-// IP extraction trusts `x-forwarded-for`'s first entry as the real client —
-// only correct if the deployment platform (Render or similar) sits as a
-// trusted single-hop proxy that sets/appends this header itself. A raw
-// client can normally set arbitrary headers; a platform-terminated TLS edge
-// is what makes this trustworthy here. If ever deployed behind something
-// that blindly forwards a client-supplied X-Forwarded-For, this becomes
-// spoofable (an attacker could fake a rotating IP to bypass every limit
-// below, or fake a real user's IP to get them blocked) — worth re-checking
-// against whatever's actually in front of this process before relying on it
-// further.
+// Client IP: production sits behind an edge that sets its own client-IP
+// header, while the leftmost X-Forwarded-For entry is whatever the client
+// sent. The trusted header is read first (CLIENT_IP_HEADER, default
+// cf-connecting-ip); X-Forwarded-For is only a fallback. The fallback is
+// never the socket or the rightmost entry on a proxied host: those are the
+// edge's addresses, shared by every visitor, so one abuser would get the
+// whole site rate-limited. Which source is in use is logged once per
+// process (names only, never addresses).
 
 import type { IncomingMessage } from "http";
+import { isIP } from "net";
+
+export const DEFAULT_CLIENT_IP_HEADER = "cf-connecting-ip";
+
+export type ClientIpSource = "trusted-header" | "x-forwarded-for" | "socket" | "unknown";
+
+function firstHeaderValue(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+// One IPv6 holder controls a whole /64; bucketing by it stops rotation
+// through those addresses. IPv4 (and IPv4-mapped) addresses stay as is.
+export function normalizeClientIp(raw: string | undefined): string | null {
+  const value = raw?.trim();
+  if (!value) return null;
+  const mapped = value.toLowerCase().startsWith("::ffff:") ? value.slice(7) : value;
+  const version = isIP(mapped);
+  if (version === 4) return mapped;
+  if (version !== 6) return null;
+  const [head, tail] = mapped.toLowerCase().split("::");
+  const headGroups = head ? head.split(":") : [];
+  const tailGroups = tail === undefined ? [] : tail ? tail.split(":") : [];
+  const groups =
+    tail === undefined
+      ? headGroups
+      : [...headGroups, ...Array(8 - headGroups.length - tailGroups.length).fill("0"), ...tailGroups];
+  return `${groups.slice(0, 4).map((group) => parseInt(group, 16).toString(16)).join(":")}::/64`;
+}
+
+export function resolveClientIp(
+  headers: IncomingMessage["headers"],
+  socketAddress: string | undefined,
+  trustedHeader: string = DEFAULT_CLIENT_IP_HEADER
+): { ip: string; source: ClientIpSource } {
+  const trusted = normalizeClientIp(firstHeaderValue(headers[trustedHeader.toLowerCase()]));
+  if (trusted) return { ip: trusted, source: "trusted-header" };
+  const forwarded = firstHeaderValue(headers["x-forwarded-for"]);
+  if (forwarded !== undefined) {
+    const leftmost = forwarded.split(",")[0]?.trim();
+    return { ip: normalizeClientIp(leftmost) ?? (leftmost || "unknown"), source: "x-forwarded-for" };
+  }
+  const socket = normalizeClientIp(socketAddress);
+  return socket ? { ip: socket, source: "socket" } : { ip: "unknown", source: "unknown" };
+}
+
+const loggedClientIpSources = new Set<ClientIpSource>();
 
 export function getClientIp(req: IncomingMessage): string {
-  const forwarded = req.headers["x-forwarded-for"];
-  const first = Array.isArray(forwarded) ? forwarded[0] : forwarded;
-  return first?.split(",")[0]?.trim() || req.socket.remoteAddress || "unknown";
+  const { ip, source } = resolveClientIp(
+    req.headers,
+    req.socket.remoteAddress,
+    process.env.CLIENT_IP_HEADER || DEFAULT_CLIENT_IP_HEADER
+  );
+  if (!loggedClientIpSources.has(source)) {
+    loggedClientIpSources.add(source);
+    console.log(JSON.stringify({ event: "client-ip-source", source }));
+  }
+  return ip;
 }
 
 interface IpState {

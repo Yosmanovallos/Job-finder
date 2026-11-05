@@ -23,6 +23,7 @@ const suites: Record<string, string[]> = {
     "validate-job-internal-links.test.ts",
     "validate-job-page-blocks.test.ts",
     "validate-ssr-dollar.test.ts",
+    "validate-client-ip.test.ts",
     "validate-job-meta.test.ts",
     "validate-city-hub-stats.test.ts",
     "validate-dashboard-filters.ts",

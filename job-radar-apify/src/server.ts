@@ -526,6 +526,10 @@ const GENERAL_API_RATE_LIMIT = 120;
 const GENERAL_API_RATE_WINDOW_MS = 60 * 1000;
 const CHECKOUT_START_BODY_MAX_BYTES = 1 * 1024;
 const SAVED_JOB_BODY_MAX_BYTES = 1 * 1024; // { applied?: boolean }
+const PROFILE_BODY_MAX_BYTES = 4 * 1024; // { name } or { roles: string[] } (<= 10 x 100 chars)
+const RUN_SCRAPER_BODY_MAX_BYTES = 4 * 1024; // { keywords: string[] }
+const RUN_SCRAPER_MAX_KEYWORDS = 10;
+const WOMPI_WEBHOOK_BODY_MAX_BYTES = 64 * 1024; // a Wompi event is a few KB
 
 // Reads a request body up to maxBytes; null when it's larger (the rest is
 // discarded, never buffered).
@@ -690,8 +694,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       JSON.stringify({
         status: "ok",
         uptime: process.uptime(),
-        timestamp: new Date().toISOString(),
-        memory: process.memoryUsage()
+        timestamp: new Date().toISOString()
       })
     );
     return;
@@ -1089,13 +1092,15 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       return;
     }
 
-    let bodyText = "";
-    req.on("data", (chunk) => {
-      bodyText += chunk.toString();
-    });
-    req.on("end", async () => {
+    const body = await readJsonBodyCapped(req, PROFILE_BODY_MAX_BYTES);
+    if (!body.ok) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Cuerpo de la solicitud inválido." }));
+      return;
+    }
+    {
       try {
-        const parsed = JSON.parse(bodyText || "{}");
+        const parsed = (body.value ?? {}) as { name?: unknown };
         const name = typeof parsed.name === "string" ? parsed.name.trim().slice(0, 255) : "";
         if (!name) {
           res.writeHead(400, { "Content-Type": "application/json" });
@@ -1117,7 +1122,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       } catch (e) {
         respondToUnexpectedError(res, e, "PATCH /api/me", "No se pudo actualizar el nombre.");
       }
-    });
+    }
     return;
   }
 
@@ -1132,13 +1137,15 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       return;
     }
 
-    let bodyText = "";
-    req.on("data", (chunk) => {
-      bodyText += chunk.toString();
-    });
-    req.on("end", async () => {
+    const body = await readJsonBodyCapped(req, PROFILE_BODY_MAX_BYTES);
+    if (!body.ok) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Cuerpo de la solicitud inválido." }));
+      return;
+    }
+    {
       try {
-        const parsed = JSON.parse(bodyText || "{}");
+        const parsed = (body.value ?? {}) as { roles?: unknown };
         if (!Array.isArray(parsed.roles)) {
           res.writeHead(400, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ error: "roles debe ser un arreglo" }));
@@ -1173,7 +1180,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
           "No se pudieron guardar los puestos."
         );
       }
-    });
+    }
     return;
   }
 
@@ -1205,22 +1212,21 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     }
     if (!checkSensitiveRateLimit(clientIp, res, "POST /api/run-scraper")) return;
 
-    let bodyText = "";
-    req.on("data", (chunk) => {
-      bodyText += chunk.toString();
-    });
-    req.on("end", async () => {
-      let keywords: string[] = [];
-      try {
-        if (bodyText) {
-          const parsed = JSON.parse(bodyText);
-          if (Array.isArray(parsed.keywords)) {
-            keywords = parsed.keywords;
-          }
-        }
-      } catch {
-        // Malformed body: keep the default keywords below.
-      }
+    const body = await readJsonBodyCapped(req, RUN_SCRAPER_BODY_MAX_BYTES);
+    {
+      const requested = body.ok ? (body.value as { keywords?: unknown } | null)?.keywords : undefined;
+      // Only short strings, deduplicated, and a bounded count: each one is a
+      // database write.
+      const keywords: string[] = Array.isArray(requested)
+        ? [
+            ...new Set(
+              requested
+                .filter((k): k is string => typeof k === "string")
+                .map((k) => k.trim())
+                .filter((k) => k.length > 0 && k.length <= 100)
+            )
+          ].slice(0, RUN_SCRAPER_MAX_KEYWORDS)
+        : [];
 
       if (keywords.length === 0) {
         res.writeHead(400, { "Content-Type": "application/json" });
@@ -1240,7 +1246,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
             "Marcado para el próximo ciclo programado (~15 min), no se ejecuta en este proceso."
         })
       );
-    });
+    }
     return;
   }
 
@@ -1299,14 +1305,15 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
   // 7. POST /api/webhooks/wompi — endpoint público, la confianza viene de la
   //    verificación de firma (nunca del payload por sí solo).
   if (pathname === "/api/webhooks/wompi" && method === "POST") {
-    let bodyText = "";
-    req.on("data", (chunk) => {
-      bodyText += chunk.toString();
-    });
-    req.on("end", async () => {
+    const body = await readJsonBodyCapped(req, WOMPI_WEBHOOK_BODY_MAX_BYTES);
+    if (!body.ok || !body.value || typeof body.value !== "object") {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Payload inválido." }));
+      return;
+    }
+    {
       try {
-        const payload = JSON.parse(bodyText);
-        const result = await handleWompiWebhook(payload);
+        const result = await handleWompiWebhook(body.value as Parameters<typeof handleWompiWebhook>[0]);
         if (!result.verified) {
           res.writeHead(401, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ error: "Firma inválida" }));
@@ -1317,7 +1324,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       } catch (e) {
         respondToUnexpectedError(res, e, "POST /api/webhooks/wompi", "Payload inválido.");
       }
-    });
+    }
     return;
   }
 
