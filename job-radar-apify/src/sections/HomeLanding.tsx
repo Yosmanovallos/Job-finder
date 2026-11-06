@@ -13,6 +13,7 @@ import { CompanyAvatar } from "../components/CompanyAvatar.js";
 import { getSourceColor } from "../lib/source-colors.js";
 import { SourceLogo } from "../components/SourceLogo.js";
 import { YouTubeLite } from "../components/YouTubeLite.js";
+import { getHomeSsrSeed } from "../lib/home-ssr-seed.js";
 
 // Homepage approved on the design canvas (R3, 2026-10-25): one DOM for both
 // layouts — sections only change arrangement at `md`, and the phone order
@@ -83,15 +84,23 @@ function useCountUp(target: number | null, durationMs = 1600): number | null {
   return value;
 }
 
-// Read synchronously on first render (this page is client-rendered), so
-// the desktop-only art never mounts — and never downloads — on a phone.
+// The first render uses the server's phone/desktop guess when the page was
+// server-rendered (so hydration matches and phones never get the desktop
+// art in their HTML), otherwise the real media query, so the desktop-only
+// art never mounts — and never downloads — on a phone. The effect then
+// corrects a wrong guess (e.g. a tablet) right after mount.
 function useMinWidth(px: number): boolean {
   const query = `(min-width: ${px}px)`;
-  const [matches, setMatches] = useState(() => window.matchMedia?.(query).matches ?? true);
+  const [matches, setMatches] = useState(() => {
+    const seed = getHomeSsrSeed();
+    if (seed) return seed.desktop;
+    return typeof window === "undefined" ? true : window.matchMedia?.(query).matches ?? true;
+  });
   useEffect(() => {
     const mq = window.matchMedia?.(query);
     if (!mq) return;
     const onChange = () => setMatches(mq.matches);
+    onChange();
     mq.addEventListener("change", onChange);
     return () => mq.removeEventListener("change", onChange);
   }, [query]);
@@ -155,7 +164,7 @@ function Hero({ country, data }: { country: string; data: HomeData }) {
               as a backstop for the few widths where the two still differ;
               browsers without the lh unit ignore it. */}
           <h1 className={`${T.h1} min-h-[4lh] md:min-h-0`}>
-            {headingLead}: <span className="text-primary">{headingTail}</span>
+            {`${headingLead}: `}<span className="text-primary">{headingTail}</span>
           </h1>
           {/* Desktop only: on a phone the hero keeps one message (the H1)
               and one action (the search). */}
@@ -301,6 +310,9 @@ function Stats({ country, data }: { country: string; data: HomeData }) {
 function LatestJobs({ country, data }: { country: string; data: HomeData }) {
   if (data.latestJobs.length === 0) return null;
   const dashboardPath = country === "VE" ? "/ve/dashboard" : "/dashboard";
+  // Server-rendered page: same clock as the HTML, so "hace 3 h" matches.
+  const seedNow = getHomeSsrSeed(country)?.now;
+  const now = seedNow ? new Date(seedNow) : new Date();
   return (
     <section className={`sr-host order-4 md:hidden ${CONTAINER} ${SECTION_Y}`}>
       <SectionHeader title="Lo más nuevo ahora" link={{ to: dashboardPath, label: "Ver todo" }} />
@@ -315,7 +327,7 @@ function LatestJobs({ country, data }: { country: string; data: HomeData }) {
                 <p className={`${T.small} mt-0.5 text-muted-foreground truncate`}>{job.company} · {job.location}</p>
                 <div className={`${T.small} mt-2 flex flex-wrap gap-1.5 font-mono`}>
                   <span className="rounded-full px-2 py-0.5" style={{ backgroundColor: color.bg, color: color.text }}>{job.source}</span>
-                  <span className="rounded-full px-2 py-0.5 bg-green-soft text-primary">{jobDateLabel(job)}</span>
+                  <span className="rounded-full px-2 py-0.5 bg-green-soft text-primary">{jobDateLabel(job, now)}</span>
                 </div>
               </div>
             </Link>
@@ -592,6 +604,48 @@ function FinalCta({ country }: { country: string }) {
   );
 }
 
+// The homepage's descriptive copy (getHomeContent: introduction plus the
+// shared sections after the city discovery, which Explore already shows).
+// It used to exist only in the raw HTML snippet that React replaced on
+// mount, so visitors flashed it unstyled and Google's rendered DOM never
+// had it. Now it is real, visible page content in both. Text verbatim.
+function About({ country }: { country: string }) {
+  const content = getHomeContent(country === "VE" ? "VE" : "CO");
+  const sections = content.sections.slice(1);
+  return (
+    <section aria-label="Sobre BuscoTrabajo" className={`order-10 md:order-9 border-t-2 border-foreground bg-[#fbfaf6]`}>
+      <div className={`${CONTAINER} py-10 md:py-14 grid gap-8 md:grid-cols-3 md:gap-10 text-[#3d413e]`}>
+        <div>
+          {content.introduction.map((paragraph) => (
+            <p key={paragraph} className={`${T.small} md:text-sm leading-relaxed mb-3`}>{paragraph}</p>
+          ))}
+        </div>
+        {sections.map((section) => (
+          <div key={section.heading}>
+            <h2 className="font-heading font-bold text-base text-foreground mb-2">{section.heading}</h2>
+            {section.paragraphs.map((paragraph) => (
+              <p key={paragraph} className={`${T.small} md:text-sm leading-relaxed mb-3`}>{paragraph}</p>
+            ))}
+            {section.links?.length ? (
+              <ul className="flex flex-wrap gap-x-4 gap-y-1">
+                {section.links.map((link) =>
+                  <li key={link.href}>
+                    {/\.(txt|xml)$/.test(link.href) ? (
+                      <a href={link.href} className={`${T.small} md:text-sm font-semibold text-primary underline underline-offset-4`}>{link.label}</a>
+                    ) : (
+                      <Link to={link.href} className={`${T.small} md:text-sm font-semibold text-primary underline underline-offset-4`}>{link.label}</Link>
+                    )}
+                  </li>
+                )}
+              </ul>
+            ) : null}
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export default function HomeLanding({ country }: { country: string }) {
   const data = useHomeData(country);
   return (
@@ -608,6 +662,7 @@ export default function HomeLanding({ country }: { country: string }) {
       <Video />
       <Why data={data} />
       <FinalCta country={country} />
+      <About country={country} />
     </div>
   );
 }

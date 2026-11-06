@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { HomeData } from "./home-stats.js";
+import { getHomeSsrSeed, homeDataHasFigures } from "./home-ssr-seed.js";
 
 export type { HomeCompany, HomeData, HomeJob } from "./home-stats.js";
 
@@ -23,9 +24,19 @@ const EMPTY: HomeData = {
 };
 
 export function useHomeData(country: string): HomeData {
-  const [data, setData] = useState<HomeData>(EMPTY);
+  // Server-rendered home: start from the figures already in the HTML and
+  // skip this mount's fetch, so hydration matches and nothing blinks.
+  const [data, setData] = useState<HomeData>(() => {
+    const seeded = getHomeSsrSeed(country);
+    return seeded && homeDataHasFigures(seeded.data) ? seeded.data : EMPTY;
+  });
+  const seededMount = useRef(data !== EMPTY);
 
   useEffect(() => {
+    if (seededMount.current) {
+      seededMount.current = false;
+      return;
+    }
     const controller = new AbortController();
     setData(EMPTY);
     fetch(`/api/home-stats?${new URLSearchParams({ country })}`, { signal: controller.signal })
