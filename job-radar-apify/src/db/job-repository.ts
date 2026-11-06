@@ -26,6 +26,7 @@ import { liveJobSql } from "../lib/job-freshness.js";
 import { findExpiredUrlHashes } from "./expired-job-repository.js";
 import { StaleWhileRevalidateCache } from "../lib/stale-while-revalidate-cache.js";
 import { clipVarchar } from "../lib/varchar.js";
+import { RECENT_SITEMAP_WINDOW_HOURS, type RecentReadyJob } from "../lib/recent-jobs.js";
 import { copySpecificCityMismatchSql } from "../lib/official-copy-location.js";
 import {
   VACANCY_IDENTITY_KEYS,
@@ -568,6 +569,104 @@ export async function streamCanonicalSitemapJobs(options: SitemapStreamOptions):
     await cancelPromise;
     client.release();
   }
+}
+
+// --- SEO Fase B: recent Google-ready jobs (src/lib/recent-jobs.ts) ----------
+
+interface RecentReadyRow extends SitemapJobRow {
+  country: string | null;
+}
+
+/**
+ * The rows sitemap-jobs.xml lists (same DISTINCT ON identity, same
+ * "canonical first, THEN seoReadySql" order as streamCanonicalSitemapJobs),
+ * restricted to rows published in the last `windowHours`. Restricting the
+ * DISTINCT ON input to the window keeps the canonical pick identical: the
+ * newest row of a group that has any row in the window is itself in the
+ * window. test:seo checks every URL here is in sitemap-jobs.xml with the
+ * same <lastmod>. Read-only, bounded by a statement timeout.
+ */
+export async function queryRecentSeoReadyJobs(
+  windowHours: number = RECENT_SITEMAP_WINDOW_HOURS,
+  options: { limit?: number; statementTimeoutMs?: number } = {}
+): Promise<RecentReadyJob[]> {
+  const hours = Math.min(Math.max(Math.floor(windowHours), 1), RECENT_SITEMAP_WINDOW_HOURS);
+  const limit = Math.min(Math.max(options.limit ?? 10_000, 1), 10_000);
+  const statementTimeoutMs = Math.min(Math.max(options.statementTimeoutMs ?? 10_000, 1_000), 30_000);
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN READ ONLY");
+    await client.query("SELECT set_config('statement_timeout', $1, true)", [`${statementTimeoutMs}ms`]);
+    const result = await client.query<RecentReadyRow>(
+      `SELECT id, title, company, location, url, country, published_at, content_updated_at,
+              (published_at > NOW() - INTERVAL '48 hours') AS is_locked
+       FROM (
+         SELECT DISTINCT ON (lower(trim(title)), lower(trim(COALESCE(company, 'confidencial'))), lower(trim(COALESCE(location, CASE country WHEN 'VE' THEN 'venezuela' ELSE 'colombia' END))))
+                id, title, company, location, url, country, published_at, content_updated_at,
+                seo_ready, is_active, valid_through
+         FROM jobs
+         WHERE is_active = TRUE AND ${liveJobSql()} AND published_at >= NOW() - ($1::int * INTERVAL '1 hour')
+         ORDER BY lower(trim(title)), lower(trim(COALESCE(company, 'confidencial'))), lower(trim(COALESCE(location, CASE country WHEN 'VE' THEN 'venezuela' ELSE 'colombia' END))), published_at DESC, id DESC
+       ) canonical
+       WHERE ${seoReadySql("canonical")}
+       ORDER BY published_at DESC, id DESC
+       LIMIT ${limit}`,
+      [hours]
+    );
+    await client.query("COMMIT");
+    const jobs: RecentReadyJob[] = result.rows.map((row) => ({
+      jobId: row.id,
+      title: row.title,
+      company: row.company,
+      location: row.location,
+      url: row.url ? resolveOutboundUrl(row.url) : row.url,
+      country: row.country,
+      publishedAt: row.published_at,
+      isLocked: row.is_locked,
+      contentUpdatedAt: row.content_updated_at
+    }));
+    // Same public view as the sitemap and hubs (anonymous visitor).
+    return maskLockedFields(jobs, "free");
+  } catch (error) {
+    try {
+      await client.query("ROLLBACK");
+    } catch {
+      // The connection may already be closed.
+    }
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+// One shared snapshot (not one per hub): ~1.5k light rows, refreshed at most
+// every 10 minutes. Its own cache instance, so it never competes with the
+// dashboard first pages in jobsPageCache (DASHBOARD-PERFORMANCE-RUNBOOK.md).
+// Rows are frozen and shared, so reads do not copy them.
+const RECENT_READY_CACHE_KEY = "recent";
+const recentReadyCache = new StaleWhileRevalidateCache<string, readonly RecentReadyJob[]>({
+  freshForMs: 10 * 60_000,
+  staleForMs: 2 * 60 * 60_000,
+  maxEntries: 1,
+  clone: (value) => value,
+  onBackgroundRefreshError: () => {
+    console.warn("[recent-ready-cache] Background refresh failed; serving the last valid snapshot.");
+  }
+});
+
+async function loadRecentReadyJobs(): Promise<readonly RecentReadyJob[]> {
+  const jobs = await queryRecentSeoReadyJobs(RECENT_SITEMAP_WINDOW_HOURS);
+  return Object.freeze(jobs.map((job) => Object.freeze(job)));
+}
+
+/** Recent Google-ready jobs; waits on Postgres only when the snapshot is cold (sitemap route). */
+export function getRecentSeoReadyJobs(): Promise<readonly RecentReadyJob[]> {
+  return recentReadyCache.get(RECENT_READY_CACHE_KEY, loadRecentReadyJobs);
+}
+
+/** Never waits: the snapshot if cached, else undefined (and one background load starts). Hubs use this. */
+export function peekRecentSeoReadyJobs(): readonly RecentReadyJob[] | undefined {
+  return recentReadyCache.peek(RECENT_READY_CACHE_KEY, loadRecentReadyJobs);
 }
 
 export interface JobsPageOptions {

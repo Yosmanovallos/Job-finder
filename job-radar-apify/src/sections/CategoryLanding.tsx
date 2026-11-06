@@ -17,6 +17,14 @@ import { isVePrefixed } from "../lib/country-context.js";
 import { Button } from "../components/ui/button.js";
 import { Job } from "../sources/types.js";
 import { ArrowLeft } from "lucide-react";
+import type { NewTodayBlock } from "../lib/recent-jobs.js";
+
+// The server embeds the block it rendered; only a well-formed one is shown,
+// so the hydrated DOM links exactly what the server HTML linked.
+function isNewTodayBlock(value: unknown): value is NewTodayBlock {
+  const block = value as NewTodayBlock | undefined;
+  return Boolean(block && typeof block.heading === "string" && Array.isArray(block.links) && block.links.length > 0);
+}
 
 type LoadState = "loading" | "found" | "not-found";
 
@@ -26,6 +34,8 @@ interface SsrCategoryPayload {
   jobs?: Job[];
   total?: number;
   insights?: CategoryInsights;
+  /** SEO Fase B «Nuevas hoy» (src/lib/recent-jobs.ts); absent when no job qualifies. */
+  newToday?: NewTodayBlock;
 }
 
 declare global {
@@ -42,6 +52,7 @@ interface CategoryPageState {
   total: number;
   insights: CategoryInsights | null;
   state: LoadState;
+  newToday?: NewTodayBlock | null;
   fromSsr?: boolean;
 }
 
@@ -84,13 +95,21 @@ export default function CategoryLanding() {
       delete window.__SSR_CATEGORY__;
       const jobs = Array.isArray(ssrCategory.jobs) ? ssrCategory.jobs : [];
       const total = ssrCategory.total || 0;
-      return { id, jobs, total, insights: ssrCategory.insights || buildCategoryInsights(category, total, jobs), state: "found", fromSsr: true };
+      return {
+        id,
+        jobs,
+        total,
+        insights: ssrCategory.insights || buildCategoryInsights(category, total, jobs),
+        state: "found",
+        fromSsr: true,
+        newToday: isNewTodayBlock(ssrCategory.newToday) ? ssrCategory.newToday : null
+      };
     }
     return { id, jobs: [], total: 0, insights: null, state: category ? "loading" : "not-found" };
   });
   const current: CategoryPageState =
     page.id === id ? page : { id, jobs: [], total: 0, insights: null, state: category ? "loading" : "not-found" };
-  const { jobs, total, insights, state } = current;
+  const { jobs, total, insights, state, newToday } = current;
 
   useEffect(() => {
     if (!category) {
@@ -270,6 +289,30 @@ export default function CategoryLanding() {
                   </nav>
                 )}
               </div>
+            </section>
+          )}
+
+          {newToday && (
+            <section
+              data-category-new-today
+              aria-label={newToday.heading}
+              className="sr-host max-w-[1240px] w-full mx-auto px-4 md:px-6 pt-8 md:pt-12"
+            >
+              <h2 className="sr font-heading font-bold text-[24px] md:text-[36px] leading-tight tracking-[-0.03em] mb-4 md:mb-6">
+                {newToday.heading}
+              </h2>
+              <ul className="sr grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-3">
+                {newToday.links.map((link) => (
+                  <li key={link.path} className="ink-card-sm rounded-2xl bg-white p-4 text-sm leading-relaxed">
+                    <Link to={link.path} className="font-bold text-foreground">
+                      {link.title}
+                    </Link>
+                    <span className="block text-[#3d413e]">
+                      {link.company} · {link.location}
+                    </span>
+                  </li>
+                ))}
+              </ul>
             </section>
           )}
 

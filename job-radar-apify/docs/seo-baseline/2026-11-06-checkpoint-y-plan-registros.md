@@ -279,6 +279,8 @@ mide en el checkpoint siguiente. Nada de pago.
 
 ### Fase B — Indexar más rápido las vacantes nuevas (SEO + Google Empleos)
 
+**Estado (2026-11-06):** implementada en `codex/seo-fase-b-indexing` (ADR 0011), sin desplegar: sitemap reciente, «Nuevas hoy» e IndexNow en dry-run. La priorización de `URL_UPDATED` por demanda queda fuera (exige enmendar el ADR 0004). Detalle y verificación: fila 23 de `docs/SEO-IMPROVEMENT-PLAN.md`.
+
 - `sitemap-jobs-recent.xml` con las vacantes de las últimas 48–72 h, con
   `lastmod` real, enlazado desde el índice.
 - Los hubs de ciudad y de rol (rastreados a menudo) enlazan las vacantes más
