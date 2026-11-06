@@ -21,8 +21,11 @@ import {
   updateUserPreferredRoles,
   getTransactionsForUser,
   streamCanonicalSitemapJobs,
-  SitemapStreamAbortedError
+  SitemapStreamAbortedError,
+  getRecentSeoReadyJobs,
+  peekRecentSeoReadyJobs
 } from "./db/job-repository.js";
+import { buildNewTodayBlock } from "./lib/recent-jobs.js";
 import { markRoleForImmediateRescan } from "./db/scheduler-repository.js";
 import {
   listSavedJobs,
@@ -1482,7 +1485,15 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
         relatedCityLinks.length > 0
           ? `\n<section data-related-cities aria-label="${escapeHtml(sectionHeadings.relatedCities)}"><h2>${escapeHtml(sectionHeadings.relatedCities)}</h2><ul>${relatedCityLinks.map((link) => `<li><a href="${escapeHtml(link.href)}">${escapeHtml(link.label)}</a></li>`).join("")}</ul></section>`
           : "";
-      const ssrSnippet = `<h1>${escapeHtml(meta.heading)}</h1>\n${emptyNotice}${overviewHtml}${statsHtml}${jobsHeading}<nav aria-label="Vacantes"><ul>\n${items}\n</ul></nav>${relatedCitiesHtml}`;
+      // SEO Fase B «Nuevas hoy»: Google-ready jobs of this hub published
+      // today (hub country's calendar day), from the shared recent snapshot.
+      // peek() never waits on Postgres: a cold snapshot just omits the block
+      // and loads in the background, so the hub's TTFB is unchanged.
+      const newToday = buildNewTodayBlock(category, peekRecentSeoReadyJobs());
+      const newTodayHtml = newToday
+        ? `<section data-category-new-today aria-label="${escapeHtml(newToday.heading)}"><h2>${escapeHtml(newToday.heading)}</h2><ul>${newToday.links.map((link) => `<li><a href="${escapeHtml(link.path)}">${escapeHtml(link.title)}</a> — ${escapeHtml(link.company)} · ${escapeHtml(link.location)}</li>`).join("")}</ul></section>\n`
+        : "";
+      const ssrSnippet = `<h1>${escapeHtml(meta.heading)}</h1>\n${emptyNotice}${overviewHtml}${newTodayHtml}${statsHtml}${jobsHeading}<nav aria-label="Vacantes"><ul>\n${items}\n</ul></nav>${relatedCitiesHtml}`;
       indexHtml = indexHtml.replace('<div id="app"></div>', () => `<div id="app">${ssrSnippet}</div>`);
 
       // Same fix /dashboard already had (Fase 1, §5.4) applied here too —
@@ -1504,7 +1515,8 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
         country: category.country,
         jobs: page,
         total,
-        insights
+        insights,
+        ...(newToday ? { newToday } : {})
       });
       indexHtml = indexHtml.replace(
         "</head>",
@@ -2276,6 +2288,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     const xml = buildSitemapIndexXml([
       "https://buscotrabajo.co/sitemap-pages.xml",
       "https://buscotrabajo.co/sitemap-jobs.xml",
+      "https://buscotrabajo.co/sitemap-jobs-recent.xml",
       "https://buscotrabajo.co/sitemap-categories.xml"
     ]);
     await sendBody(req, res, 200, { "Content-Type": "application/xml; charset=utf-8" }, xml);
@@ -2398,6 +2411,38 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       res.off("close", abort);
       activeSitemapStreams -= 1;
     }
+    return;
+  }
+
+  // SEO Fase B: Google-ready jobs published in the last 72 h. A subset of
+  // sitemap-jobs.xml with the same <loc>/<lastmod> (test:seo checks it), so a
+  // crawler that re-reads this small file often finds new jobs sooner. Served
+  // from the shared 10-minute snapshot (src/lib/recent-jobs.ts); a failed cold
+  // read is a 503 no-store, never a truncated 200.
+  if (pathname === "/sitemap-jobs-recent.xml" && method === "GET") {
+    let recent: Awaited<ReturnType<typeof getRecentSeoReadyJobs>>;
+    try {
+      recent = await getRecentSeoReadyJobs();
+    } catch (error) {
+      console.error("[sitemap-jobs-recent] No se pudo leer:", error instanceof Error ? error.message : "error");
+      res.writeHead(503, {
+        "Content-Type": "text/plain; charset=utf-8",
+        "Retry-After": "60",
+        "Cache-Control": "no-store"
+      });
+      res.end("Sitemap temporalmente no disponible.");
+      return;
+    }
+    const entries = recent
+      .map((job) => buildJobSitemapEntry(job))
+      .filter((entry): entry is string => entry !== null);
+    await sendBody(
+      req,
+      res,
+      200,
+      { "Content-Type": "application/xml; charset=utf-8" },
+      `${JOBS_SITEMAP_HEADER}${entries.join("\n")}${JOBS_SITEMAP_FOOTER}`
+    );
     return;
   }
 
@@ -2665,6 +2710,27 @@ if (!process.env.JOB_RADAR_TEST_MODE) {
     });
   } else if (outcome === "failed") {
     console.warn("[dashboard-cache] Warmup failed; the first request will retry normally.");
+  }
+
+  // SEO Fase B: load the recent Google-ready snapshot AFTER the dashboard
+  // warmup (never competing with it) and before listening, so the first hub
+  // requests only peek() it instead of racing its query. Bounded to 5 s; on
+  // timeout or failure the hubs simply omit «Nuevas hoy» until it loads.
+  if (outcome === "ready") {
+    const recentStartedAt = Date.now();
+    const recentOutcome = await Promise.race([
+      getRecentSeoReadyJobs().then((jobs) => jobs.length).catch(() => "failed" as const),
+      new Promise<"timeout">((resolve) => setTimeout(() => resolve("timeout"), 5_000).unref())
+    ]);
+    console.log(
+      JSON.stringify({
+        ts: new Date().toISOString(),
+        event: "recent_ready_cache_warmed",
+        durationMs: Date.now() - recentStartedAt,
+        outcome: typeof recentOutcome === "number" ? "ready" : recentOutcome,
+        jobs: typeof recentOutcome === "number" ? recentOutcome : null
+      })
+    );
   }
 }
 

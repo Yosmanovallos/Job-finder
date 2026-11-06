@@ -478,3 +478,10 @@ and `git diff --check` passed. Repository-wide typecheck still had unrelated,
 pre-existing errors. Docker Desktop was unavailable, so the isolated PostgreSQL
 suite was not run. Do not treat those two limitations as new failures from the
 dashboard optimization, and do not use them to waive validation of future code.
+
+## SEO Fase B: copia de vacantes aptas recientes (2026-11-06, sin desplegar)
+
+- Una consulta de solo lectura (aptas publicadas en 72 h) alimenta `/sitemap-jobs-recent.xml`, «Nuevas hoy» de los hubs e IndexNow. Tiene su propia caché (`recentReadyCache`, 1 entrada, 10 min fresca, 2 h usable), separada de `jobsPageCache`, así que no desaloja las primeras páginas del dashboard.
+- Arranque: se carga **después** del warmup del dashboard y antes de `listen`, con 5 s como máximo (evento `recent_ready_cache_warmed`). Si el warmup del dashboard falla o se pasa de tiempo, no se carga y los hubs omiten el bloque hasta que la copia exista.
+- Los hubs solo hacen `peek()`: nunca esperan a Postgres. Medición local en frío (3 procesos por lado, mediana): Bogotá 63→68 ms, VE project-manager 37→32 ms, Medellín 29→31 ms. Producción antes (MISS, URL única): 0,26–0,30 s con caché de app caliente.
+- Tras desplegar: comprobar `dashboard_cache_warmed` y `recent_ready_cache_warmed` en los logs de Render, y el TTFB MISS de `/empleos/bogota`, `/empleos/medellin`, `/empleos/cali`, `/empleos/asesor-comercial` y `/ve/empleos/project-manager`.
