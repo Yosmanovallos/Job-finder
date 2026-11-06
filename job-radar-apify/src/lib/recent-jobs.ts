@@ -50,9 +50,29 @@ export function hubTimeZone(country: string): string {
   return country.toUpperCase() === "VE" ? "America/Caracas" : "America/Bogota";
 }
 
+// One formatter per time zone, reused for the life of the process. Building
+// an Intl.DateTimeFormat is expensive and allocates native ICU memory that GC
+// frees late. One per job per hub request (~2k per request) cost ~0.2 s of
+// TTFB and pushed the Render instance past its memory limit (2026-11-06).
+const dayFormatters = new Map<string, Intl.DateTimeFormat>();
+
+function dayFormatter(timeZone: string): Intl.DateTimeFormat {
+  let formatter = dayFormatters.get(timeZone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat("en-CA", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    });
+    dayFormatters.set(timeZone, formatter);
+  }
+  return formatter;
+}
+
 /** YYYY-MM-DD of `date` in `timeZone`. */
 export function calendarDay(date: Date, timeZone: string): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
+  return dayFormatter(timeZone).format(date);
 }
 
 // Same folding as buildJobWhere's city predicate (LOWER + accents stripped,
@@ -67,9 +87,12 @@ function foldCityText(value: string): string {
  * city, or the title matches the role with the same word plan as
  * rolePredicate(); `country IS NULL OR country = hub.country`.
  */
-export function hubMatcher(hub: ResolvedCategory): (job: Pick<RecentReadyJob, "title" | "location" | "country">) => boolean {
+export function hubMatcher(
+  hub: ResolvedCategory
+): (job: Pick<RecentReadyJob, "title" | "location" | "country">) => boolean {
   const country = hub.country.toUpperCase();
-  const inCountry = (job: Pick<RecentReadyJob, "country">) => !job.country || job.country.toUpperCase() === country;
+  const inCountry = (job: Pick<RecentReadyJob, "country">) =>
+    !job.country || job.country.toUpperCase() === country;
   if (hub.kind === "ciudad") {
     const city = foldCityText(hub.label);
     return (job) => inCountry(job) && foldCityText(job.location || "").includes(city);
@@ -79,7 +102,9 @@ export function hubMatcher(hub: ResolvedCategory): (job: Pick<RecentReadyJob, "t
 }
 
 export function newTodayHeading(hub: ResolvedCategory): string {
-  return hub.kind === "ciudad" ? `Nuevas hoy en ${hub.label}` : `Vacantes de ${hub.label} nuevas hoy`;
+  return hub.kind === "ciudad"
+    ? `Nuevas hoy en ${hub.label}`
+    : `Vacantes de ${hub.label} nuevas hoy`;
 }
 
 /**
@@ -99,12 +124,22 @@ export function buildNewTodayBlock(
   const matches = hubMatcher(hub);
   const links = recent
     .filter((job) => job.company && job.location && job.url && !job.isLocked)
+    // The hub filter first (cheap string test), so only this hub's jobs are
+    // date-formatted.
+    .filter(matches)
     .filter((job) => {
       const published = new Date(job.publishedAt);
-      return Number.isFinite(published.getTime()) && published.getTime() <= now.getTime() && calendarDay(published, timeZone) === today;
+      return (
+        Number.isFinite(published.getTime()) &&
+        published.getTime() <= now.getTime() &&
+        calendarDay(published, timeZone) === today
+      );
     })
-    .filter(matches)
-    .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime() || (a.jobId < b.jobId ? 1 : -1))
+    .sort(
+      (a, b) =>
+        new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime() ||
+        (a.jobId < b.jobId ? 1 : -1)
+    )
     .slice(0, NEW_TODAY_LIMIT)
     .map((job) => ({
       path: buildJobPath(job),
