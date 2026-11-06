@@ -12,14 +12,14 @@ Este documento es análisis y plan; no implementa nada.
 La meta del plan de crecimiento era +500 % (x6) o +1.500 % (x16) sobre la base
 del 24 de octubre. Comparación con cantidades absolutas:
 
-| Indicador | Base (16–22 oct) | Ahora (29 oct–4 nov / 31 oct–6 nov) | Cambio |
-|---|---|---|---|
-| Clics GSC / semana | 7 | 585 | x84 |
-| Impresiones GSC / semana | 442 | 10.600 | x24 |
-| Posición media | 12,4 (90 d) | 6,4 (7 d) | mejora |
-| Clics a `/empleos/*` / día | 0–1 | 157 (4 nov) | — |
-| Registros reales / semana (BD) | 11 | 411 (6 nov aún abierto) | x37 |
-| Usuarios registrados totales (BD) | — | 592 | — |
+| Indicador                         | Base (16–22 oct) | Ahora (29 oct–4 nov / 31 oct–6 nov) | Cambio |
+| --------------------------------- | ---------------- | ----------------------------------- | ------ |
+| Clics GSC / semana                | 7                | 585                                 | x84    |
+| Impresiones GSC / semana          | 442              | 10.600                              | x24    |
+| Posición media                    | 12,4 (90 d)      | 6,4 (7 d)                           | mejora |
+| Clics a `/empleos/*` / día        | 0–1              | 157 (4 nov)                         | —      |
+| Registros reales / semana (BD)    | 11               | 411 (6 nov aún abierto)             | x37    |
+| Usuarios registrados totales (BD) | —                | 592                                 | —      |
 
 Registros reales = `auth.users` sin cuentas de prueba (yopmail, example-test).
 
@@ -44,13 +44,13 @@ Registros por día (BD): 26 oct 8 · 27: 9 · 28: 6 · 29: 11 · 30: 12 · 31: 1
 El filtro de consulta deja fuera las consultas anonimizadas (la mayor parte de
 la cola larga), así que la separación se hace por página:
 
-| Día | Portada `/` (≈ marca) | `/empleos/*` (≈ SEO real) |
-|---|---|---|
-| 26–31 oct | 0–7 / día | 10–26 / día |
-| 1 nov | 39 | 28 |
-| 2 nov | **122** | 39 |
-| 3 nov | 58 | 64 |
-| 4 nov | 37 | **157** |
+| Día       | Portada `/` (≈ marca) | `/empleos/*` (≈ SEO real) |
+| --------- | --------------------- | ------------------------- |
+| 26–31 oct | 0–7 / día             | 10–26 / día               |
+| 1 nov     | 39                    | 28                        |
+| 2 nov     | **122**               | 39                        |
+| 3 nov     | 58                    | 64                        |
+| 4 nov     | 37                    | **157**                   |
 
 Las páginas `/empleos/*` tuvieron 3.826 impresiones el 4 de noviembre, frente a
 unas 41–69 al día antes del 25 de octubre. **El crecimiento SEO es real y sigue
@@ -96,15 +96,15 @@ Vacantes creadas en los últimos 7 días y cuántas llegaron a estar aptas para
 Google (`seo_ready_at`), consulta de solo lectura. La medición formal de F3
 está prevista para el 9 de noviembre.
 
-| Fuente | Nuevas 7 d | Aptas | % | Mediana creada→apta | Base F0 (1 nov) |
-|---|---|---|---|---|---|
-| LinkedIn | 3.887 | 805 | 21 % | 0 h | 21 % CO |
-| Magneto | 1.811 | 1.591 | **88 %** | 0,2 h | atraso 107–113 h |
-| Computrabajo | 1.228 | 51 | 4 % | 7,1 h | 2 % CO |
-| Elempleo | 568 | 561 | 99 % | 0 h | — |
-| Portal oficial | 515 | 393 | 76 % | 0 h | ~72/día |
-| WeRemoto | 53 | 17 | 32 % | 0 h | — |
-| Workana, Glassdoor, Indeed, GetOnBoard, RemoteOK, Torre | 1.440 | 0 | 0 % | — | excluidas a propósito o sin detalle |
+| Fuente                                                  | Nuevas 7 d | Aptas | %        | Mediana creada→apta | Base F0 (1 nov)                     |
+| ------------------------------------------------------- | ---------- | ----- | -------- | ------------------- | ----------------------------------- |
+| LinkedIn                                                | 3.887      | 805   | 21 %     | 0 h                 | 21 % CO                             |
+| Magneto                                                 | 1.811      | 1.591 | **88 %** | 0,2 h               | atraso 107–113 h                    |
+| Computrabajo                                            | 1.228      | 51    | 4 %      | 7,1 h               | 2 % CO                              |
+| Elempleo                                                | 568        | 561   | 99 %     | 0 h                 | —                                   |
+| Portal oficial                                          | 515        | 393   | 76 %     | 0 h                 | ~72/día                             |
+| WeRemoto                                                | 53         | 17    | 32 %     | 0 h                 | —                                   |
+| Workana, Glassdoor, Indeed, GetOnBoard, RemoteOK, Torre | 1.440      | 0     | 0 %      | —                   | excluidas a propósito o sin detalle |
 
 - Aptas por día: unas **490** (3.418 en 7 días), frente a ~358 en F0 (286 no
   oficiales + ~72 oficiales).
@@ -155,10 +155,38 @@ Estas señales lo indican:
 - GA4 marcó un valor atípico en Direct: 130 sesiones frente a 8 esperadas.
 - Los registros llegaron a 118 al día y luego bajaron (49, 31).
 
-Este patrón suele venir de una difusión, por ejemplo un video, grupos de
-WhatsApp, un post en X (aparece t.co) o el boca a boca. La causa no está
-verificada; hay que preguntarla. Es la mejor pista de lo que funciona además
-del SEO, y conviene repetirlo de forma orgánica.
+**Causa confirmada por el propietario: TikTok orgánico, sin anuncios.** Los
+videos son de su cuenta personal `@kyubiixtv` (308 seguidores). Las fechas se
+leen del ID del video, en hora de Bogotá; las vistas son las de la captura
+del 6 de noviembre:
+
+| Publicado     | Video                                                              | Vistas   |
+| ------------- | ------------------------------------------------------------------ | -------- |
+| 31 oct, 09:42 | Fijado, «Esto me dejó loco…» (#buscotrabajo)                       | 46,1 mil |
+| 1 nov, 18:45  | Respuesta a un comentario (filtrar LinkedIn, conectar plataformas) | 750      |
+| 2 nov, 08:38  | Respuesta: «¿es de pago?»                                          | 775      |
+| 2 nov, 08:41  | Respuesta: qué opina la IA de tener que crear cuenta               | 851      |
+| 4 nov, 20:47  | «Buscas trabajo? / Trabajito sí hay»                               | 5.595    |
+
+- La secuencia cuadra con los registros: 10 (31 oct) → 40 → **118** → 91 →
+  72 → 49 → 31.
+- Unas **54 mil vistas trajeron unos 400 registros** por encima de la base
+  de ~10/día, es decir, **~0,7 % de vistas → registro**.
+- TikTok no aparece como fuente en GA4. Su navegador interno no envía
+  referencia, así que el tráfico cae en Direct. Además, mucha gente vio el
+  video y luego buscó la marca en Google: de ahí el salto de «buscotrabajo
+  co» y de la portada.
+- Los comentarios respondidos muestran las dudas reales del público: si es
+  de pago (están cansados de páginas que cobran), por qué pedir cuenta, y si
+  conecta o filtra LinkedIn y otras plataformas. Conviene responderlas en la
+  portada y en el registro, y también en las preguntas de la Fase D.
+- No se pudo leer el contenido ni los comentarios de los videos: TikTok
+  responde 403 al navegador automatizado y no se intentó saltar ese bloqueo.
+
+Implicación para la meta: con ~0,7 %, 1.000 registros al día solo desde
+TikTok exigirían ~140 mil vistas diarias. Combinado con el SEO, TikTok es la
+palanca de crecimiento más rápida que se ha medido hasta hoy, y además
+alimenta las búsquedas de marca en Google.
 
 ## 4. Riesgos detectados
 
@@ -182,12 +210,12 @@ Hoy hay aproximadamente **1 registro por cada 5–6 sesiones** (481 registros
 reales frente a 2.620 sesiones en 28 días). La exigencia de cuenta para
 aplicar (decisión del propietario) es lo que convierte.
 
-| Meta | Registros/día | Sesiones/día necesarias | Frente a hoy (~350/día) |
-|---|---|---|---|
-| 1.000 en total | — | — | Faltan ~408; al ritmo actual de 30–50/día, unas 2 semanas |
-| 1.000 / mes | 33 | ~185 | En el límite: Google + IA + Google Empleos suman ~150–200 sesiones/día, entre 750 y 1.200 al mes |
-| 1.000 / semana | 143 | ~800 | x2,3 |
-| 1.000 / día | 1.000 | ~5.500 | x15; horizonte de 6–12 meses |
+| Meta           | Registros/día | Sesiones/día necesarias | Frente a hoy (~350/día)                                                                          |
+| -------------- | ------------- | ----------------------- | ------------------------------------------------------------------------------------------------ |
+| 1.000 en total | —             | —                       | Faltan ~408; al ritmo actual de 30–50/día, unas 2 semanas                                        |
+| 1.000 / mes    | 33            | ~185                    | En el límite: Google + IA + Google Empleos suman ~150–200 sesiones/día, entre 750 y 1.200 al mes |
+| 1.000 / semana | 143           | ~800                    | x2,3                                                                                             |
+| 1.000 / día    | 1.000         | ~5.500                  | x15; horizonte de 6–12 meses                                                                     |
 
 **Meta confirmada por el propietario (2026-11-06): 1.000 registros al día**,
 solo con tráfico orgánico.
@@ -198,13 +226,13 @@ Son unas 5.500 sesiones al día con la conversión actual, 15 veces lo de hoy.
 Los hitos de abajo son metas de trabajo, no pronósticos. Se revisan en cada
 checkpoint con cantidades absolutas.
 
-| Hito | Registros/día sostenidos (sin picos) | Sesiones/día |
-|---|---|---|
-| Hoy | ~30–50 | ~350 |
-| Fin de noviembre | 100 | ~550 |
-| Fin de enero | 250 | ~1.400 |
-| Fin de marzo | 500 | ~2.750 |
-| Mayo–junio | 1.000 | ~5.500 |
+| Hito             | Registros/día sostenidos (sin picos) | Sesiones/día |
+| ---------------- | ------------------------------------ | ------------ |
+| Hoy              | ~30–50                               | ~350         |
+| Fin de noviembre | 100                                  | ~550         |
+| Fin de enero     | 250                                  | ~1.400       |
+| Fin de marzo     | 500                                  | ~2.750       |
+| Mayo–junio       | 1.000                                | ~5.500       |
 
 De dónde tiene que salir ese volumen, y qué lo limita hoy:
 
@@ -219,12 +247,14 @@ De dónde tiene que salir ese volumen, y qué lo limita hoy:
    Fase D, más IndexNow/Bing en la Fase B.
 4. **Retorno y marca**: a esta escala hace falta que la gente vuelva. Las
    alertas de vacantes (Fase E) pasan a ser prioritarias, no opcionales.
-5. **Difusión orgánica repetible** (Fase F), medida con `utm`.
+5. **Difusión orgánica repetible** (Fase F, TikTok), medida con `utm`.
 
-Orden de ejecución ajustado: **B → A → C → D → E → F**. A va en paralelo
-cuando no toque los mismos archivos.
+Orden de ejecución ajustado: **B → A → C → D → E**. A va en paralelo cuando
+no toque los mismos archivos. **F (TikTok) empieza ya**: no necesita código,
+y el enlace medible llega con la Fase A.
 
 Capacidad que hay que preparar antes de multiplicar el tráfico por 5:
+
 - Supabase Nano: el cambio a Micro no cuesta más en el plan Pro; requiere
   decisión del propietario.
 - Disk IO, según el antecedente del 3 de noviembre.
@@ -298,8 +328,18 @@ mide en el checkpoint siguiente. Nada de pago.
 - Medir el registro por visita en cada tipo de página antes y después de
   AdSense.
 
-### Fase F — Difusión orgánica sin pago (repetir lo del 2 de noviembre)
+### Fase F — Difusión orgánica sin pago (repetir TikTok)
 
+- **TikTok como canal principal de difusión.** Cadencia sostenida, en vez de
+  un solo video viral:
+  - responder comentarios con video (ya funcionó);
+  - series por ciudad o por rol («vacantes sin experiencia en Medellín
+    hoy»), con datos reales del sitio;
+  - responder «¿es de pago?» y «¿por qué cuenta?».
+- **Medición:** un enlace corto propio (p. ej. `buscotrabajo.co/tiktok`) que
+  redirige con `utm_source=tiktok&utm_medium=social`, puesto en la bio si la
+  cuenta lo permite o dicho en el video. Entra en la Fase A. Sin él, TikTok
+  seguirá viéndose como Direct y como búsquedas de marca.
 - Canales propios de «vacantes del día» por ciudad (WhatsApp/Telegram/X)
   enlazando a los hubs, con `utm` para medirlos.
 - Enlaces de autoridad: bolsas universitarias, SENA, secretarías de
