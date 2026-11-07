@@ -96,4 +96,8 @@ código. Usa un reloj fijo en todas las pruebas nuevas.
 - [ ] Checkpoints en GSC a +14 y +28 días: impresiones, posición y aparición
       orgánica frente a Google Empleos. Decidir la segunda ola: Medellín y
       Cali sin experiencia, fines de semana, medio tiempo y por días.
+- [ ] Después de la lectura del 2026-11-26 de `city-hub-pages`, revisar
+      `/empleos/remoto` (CO): decidir si recibe el title y H1 de D4 («Trabajo
+      remoto en Colombia: {n} vacantes desde casa») y el bloque de respuesta,
+      con su propia medición.
 - [ ] Archivar el cambio en `changes/archive/`.

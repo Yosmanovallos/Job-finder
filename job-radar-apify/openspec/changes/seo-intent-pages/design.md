@@ -97,7 +97,7 @@ se muestra el aviso vacío que ya existe.
 | `/empleos/sin-experiencia` | «Trabajo sin experiencia en Colombia: {n} vacantes» |
 | `/empleos/bogota/sin-experiencia` | «Trabajo sin experiencia en Bogotá: {n} vacantes» |
 
-- **Desviación (ADR 0012 §5):** `/empleos/remoto` (CO) conserva byte a byte
+- **Enmienda a D4 (2026-11-07, aprobada por la sesión principal; ADR 0012 §5):** `/empleos/remoto` (CO) conserva byte a byte
   su title, H1, meta y copia actuales hasta la lectura del 2026-11-26 de
   `city-hub-pages`. La copia D4 aplica solo a las URL nuevas, y el bloque de
   respuesta también.
