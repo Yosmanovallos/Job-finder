@@ -93,9 +93,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setDbName(data.name || undefined);
       setPreferredRoles(Array.isArray(data.preferredRoles) ? data.preferredRoles : null);
       // A brand-new account (onboarding not done yet): record where the
-      // visitor first came from, once per browser. Fire-and-forget; the
+      // visitor first came from, once per account and browser. Fire-and-forget; the
       // server ignores accounts older than a day.
-      if (!Array.isArray(data.preferredRoles)) void sendFirstTouchOnce(accessToken, signupMetadata);
+      if (!Array.isArray(data.preferredRoles) && typeof data.id === "string")
+        void sendFirstTouchOnce(accessToken, data.id, signupMetadata);
     } catch (e) {
       console.warn("[Auth] No se pudo verificar el tier con el servidor:", e);
     } finally {

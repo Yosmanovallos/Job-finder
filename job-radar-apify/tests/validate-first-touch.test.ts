@@ -140,3 +140,34 @@ test("first touch: channels — utm first, then the referrer host", () => {
   assert.equal(classifySource(touch(null, "sena.edu.co")), "ref: sena.edu.co");
   assert.equal(classifySource({ utmSource: null, referrerHost: null, landingPath: null }), "sin dato");
 });
+
+test("first touch: sent once per account, and the signup copy wins over this browser's", async () => {
+  const items = new Map<string, string>();
+  const sent: unknown[] = [];
+  const g = globalThis as Record<string, unknown>;
+  const previous = { window: g.window, fetch: g.fetch };
+  g.window = {
+    localStorage: {
+      getItem: (key: string) => items.get(key) ?? null,
+      setItem: (key: string, value: string) => void items.set(key, value)
+    }
+  };
+  g.fetch = async (_url: string, init: { body: string }) => {
+    sent.push(JSON.parse(init.body));
+    return new Response(null, { status: 204 });
+  };
+  try {
+    const { FIRST_TOUCH_STORAGE_KEY, sendFirstTouchOnce } = await import("../src/lib/first-touch.js");
+    items.set(FIRST_TOUCH_STORAGE_KEY, JSON.stringify({ landingPath: "/dashboard", capturedAt: new Date().toISOString() }));
+    const signupCopy = { landingPath: "/", utmSource: "tiktok", capturedAt: new Date().toISOString() };
+    await sendFirstTouchOnce("token", "old-account");
+    await sendFirstTouchOnce("token", "old-account");
+    await sendFirstTouchOnce("token", "new-account", signupCopy);
+    assert.equal(sent.length, 2, "una vez por cuenta; otra cuenta en el mismo navegador también envía");
+    assert.equal((sent[0] as { landingPath: string }).landingPath, "/dashboard");
+    assert.equal((sent[1] as { utmSource: string }).utmSource, "tiktok", "la copia del registro gana");
+  } finally {
+    g.window = previous.window;
+    g.fetch = previous.fetch;
+  }
+});

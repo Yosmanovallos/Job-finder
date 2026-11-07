@@ -265,29 +265,33 @@ export function readFirstTouch(): FirstTouch | null {
 }
 
 /**
- * Sends the stored first touch once per browser, after the visitor signs in
+ * Sends the stored first touch once per account and browser, after the visitor signs in
  * for the first time (the onboarding step is still pending). The server
  * ignores it for accounts older than a day and never overwrites a value.
  */
 export async function sendFirstTouchOnce(
   accessToken: string,
+  userId: string,
   /** `user_metadata.bt_first_touch`, saved by the e-mail signup form. */
   fromSignupMetadata?: unknown
 ): Promise<void> {
   const store = storage();
   if (!store) return;
   try {
-    if (store.getItem(FIRST_TOUCH_SENT_KEY)) return;
+    // Per account, not per browser: on a shared phone or a cybercafé PC an
+    // old account signing in must not use up the next signup's send.
+    const sentKey = `${FIRST_TOUCH_SENT_KEY}:${userId}`;
+    if (store.getItem(sentKey)) return;
     const now = new Date();
-    // The confirmation link of an e-mail signup often opens in another
-    // browser (TikTok's in-app browser → the mail app → Chrome), where
-    // nothing is stored: the copy saved with the signup covers that case.
+    // The copy saved with an e-mail signup belongs to the browser where the
+    // person signed up; the confirmation link often opens in another one
+    // (TikTok's in-app browser → the mail app → Chrome), so it wins.
     const touch =
-      parseStored(store.getItem(FIRST_TOUCH_STORAGE_KEY), now) ?? parseFirstTouch(fromSignupMetadata, now);
+      parseFirstTouch(fromSignupMetadata, now) ?? parseStored(store.getItem(FIRST_TOUCH_STORAGE_KEY), now);
     // Nothing remembered (storage cleared, new browser after a Google
     // login): the account simply stays without attribution.
     if (!touch) return;
-    store.setItem(FIRST_TOUCH_SENT_KEY, "1");
+    store.setItem(sentKey, "1");
     await fetch("/api/me/first-touch", {
       method: "POST",
       headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
