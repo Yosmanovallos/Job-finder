@@ -61,7 +61,11 @@ const UNCHANGED: Record<string, string> = {
 // 2026-11-02 (/opiniones): ROUTE_META gained the "/opiniones" entry. Without
 // that key the hash is still 306fc945…6f03e, so every existing page's meta is
 // byte-identical; only the new entry changes it.
-const OTHER_PAGES_UNCHANGED = "86bb8fd10f6676646608275e58ba9dfc33fa405b7283e39a9ffc4eeb4f0c4ce2";
+// 2026-11-06 (Bing "meta descriptions too short"): the company page and
+// /empresas directory descriptions were lengthened on purpose (job-seo.ts
+// buildCompanyMeta, page-meta.ts companiesDirectoryMeta). Before that change
+// the hash was 86bb8fd1…c4ce2; titles, hub and dashboard meta are unchanged.
+const OTHER_PAGES_UNCHANGED = "52ead194a984839839c1142781cb50dc30908ff82cdfa9798c93032dde03ba49";
 
 test("JMT-001 visible body, JobPosting, payload, canonical, robots verdict, sitemap and other pages' meta are unchanged", () => {
   for (const job of META_FIXTURES) {

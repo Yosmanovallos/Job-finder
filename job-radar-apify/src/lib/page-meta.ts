@@ -115,6 +115,6 @@ export function companiesDirectoryMeta(countryName: string): { title: string; he
   return {
     heading,
     title: `${heading} | BuscoTrabajo`,
-    description: `Explora empresas con vacantes activas en ${countryName} en BuscoTrabajo — su reputación y ofertas.`
+    description: `Explora las empresas que están contratando en ${countryName}: vacantes activas, reputación como empleador y enlace al portal original de cada oferta. Gratis.`
   };
 }

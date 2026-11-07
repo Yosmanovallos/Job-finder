@@ -745,7 +745,11 @@ export function buildCompanyMeta(
   return {
     title: `Empleos en ${companyName} | BuscoTrabajo`,
     heading: companyName,
-    description: `Empleos en ${companyName}: ${countLabel} en ${countryName}. Compara sus ofertas y su reputación, y postúlate en el portal original.`,
+    // ~150-165 chars for usual names (Bing flagged the old ~120-char copy as
+    // too short, 2026-11-06). Every claim is on the page: each row shows city
+    // and modality (CategoryJobRow), reputation shows when a source has it,
+    // and applying is free on the original portal.
+    description: `Empleos en ${companyName}: ${countLabel} en ${countryName}. Compara sus ofertas por ciudad y modalidad, revisa su reputación y postúlate gratis en el portal original.`,
     canonicalUrl: buildCompanyUrl(companyName, country)
   };
 }
