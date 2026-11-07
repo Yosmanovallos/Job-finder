@@ -3,6 +3,7 @@ import { COUNTRIES, SOURCES_BY_COUNTRY } from "../countries/index.js";
 import type { JobFilterParams } from "./job-filters.js";
 import { buildJobUrl, isPubliclyDescribable, isUuid } from "./job-seo.js";
 import type { SitemapJobInput } from "./job-seo.js";
+import { trustedEmploymentType } from "./employment-type-trust.js";
 
 export interface PublicJobsQuery {
   filters: JobFilterParams;
@@ -174,7 +175,7 @@ export function toPublicJob(job: PublicJobInput): PublicJob | null {
     description: boundedText(job.description, 8_000),
     requirements: boundedTextArray(job.requirements, 100, 500),
     technologies: boundedTextArray(job.technologies, 100, 100),
-    employmentType: boundedText(job.employmentType, 100),
+    employmentType: boundedText(trustedEmploymentType(job.source, job.employmentType), 100),
     salaryMin: numeric(job.salaryMin),
     salaryMax: numeric(job.salaryMax),
     salaryCurrency: boundedText(job.salaryCurrency, 12),

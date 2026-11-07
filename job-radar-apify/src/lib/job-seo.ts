@@ -8,6 +8,7 @@ import { countryNameFor } from "./country-codes.js";
 import { isPlaceholderEmployer } from "./company-key.js";
 import { getOfficialCareersUrl } from "../data/official-careers-links.js";
 import { reputationLabel, reputationReviewText, reputationScoreText } from "./reputation-labels.js";
+import { trustedEmploymentType } from "./employment-type-trust.js";
 
 export const SITE_URL = "https://buscotrabajo.co";
 // Job SEO V2 (docs/JOBPOSTING-GOOGLE-CONTRACT.md): there is deliberately no
@@ -241,7 +242,8 @@ export function buildJobPageBody(job: SeoJob): string {
     facts.push(`<li>Candidatos desde: ${escapeHtml(eligible.join(", "))}</li>`);
   const published = formatPublishedDate(job.publishedAt);
   if (published) facts.push(`<li>Publicada: ${escapeHtml(published)}</li>`);
-  if (job.employmentType) facts.push(`<li>Tipo de empleo: ${escapeHtml(job.employmentType)}</li>`);
+  const employmentType = trustedEmploymentType(job.source, job.employmentType);
+  if (employmentType) facts.push(`<li>Tipo de empleo: ${escapeHtml(employmentType)}</li>`);
   if (job.salary) facts.push(`<li>Salario: ${escapeHtml(String(job.salary))}</li>`);
   const official = officialEmployerSource(job);
   facts.push(
@@ -313,7 +315,7 @@ export function buildJobPagePayload(job: SeoJob): { job: SeoJob } {
     url: job.url, dateText: job.dateText, source: job.source,
     publishedAt: job.publishedAt, country: job.country,
     description: job.description, requirements: job.requirements,
-    technologies: job.technologies, employmentType: job.employmentType,
+    technologies: job.technologies, employmentType: trustedEmploymentType(job.source, job.employmentType),
     salary: job.salary, salaryMin: job.salaryMin, salaryMax: job.salaryMax,
     salaryCurrency: job.salaryCurrency, salaryRaw: job.salaryRaw,
     applicantCount: job.applicantCount, remoteType: job.remoteType,
@@ -443,7 +445,7 @@ export function buildJobMetaDescription(job: SeoJob): string {
   // "Bogotá, D.C." already ends the sentence.
   const endSentence = (part: string) => (/[.!?]$/.test(part) ? part : `${part}.`);
   let text = endSentence(`${collapseSpaces(job.title)}${company ? ` en ${company}` : ""}${location ? `, ${location}` : ""}`);
-  const employmentType = collapseSpaces(job.employmentType || "");
+  const employmentType = collapseSpaces(trustedEmploymentType(job.source, job.employmentType) || "");
   if (employmentType && codePoints(`${text} ${endSentence(employmentType)}`) <= JOB_META_DESCRIPTION_MAX) {
     text = `${text} ${endSentence(employmentType)}`;
   }
@@ -560,9 +562,10 @@ export function buildJobPosting(job: SeoJob): Record<string, unknown> | null {
     }
   };
 
-  const employmentTypeToken = job.employmentType
-    ? EMPLOYMENT_TYPE_LABEL_TO_SCHEMA[job.employmentType]
-    : undefined;
+  // Only a source whose value means the schedule (employment-type-trust.ts):
+  // Magneto's PART_TIME/FULL_TIME is its contract term, so it is omitted.
+  const employmentType = trustedEmploymentType(job.source, job.employmentType);
+  const employmentTypeToken = employmentType ? EMPLOYMENT_TYPE_LABEL_TO_SCHEMA[employmentType] : undefined;
   if (employmentTypeToken) posting.employmentType = employmentTypeToken;
 
   if (job.validThrough) posting.validThrough = new Date(job.validThrough).toISOString();
