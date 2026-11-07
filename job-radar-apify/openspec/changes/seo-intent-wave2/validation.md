@@ -254,3 +254,41 @@ su propio build) y después por esta rama. Cambios en el script:
 - **Preexistente, fuera de alcance:** `npx eslint src/lib/job-seo.ts` da 3
   errores `no-misleading-character-class` en la regex `EMOJI` (línea ~351),
   que este cambio no toca.
+
+## 6. EXPLAIN de producción de las 10 consultas reales (antes del merge)
+
+`scripts/count-intent-inventory.ts` con el código de esta rama, corrido el
+2026-11-07 a las 18:58 UTC con autorización del propietario. Es una
+transacción `BEGIN READ ONLY` con `ROLLBACK`. Toma el SQL exacto de
+`queryJobsPage` para cada página de `listIntentCategories()` y lo explica
+con `EXPLAIN (ANALYZE, BUFFERS)`.
+
+| Página | Tiempo | Bloques en caché | Lecturas a disco |
+|---|---:|---:|---:|
+| `/empleos/remoto` | 1.422 ms | 18.675 | 0 |
+| `/ve/empleos/remoto` | 833 ms | 13.802 | 0 |
+| `/empleos/sin-experiencia` | 2.046 ms | 148.825 | 0 |
+| `/ve/empleos/sin-experiencia` | 1.281 ms | 40.892 | 0 |
+| **`/empleos/fines-de-semana`** | **900 ms** | 8.659 | 0 |
+| **`/empleos/medio-tiempo`** | **1.736 ms** | 8.801 | 0 |
+| **`/empleos/temporada`** | **919 ms** | 9.986 | 0 |
+| `/empleos/bogota/sin-experiencia` | 1.407 ms | 60.453 | 0 |
+| **`/empleos/medellin/sin-experiencia`** | **918 ms** | 23.884 | 0 |
+| **`/empleos/cali/sin-experiencia`** | **813 ms** | 17.409 | 0 |
+| `/empleos/bogota` (hub, referencia) | 721 ms | 8.526 | 0 |
+
+- **0 lecturas a disco en todas.** No repite el incidente de Disk IO del
+  #109.
+- **Las de jornada leen tan pocos bloques como el hub** (8,7–10 K frente a
+  8,5 K): solo leen el título. La de medio tiempo tardó 1,7 s con los
+  mismos bloques que las otras dos; es CPU de la normalización del título
+  o ruido de una sola medición. Hay que repetirla tras desplegar.
+- **Medellín y Cali** cuestan menos que Bogotá (0,8–0,9 s): tienen menos
+  filas candidatas.
+- **Carga total:** el keeper (#124) recorre las 10 en serie, unos 12,3 s
+  de una conexión cada 3 h. Antes eran 5 consultas, unos 6,7 s. El sitemap
+  en frío solo consulta las que el keeper aún no cargó.
+- **Igual que en el #123:** en frío, una página de intención (0,8–2 s)
+  supera al hub (0,72 s). Se mitiga con la caché de intención, la
+  respuesta obsoleta mientras recarga y el keeper. Para las páginas nuevas
+  de jornada la diferencia es menor que en «sin experiencia».

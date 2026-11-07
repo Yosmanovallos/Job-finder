@@ -60,7 +60,8 @@ pruebas nuevas.
 
 ## 8. Publicación (cada paso con aprobación)
 
-- [ ] PR con los conteos, el benchmark y el drift. Merge solo con
+- [x] EXPLAIN de producción de las 10 consultas reales (validation.md §6).
+- [x] PR #129 con los conteos, el benchmark y el drift. Merge solo con
       aprobación.
 - [ ] Tras desplegar: drift y TTFB en producción, memoria en Render,
       inspección en GSC y Bing, envío por IndexNow.
