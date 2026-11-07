@@ -43,35 +43,54 @@ export function checkSensitiveRateLimit(
 // Reads a JSON body with a hard byte cap, WITHOUT `req.destroy()`
 // mid-stream — that was tried for an upload endpoint and reset the raw socket before a
 // clean 4xx could flush, so a client saw a connection reset instead of a
-// real error. Same fix here: once over cap, stop appending but let the
-// stream drain naturally, then respond normally.
+// real error. Stop buffering on excess, abort or optional deadline and allow
+// a clean error response while any remaining input drains.
 export function readJsonBodyCapped(
   req: http.IncomingMessage,
-  maxBytes: number
+  maxBytes: number,
+  timeoutMs?: number
 ): Promise<{ ok: true; value: unknown } | { ok: false }> {
   return new Promise((resolve) => {
+    let settled = false;
     let bytes = 0;
     let bodyText = "";
-    let tooLarge = false;
-    req.on("data", (chunk: Buffer) => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const finish = (result: { ok: true; value: unknown } | { ok: false }) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      req.off("data", onData);
+      req.off("end", onEnd);
+      // Keep the once-error listener to absorb a late stream error after a timeout.
+      req.off("aborted", onError);
+      resolve(result);
+    };
+    const onError = () => finish({ ok: false });
+    const onData = (chunk: Buffer) => {
       bytes += chunk.length;
       if (bytes > maxBytes) {
-        tooLarge = true;
+        finish({ ok: false });
+        req.resume();
         return;
       }
       bodyText += chunk.toString();
-    });
-    req.on("end", () => {
-      if (tooLarge) {
-        resolve({ ok: false });
-        return;
-      }
+    };
+    const onEnd = () => {
       try {
-        resolve({ ok: true, value: JSON.parse(bodyText || "{}") });
+        finish({ ok: true, value: JSON.parse(bodyText || "{}") });
       } catch {
-        resolve({ ok: false });
+        finish({ ok: false });
       }
-    });
-    req.on("error", () => resolve({ ok: false }));
+    };
+    req.on("data", onData);
+    req.once("end", onEnd);
+    req.once("error", onError);
+    req.once("aborted", onError);
+    if (timeoutMs !== undefined) {
+      timer = setTimeout(() => {
+        finish({ ok: false });
+        req.resume();
+      }, timeoutMs);
+    }
   });
 }

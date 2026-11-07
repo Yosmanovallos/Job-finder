@@ -1,5 +1,21 @@
 # Agent Readiness runbook — BuscoTrabajo.co
 
+## Free sample containment — 2026-11-07
+
+ADR 0013 and OpenSpec `public-api-free-sample` supersede the original runtime
+page limits below. Search defaults to three jobs, accepts limits 1–3 and only
+offset zero. REST, MCP, A2A and WebMCP share per-IP sliding quotas of 5/minute
+and 25/24 hours. Global process safeguards are 30/minute, 500/24 hours and two
+in-flight runtime requests. Protocol bodies have a 16 KiB cap and five-second
+deadline. Data responses are private/no-store. Static discovery remains cached.
+
+HTTP 429 includes Retry-After. Admission precedes body parsing and database
+access. Quotas include invalid requests, HEAD, protocol setup and metadata.
+They reset on process restart and apply independently per replica. Review edge
+identity and durable enforcement before expanding or monetizing capacity.
+Validation evidence is in the OpenSpec change. Dashboard load and infrastructure
+budgets remain protected by the existing performance runbook.
+
 Fecha de inicio: 2026-09-17/18 UTC. Rama: `codex/agent-readiness-100`. Base: `origin/main@5dddeee`, que contiene `d67fc32`.
 
 ## Objetivo y límites

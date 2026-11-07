@@ -90,7 +90,6 @@ import {
   JOBS_SITEMAP_FOOTER,
   buildSitemapIndexXml,
   isUuid,
-  resolveCategorySlug,
   resolveCategoryPath,
   isLegacyRemoteCopy,
   type ResolvedCategory,

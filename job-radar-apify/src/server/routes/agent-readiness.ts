@@ -24,7 +24,8 @@ import {
   parsePublicJobsQuery,
   searchPublicJobs
 } from "../../lib/public-jobs-api.js";
-import { checkRateLimit, recordSuspiciousEvent } from "../../lib/security-monitor.js";
+import { PublicApiLimiter } from "../../lib/public-api-limiter.js";
+import { PUBLIC_API_POLICY } from "../../lib/public-api-policy.js";
 import { readJsonBodyCapped } from "../http-helpers.js";
 
 export type SendBody = (
@@ -56,7 +57,7 @@ interface AgentActionResult {
 const jsonHeaders = {
   "Content-Type": "application/json; charset=utf-8",
   "Access-Control-Allow-Origin": "*",
-  "Cache-Control": "public, max-age=60, s-maxage=300, stale-while-revalidate=600"
+  "Cache-Control": "private, no-store"
 };
 const discoveryHeaders = {
   "Content-Type": "application/json; charset=utf-8",
@@ -83,8 +84,8 @@ const toolSchemas: Record<string, Record<string, unknown>> = {
       sources: { type: "array", maxItems: 10, items: { type: "string", maxLength: 80 } },
       cities: { type: "array", maxItems: 10, items: { type: "string", maxLength: 80 } },
       roles: { type: "array", maxItems: 10, items: { type: "string", maxLength: 80 } },
-      limit: { type: "integer", minimum: 1, maximum: 50, default: 20 },
-      offset: { type: "integer", minimum: 0, maximum: 5000, default: 0 }
+      limit: { type: "integer", minimum: 1, maximum: PUBLIC_API_POLICY.results, default: PUBLIC_API_POLICY.results },
+      offset: { type: "integer", minimum: 0, maximum: PUBLIC_API_POLICY.offset, default: 0 }
     }
   },
   get_job: {
@@ -158,7 +159,7 @@ export async function sendStructuredApiError(
     req,
     res,
     status,
-    { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "private, no-store", "Access-Control-Allow-Origin": "*", "X-Request-Id": requestId },
+    { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "private, no-store", "Access-Control-Allow-Origin": "*", "Access-Control-Expose-Headers": "Retry-After, X-Request-Id", "X-Request-Id": requestId },
     JSON.stringify({ error: { code, message, resolution, requestId, ...(details ? { details } : {}) } })
   );
 }
@@ -187,11 +188,6 @@ async function handleMcp(
     await context.sendBody(req, res, 403, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }, JSON.stringify({ jsonrpc: "2.0", id: null, error: { code: -32000, message: "Origin not allowed." } }));
     return;
   }
-  if (!checkRateLimit(context.clientIp, 60, 60_000, "agent-protocol")) {
-    recordSuspiciousEvent(context.clientIp, "rate-limit POST /mcp");
-    await context.sendBody(req, res, 429, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", "Retry-After": "60" }, JSON.stringify({ jsonrpc: "2.0", id: null, error: { code: -32001, message: "Rate limit exceeded." } }));
-    return;
-  }
   const accept = String(req.headers.accept || "").toLowerCase();
   if (!accept.includes("application/json") || !accept.includes("text/event-stream")) {
     await context.sendBody(req, res, 406, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }, JSON.stringify({ jsonrpc: "2.0", id: null, error: { code: -32000, message: "Accept must include application/json and text/event-stream." } }));
@@ -201,7 +197,8 @@ async function handleMcp(
     await context.sendBody(req, res, 415, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }, JSON.stringify({ jsonrpc: "2.0", id: null, error: { code: -32700, message: "Content-Type must be application/json." } }));
     return;
   }
-  const body = await readJsonBodyCapped(req, 64 * 1024);
+  const body = await readJsonBodyCapped(req, PUBLIC_API_POLICY.bodyBytes, PUBLIC_API_POLICY.bodyTimeoutMs);
+  if (!body.ok) res.setHeader("Connection", "close");
   if (!body.ok || !body.value || (body.value as JsonRpcEnvelope).jsonrpc !== "2.0" || typeof (body.value as JsonRpcEnvelope).method !== "string") {
     await context.sendBody(req, res, 400, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }, JSON.stringify({ jsonrpc: "2.0", id: body.ok ? (body.value as JsonRpcEnvelope | null | undefined)?.id ?? null : null, error: { code: -32700, message: "Invalid JSON-RPC request." } }));
     return;
@@ -265,12 +262,8 @@ async function handleA2a(
     await context.sendBody(req, res, 403, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }, JSON.stringify({ jsonrpc: "2.0", id: null, error: { code: -32000, message: "Origin not allowed." } }));
     return;
   }
-  if (!checkRateLimit(context.clientIp, 60, 60_000, "agent-protocol")) {
-    recordSuspiciousEvent(context.clientIp, "rate-limit POST /a2a");
-    await context.sendBody(req, res, 429, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", "Retry-After": "60" }, JSON.stringify({ jsonrpc: "2.0", id: null, error: { code: -32001, message: "Rate limit exceeded." } }));
-    return;
-  }
-  const body = await readJsonBodyCapped(req, 64 * 1024);
+  const body = await readJsonBodyCapped(req, PUBLIC_API_POLICY.bodyBytes, PUBLIC_API_POLICY.bodyTimeoutMs);
+  if (!body.ok) res.setHeader("Connection", "close");
   const request = body.ok ? (body.value as A2aRequest | null | undefined) : null;
   if (!request || request.jsonrpc !== "2.0" || request.method !== "message/send" || request.id === undefined) {
     await context.sendBody(req, res, 400, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }, JSON.stringify({ jsonrpc: "2.0", id: request?.id ?? null, error: { code: -32600, message: "Only message/send JSON-RPC requests are supported." } }));
@@ -297,7 +290,7 @@ async function handleA2a(
   await context.sendBody(req, res, 200, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }, JSON.stringify({ jsonrpc: "2.0", id: request.id, result: { kind: "message", messageId: randomUUID(), role: "agent", contextId: request.params?.message?.contextId, parts: [{ kind: "data", data: action.value }] } }));
 }
 
-export async function handleAgentReadinessRoute(
+async function handleAdmittedAgentRoute(
   req: http.IncomingMessage,
   res: http.ServerResponse,
   context: AgentReadinessRouteContext
@@ -400,4 +393,42 @@ export async function handleAgentReadinessRoute(
     return true;
   }
   return false;
+}
+
+const publicApiLimiter = new PublicApiLimiter();
+
+/** Admit all runtime agent surfaces before body parsing or database access. */
+export async function handleAgentReadinessRoute(
+  req: http.IncomingMessage,
+  res: http.ServerResponse,
+  context: AgentReadinessRouteContext
+): Promise<boolean> {
+  const runtime = context.pathname === "/mcp" || context.pathname === "/a2a" ||
+    (context.pathname.startsWith("/api/v1/") && context.method !== "OPTIONS");
+  if (!runtime) return handleAdmittedAgentRoute(req, res, context);
+  const admission = publicApiLimiter.acquire(context.clientIp);
+  if (!admission.allowed) {
+    res.setHeader("Retry-After", String(admission.retryAfter));
+    res.setHeader("Connection", "close");
+    if (context.pathname === "/mcp" || context.pathname === "/a2a") {
+      await context.sendBody(req, res, 429, {
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "private, no-store",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Expose-Headers": "Retry-After"
+      }, JSON.stringify({ jsonrpc: "2.0", id: null, error: {
+        code: -32001, message: "Free API quota or capacity exceeded. Respect Retry-After."
+      } }));
+    } else {
+      await sendStructuredApiError(req, res, context.sendBody, 429, "rate_limit_exceeded",
+        "Se alcanzó la cuota o capacidad de la muestra gratuita.", "Respeta Retry-After antes de reintentar.");
+    }
+    req.resume();
+    return true;
+  }
+  try {
+    return await handleAdmittedAgentRoute(req, res, context);
+  } finally {
+    admission.release();
+  }
 }

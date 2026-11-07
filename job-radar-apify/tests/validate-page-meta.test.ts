@@ -5,7 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { ROUTE_META, companiesDirectoryMeta, dashboardDescription } from "../src/lib/page-meta.js";
 import { getHomeContent, injectPublicContent, injectRouteMeta } from "../src/lib/agent-readiness.js";
-import { buildCompanyMeta } from "../src/lib/job-seo.js";
+import { buildCompanyMeta, firstSourceSentence } from "../src/lib/job-seo.js";
 
 // Offline guard for the per-page head the server injects into the SPA
 // shell (SEO fase B, 2026-10-25). Runs against the real index.html source,
@@ -94,4 +94,15 @@ test("Organization schema lists every official social profile", () => {
     assert.ok(indexHtml.includes(`"${profile}"`), profile);
   }
   assert.ok(indexHtml.includes('<meta property="og:site_name" content="BuscoTrabajo" />'));
+});
+
+
+test("source sentences strip emoji components and preserve ordinary Unicode text", () => {
+  const sentence = "Buscamos una persona con experiencia en análisis y reportes.";
+  for (const emoji of ["😀", "👩🏽‍💻", "🇨🇴", "1️⃣", "\u200d", "\ufe0f"]) {
+    const actual = firstSourceSentence(`${emoji} ${sentence}`, "Analista");
+    // A keycap's base digit is retained by the existing single-code-point cleanup.
+    const expected = emoji === "1️⃣" ? `1 ${sentence}` : sentence;
+    assert.equal(actual, expected, emoji);
+  }
 });
