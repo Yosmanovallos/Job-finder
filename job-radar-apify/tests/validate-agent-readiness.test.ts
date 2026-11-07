@@ -176,8 +176,8 @@ test("experimental discovery documents reference only real read-only resources",
 });
 
 test("public job query validation is bounded", () => {
-  assert.equal(parsePublicJobsQuery(new URLSearchParams("limit=50&offset=5000&country=CO")).ok, true);
-  for (const query of ["limit=51", "offset=5001", "country=US", "search=x".replace("x", "x".repeat(121)), "unknown=1"]) {
+  assert.equal(parsePublicJobsQuery(new URLSearchParams("limit=3&offset=0&country=CO")).ok, true);
+  for (const query of ["limit=4", "offset=1", "country=US", "search=x".replace("x", "x".repeat(121)), "unknown=1"]) {
     const result = parsePublicJobsQuery(new URLSearchParams(query));
     assert.equal(result.ok, false, query);
   }

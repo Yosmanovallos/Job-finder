@@ -5,6 +5,7 @@ import {
   captureAcquisition,
   parseAcquisition,
   sanitizeAnalyticsPath,
+  sanitizeSearchTerm,
   trackEvent
 } from "../src/lib/analytics.js";
 
@@ -237,4 +238,14 @@ test("search: término sin PII y search_id en el embudo", async () => {
   assert.equal(currentSearchId(1000 + 31 * 60_000), undefined);
   clearSearchContext();
   assert.equal(currentSearchId(1001), undefined);
+});
+
+
+test("search sanitizer keeps its ASCII control and C1 behavior", () => {
+  for (let point = 0; point <= 0x9f; point++) {
+    if (point >= 0x20 && point < 0x7f) continue;
+    const character = String.fromCharCode(point);
+    const expected = point < 0x20 || point === 0x7f ? "a b" : `a${character}b`;
+    assert.equal(sanitizeSearchTerm(`a${character}b`), expected, `code point ${point}`);
+  }
 });

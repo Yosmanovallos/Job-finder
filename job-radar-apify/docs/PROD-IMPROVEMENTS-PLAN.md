@@ -24,6 +24,18 @@ mejoras de SEO/UX/seguridad/observabilidad.
 
 ## Estado del roadmap
 
+Contención de API gratuita, 2026-11-07. Cambio acotado
+`openspec/changes/public-api-free-sample/` y ADR 0013. Máximo tres resultados,
+offset cero, cuotas compartidas por IP de 5/minuto y 25/24 horas, topes globales
+de 30/minuto y 500/24 horas y dos solicitudes simultáneas. Cuerpos de protocolo
+limitados a 16 KiB y cinco segundos. Lint, tipos, unitarias, integración aislada
+de 23 suites y baseline sintético pasan. PR 126 integrada como `108582c`.
+Protección confirmada por HTTP en producción el 7-Nov a las 13.23 Bogotá,
+con tres resultados, 429 compartido y dashboard MISS de 209–254 ms.
+Pendiente de auditoría la lectura de logs de arranque de Render debido al
+bloqueo del control del navegador. OpenSpec sigue abierto hasta cerrar ese
+punto. Los contadores se reinician con el proceso.
+
 Entrega acotada 2026-10-29: archivo privado de vacantes retiradas, PR #77,
 `3ae484f` en main. Conserva el máximo público de 30 días y el diseño; migración
 aditiva aplicada con RLS y sin grants públicos. Lint, tipos, unitarias,

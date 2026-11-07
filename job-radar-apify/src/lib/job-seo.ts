@@ -348,7 +348,7 @@ const foldForCompare = (text: string) =>
 
 // Emoji plus the invisible pieces they leave behind: variation selector,
 // zero-width joiner, keycap, skin tones and regional indicators.
-const EMOJI = /[\p{Extended_Pictographic}\u{FE0F}\u{200D}\u{20E3}\u{1F3FB}-\u{1F3FF}\u{1F1E6}-\u{1F1FF}]/gu;
+const EMOJI = /\p{Extended_Pictographic}|\u{FE0F}|\u{200D}|\u{20E3}|[\u{1F3FB}-\u{1F3FF}]|[\u{1F1E6}-\u{1F1FF}]/gu;
 
 /** Cuts at the last space within `max` code points; never inside a word or a character. */
 export function clipAtWord(text: string, max: number): string {
