@@ -72,10 +72,16 @@ test("shared builders stay within the length limits", () => {
     const directory = companiesDirectoryMeta(name);
     assert.ok(directory.title.length <= 60, directory.title);
     assert.ok(directory.title.startsWith(directory.heading));
+    // Bing flags descriptions under ~150 chars as too short (2026-11-06).
+    assert.ok(directory.description.length >= 145 && directory.description.length <= 165, directory.description);
   }
   const company = buildCompanyMeta("Bancolombia", 97, "CO");
   assert.equal(company.title, "Empleos en Bancolombia | BuscoTrabajo");
   assert.match(company.description, /97 vacantes activas en Colombia/);
+  for (const name of ["BBVA", "Deloitte", "Bancolombia"]) {
+    const { description } = buildCompanyMeta(name, 45, "CO");
+    assert.ok(description.length >= 150 && description.length <= 170, description);
+  }
 });
 
 test("Organization schema lists every official social profile", () => {
