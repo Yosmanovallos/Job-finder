@@ -12,7 +12,9 @@ import { pool } from "../src/db/client.js";
 import { sqlSinExperiencia } from "../src/lib/job-experience.js";
 import { renderIntentAnswerHtml } from "../src/lib/intent-pages.js";
 import { SITE_URL } from "../src/lib/job-seo.js";
+import { sqlSchedule, type ScheduleIntent } from "../src/lib/job-schedule.js";
 import { EXPERIENCE_CASES } from "./fixtures/experience-cases.js";
+import { SCHEDULE_CASES } from "./fixtures/schedule-cases.js";
 
 dotenv.config();
 
@@ -43,6 +45,19 @@ async function sqlParity(): Promise<void> {
     }
   }
   check(mismatches === 0, `SQL y memoria coinciden en los ${EXPERIENCE_CASES.length} casos del fixture compartido.`, `${mismatches} casos difieren.`);
+
+  console.log("\n--- SIW-011: clasificador de jornada SQL = memoria ---\n");
+  let scheduleMismatches = 0;
+  for (const intent of ["fines-de-semana", "medio-tiempo", "temporada"] as ScheduleIntent[]) {
+    for (const c of SCHEDULE_CASES) {
+      const { rows } = await pool.query<{ hit: boolean }>(`SELECT ${sqlSchedule(intent, "$1::text")} AS hit`, [c.title]);
+      if (rows[0].hit !== c.expected.includes(intent)) {
+        scheduleMismatches++;
+        console.error(`   SQL ≠ esperado en «${c.note}» (${intent}): ${c.title}`);
+      }
+    }
+  }
+  check(scheduleMismatches === 0, `SQL y memoria coinciden en los ${SCHEDULE_CASES.length} casos × 3 intenciones de jornada.`, `${scheduleMismatches} casos difieren.`);
 }
 
 let seq = 0;
@@ -87,6 +102,20 @@ async function seed(): Promise<void> {
     description: "Requisitos: 3 años de experiencia en SQL."
   });
   for (let i = 0; i < 3; i++) await insertJob({ title: `Mesero sin experiencia SIP ${i}`, location: "Caracas, Venezuela", country: "VE" });
+  // seo-intent-wave2: Medellín × sin experiencia indexable (10), fines de
+  // semana indexable (10), medio tiempo below the guard (3), temporada 0,
+  // and Ciudad Guayana with Puerto Ordaz.
+  for (let i = 0; i < 10; i++) await insertJob({ title: `Auxiliar sin experiencia SIW ${i}`, location: "Medellín, Antioquia", country: "CO" });
+  for (let i = 0; i < 10; i++) await insertJob({ title: `Mesero fines de semana SIW ${i}`, location: "Barranquilla, Atlántico", country: "CO" });
+  await insertJob({
+    title: "Asesor comercial SIW disponibilidad",
+    location: "Barranquilla, Atlántico",
+    country: "CO",
+    description: "Disponibilidad para laborar fines de semana y festivos."
+  });
+  for (let i = 0; i < 3; i++) await insertJob({ title: `Cajero medio tiempo SIW ${i}`, location: "Cali, Valle del Cauca", country: "CO" });
+  await insertJob({ title: "Asistente comercial SIW Puerto Ordaz", location: "Puerto Ordaz, Bolívar", country: "VE" });
+  await insertJob({ title: "Vendedor SIW Ciudad Guayana", location: "Ciudad Guayana, Bolívar", country: "VE" });
 }
 
 function startServer(port: number, extraEnv: Record<string, string> = {}): ChildProcess {
@@ -204,12 +233,13 @@ async function httpChecks(): Promise<void> {
     const sin = await get(base, "/empleos/sin-experiencia");
     check(
       sin.status === 200 &&
-        sin.html.includes("<title>Trabajo sin experiencia en Colombia: 10 vacantes | BuscoTrabajo</title>") &&
+        // 10 in Bogotá + 10 in Medellín (seo-intent-wave2 seed).
+        sin.html.includes("<title>Trabajo sin experiencia en Colombia: 20 vacantes | BuscoTrabajo</title>") &&
         robotsOf(sin.html) === "index" &&
         !sin.html.includes("SIP no apto") &&
         !sin.html.includes("en Python SIP") &&
         (sin.payload?.jobs ?? []).every((job) => /sin experiencia/i.test(job.title)),
-      "SIP-010/020/022 /empleos/sin-experiencia: 10 aptas, solo las que pasan el clasificador y la guarda.",
+      "SIP-010/020/022 /empleos/sin-experiencia: 20 aptas, solo las que pasan el clasificador y la guarda.",
       `/empleos/sin-experiencia falló (status ${sin.status}, total ${sin.payload?.total}, robots ${robotsOf(sin.html)}).`
     );
     const sinVe = await get(base, "/ve/empleos/sin-experiencia");
@@ -250,6 +280,8 @@ async function httpChecks(): Promise<void> {
       "SIP-021 enlaces de Caracas inesperados."
     );
 
+    await wave2Checks(base, sitemap, loc, links);
+
     const api = await fetch(`${base}/api/intent-page?path=${encodeURIComponent("/ve/empleos/remoto")}`);
     const apiBody = (await api.json()) as { total: number; country: string };
     const bad = await fetch(`${base}/api/intent-page?path=${encodeURIComponent("/empleos/cualquier-cosa")}`);
@@ -267,7 +299,7 @@ async function httpChecks(): Promise<void> {
   const rollback = startServer(ROLLBACK_PORT, { INTENT_PAGES_ENABLED: "false" });
   try {
     await waitFor(rollback, rbBase);
-    const gone = await Promise.all(["/empleos/sin-experiencia", "/ve/empleos/sin-experiencia", "/empleos/bogota/sin-experiencia"].map((route) => fetch(`${rbBase}${route}`).then((r) => r.status)));
+    const gone = await Promise.all(["/empleos/sin-experiencia", "/ve/empleos/sin-experiencia", "/empleos/bogota/sin-experiencia", "/empleos/medellin/sin-experiencia", "/empleos/fines-de-semana", "/empleos/medio-tiempo", "/empleos/temporada"].map((route) => fetch(`${rbBase}${route}`).then((r) => r.status)));
     const veRemote = await get(rbBase, "/ve/empleos/remoto");
     const legacySitemap = await (await fetch(`${rbBase}/sitemap-categories.xml`)).text();
     check(
@@ -281,6 +313,128 @@ async function httpChecks(): Promise<void> {
   } finally {
     await stop(rollback);
   }
+}
+
+// seo-intent-wave2 (SIW-001 … SIW-052) over the same server.
+async function wave2Checks(base: string, sitemap: string, loc: (path: string) => boolean, bogotaLinks: string[]): Promise<void> {
+  console.log("\n--- SIW: segunda ola por HTTP ---\n");
+  check(
+    loc("/empleos/fines-de-semana") &&
+      loc("/empleos/medellin/sin-experiencia") &&
+      !loc("/empleos/medio-tiempo") &&
+      !loc("/empleos/temporada") &&
+      !loc("/empleos/cali/sin-experiencia") &&
+      !sitemap.includes("/ve/empleos/fines-de-semana"),
+    "SIW-030/033 el sitemap lista fines de semana y Medellín (≥ 10) y no medio tiempo, temporada ni Cali.",
+    "SIW-030 el sitemap no refleja la guarda de las páginas nuevas."
+  );
+  const med = await get(base, "/empleos/medellin/sin-experiencia");
+  check(
+    med.status === 200 &&
+      canonicalOf(med.html) === `${SITE_URL}/empleos/medellin/sin-experiencia` &&
+      med.html.includes("<title>Trabajo sin experiencia en Medellín: 10 vacantes | BuscoTrabajo</title>") &&
+      robotsOf(med.html) === "index" &&
+      (med.payload?.jobs ?? []).length === 10 &&
+      (med.payload?.jobs ?? []).every((job) => /medell/i.test(job.location || "") && /sin experiencia/i.test(job.title)) &&
+      !hasHreflang(med.html),
+    "SIW-001 Medellín × sin experiencia: canonical propio, solo Medellín y el clasificador, sin hreflang.",
+    `SIW-001 falló (status ${med.status}, canonical ${canonicalOf(med.html)}, jobs ${(med.payload?.jobs ?? []).length}).`
+  );
+  const medOther = await get(base, "/empleos/medellin/fines-de-semana");
+  check(
+    canonicalOf(medOther.html) === `${SITE_URL}/empleos/medellin`,
+    "SIW-002 /empleos/medellin/fines-de-semana sigue siendo el hub.",
+    `SIW-002 canonical ${canonicalOf(medOther.html)}.`
+  );
+
+  const fds = await get(base, "/empleos/fines-de-semana");
+  check(
+    fds.status === 200 &&
+      fds.html.includes("<title>Trabajo los fines de semana en Colombia: 10 vacantes | BuscoTrabajo</title>") &&
+      fds.html.includes("<h1>Trabajo los fines de semana en Colombia</h1>") &&
+      robotsOf(fds.html) === "index" &&
+      !fds.html.includes("SIW disponibilidad") &&
+      (fds.payload?.jobs ?? []).every((job) => /fines de semana/i.test(job.title)) &&
+      !hasHreflang(fds.html),
+    "SIW-010/022/040 /empleos/fines-de-semana: 10 aptas por título, sin la mención de la descripción y sin hreflang.",
+    `SIW-010 falló (status ${fds.status}, total ${fds.payload?.total}, robots ${robotsOf(fds.html)}).`
+  );
+  const fdsAnswer = /<section data-intent-answer aria-label="[^"]*">([\s\S]*?)<\/section>/.exec(fds.html)?.[1];
+  check(
+    Boolean(
+      fdsAnswer &&
+        fds.payload?.answer &&
+        fdsAnswer === renderIntentAnswerHtml(fds.payload.answer) &&
+        fdsAnswer.includes("cuyo título dice que son de fines de semana")
+    ),
+    "SIW-041 el bloque de respuesta de fines de semana es el mismo en el HTML y en el payload.",
+    "SIW-041 el bloque de fines de semana difiere o falta."
+  );
+  const mt = await get(base, "/empleos/medio-tiempo");
+  const temp = await get(base, "/empleos/temporada");
+  check(
+    mt.status === 200 &&
+      robotsOf(mt.html) === "noindex,follow" &&
+      mt.payload?.total === 3 &&
+      temp.status === 200 &&
+      robotsOf(temp.html) === "noindex,follow",
+    "SIW-030 medio tiempo (3) y temporada (0) responden 200 noindex,follow.",
+    `SIW-030 falló (medio tiempo ${mt.status} ${robotsOf(mt.html)} total ${mt.payload?.total}; temporada ${temp.status} ${robotsOf(temp.html)}).`
+  );
+  const missing = await Promise.all(
+    ["/ve/empleos/fines-de-semana", "/ve/empleos/medio-tiempo", "/ve/empleos/temporada", "/empleos/por-dias", "/empleos/puerto-ordaz"].map((route) =>
+      fetch(`${base}${route}`).then((r) => r.status)
+    )
+  );
+  check(
+    missing.every((status) => status === 404),
+    "SIW-020/052 sin versión de VE, por días ni /empleos/puerto-ordaz: 404.",
+    `SIW-020 códigos: ${missing.join(",")}`
+  );
+
+  const plain = (await (await fetch(`${base}/api/jobs?country=CO&limit=5`)).json()) as { total: number };
+  const withSchedule = (await (await fetch(`${base}/api/jobs?country=CO&limit=5&schedule=fines-de-semana`)).json()) as { total: number };
+  check(
+    plain.total === withSchedule.total && plain.total > 10,
+    "SIW-013 /api/jobs ignora ?schedule=.",
+    `SIW-013 /api/jobs total ${plain.total} frente a ${withSchedule.total}.`
+  );
+
+  check(
+    bogotaLinks.includes("/empleos/fines-de-semana") &&
+      !bogotaLinks.includes("/empleos/medio-tiempo") &&
+      !bogotaLinks.includes("/empleos/medellin/sin-experiencia"),
+    "SIW-032 el hub de Bogotá enlaza fines de semana (indexable) y no medio tiempo ni la página de Medellín.",
+    `SIW-032 enlaces de Bogotá: ${bogotaLinks.join(", ")}`
+  );
+  const medHub = await get(base, "/empleos/medellin");
+  const medLinks = (medHub.payload?.intentLinks ?? []).map((link) => link.href);
+  check(
+    medLinks.includes("/empleos/medellin/sin-experiencia") &&
+      !medLinks.includes("/empleos/cali/sin-experiencia") &&
+      canonicalOf(medHub.html) === `${SITE_URL}/empleos/medellin`,
+    "SIW-032 el hub de Medellín enlaza su página sin experiencia.",
+    `SIW-032 enlaces de Medellín: ${medLinks.join(", ")}`
+  );
+
+  const guayana = await get(base, "/empleos/ciudad-guayana");
+  const guayanaTitles = (guayana.payload?.jobs ?? []).map((job) => job.title);
+  check(
+    guayana.status === 200 &&
+      canonicalOf(guayana.html) === `${SITE_URL}/empleos/ciudad-guayana` &&
+      guayana.html.includes("<title>Empleos en Ciudad Guayana y Puerto Ordaz: trabajo y ofertas de empleo | BuscoTrabajo</title>") &&
+      guayanaTitles.includes("Asistente comercial SIW Puerto Ordaz") &&
+      guayanaTitles.includes("Vendedor SIW Ciudad Guayana"),
+    "SIW-050/051 el hub de Ciudad Guayana nombra y lista Puerto Ordaz; canonical sin cambios.",
+    `SIW-050 falló (status ${guayana.status}, vacantes ${guayanaTitles.join(" | ")}).`
+  );
+  const caracasHub = await get(base, "/empleos/caracas");
+  check(
+    caracasHub.html.includes("<title>Empleos en Caracas: trabajo y ofertas de empleo | BuscoTrabajo</title>") &&
+      !caracasHub.html.includes("SIW Puerto Ordaz"),
+    "SIW-052 el hub de Caracas no cambia.",
+    "SIW-052 el hub de Caracas cambió."
+  );
 }
 
 async function main(): Promise<void> {
