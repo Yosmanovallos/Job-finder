@@ -1,3 +1,4 @@
+import { PUBLIC_API_POLICY } from "./public-api-policy.js";
 import { COUNTRIES, SOURCES_BY_COUNTRY } from "../countries/index.js";
 import type { JobFilterParams } from "./job-filters.js";
 import { buildJobUrl, isPubliclyDescribable, isUuid } from "./job-seo.js";
@@ -78,10 +79,10 @@ export function parsePublicJobsQuery(params: URLSearchParams): QueryValidationRe
     arrays[name] = values;
   }
 
-  const limit = boundedInteger(rawLimit || undefined, 20, 1, 50);
-  const offset = boundedInteger(rawOffset || undefined, 0, 0, 5000);
-  if (limit === null) return { ok: false, parameter: "limit", reason: "Usa un entero entre 1 y 50." };
-  if (offset === null) return { ok: false, parameter: "offset", reason: "Usa un entero entre 0 y 5000." };
+  const limit = boundedInteger(rawLimit || undefined, PUBLIC_API_POLICY.results, 1, PUBLIC_API_POLICY.results);
+  const offset = boundedInteger(rawOffset || undefined, 0, 0, PUBLIC_API_POLICY.offset);
+  if (limit === null) return { ok: false, parameter: "limit", reason: `Usa un entero entre 1 y ${PUBLIC_API_POLICY.results}.` };
+  if (offset === null) return { ok: false, parameter: "offset", reason: "La muestra gratuita solo admite offset=0." };
 
   return {
     ok: true,
@@ -195,7 +196,7 @@ export async function searchPublicJobs(query: PublicJobsQuery): Promise<{ jobs: 
       offset: query.offset,
       count: jobs.length,
       total: result.total,
-      hasMore: query.offset + result.jobs.length < result.total
+      hasMore: false
     }
   };
 }
