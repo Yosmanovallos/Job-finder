@@ -8,6 +8,7 @@ import {
   buildCategoryPath,
   type ResolvedCategory,
   buildCategoryMeta,
+  cityHubPlaces,
   buildCategoryInsights,
   buildCategoryInternalLinks,
   buildRelatedCityLinks,
@@ -183,7 +184,13 @@ export default function CategoryLanding() {
       };
     }
     const params = new URLSearchParams();
-    params.set(category.kind === "ciudad" ? "cities" : "roles", category.label);
+    // Same places as the SSR hub (cityHubFilters: aliases such as Puerto
+    // Ordaz for Ciudad Guayana included); /api/jobs reads repeated `cities`.
+    if (category.kind === "ciudad") {
+      for (const place of cityHubPlaces(category.label)) params.append("cities", place);
+    } else {
+      params.set("roles", category.label);
+    }
     params.set("country", category.country);
     params.set("limit", String(PAGE_LIMIT));
 

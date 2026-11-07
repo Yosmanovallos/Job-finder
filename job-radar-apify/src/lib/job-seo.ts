@@ -607,17 +607,54 @@ export type CategoryKind = "ciudad" | "rol" | "intencion";
 // or a role. Like a role, the country comes from the URL prefix
 // (/empleos/<intent> is CO, /ve/empleos/<intent> is VE). A city × intent
 // page (/empleos/<city>/<intent>) exists only for the whitelisted pairs.
-export type IntentId = "remoto" | "sin-experiencia";
+// seo-intent-wave2 adds the schedule intents (job-schedule.ts). Every
+// function that branches on an intent uses an exhaustive switch, so a new
+// IntentId without its filter, copy, label or answer does not compile.
+export type IntentId = "remoto" | "sin-experiencia" | "fines-de-semana" | "medio-tiempo" | "temporada";
 export const INTENT_LABELS: Record<IntentId, string> = {
   remoto: "Remoto",
-  "sin-experiencia": "Sin experiencia"
+  "sin-experiencia": "Sin experiencia",
+  "fines-de-semana": "Fines de semana",
+  "medio-tiempo": "Medio tiempo",
+  temporada: "Temporada"
+};
+// Countries where each national intent page exists (seo-intent-wave2 design
+// D2/D3, decided by the 2026-11-07 count). A country left out has no route
+// (404), so no cache key, keeper query, sitemap entry or hreflang either.
+export const INTENT_COUNTRIES: Record<IntentId, readonly string[]> = {
+  remoto: ["CO", "VE"],
+  "sin-experiencia": ["CO", "VE"],
+  "fines-de-semana": ["CO"],
+  "medio-tiempo": ["CO"],
+  temporada: ["CO"]
 };
 export const CITY_INTENTS: ReadonlyArray<{ city: string; country: string; intent: IntentId }> = [
-  { city: "Bogotá", country: "CO", intent: "sin-experiencia" }
+  { city: "Bogotá", country: "CO", intent: "sin-experiencia" },
+  { city: "Medellín", country: "CO", intent: "sin-experiencia" },
+  { city: "Cali", country: "CO", intent: "sin-experiencia" }
 ];
 
 function isIntentId(value: string): value is IntentId {
   return Object.hasOwn(INTENT_LABELS, value);
+}
+
+export function intentExistsIn(intent: IntentId, country: string): boolean {
+  return INTENT_COUNTRIES[intent].includes(country);
+}
+
+// Location aliases of a city hub (seo-intent-wave2 design D6): people search
+// "Puerto Ordaz" (Ubersuggest 1,9 K) far more than "Ciudad Guayana" (390),
+// and the jobs say "Puerto Ordaz". Read ONLY by the hub's filters
+// (cityHubFilters / hubMatcher) and its title/meta: the country's city list
+// stays as it is, so there is no new hub, no new job breadcrumb and no new
+// dashboard option. Rollback: remove the entry.
+export const CITY_HUB_LOCATION_ALIASES: Readonly<Record<string, readonly string[]>> = {
+  "Ciudad Guayana": ["Puerto Ordaz"]
+};
+
+/** The hub's city plus its aliases, in display order. */
+export function cityHubPlaces(city: string): string[] {
+  return [city, ...(Object.hasOwn(CITY_HUB_LOCATION_ALIASES, city) ? CITY_HUB_LOCATION_ALIASES[city] : [])];
 }
 
 export interface ResolvedCategory {
@@ -668,6 +705,7 @@ export function resolveCategorySlug(
   // it for the dashboard's city filter), so /ve/empleos/remoto listed
   // Colombia under a Colombia canonical. ADR 0012.
   if (isIntentId(target)) {
+    if (!intentExistsIn(target, requestCountry)) return null;
     return { kind: "intencion", label: INTENT_LABELS[target], country: requestCountry, intent: target };
   }
   for (const city of CITY_OPTIONS) {
@@ -939,10 +977,13 @@ export function buildCategoryMeta(category: ResolvedCategory, totalCount: number
   // empleo en <ciudad>" — docs/seo-baseline/2026-10-24-measurement-baseline.md).
   // "Remoto" lives in CITY_OPTIONS as a modality bucket, not a place
   // ("trabajos remotos" is its own query in Search Console).
+  // A city hub with location aliases names them too (seo-intent-wave2 D6):
+  // "Ciudad Guayana y Puerto Ordaz". Every other hub reads exactly as before.
+  const places = kind === "ciudad" ? cityHubPlaces(label) : [label];
   const heading = isRemoteBucket(category)
     ? `Trabajos remotos en ${countryName}: empleos y ofertas de empleo`
     : kind === "ciudad"
-      ? `Empleos en ${label}: trabajo y ofertas de empleo`
+      ? `Empleos en ${places.join(" y ")}: trabajo y ofertas de empleo`
       : `Trabajo de ${label} en ${countryName}`;
   const target = isRemoteBucket(category)
     ? `trabajo remoto en ${countryName}`
@@ -960,7 +1001,7 @@ export function buildCategoryMeta(category: ResolvedCategory, totalCount: number
     // under ~160 characters for the longest city name.
     description:
       kind === "ciudad" && !isRemoteBucket(category)
-        ? `¿Buscas trabajo en ${label}? ${totalCount === 1 ? "1 vacante activa" : `${countLabel} y ofertas de empleo activas`}. Compara las empresas y cargos que más contratan y aplica en la fuente original.`
+        ? `¿Buscas trabajo en ${places.join(" o ")}? ${totalCount === 1 ? "1 vacante activa" : `${countLabel} y ofertas de empleo activas`}. ${places.length > 1 ? "Compara empresas y cargos y aplica en la fuente original." : "Compara las empresas y cargos que más contratan y aplica en la fuente original."}`
         : `Encuentra ${countLabel} de ${target}. Compara ofertas de empleo actuales y visita la fuente original para aplicar.`,
     canonicalUrl: buildCategoryUrl(category)
   };
@@ -1094,11 +1135,14 @@ export function buildCategoryInsights(
 
   const visibleCount = jobs.length;
   const countLabel = totalCount === 1 ? "1 vacante activa" : `${totalCount} vacantes activas`;
+  const schedule = scheduleWording(category);
   const target = isRemoteBucket(category)
     ? `trabajo remoto en ${getCountryConfig(category.country).name}`
     : isSinExperiencia(category)
       ? `trabajo sin experiencia en ${intentPlace(category)}`
-      : category.kind === "ciudad"
+      : schedule
+        ? `trabajo ${schedule} en ${intentPlace(category)}`
+        : category.kind === "ciudad"
         ? `trabajo en ${category.label}`
         : `${category.label} en ${getCountryConfig(category.country).name}`;
   const sampleLabel =
@@ -1174,7 +1218,9 @@ export function buildCategoryStatsCopy(
     ? `Trabajos remotos en ${countryName}`
     : isSinExperiencia(category)
       ? `Trabajos sin experiencia en ${intentPlace(category)}`
-      : category.kind === "ciudad"
+      : scheduleWording(category)
+        ? `Trabajos ${scheduleWording(category)} en ${intentPlace(category)}`
+        : category.kind === "ciudad"
         ? `Trabajos en ${category.label}`
         : `${category.label} en ${countryName}`;
   const active = insights.activeLast30Days;
@@ -1238,6 +1284,25 @@ function isSinExperiencia(category: ResolvedCategory): boolean {
   return category.kind === "intencion" && category.intent === "sin-experiencia";
 }
 
+/** "de fines de semana" / "de medio tiempo" / "por temporada", or null (seo-intent-wave2). */
+function scheduleWording(category: ResolvedCategory): string | null {
+  if (category.kind !== "intencion" || !category.intent) return null;
+  const intent: IntentId = category.intent;
+  switch (intent) {
+    case "remoto":
+    case "sin-experiencia":
+      return null;
+    case "fines-de-semana":
+      return "de fines de semana";
+    case "medio-tiempo":
+      return "de medio tiempo";
+    case "temporada":
+      return "por temporada";
+    default:
+      return assertNever(intent);
+  }
+}
+
 /** "Colombia", "Venezuela" or the city of a city × intent page. */
 function intentPlace(category: ResolvedCategory): string {
   return category.city || getCountryConfig(category.country).name;
@@ -1253,30 +1318,53 @@ function buildIntentMeta(category: ResolvedCategory, totalCount: number): Catego
   const counted = totalCount >= INTENT_TITLE_MIN_COUNT;
   const canonicalUrl = buildCategoryUrl(category);
   const count = totalCount === 1 ? "1 vacante" : `${totalCount} vacantes`;
-  if (category.intent === "remoto") {
-    const heading = `Trabajo remoto en ${place}: vacantes desde casa`;
-    return {
-      title: `${counted ? `Trabajo remoto en ${place}: ${totalCount} vacantes desde casa` : heading} | BuscoTrabajo`,
-      heading,
-      description: fitDescription(
-        `${count} de trabajo remoto en ${place} para trabajar desde casa. Compara empresas`,
-        ". Aplica en la fuente original de cada oferta.",
-        category.city ? CITY_DESCRIPTION_FILLERS : DESCRIPTION_FILLERS
-      ),
-      canonicalUrl
-    };
-  }
-  const heading = `Trabajo sin experiencia en ${place}`;
-  return {
+  const fillers = category.city ? CITY_DESCRIPTION_FILLERS : DESCRIPTION_FILLERS;
+  const tail = ". Aplica en la fuente original de cada oferta.";
+  // "{heading}: {n} vacantes" pages; remoto keeps its own shape.
+  const counting = (heading: string, head: string): CategoryMeta => ({
     title: `${counted ? `${heading}: ${totalCount} vacantes` : heading} | BuscoTrabajo`,
     heading,
-    description: fitDescription(
-      `${count} de trabajo sin experiencia en ${place}: el aviso dice que no la piden. Compara empresas`,
-      ". Aplica en la fuente original de cada oferta.",
-      category.city ? CITY_DESCRIPTION_FILLERS : DESCRIPTION_FILLERS
-    ),
+    description: fitDescription(head, tail, fillers),
     canonicalUrl
-  };
+  });
+  const intent = category.intent as IntentId;
+  switch (intent) {
+    case "remoto": {
+      const heading = `Trabajo remoto en ${place}: vacantes desde casa`;
+      return {
+        title: `${counted ? `Trabajo remoto en ${place}: ${totalCount} vacantes desde casa` : heading} | BuscoTrabajo`,
+        heading,
+        description: fitDescription(`${count} de trabajo remoto en ${place} para trabajar desde casa. Compara empresas`, tail, fillers),
+        canonicalUrl
+      };
+    }
+    case "sin-experiencia":
+      return counting(
+        `Trabajo sin experiencia en ${place}`,
+        `${count} de trabajo sin experiencia en ${place}: el aviso dice que no la piden. Compara empresas`
+      );
+    case "fines-de-semana":
+      return counting(
+        `Trabajo los fines de semana en ${place}`,
+        `${count} para trabajar los fines de semana en ${place}: lo dice el título del aviso. Compara empresas`
+      );
+    case "medio-tiempo":
+      return counting(
+        `Trabajo de medio tiempo en ${place}`,
+        `${count} de trabajo de medio tiempo en ${place}: lo dice el título del aviso. Compara empresas`
+      );
+    case "temporada":
+      return counting(
+        `Trabajo por temporada en ${place}`,
+        `${count} de trabajo por temporada en ${place}: lo dice el título del aviso. Compara empresas`
+      );
+    default:
+      return assertNever(intent);
+  }
+}
+
+export function assertNever(value: never): never {
+  throw new Error(`Unhandled intent: ${String(value)}`);
 }
 
 // Grows "Compara empresas" with page-true list items (every hub and intent
@@ -1333,6 +1421,13 @@ export function buildCategorySectionHeadings(category: ResolvedCategory): {
   if (isSinExperiencia(category)) {
     return {
       jobs: `Vacantes sin experiencia recientes en ${intentPlace(category)}`,
+      relatedCities: `Empleos por ciudad en ${countryName}`
+    };
+  }
+  const schedule = scheduleWording(category);
+  if (schedule) {
+    return {
+      jobs: `Vacantes ${schedule} recientes en ${intentPlace(category)}`,
       relatedCities: `Empleos por ciudad en ${countryName}`
     };
   }
