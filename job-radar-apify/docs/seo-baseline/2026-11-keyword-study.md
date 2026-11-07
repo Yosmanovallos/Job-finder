@@ -22,6 +22,14 @@ El hallazgo principal: **la demanda de intención y de municipios ya la están
 captando vacantes sueltas, no páginas permanentes.** Cuando la vacante vence,
 la posición se pierde con ella.
 
+> **Vigencia (2026-11-07):** las prioridades de §6, §6b (conclusiones) y
+> §8.6 quedan sustituidas por `docs/SEO-GROWTH-ROADMAP-2026-11.md`. Allí está
+> la **corrección** a la conclusión 1 de §6b. Con la vista «aparición en
+> búsquedas» de GSC, casi todas las impresiones de vacantes en búsquedas de
+> ciudad o intención son de **Google Empleos**. Nuestras vacantes no le
+> quitan el puesto al hub; el hub pierde el resultado orgánico frente a
+> Computrabajo y elempleo.
+
 ## 1. El video: qué muestra y qué dice
 
 ### Método
