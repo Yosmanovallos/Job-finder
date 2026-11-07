@@ -28,7 +28,7 @@
       `npm run test:unit`, `npm run test:seo`.
 - [ ] `/seo drift compare` contra las URLs de baseline
       (`docs/SEO-IMPROVEMENT-PLAN.md` §2), incluida al menos una vacante de
-      solo deben cambiar `employmentType` y la línea «Tipo de empleo».
+      Magneto y otra de Elempleo: solo deben cambiar `employmentType` y la línea «Tipo de empleo».
 - [ ] Rich Results Test sobre una vacante de Magneto y otra de Elempleo: siguen siendo válidas.
 - [ ] Aprobación del propietario para merge y despliegue.
 
