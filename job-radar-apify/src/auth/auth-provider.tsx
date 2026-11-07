@@ -4,6 +4,7 @@ import type { supabase as SupabaseClient } from "../lib/supabase-client.js";
 import { isSupabaseConfigError } from "../lib/auth-error-messages.js";
 import { trackEvent } from "../lib/analytics.js";
 import { trackAuthCallback, trackConfirmedAuth } from "../lib/auth-analytics.js";
+import { readFirstTouch, sendFirstTouchOnce } from "../lib/first-touch.js";
 
 export interface UserProfile {
   id: string;
@@ -80,7 +81,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [configError, setConfigError] = useState(false);
   const [passwordRecovery, setPasswordRecovery] = useState(false);
 
-  const fetchServerProfile = async (accessToken: string) => {
+  const fetchServerProfile = async (accessToken: string, signupMetadata?: unknown) => {
     try {
       const res = await fetch("/api/me", {
         headers: { Authorization: `Bearer ${accessToken}` }
@@ -91,6 +92,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSubscriptionEnd(data.subscriptionEnd);
       setDbName(data.name || undefined);
       setPreferredRoles(Array.isArray(data.preferredRoles) ? data.preferredRoles : null);
+      // A brand-new account (onboarding not done yet): record where the
+      // visitor first came from, once per account and browser. Fire-and-forget; the
+      // server ignores accounts older than a day.
+      if (!Array.isArray(data.preferredRoles) && typeof data.id === "string")
+        void sendFirstTouchOnce(accessToken, data.id, signupMetadata);
     } catch (e) {
       console.warn("[Auth] No se pudo verificar el tier con el servidor:", e);
     } finally {
@@ -114,7 +120,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           );
         }
         setSession(data.session);
-        if (data.session) fetchServerProfile(data.session.access_token);
+        if (data.session)
+          fetchServerProfile(data.session.access_token, data.session.user.user_metadata?.bt_first_touch);
         setLoading(false);
       });
 
@@ -127,7 +134,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // confirmed in server logs — real, measurable latency, not a guess).
         // Skip it here; getSession() already covers the initial fetch.
         if (newSession && event !== "INITIAL_SESSION") {
-          fetchServerProfile(newSession.access_token);
+          fetchServerProfile(newSession.access_token, newSession.user.user_metadata?.bt_first_touch);
         } else if (!newSession) {
           setTier("free");
           setSubscriptionEnd(undefined);
@@ -200,10 +207,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const callbackUrl = new URL("/auth/callback", window.location.origin);
     if (returnTo) callbackUrl.searchParams.set("return_to", returnTo);
     const supabase = await getSupabase();
+    const firstTouch = readFirstTouch();
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { emailRedirectTo: callbackUrl.toString() }
+      options: {
+        emailRedirectTo: callbackUrl.toString(),
+        // Copy of the first touch (src/lib/first-touch.ts, no PII) for when
+        // the confirmation link opens in another browser.
+        ...(firstTouch ? { data: { bt_first_touch: firstTouch } } : {})
+      }
     });
     if (error && isSupabaseConfigError(error.message)) {
       setConfigError(true);

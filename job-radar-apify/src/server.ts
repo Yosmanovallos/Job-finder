@@ -21,6 +21,8 @@ import {
   maskLockedFields,
   updateUserName,
   updateUserPreferredRoles,
+  recordUserFirstTouch,
+  SignupAttributionUnavailableError,
   getTransactionsForUser,
   streamCanonicalSitemapJobs,
   SitemapStreamAbortedError,
@@ -129,6 +131,7 @@ import {
 } from "./lib/job-company-links.js";
 import { reputationLabel, reputationReviewText, reputationScoreText } from "./lib/reputation-labels.js";
 import { verifySession } from "./auth/verify-session.js";
+import { isNewAccount, parseFirstTouch, TIKTOK_SHORT_LINK_TARGET } from "./lib/first-touch.js";
 import { startPaymentCheckout } from "./payments/checkout.js";
 import { handleWompiWebhook } from "./payments/webhook.js";
 import { handleRunsRoute, isRunsRoute } from "./server/routes/runs.js";
@@ -547,6 +550,8 @@ function peekCompanyJobs(scope: CompanyJobsScope, res: http.ServerResponse): Com
 const GENERAL_API_RATE_LIMIT = 120;
 const GENERAL_API_RATE_WINDOW_MS = 60 * 1000;
 const CHECKOUT_START_BODY_MAX_BYTES = 1 * 1024;
+// Signup first touch (src/lib/first-touch.ts): five short strings and a date.
+const FIRST_TOUCH_BODY_MAX_BYTES = 2 * 1024;
 const SAVED_JOB_BODY_MAX_BYTES = 1 * 1024; // { applied?: boolean }
 
 // Reads a request body up to maxBytes; null when it's larger (the rest is
@@ -1231,6 +1236,36 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
         );
       }
     });
+    return;
+  }
+
+  // 4c-ter. POST /api/me/first-touch — signup attribution (Fase A). The
+  // browser sends where the visitor first came from (src/lib/first-touch.ts)
+  // right after the account is created. Written once per account, only for
+  // accounts younger than 24 h (an old account that logs in again is not a
+  // new signup), every field re-sanitized here. Always 204 to the client:
+  // attribution must never surface as an error in the signup flow.
+  if (pathname === "/api/me/first-touch" && method === "POST") {
+    const session = await verifySession(req);
+    if (!session) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "No autenticado" }));
+      return;
+    }
+    const body = await readJsonBodyCapped(req, FIRST_TOUCH_BODY_MAX_BYTES);
+    const now = new Date();
+    const touch = body.ok ? parseFirstTouch(body.value, now) : null;
+    if (touch && isNewAccount(session.authCreatedAt, now)) {
+      try {
+        await recordUserFirstTouch(session.id, touch);
+      } catch (e) {
+        if (!(e instanceof SignupAttributionUnavailableError)) {
+          console.warn("[first-touch] no se pudo guardar:", (e as Error)?.message || e);
+        }
+      }
+    }
+    res.writeHead(204, { "Cache-Control": "no-store" });
+    res.end();
     return;
   }
 
@@ -2713,6 +2748,20 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       },
       indexHtml
     );
+    return;
+  }
+
+  // /tiktok — short link for the TikTok bio and videos (Fase A/F): lands on
+  // the homepage tagged with utm_*, so GA4 and the signup's first touch
+  // stop counting TikTok as Direct. A 302 (the target may change), never
+  // indexed and absent from every sitemap.
+  if (pathname === "/tiktok" && (method === "GET" || method === "HEAD")) {
+    res.writeHead(302, {
+      Location: TIKTOK_SHORT_LINK_TARGET,
+      "Cache-Control": "no-store",
+      "X-Robots-Tag": "noindex, nofollow"
+    });
+    res.end();
     return;
   }
 

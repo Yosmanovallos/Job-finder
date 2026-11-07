@@ -72,7 +72,8 @@ const suites: Record<string, string[]> = {
     "validate-placeholder-employer.test.ts",
     "validate-auth-error-messages.test.ts",
     "validate-email-typo.test.ts",
-    "validate-site-feedback.test.ts"
+    "validate-site-feedback.test.ts",
+    "validate-first-touch.test.ts"
   ],
   integration: [
     "validate-isolated-database.ts",

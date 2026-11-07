@@ -1822,6 +1822,56 @@ export async function updateUserPreferredRoles(authUid: string, roles: string[])
   };
 }
 
+/**
+ * Signup attribution (Fase A): writes the first touch ONCE per account —
+ * never overwrites (`first_touch_at IS NULL`). The caller has already
+ * checked the account is new and sanitized every field
+ * (src/lib/first-touch.ts). Returns false when nothing was written (already
+ * set) and throws `SignupAttributionUnavailableError` while the migration
+ * (scripts/migrate-signup-attribution.ts) has not run yet.
+ */
+export class SignupAttributionUnavailableError extends Error {}
+
+export async function recordUserFirstTouch(
+  authUid: string,
+  touch: {
+    landingPath: string;
+    referrerHost: string | null;
+    utmSource: string | null;
+    utmMedium: string | null;
+    utmCampaign: string | null;
+    capturedAt: string;
+  }
+): Promise<boolean> {
+  try {
+    const result = await pool.query(
+      `UPDATE users SET
+         first_touch_path = $2,
+         first_touch_referrer_host = $3,
+         first_touch_utm_source = $4,
+         first_touch_utm_medium = $5,
+         first_touch_utm_campaign = $6,
+         first_touch_at = $7
+       WHERE id = $1 AND first_touch_at IS NULL`,
+      [
+        authUid,
+        touch.landingPath,
+        touch.referrerHost,
+        touch.utmSource,
+        touch.utmMedium,
+        touch.utmCampaign,
+        touch.capturedAt
+      ]
+    );
+    return (result.rowCount ?? 0) > 0;
+  } catch (error) {
+    if ((error as { code?: string })?.code === "42703") {
+      throw new SignupAttributionUnavailableError("signup-attribution columns missing");
+    }
+    throw error;
+  }
+}
+
 export async function getUserTier(authUid: string): Promise<SubscriptionTier> {
   const result = await pool.query(
     `SELECT subscription_tier, subscription_end FROM users WHERE id = $1`,

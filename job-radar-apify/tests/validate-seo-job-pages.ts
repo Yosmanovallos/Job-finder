@@ -1062,6 +1062,28 @@ async function runHttpTests() {
       `GET /pricing respondió ${pricingRes.status} (Location: ${pricingRes.headers.get("location")}) en vez de 301 a /.`
     );
 
+    // /tiktok (Fase A): the bio short link is a 302 to / tagged with utm_*,
+    // never indexed and never listed in a sitemap.
+    const tiktokRes = await fetch(`${BASE_URL}/tiktok`, { redirect: "manual" });
+    check(
+      tiktokRes.status === 302 &&
+        tiktokRes.headers.get("location") === "/?utm_source=tiktok&utm_medium=social&utm_campaign=bio" &&
+        /noindex/.test(tiktokRes.headers.get("x-robots-tag") || ""),
+      "GET /tiktok responde 302 a /?utm_source=tiktok&utm_medium=social&utm_campaign=bio con X-Robots-Tag noindex.",
+      `GET /tiktok respondió ${tiktokRes.status} (Location: ${tiktokRes.headers.get("location")}, X-Robots-Tag: ${tiktokRes.headers.get("x-robots-tag")}).`
+    );
+    check(
+      !pagesXml.includes("/tiktok") && !indexXml.includes("/tiktok"),
+      "/tiktok no aparece en sitemap.xml ni en sitemap-pages.xml.",
+      "/tiktok aparece en un sitemap."
+    );
+    const firstTouchAnonRes = await fetch(`${BASE_URL}/api/me/first-touch`, { method: "POST", body: "{}" });
+    check(
+      firstTouchAnonRes.status === 401,
+      "POST /api/me/first-touch sin sesión responde 401 (no escribe nada).",
+      `POST /api/me/first-touch sin sesión respondió ${firstTouchAnonRes.status}.`
+    );
+
     const jobsSitemapRes = await fetch(`${BASE_URL}/sitemap-jobs.xml`);
     const jobsSitemapXml = await jobsSitemapRes.text();
     const sitemapLocs = [...jobsSitemapXml.matchAll(/<loc>(.*?)<\/loc>/g)].map((m) => m[1]);
