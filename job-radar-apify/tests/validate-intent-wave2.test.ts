@@ -7,6 +7,9 @@ import { createElement } from "react";
 import {
   buildCategoriesSitemapXml,
   buildCategoryMeta,
+  buildCategoryInsights,
+  buildCategorySectionHeadings,
+  buildCategoryStatsCopy,
   buildCategoryPath,
   resolveCategoryPath,
   resolveCategorySlug,
@@ -244,6 +247,20 @@ test("SIW-040 title, H1 and meta of the new pages (design D4)", () => {
   }
 });
 
+test("SIW-040 section headings of the schedule pages name the intent, never the bare label", () => {
+  const expected: Array<[ResolvedCategory, string, string]> = [
+    [fdsCO, "Vacantes de fines de semana recientes en Colombia", "Trabajos de fines de semana en Colombia: cifras de las ofertas activas"],
+    [mtCO, "Vacantes de medio tiempo recientes en Colombia", "Trabajos de medio tiempo en Colombia: cifras de las ofertas activas"],
+    [tempCO, "Vacantes por temporada recientes en Colombia", "Trabajos por temporada en Colombia: cifras de las ofertas activas"]
+  ];
+  for (const [page, jobsHeading, statsHeading] of expected) {
+    assert.equal(buildCategorySectionHeadings(page).jobs, jobsHeading);
+    const jobs = [job(1), job(2)];
+    const stats = buildCategoryStatsCopy(page, buildCategoryInsights(page, 30, jobs, AS_OF))!;
+    assert.equal(stats.heading, statsHeading);
+  }
+});
+
 test("SIW-041 the answer block is identical in the SSR string and the React render", () => {
   for (const page of NEW_PAGES) {
     const answer = buildIntentAnswer(page, 30, [job(1), job(2), job(3), job(4)])!;
@@ -287,4 +304,4 @@ test("SIW-052 nothing else changes: other hubs, VE city list, job breadcrumbs, n
   );
 });
 
-void AS_OF;
+

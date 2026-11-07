@@ -32,6 +32,12 @@ que ya está en producción.
    regla. Las versiones de Venezuela, solo si pasan la regla de D2.
 3. `/empleos/ciudad-guayana` nombra Puerto Ordaz y lista sus vacantes.
 
+**Resultado del conteo del 2026-11-07** (`validation.md` §1):
+- entran `/empleos/fines-de-semana` (30), `/empleos/medio-tiempo` (26),
+  `/empleos/temporada` (245) y Medellín (34) y Cali (15) × sin experiencia;
+- «por días» no entra (0);
+- ninguna versión de Venezuela entra.
+
 ## Alcance
 
 - Ampliar la lista blanca ciudad × intención (`CITY_INTENTS`).

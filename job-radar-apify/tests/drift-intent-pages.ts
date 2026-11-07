@@ -134,6 +134,9 @@ async function main(): Promise<void> {
   ];
   try {
     await runDrift(urls);
+    // SIW-061: the first request of a fresh process, ONE URL per process,
+    // base and branch alternated so machine drift hits both alike.
+    await isolatedTtfb(["/dashboard", "/empleos/bogota", "/empleos/medellin", "/empleos/cali", "/empleos/caracas", "/empleos/ciudad-guayana", "/empleos/remoto", jobPath]);
   } finally {
     await pool.query(`DELETE FROM jobs WHERE url_hash LIKE 'drift-%'`);
     await pool.end();
@@ -160,6 +163,38 @@ async function seedSynthetic(): Promise<void> {
       [n, title, `Empresa drift ${n % 3}`, location, country, `https://example.com/drift/${n}`, n]
     );
   }
+}
+
+const TTFB_RUNS = 5;
+
+async function firstHit(dir: string, url: string): Promise<number> {
+  const server = start(dir);
+  try {
+    await ready(server);
+    const t = performance.now();
+    const res = await fetch(`${BASE}${url}${url.includes("?") ? "&" : "?"}ttfb=${Date.now()}`);
+    await res.text();
+    return Math.round(performance.now() - t);
+  } finally {
+    await stop(server);
+  }
+}
+
+async function isolatedTtfb(urls: string[]): Promise<void> {
+  const out: Record<string, { base: number; branch: number; deltaPct: number }> = {};
+  const median = (values: number[]) => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
+  for (const url of urls) {
+    const base: number[] = [];
+    const branch: number[] = [];
+    for (let run = 0; run < TTFB_RUNS; run++) {
+      base.push(await firstHit(BASE_DIR, url));
+      branch.push(await firstHit(BRANCH_DIR, url));
+    }
+    const b = median(base);
+    const r = median(branch);
+    out[url] = { base: b, branch: r, deltaPct: Math.round(((r - b) / Math.max(b, 1)) * 100) };
+  }
+  console.log(JSON.stringify({ isolatedColdTtfbMedianMs: out }, null, 2));
 }
 
 async function runDrift(urls: string[]): Promise<void> {

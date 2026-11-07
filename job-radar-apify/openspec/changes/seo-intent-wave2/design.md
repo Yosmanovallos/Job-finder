@@ -25,9 +25,15 @@
 ### D1. Intenciones de jornada y tipo exhaustivo
 
 ```ts
-type IntentId = "remoto" | "sin-experiencia" | "fines-de-semana" | "medio-tiempo";
-// "por-dias" y "temporada" solo si pasan D2.
+type IntentId = "remoto" | "sin-experiencia" | "fines-de-semana" | "medio-tiempo" | "temporada";
+// "por-dias" no pasó D2 (0 en el título). Ver validation.md §1.
 ```
+
+**Resultado del conteo (2026-11-07, `validation.md` §1):** las tres
+intenciones de jornada usan **solo el título**. La descripción (0/15) y
+`employment_type` (2.094 filas «Medio tiempo», 0/15 verificables) no
+cuentan. Así el filtro no lee descripciones y no necesita columna
+derivada.
 
 - Cada función que hoy ramifica por intención pasa a un `switch`
   exhaustivo con comprobación `never`. Un `IntentId` nuevo sin filtro,
@@ -87,7 +93,7 @@ Una intención entra en esta fase si cumple **todo**:
 ```ts
 const INTENT_COUNTRIES: Record<IntentId, readonly ("CO" | "VE")[]> = {
   remoto: ["CO", "VE"], "sin-experiencia": ["CO", "VE"],
-  "fines-de-semana": ["CO"], "medio-tiempo": ["CO"] // según D2
+  "fines-de-semana": ["CO"], "medio-tiempo": ["CO"], temporada: ["CO"] // VE: 1, 3 y 1
 };
 ```
 
@@ -104,13 +110,14 @@ const INTENT_COUNTRIES: Record<IntentId, readonly ("CO" | "VE")[]> = {
 | `/empleos/cali/sin-experiencia` | «Trabajo sin experiencia en Cali: {n} vacantes» |
 | `/empleos/fines-de-semana` | «Trabajo los fines de semana en Colombia: {n} vacantes» |
 | `/empleos/medio-tiempo` | «Trabajo de medio tiempo en Colombia: {n} vacantes» |
+| `/empleos/temporada` | «Trabajo por temporada en Colombia: {n} vacantes» |
 
 - Mismas reglas que D4 de `seo-intent-pages`: `{n}` es el `total` real y
   solo aparece desde 10; la descripción tiene 150–160 caracteres y solo
   dice lo que la página muestra; el H1 no lleva número.
 - Bloque de respuesta: «¿Cuántas vacantes hay?» dice qué evidencia se usó
-  («cuyo aviso dice que son de fines de semana», «de medio tiempo según el
-  aviso o la fuente»). Ciudades y empresas, igual que hoy.
+  («cuyo título dice que son de fines de semana / de medio tiempo / por
+  temporada»). Ciudades y empresas, igual que hoy.
 - Etiqueta del enlace desde los hubs: «Trabajo los fines de semana en
   Colombia», «Trabajo de medio tiempo en Colombia», «Trabajo sin
   experiencia en Medellín».
@@ -150,8 +157,9 @@ Ciudad Guayana no está en ninguna medición abierta, así que se cambia ya.
 **Cambio:**
 
 - Alias de ubicación propio del hub: `CITY_HUB_LOCATION_ALIASES =
-  { "Ciudad Guayana": ["Puerto Ordaz"] }` (y «San Félix» solo si el conteo
-  muestra vacantes reales). Lo leen **solo** `cityHubFilters` y su gemelo
+  { "Ciudad Guayana": ["Puerto Ordaz"] }`. San Félix no tiene vacantes
+  (conteo: 0) y no entra. Hoy el hub no tiene ninguna vacante apta con
+  «Ciudad Guayana»; con el alias pasa a 8 de Puerto Ordaz. Lo leen **solo** `cityHubFilters` y su gemelo
   `hubMatcher`. La lista de ciudades de VE (`countries/index.ts`) no
   cambia, así que no hay hub nuevo, ni migas nuevas en vacantes, ni opción
   nueva en el dashboard.
@@ -178,6 +186,11 @@ Ciudad Guayana no está en ninguna medición abierta, así que se cambia ya.
 ## Rollback
 
 `INTENT_PAGES_ENABLED=false` apaga también las páginas nuevas (410 a las
-URL nuevas ya publicadas, ADR 0012 §10). El alias de Ciudad Guayana tiene
-su propia bandera, `CITY_HUB_ALIASES_ENABLED` (activa por defecto): al
-apagarla, el hub vuelve al filtro, título y meta de hoy.
+URL nuevas ya publicadas, ADR 0012 §10; lo comprueba `test:seo`).
+
+El alias de Ciudad Guayana **no tiene bandera de entorno**: lo leen el
+servidor y el cliente (`CategoryLanding` pide las mismas ubicaciones a
+`/api/jobs` al navegar), y una variable solo de servidor desalinearía la
+hidratación. Para revertirlo se borra la entrada de
+`CITY_HUB_LOCATION_ALIASES` (una línea) y se despliega: el hub vuelve al
+filtro, título y meta de hoy.

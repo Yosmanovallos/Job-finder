@@ -10,50 +10,50 @@ pruebas nuevas.
 - [x] Confirmar que Ciudad Guayana no está en las mediciones abiertas
       hasta el 2026-11-26 (design D6).
 - [x] Fijar la regla de decisión D2 antes del conteo.
-- [ ] Enmienda al ADR 0012: intenciones de jornada, países por intención y
+- [x] Enmienda al ADR 0012: intenciones de jornada, países por intención y
       alias de ubicación.
 
 ## 1. Conteo previo (solo lectura, antes de escribir código)
 
 - [x] `scripts/count-intent-wave2.ts`: `BEGIN READ ONLY`, statement
       timeout de 60 s y `ROLLBACK`.
-- [ ] El propietario lo corre desde el checkout con `.env`.
-- [ ] Registrar los conteos y las muestras en `validation.md` y aplicar D2:
+- [x] El propietario lo autorizó y se corrió desde el checkout con `.env`.
+- [x] Registrar los conteos y las muestras en `validation.md` y aplicar D2:
       qué intenciones y qué países entran, y con qué variante del
       clasificador.
 
 ## 2. Clasificador de jornada
 
-- [ ] Pruebas rojas de SIW-010 a SIW-013 con un fixture compartido.
-- [ ] `src/lib/job-schedule.ts` (memoria y SQL) y el filtro `schedule`.
+- [x] Pruebas rojas de SIW-010 a SIW-013 con un fixture compartido.
+- [x] `src/lib/job-schedule.ts` (memoria y SQL) y el filtro `schedule`.
 
 ## 3. Resolución, países y tipo exhaustivo
 
-- [ ] Pruebas rojas de SIW-001, SIW-002, SIW-012 y SIW-020 a SIW-022.
-- [ ] `IntentId`, `INTENT_COUNTRIES`, `CITY_INTENTS` y `switch`
+- [x] Pruebas rojas de SIW-001, SIW-002, SIW-012 y SIW-020 a SIW-022.
+- [x] `IntentId`, `INTENT_COUNTRIES`, `CITY_INTENTS` y `switch`
       exhaustivos en filtros, meta, etiquetas y respuesta.
 
 ## 4. Guarda, sitemap, enlaces, keeper y caché
 
-- [ ] Pruebas rojas de SIW-030 a SIW-034.
-- [ ] Sitemap con conteos conocidos y `intentPageCache` dimensionada.
+- [x] Pruebas rojas de SIW-030 a SIW-034.
+- [x] Sitemap con conteos conocidos y `intentPageCache` dimensionada.
 
 ## 5. Contenido
 
-- [ ] Pruebas rojas de SIW-040 y SIW-041.
-- [ ] Copia D4 en el SSR y en `CategoryLanding`.
+- [x] Pruebas rojas de SIW-040 y SIW-041.
+- [x] Copia D4 en el SSR y en `CategoryLanding`.
 
 ## 6. Ciudad Guayana
 
-- [ ] Pruebas rojas de SIW-050 a SIW-053.
-- [ ] Alias en `cityHubFilters` y `hubMatcher`, title/H1/meta y bandera.
+- [x] Pruebas rojas de SIW-050 a SIW-053.
+- [x] Alias en `cityHubFilters`, `hubMatcher` y el respaldo del cliente; title/H1/meta. Sin bandera (design D6, rollback en una línea).
 
 ## 7. Rendimiento y no regresión
 
-- [ ] Benchmark SIW-062 con 3.000 filas.
-- [ ] Drift SIW-060 frente a `origin/main`.
-- [ ] TTFB en frío SIW-061.
-- [ ] `tsc`, build, `test:unit`, `test:seo`, `test:dashboard-filters`,
+- [x] Benchmark SIW-062 con 3.000 filas.
+- [x] Drift SIW-060 frente a `origin/main`.
+- [x] TTFB en frío SIW-061.
+- [x] `tsc`, build, `test:unit`, `test:seo`, `test:dashboard-filters`,
       `test:companies-search`. ESLint de `src/server.ts` sin errores
       (incluye quitar la importación sin uso de `resolveCategorySlug` que ya
       venía de `main`).

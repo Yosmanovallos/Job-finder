@@ -7,6 +7,7 @@ import { performance } from "node:perf_hooks";
 import { pool } from "../src/db/client.js";
 import { queryJobsPageForParity } from "../src/db/job-repository.js";
 import { classifyExperience } from "../src/lib/job-experience.js";
+import { matchesSchedule } from "../src/lib/job-schedule.js";
 import {
   buildHubIntentLinks,
   buildIntentAnswer,
@@ -29,7 +30,17 @@ const DESCRIPTION =
 function rows(): SeoJob[] {
   return Array.from({ length: ROWS }, (_, i) => ({
     jobId: `00000000-0000-4000-8000-${String(i).padStart(12, "0")}`,
-    title: i % 3 === 0 ? `Asesor comercial sin experiencia ${i}` : `Analista ${i}`,
+    // seo-intent-wave2: some schedule titles too, so their filters match rows.
+    title:
+      i % 3 === 0
+        ? `Asesor comercial sin experiencia ${i}`
+        : i % 5 === 1
+          ? `Mesero fines de semana ${i}`
+          : i % 7 === 2
+            ? `Cajero medio tiempo ${i}`
+            : i % 11 === 4
+              ? `Impulsadora temporada navideña ${i}`
+              : `Analista ${i}`,
     company: `Empresa ${i % 40}`,
     location: CITIES[i % CITIES.length],
     url: `https://example.invalid/${i}`,
@@ -89,6 +100,21 @@ function inMemory() {
     buildHubIntentLinks(bogota, () => 1250);
     return meta.title;
   };
+  // seo-intent-wave2: the same request for a schedule page (its SQL picked
+  // the 60 newest matching titles).
+  const fds = resolveCategorySlug("fines-de-semana", "CO")!;
+  const fdsPage = all.filter((job) => matchesSchedule("fines-de-semana", job.title)).slice(0, 60);
+  const scheduleRequest = () => {
+    const meta = buildCategoryMeta(fds, 400);
+    const insights = buildCategoryInsights(fds, 400, fdsPage, NOW);
+    buildCategoryStatsCopy(fds, insights);
+    const answer = buildIntentAnswer(fds, 400, fdsPage);
+    if (answer) renderIntentAnswerHtml(answer);
+    buildNewTodayBlock(fds, fdsPage.map(toRecent), NOW);
+    buildIntentHreflangTags(fds, { CO: 400, VE: 0 });
+    buildHubIntentLinks(bogota, () => 400);
+    return meta.title;
+  };
   // Stress: the new answer block over all 3,000 rows in one request.
   const answerStress = () => {
     const answer = buildIntentAnswer(sinExp, ROWS, all);
@@ -100,12 +126,14 @@ function inMemory() {
   global.gc?.();
   const rssBefore = process.memoryUsage().rss;
   const ssrRequest = time(request);
+  const scheduleSsrRequest = time(scheduleRequest);
   const answerBlock3000 = time(answerStress);
   global.gc?.();
   const rssAfter = process.memoryUsage().rss;
   const classifier3000 = time(classifierStress);
   return {
     ssrRequest60Rows: ssrRequest,
+    scheduleSsrRequest60Rows: scheduleSsrRequest,
     answerBlock3000Rows: answerBlock3000,
     classifier3000Rows: classifier3000,
     rssBeforeMb: Number((rssBefore / 1e6).toFixed(1)),
@@ -170,6 +198,7 @@ console.log(JSON.stringify({ sqlFilter3000Rows: sql }, null, 2));
 await pool.end();
 const ok =
   memory.ssrRequest60Rows.msPerRequest < 10 &&
+  memory.scheduleSsrRequest60Rows.msPerRequest < 10 &&
   memory.answerBlock3000Rows.msPerRequest < 10 &&
   memory.rssAfter1000RequestsMb - memory.rssBeforeMb < 20;
 console.log(ok ? "SIP-052 OK" : "SIP-052 FUERA DE PRESUPUESTO");

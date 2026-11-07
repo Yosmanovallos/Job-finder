@@ -81,8 +81,9 @@ siguen vigentes para todas las páginas de intención, nuevas incluidas.
 - **SIW-052:** ningún otro hub cambia su filtro, title, H1 ni meta. No
   existe `/empleos/puerto-ordaz` (404). La lista de ciudades de VE, las
   migas de las vacantes y las opciones del dashboard no cambian.
-- **SIW-053:** con `CITY_HUB_ALIASES_ENABLED=false`, el hub vuelve al
-  filtro, title y meta de hoy.
+- **SIW-053:** sin la entrada de `CITY_HUB_LOCATION_ALIASES`, el hub vuelve
+  al filtro, title y meta de hoy (rollback en una línea; design D6).
+  Cubierto por SIW-052: los hubs sin alias se comportan como hoy.
 
 ## No regresión
 

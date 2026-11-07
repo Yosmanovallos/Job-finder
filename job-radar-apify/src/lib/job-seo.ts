@@ -1135,11 +1135,14 @@ export function buildCategoryInsights(
 
   const visibleCount = jobs.length;
   const countLabel = totalCount === 1 ? "1 vacante activa" : `${totalCount} vacantes activas`;
+  const schedule = scheduleWording(category);
   const target = isRemoteBucket(category)
     ? `trabajo remoto en ${getCountryConfig(category.country).name}`
     : isSinExperiencia(category)
       ? `trabajo sin experiencia en ${intentPlace(category)}`
-      : category.kind === "ciudad"
+      : schedule
+        ? `trabajo ${schedule} en ${intentPlace(category)}`
+        : category.kind === "ciudad"
         ? `trabajo en ${category.label}`
         : `${category.label} en ${getCountryConfig(category.country).name}`;
   const sampleLabel =
@@ -1215,7 +1218,9 @@ export function buildCategoryStatsCopy(
     ? `Trabajos remotos en ${countryName}`
     : isSinExperiencia(category)
       ? `Trabajos sin experiencia en ${intentPlace(category)}`
-      : category.kind === "ciudad"
+      : scheduleWording(category)
+        ? `Trabajos ${scheduleWording(category)} en ${intentPlace(category)}`
+        : category.kind === "ciudad"
         ? `Trabajos en ${category.label}`
         : `${category.label} en ${countryName}`;
   const active = insights.activeLast30Days;
@@ -1277,6 +1282,25 @@ export function isLegacyRemoteCopy(category: ResolvedCategory): boolean {
 
 function isSinExperiencia(category: ResolvedCategory): boolean {
   return category.kind === "intencion" && category.intent === "sin-experiencia";
+}
+
+/** "de fines de semana" / "de medio tiempo" / "por temporada", or null (seo-intent-wave2). */
+function scheduleWording(category: ResolvedCategory): string | null {
+  if (category.kind !== "intencion" || !category.intent) return null;
+  const intent: IntentId = category.intent;
+  switch (intent) {
+    case "remoto":
+    case "sin-experiencia":
+      return null;
+    case "fines-de-semana":
+      return "de fines de semana";
+    case "medio-tiempo":
+      return "de medio tiempo";
+    case "temporada":
+      return "por temporada";
+    default:
+      return assertNever(intent);
+  }
 }
 
 /** "Colombia", "Venezuela" or the city of a city × intent page. */
@@ -1397,6 +1421,13 @@ export function buildCategorySectionHeadings(category: ResolvedCategory): {
   if (isSinExperiencia(category)) {
     return {
       jobs: `Vacantes sin experiencia recientes en ${intentPlace(category)}`,
+      relatedCities: `Empleos por ciudad en ${countryName}`
+    };
+  }
+  const schedule = scheduleWording(category);
+  if (schedule) {
+    return {
+      jobs: `Vacantes ${schedule} recientes en ${intentPlace(category)}`,
       relatedCities: `Empleos por ciudad en ${countryName}`
     };
   }
