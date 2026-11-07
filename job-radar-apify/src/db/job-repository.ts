@@ -22,6 +22,7 @@ import { FREELANCE_SOURCES, modalityForFilter, sqlJobModality } from "../lib/job
 import { initialDetailStatus, refreshGoogleReadinessInTransaction } from "./job-readiness-repository.js";
 import { sourceSupportsDetail } from "../sources/detail-capability.js";
 import { seoReadySql } from "../lib/google-job-readiness.js";
+import { experienceForFilter, sqlSinExperiencia } from "../lib/job-experience.js";
 import { liveJobSql } from "../lib/job-freshness.js";
 import { findExpiredUrlHashes } from "./expired-job-repository.js";
 import { StaleWhileRevalidateCache } from "../lib/stale-while-revalidate-cache.js";
@@ -930,6 +931,20 @@ function buildJobWhere(filters: JobFilterParams, sql: SqlParts): string[] {
   if (filters.country) {
     where.push(`(country IS NULL OR country = ${sql.param(filters.country.toUpperCase())})`);
   }
+
+  // Intent pages (ADR 0012). The canonical CTE carries neither seo_ready nor
+  // the description, so both are read with ONE primary-key probe per row
+  // that already passed every other filter (country, modality, city), never
+  // inside the materialized projection, which would read every description.
+  // Only queryJobsPage's `filtered` CTE uses these filters.
+  const experience = experienceForFilter(filters.experience);
+  if (filters.googleReady || experience) {
+    const checks = [
+      ...(filters.googleReady ? ["intent_row.seo_ready = TRUE"] : []),
+      ...(experience ? [sqlSinExperiencia("intent_row.title", "intent_row.description")] : [])
+    ];
+    where.push(`EXISTS (SELECT 1 FROM jobs intent_row WHERE intent_row.id = canonical.id AND ${checks.join(" AND ")})`);
+  }
   return where;
 }
 
@@ -949,6 +964,32 @@ export async function getJobsPage(options: JobsPageOptions = {}): Promise<JobsPa
   const page = await jobsPageCache.get(jobsPageCacheKey(blockOptions), () => queryJobsPage(blockOptions));
   // `get` already returned a private copy, so slicing it is safe.
   return { jobs: page.jobs.slice(offset - block, offset - block + limit), total: page.total };
+}
+
+// Intent pages (ADR 0012 §6) keep their own small cache, outside the 64-entry
+// LRU above: 5 keys of page traffic must never evict the warmed dashboard
+// pages (same precedent as the homepage and company caches). Same freshness
+// policy and single-flight refresh. One entry is the first page of 60 rows
+// and its total, which is also the inventory guard's count.
+const intentPageCache = new StaleWhileRevalidateCache<string, JobsPage>({
+  freshForMs: JOBS_PAGE_CACHE_FRESH_MS,
+  staleForMs: JOBS_PAGE_CACHE_STALE_MS,
+  maxEntries: 8,
+  clone: cloneJobsPage,
+  onBackgroundRefreshError: () => {
+    console.warn("[intent-page-cache] Background refresh failed; serving the last valid page.");
+  }
+});
+
+export function getIntentPage(filters: JobFilterParams, limit: number): Promise<JobsPage> {
+  const options: JobsPageOptions = { filters, limit, offset: 0, includeDetails: false };
+  return intentPageCache.get(jobsPageCacheKey(options), () => queryJobsPage(options));
+}
+
+/** Cached intent page or undefined (loads it in the background); never waits. */
+export function peekIntentPage(filters: JobFilterParams, limit: number): JobsPage | undefined {
+  const options: JobsPageOptions = { filters, limit, offset: 0, includeDetails: false };
+  return intentPageCache.peek(jobsPageCacheKey(options), () => queryJobsPage(options));
 }
 
 /**

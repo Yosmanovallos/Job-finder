@@ -93,6 +93,10 @@ export function hubMatcher(
   const country = hub.country.toUpperCase();
   const inCountry = (job: Pick<RecentReadyJob, "country">) =>
     !job.country || job.country.toUpperCase() === country;
+  // An intent page passes its own rows, already filtered by its SQL
+  // (modality / experience / city / Google-ready), so only the country
+  // rule applies here (ADR 0012).
+  if (hub.kind === "intencion") return (job) => inCountry(job);
   if (hub.kind === "ciudad") {
     const city = foldCityText(hub.label);
     return (job) => inCountry(job) && foldCityText(job.location || "").includes(city);
@@ -102,6 +106,12 @@ export function hubMatcher(
 }
 
 export function newTodayHeading(hub: ResolvedCategory): string {
+  if (hub.kind === "intencion") {
+    // /empleos/remoto (CO) keeps the heading it had as the "Remoto" city
+    // bucket (ADR 0012 §5).
+    if (hub.intent === "remoto") return hub.country === "CO" && !hub.city ? "Nuevas hoy en Remoto" : "Vacantes remotas nuevas hoy";
+    return hub.city ? `Vacantes sin experiencia nuevas hoy en ${hub.city}` : "Vacantes sin experiencia nuevas hoy";
+  }
   return hub.kind === "ciudad"
     ? `Nuevas hoy en ${hub.label}`
     : `Vacantes de ${hub.label} nuevas hoy`;

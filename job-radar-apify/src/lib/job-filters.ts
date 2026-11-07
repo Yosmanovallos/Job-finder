@@ -197,6 +197,10 @@ export interface JobFilterParams {
   // `country === value` alone; that silently drops every remote job (see
   // GET /api/jobs in server.ts for the same rule applied server-side).
   country?: string;
+  // Intent pages only (ADR 0012), never from a request parameter:
+  // "sin-experiencia" (job-experience.ts) and Google-ready rows only.
+  experience?: "sin-experiencia";
+  googleReady?: boolean;
 }
 
 const normalizeText = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();

@@ -22,30 +22,12 @@ dotenv.config();
 
 const { pool } = await import("../src/db/client.js");
 const { sqlJobModality } = await import("../src/lib/job-modality.js");
+const { sqlSinExperiencia, SIN_EXPERIENCIA_PHRASES } = await import("../src/lib/job-experience.js");
 const { sqlSearchTitle } = await import("../src/lib/job-search-intent.js");
 
-// D3 phrases, in the normalized form of searchTitleText(): lowercase, no
-// accents (ñ→n), every non [a-z0-9+#] run is one space, padded with spaces.
-const POSITIVE = [
-  "sin experiencia",
-  "no requiere experiencia",
-  "no se requiere experiencia",
-  "primer empleo",
-  "0 anos de experiencia",
-  "experiencia no requerida"
-];
-// Exclusion: an explicit minimum of N >= 1 years/months. Plain ASCII POSIX
-// regex so JS (RegExp) and Postgres (~) read it the same way.
-const EXCLUSION =
-  " [1-9][0-9]* (ano|anos|mes|meses) de experiencia | experiencia (minima )?(de )?[1-9][0-9]* (ano|anos|mes|meses) ";
-
-const lit = (v: string) => `'${v.replace(/'/g, "''")}'`;
-const positiveSql = (expr: string) => `${expr} LIKE ANY (ARRAY[${POSITIVE.map((p) => lit(`% ${p} %`)).join(", ")}]::text[])`;
-const exclusionSql = (expr: string) => `${expr} ~ ${lit(EXCLUSION)}`;
-
-const titleN = sqlSearchTitle("j.title");
-const descN = sqlSearchTitle("j.description");
-const sinExperiencia = `((${positiveSql(titleN)} OR ${positiveSql(descN)}) AND NOT (${exclusionSql(titleN)} OR ${exclusionSql(descN)}))`;
+// The exact classifier of the pages (src/lib/job-experience.ts, design D3).
+const sinExperiencia = sqlSinExperiencia("j.title", "j.description");
+const phraseOnly = `(${sqlSearchTitle("j.title")} LIKE ANY (ARRAY[${SIN_EXPERIENCIA_PHRASES.map((p) => `'% ${p} %'`).join(", ")}]::text[]) OR ${sqlSearchTitle("j.description")} LIKE ANY (ARRAY[${SIN_EXPERIENCIA_PHRASES.map((p) => `'% ${p} %'`).join(", ")}]::text[]))`;
 const fold = (col: string) => `LOWER(TRANSLATE(COALESCE(${col}, ''), 'áéíóúüñÁÉÍÓÚÜÑ', 'aeiouunAEIOUUN'))`;
 
 const canonicalReady = `
@@ -73,7 +55,7 @@ try {
       SELECT j.country,
              ${fold("j.location")} AS loc,
              ${sinExperiencia} AS sin_exp,
-             (${positiveSql(titleN)} OR ${positiveSql(descN)}) AS sin_exp_phrase,
+             ${phraseOnly} AS sin_exp_phrase,
              -- ready only exposes id, so the classifier's bare columns are j's.
              ${sqlJobModality()} AS modality,
              (j.description IS NOT NULL AND length(j.description) > 0) AS has_description

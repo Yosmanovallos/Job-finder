@@ -4,7 +4,9 @@ import { CategoryJobRow } from "../components/CategoryJobRow.js";
 import { ContentCta } from "../components/ContentPage.js";
 import { usePageMeta } from "../lib/use-page-meta.js";
 import {
-  resolveCategorySlug,
+  resolveCategoryPath,
+  buildCategoryPath,
+  type ResolvedCategory,
   buildCategoryMeta,
   buildCategoryInsights,
   buildCategoryInternalLinks,
@@ -18,6 +20,16 @@ import { Button } from "../components/ui/button.js";
 import { Job } from "../sources/types.js";
 import { ArrowLeft } from "lucide-react";
 import type { NewTodayBlock } from "../lib/recent-jobs.js";
+import { IntentAnswerBlock } from "../components/IntentAnswerBlock.js";
+import { INTENT_LINKS_HEADING, isIntentAnswer, type IntentAnswer, type IntentLink } from "../lib/intent-pages.js";
+
+function isIntentLinks(value: unknown): value is IntentLink[] {
+  return Array.isArray(value) && value.every((link) => typeof link?.href === "string" && typeof link?.label === "string");
+}
+
+// What the server rendered while INTENT_PAGES_ENABLED=false: the CO
+// "Remoto" city bucket (ADR 0012 §10).
+const LEGACY_REMOTE: ResolvedCategory = { kind: "ciudad", label: "Remoto", country: "CO" };
 
 // The server embeds the block it rendered; only a well-formed one is shown,
 // so the hydrated DOM links exactly what the server HTML linked.
@@ -36,6 +48,12 @@ interface SsrCategoryPayload {
   insights?: CategoryInsights;
   /** SEO Fase B «Nuevas hoy» (src/lib/recent-jobs.ts); absent when no job qualifies. */
   newToday?: NewTodayBlock;
+  /** Intent pages only (ADR 0012). */
+  intent?: string;
+  indexable?: boolean;
+  answer?: IntentAnswer;
+  /** City hubs: intent pages that pass the guard. */
+  intentLinks?: IntentLink[];
 }
 
 declare global {
@@ -53,6 +71,8 @@ interface CategoryPageState {
   insights: CategoryInsights | null;
   state: LoadState;
   newToday?: NewTodayBlock | null;
+  answer?: IntentAnswer | null;
+  intentLinks?: IntentLink[];
   fromSsr?: boolean;
 }
 
@@ -64,7 +84,7 @@ interface CategoryPageState {
 // Same page shell as the company page (ink breadcrumb on a soft-green band,
 // ink cards), so a job opened from any hub looks the same.
 export default function CategoryLanding() {
-  const { id } = useParams<{ id: string }>();
+  const { id, slug } = useParams<{ id: string; slug?: string }>();
   const navigate = useNavigate();
   const location = useLocation();
   // Only affects "rol" categories (a city match already carries its own
@@ -74,7 +94,17 @@ export default function CategoryLanding() {
   const requestCountry = isVePrefixed(location.pathname) ? "VE" : "CO";
   const dashboardPath = requestCountry === "VE" ? "/ve/dashboard" : "/dashboard";
 
-  const category = id ? resolveCategorySlug(id, requestCountry) : null;
+  // Same resolution as server.ts: a second segment only matters for a
+  // whitelisted city × intent pair (/empleos/bogota/sin-experiencia).
+  const resolved = id ? resolveCategoryPath(slug ? [id, slug] : [id], requestCountry) : null;
+  const pageKey = resolved?.kind === "intencion" && resolved.city ? `${id}/${slug}` : id;
+  // With the rollback flag on, the server sends the legacy remote payload
+  // (no `intent` field): keep rendering what it rendered.
+  const [legacyRemote] = useState(() => {
+    const ssr = window.__SSR_CATEGORY__;
+    return Boolean(resolved?.kind === "intencion" && resolved.intent === "remoto" && ssr && ssr.slug === pageKey && !ssr.intent);
+  });
+  const category = legacyRemote && resolved?.intent === "remoto" ? LEGACY_REMOTE : resolved;
 
   // server.ts's category branch embeds this exact response (see its
   // comment on window.__SSR_CATEGORY__) — a first anonymous visitor with
@@ -91,35 +121,67 @@ export default function CategoryLanding() {
   // never shows a short skeleton first.
   const [page, setPage] = useState<CategoryPageState>(() => {
     const ssrCategory = window.__SSR_CATEGORY__;
-    if (category && ssrCategory && ssrCategory.slug === id && ssrCategory.country === category.country) {
+    if (category && ssrCategory && ssrCategory.slug === pageKey && ssrCategory.country === category.country) {
       delete window.__SSR_CATEGORY__;
       const jobs = Array.isArray(ssrCategory.jobs) ? ssrCategory.jobs : [];
       const total = ssrCategory.total || 0;
       return {
-        id,
+        id: pageKey,
         jobs,
         total,
         insights: ssrCategory.insights || buildCategoryInsights(category, total, jobs),
         state: "found",
         fromSsr: true,
-        newToday: isNewTodayBlock(ssrCategory.newToday) ? ssrCategory.newToday : null
+        newToday: isNewTodayBlock(ssrCategory.newToday) ? ssrCategory.newToday : null,
+        answer: isIntentAnswer(ssrCategory.answer) ? ssrCategory.answer : null,
+        intentLinks: isIntentLinks(ssrCategory.intentLinks) ? ssrCategory.intentLinks : []
       };
     }
-    return { id, jobs: [], total: 0, insights: null, state: category ? "loading" : "not-found" };
+    return { id: pageKey, jobs: [], total: 0, insights: null, state: category ? "loading" : "not-found" };
   });
   const current: CategoryPageState =
-    page.id === id ? page : { id, jobs: [], total: 0, insights: null, state: category ? "loading" : "not-found" };
-  const { jobs, total, insights, state, newToday } = current;
+    page.id === pageKey ? page : { id: pageKey, jobs: [], total: 0, insights: null, state: category ? "loading" : "not-found" };
+  const { jobs, total, insights, state, newToday, answer, intentLinks = [] } = current;
 
   useEffect(() => {
     if (!category) {
-      setPage({ id, jobs: [], total: 0, insights: null, state: "not-found" });
+      setPage({ id: pageKey, jobs: [], total: 0, insights: null, state: "not-found" });
       return;
     }
-    if (page.id === id && page.fromSsr) return;
+    if (page.id === pageKey && page.fromSsr) return;
 
     let cancelled = false;
-    setPage({ id, jobs: [], total: 0, insights: null, state: "loading" });
+    setPage({ id: pageKey, jobs: [], total: 0, insights: null, state: "loading" });
+    if (category.kind === "intencion") {
+      // Intent pages: the server's own whitelisted fallback, same cache and
+      // same answer block as the SSR page (ADR 0012 §6).
+      fetch(`/api/intent-page?path=${encodeURIComponent(buildCategoryPath(category))}`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (cancelled) return;
+          if (!data) {
+            setPage({ id: pageKey, jobs: [], total: 0, insights: null, state: "not-found" });
+            return;
+          }
+          const nextJobs = data.jobs || [];
+          const nextTotal = data.total || 0;
+          setPage({
+            id: pageKey,
+            jobs: nextJobs,
+            total: nextTotal,
+            insights: data.insights || buildCategoryInsights(category, nextTotal, nextJobs),
+            state: "found",
+            newToday: isNewTodayBlock(data.newToday) ? data.newToday : null,
+            answer: isIntentAnswer(data.answer) ? data.answer : null
+          });
+        })
+        .catch(() => {
+          if (!cancelled) setPage({ id: pageKey, jobs: [], total: 0, insights: null, state: "not-found" });
+        });
+      return () => {
+        cancelled = true;
+      };
+    }
     const params = new URLSearchParams();
     params.set(category.kind === "ciudad" ? "cities" : "roles", category.label);
     params.set("country", category.country);
@@ -132,20 +194,20 @@ export default function CategoryLanding() {
         if (data) {
           const nextJobs = data.jobs || [];
           const nextTotal = data.total || 0;
-          setPage({ id, jobs: nextJobs, total: nextTotal, insights: buildCategoryInsights(category, nextTotal, nextJobs), state: "found" });
+          setPage({ id: pageKey, jobs: nextJobs, total: nextTotal, insights: buildCategoryInsights(category, nextTotal, nextJobs), state: "found" });
         } else {
-          setPage({ id, jobs: [], total: 0, insights: null, state: "not-found" });
+          setPage({ id: pageKey, jobs: [], total: 0, insights: null, state: "not-found" });
         }
       })
       .catch(() => {
-        if (!cancelled) setPage({ id, jobs: [], total: 0, insights: null, state: "not-found" });
+        if (!cancelled) setPage({ id: pageKey, jobs: [], total: 0, insights: null, state: "not-found" });
       });
     return () => {
       cancelled = true;
     };
     // Dependencies intentionally limited to the list below: `category` is
     // derived from them, and `page` only gates the first SSR-backed run.
-  }, [id, requestCountry]);
+  }, [id, slug, requestCountry]);
 
   const meta = category ? buildCategoryMeta(category, total) : null;
   const internalLinks = category ? buildCategoryInternalLinks(category) : [];
@@ -160,7 +222,10 @@ export default function CategoryLanding() {
   // Job cards pass this page as their origin, so the job page's back link
   // returns here.
   const origin = category
-    ? { label: category.kind === "ciudad" ? `Empleos en ${category.label}` : category.label, path: location.pathname }
+    ? {
+        label: category.kind === "ciudad" ? `Empleos en ${category.label}` : category.kind === "intencion" && meta ? meta.heading : category.label,
+        path: location.pathname
+      }
     : undefined;
 
   return (
@@ -222,6 +287,11 @@ export default function CategoryLanding() {
 
       {state === "found" && meta && (
         <>
+          {answer && (
+            <div className="max-w-[1240px] w-full mx-auto px-4 md:px-6 pb-8 text-sm leading-relaxed [&_h2]:font-heading [&_h2]:font-bold [&_h2]:text-xl [&_h2]:mb-3 [&_dt]:font-bold [&_dd]:mb-2 [&_dd]:text-[#3d413e]">
+              <IntentAnswerBlock answer={answer} />
+            </div>
+          )}
           {total === 0 && (
             <section className="max-w-[1240px] w-full mx-auto px-4 md:px-6 pb-8">
               <p className="ink-card-sm rounded-2xl bg-[#fdf1d3] p-5 text-[#3d413e]">No hay vacantes en esta categoría por ahora.</p>
@@ -403,6 +473,29 @@ export default function CategoryLanding() {
                 ))}
               </ul>
             </section>
+          )}
+          {intentLinks.length > 0 && (
+            <nav
+              data-intent-links
+              aria-label={INTENT_LINKS_HEADING}
+              className="sr-host max-w-[1240px] w-full mx-auto px-4 md:px-6 pb-8 md:pb-12"
+            >
+              <h2 className="sr font-heading font-bold text-[24px] md:text-[36px] leading-tight tracking-[-0.03em] mb-4 md:mb-6">
+                {INTENT_LINKS_HEADING}
+              </h2>
+              <ul className="sr flex flex-wrap gap-2">
+                {intentLinks.map((link) => (
+                  <li key={link.href}>
+                    <Link
+                      to={link.href}
+                      className="ink-card-sm ink-lift inline-flex rounded-full bg-white px-3.5 py-1.5 text-sm font-bold text-foreground no-underline"
+                    >
+                      {link.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </nav>
           )}
           <ContentCta to={dashboardPath} />
         </>

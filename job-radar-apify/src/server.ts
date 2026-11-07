@@ -7,6 +7,8 @@ import dotenv from "dotenv";
 import {
   getJobsPage,
   peekJobsPage,
+  getIntentPage,
+  peekIntentPage,
   getJobById,
   getHomeJobCounts,
   getHomeCompanies,
@@ -25,7 +27,22 @@ import {
   getRecentSeoReadyJobs,
   peekRecentSeoReadyJobs
 } from "./db/job-repository.js";
-import { buildNewTodayBlock } from "./lib/recent-jobs.js";
+import { buildNewTodayBlock, type RecentReadyJob } from "./lib/recent-jobs.js";
+import {
+  buildHubIntentLinks,
+  buildIntentAnswer,
+  buildIntentHreflangTags,
+  intentCategoryForPath,
+  intentFilters,
+  intentPagesEnabled,
+  intentRobots,
+  isIntentIndexable,
+  listIntentCategories,
+  renderHubIntentLinksHtml,
+  renderIntentAnswerHtml,
+  siblingIntent,
+  type IntentAnswer
+} from "./lib/intent-pages.js";
 import { markRoleForImmediateRescan } from "./db/scheduler-repository.js";
 import {
   listSavedJobs,
@@ -74,6 +91,8 @@ import {
   buildSitemapIndexXml,
   isUuid,
   resolveCategorySlug,
+  resolveCategoryPath,
+  isLegacyRemoteCopy,
   RETIRED_ROLE_SLUGS,
   buildCategoryMeta,
   buildCategoryInsights,
@@ -776,6 +795,41 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     return;
   }
 
+  // 4a. GET /api/intent-page?path=<path> — the client fallback of an intent
+  //     page (CategoryLanding after a client-side navigation), served from
+  //     the same intent cache as the SSR page. Only the whitelisted intent
+  //     paths are accepted, so it can never run an arbitrary filter
+  //     (ADR 0012 §6). Same public, anonymous view as the SSR page.
+  if (pathname === "/api/intent-page" && method === "GET") {
+    const intent = intentPagesEnabled() ? intentCategoryForPath(parsedUrl.searchParams.get("path") || "") : null;
+    if (!intent) {
+      res.writeHead(404, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Página de intención desconocida" }));
+      return;
+    }
+    const result = await getIntentPage(intentFilters(intent), CITY_HUB_PAGE_LIMIT);
+    const jobs = maskLockedFields(result.jobs, "free").filter(isPubliclyDescribable);
+    const answer = isLegacyRemoteCopy(intent) ? null : buildIntentAnswer(intent, result.total, jobs);
+    const newToday = buildNewTodayBlock(intent, jobs.map(toRecentReadyJob));
+    await sendBody(
+      req,
+      res,
+      200,
+      { "Content-Type": "application/json", "Cache-Control": "public, max-age=60, s-maxage=300, stale-while-revalidate=600" },
+      JSON.stringify({
+        country: intent.country,
+        intent: intent.intent,
+        jobs,
+        total: result.total,
+        indexable: isIntentIndexable(result.total),
+        insights: buildCategoryInsights(intent, result.total, jobs),
+        ...(answer ? { answer } : {}),
+        ...(newToday ? { newToday } : {})
+      })
+    );
+    return;
+  }
+
   // 4. GET /api/jobs — tier is always resolved server-side from a verified
   //    session; free/anonymous callers get the 48h freshness paywall masking.
   //    PostgreSQL filters/counts/paginates; only the requested page enters
@@ -1380,7 +1434,25 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     // anonymous visitor already gets.
     if (id && !isUuid(id)) {
       const requestCountry = isVeEmpleos ? "VE" : "CO";
-      const category = resolveCategorySlug(id, requestCountry);
+      // Intent pages (ADR 0012): /empleos/<intent>, /ve/empleos/<intent> and
+      // the whitelisted /empleos/<city>/<intent>. Any other second segment
+      // keeps the first segment's page, as before.
+      const resolved = resolveCategoryPath(segments, requestCountry);
+      let category = resolved;
+      if (resolved?.kind === "intencion" && !intentPagesEnabled()) {
+        // Rollback (ADR 0012 §10): remoto goes back to the CO "Remoto" city
+        // bucket; the URLs that only exist as intent pages answer 410 so
+        // Google drops them cleanly.
+        if (resolved.intent === "remoto" && !resolved.city) {
+          category = { kind: "ciudad", label: "Remoto", country: "CO" };
+        } else {
+          res.writeHead(410, { "Content-Type": "text/html; charset=utf-8" });
+          res.end(
+            '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Categoría ya no disponible | BuscoTrabajo</title><meta name="robots" content="noindex"></head><body><h1>Esta categoría ya no está disponible</h1><p><a href="/dashboard">Ver todas las vacantes</a></p></body></html>'
+          );
+          return;
+        }
+      }
       if (!category) {
         // A role slug that used to resolve (crawled/sitemapped before a
         // taxonomy swap, see job-seo.ts's RETIRED_ROLE_SLUGS comment) is a
@@ -1406,22 +1478,48 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       // country filter at all and would silently mix both countries' jobs
       // under a URL whose own heading claimed just one — see
       // ResolvedCategory's comment.
-      const filterParams: JobFilterParams =
-        category.kind === "ciudad"
+      const isIntent = category.kind === "intencion";
+      const filterParams: JobFilterParams = isIntent
+        ? intentFilters(category)
+        : category.kind === "ciudad"
           ? cityHubFilters(category)
           : { roles: [category.label], country: category.country };
       // isPubliclyDescribable filters out any locked job the same way
       // buildJobsSitemapXml/the job-detail branch already do — a category
       // page must never list a job it can't also link a working page for.
       // Job pages peek this same cache entry for their related links.
-      const matched = await getJobsPage({
-        filters: filterParams,
-        limit: CITY_HUB_PAGE_LIMIT,
-        offset: 0,
-        includeDetails: false
-      });
+      // Intent pages read their own small cache (ADR 0012 §6), never the
+      // dashboard's 64-entry LRU.
+      const matched = isIntent
+        ? await getIntentPage(filterParams, CITY_HUB_PAGE_LIMIT)
+        : await getJobsPage({
+            filters: filterParams,
+            limit: CITY_HUB_PAGE_LIMIT,
+            offset: 0,
+            includeDetails: false
+          });
       const page = maskLockedFields(matched.jobs, "free").filter(isPubliclyDescribable);
       const total = matched.total;
+      // Intent pages only: the guard (total = Google-ready rows), the answer
+      // block from the rows already loaded, and the sibling country's total
+      // for hreflang, from the same cache (a failure only drops hreflang).
+      const intentAnswer: IntentAnswer | null =
+        isIntent && !isLegacyRemoteCopy(category) ? buildIntentAnswer(category, total, page) : null;
+      const sibling = isIntent ? siblingIntent(category) : null;
+      let siblingTotal = 0;
+      if (sibling) {
+        try {
+          siblingTotal = (await getIntentPage(intentFilters(sibling), CITY_HUB_PAGE_LIMIT)).total;
+        } catch {
+          siblingTotal = 0;
+        }
+      }
+      // City hubs link the intent pages that pass the guard. peek() never
+      // waits: a cold count means no link yet, never a guess.
+      const hubIntentLinks =
+        category.kind === "ciudad" && intentPagesEnabled()
+          ? buildHubIntentLinks(category, (intent) => peekIntentPage(intentFilters(intent), CITY_HUB_PAGE_LIMIT)?.total)
+          : [];
 
       let indexHtml: string;
       try {
@@ -1489,11 +1587,20 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       // today (hub country's calendar day), from the shared recent snapshot.
       // peek() never waits on Postgres: a cold snapshot just omits the block
       // and loads in the background, so the hub's TTFB is unchanged.
-      const newToday = buildNewTodayBlock(category, peekRecentSeoReadyJobs());
+      // Intent pages read «Nuevas hoy» from their own rows, already filtered
+      // by their SQL (sorted newest first), so no other snapshot is needed.
+      const newToday = buildNewTodayBlock(
+        category,
+        isIntent ? page.map(toRecentReadyJob) : peekRecentSeoReadyJobs()
+      );
       const newTodayHtml = newToday
         ? `<section data-category-new-today aria-label="${escapeHtml(newToday.heading)}"><h2>${escapeHtml(newToday.heading)}</h2><ul>${newToday.links.map((link) => `<li><a href="${escapeHtml(link.path)}">${escapeHtml(link.title)}</a> — ${escapeHtml(link.company)} · ${escapeHtml(link.location)}</li>`).join("")}</ul></section>\n`
         : "";
-      const ssrSnippet = `<h1>${escapeHtml(meta.heading)}</h1>\n${emptyNotice}${overviewHtml}${newTodayHtml}${statsHtml}${jobsHeading}<nav aria-label="Vacantes"><ul>\n${items}\n</ul></nav>${relatedCitiesHtml}`;
+      const intentAnswerHtml = intentAnswer
+        ? `<section data-intent-answer aria-label="${escapeHtml(intentAnswer.heading)}">${renderIntentAnswerHtml(intentAnswer)}</section>\n`
+        : "";
+      const hubIntentLinksHtml = renderHubIntentLinksHtml(hubIntentLinks);
+      const ssrSnippet = `<h1>${escapeHtml(meta.heading)}</h1>\n${intentAnswerHtml}${emptyNotice}${overviewHtml}${newTodayHtml}${statsHtml}${jobsHeading}<nav aria-label="Vacantes"><ul>\n${items}\n</ul></nav>${relatedCitiesHtml}${hubIntentLinksHtml}`;
       indexHtml = indexHtml.replace('<div id="app"></div>', () => `<div id="app">${ssrSnippet}</div>`);
 
       // Same fix /dashboard already had (Fase 1, §5.4) applied here too —
@@ -1511,12 +1618,16 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       // removes the redundant fetch's failure mode entirely for the
       // common case.
       const ssrCategoryPayload = escapeJsonForScriptTag({
-        slug: id,
+        // A city × intent page carries both segments, so the Bogotá hub's
+        // client never mistakes it for its own payload (and vice versa).
+        slug: isIntent && category.city ? `${segments[0]}/${segments[1]}` : id,
         country: category.country,
         jobs: page,
         total,
         insights,
-        ...(newToday ? { newToday } : {})
+        ...(newToday ? { newToday } : {}),
+        ...(isIntent ? { intent: category.intent, indexable: isIntentIndexable(total), ...(intentAnswer ? { answer: intentAnswer } : {}) } : {}),
+        ...(hubIntentLinks.length > 0 ? { intentLinks: hubIntentLinks } : {})
       });
       indexHtml = indexHtml.replace(
         "</head>",
@@ -1560,6 +1671,20 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       // URL for Caracas) — emitting a self-only hreflang set there would be
       // exactly what seo-hreflang flags as Critical (missing reciprocal),
       // so this must stay gated on kind === "rol".
+      // Intent pages: reciprocal es-CO/es-VE only when both national pages
+      // pass the guard; city × intent pages never (design D5).
+      if (isIntent) {
+        const intentHreflangTags = buildIntentHreflangTags(
+          category,
+          category.country === "VE" ? { CO: siblingTotal, VE: total } : { CO: total, VE: siblingTotal }
+        );
+        if (intentHreflangTags) {
+          indexHtml = indexHtml.replace(
+            /<link[^>]*rel=["']canonical["'][^>]*>/,
+            (canonicalTag) => `${canonicalTag}\n${intentHreflangTags}`
+          );
+        }
+      }
       if (category.kind === "rol") {
         const coRoleUrl = `${SITE_URL}${buildCategoryPath({ ...category, country: "CO" })}`;
         const veRoleUrl = `${SITE_URL}${buildCategoryPath({ ...category, country: "VE" })}`;
@@ -1599,10 +1724,13 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       // but noindex — same "thin content" mitigation docs/SEO-PLAN.md §6
       // already applies elsewhere, so an empty category never sits in
       // Google's index looking like a doorway page until it fills up.
-      if (total === 0) {
+      // Intent pages: the inventory guard (design D2) — below 10 Google-ready
+      // jobs, a 200 with noindex,follow, out of the sitemap and unlinked.
+      const categoryRobots = isIntent ? intentRobots(total) : total === 0 ? "noindex" : null;
+      if (categoryRobots) {
         indexHtml = indexHtml
           .replace(/<meta[^>]*name=["']robots["'][^>]*>/i, "")
-          .replace("</head>", () => `  <meta name="robots" content="noindex">\n</head>`);
+          .replace("</head>", () => `  <meta name="robots" content="${categoryRobots}">\n</head>`);
       }
 
       await sendBody(req, res, 200, { "Content-Type": "text/html; charset=utf-8" }, indexHtml);
@@ -2447,9 +2575,27 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
   }
 
   if (pathname === "/sitemap-categories.xml" && method === "GET") {
-    // Static taxonomy (CITY_OPTIONS + DEFAULT_ROLES_200) — no DB query
-    // needed, unlike sitemap-jobs.xml above.
-    const xml = buildCategoriesSitemapXml();
+    // Static taxonomy (CITY_OPTIONS + DEFAULT_ROLES_200), plus the intent
+    // pages that pass the inventory guard right now (ADR 0012). Their counts
+    // are awaited from the intent cache, never peeked: a cold start must not
+    // publish a sitemap without them that Cloudflare then keeps. A failed
+    // count is a 503 no-store, never a 200 missing URLs.
+    let xml: string;
+    if (intentPagesEnabled()) {
+      try {
+        const intents = listIntentCategories();
+        const totals = await Promise.all(
+          intents.map((intent) => getIntentPage(intentFilters(intent), CITY_HUB_PAGE_LIMIT).then((result) => result.total))
+        );
+        xml = buildCategoriesSitemapXml({ intents: intents.filter((_, index) => isIntentIndexable(totals[index])) });
+      } catch {
+        res.writeHead(503, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store", "Retry-After": "60" });
+        res.end("Sitemap temporalmente no disponible");
+        return;
+      }
+    } else {
+      xml = buildCategoriesSitemapXml();
+    }
     await sendBody(req, res, 200, { "Content-Type": "application/xml; charset=utf-8" }, xml);
     return;
   }
@@ -2742,3 +2888,19 @@ server.listen(PORT, () => {
     "ℹ️  El scraping corre fuera de este proceso (GitHub Actions, scripts/run-scrape-tick.ts) — el servidor web nunca scrapea."
   );
 });
+
+// An intent page's own rows, in the shape buildNewTodayBlock() reads (ADR
+// 0012: «Nuevas hoy» of an intent page comes from its already-filtered rows).
+function toRecentReadyJob(job: Job): RecentReadyJob {
+  return {
+    jobId: job.jobId,
+    title: job.title,
+    company: job.company ?? null,
+    location: job.location ?? null,
+    url: job.url ?? null,
+    country: job.country ?? null,
+    publishedAt: job.publishedAt ?? "",
+    isLocked: Boolean((job as { isLocked?: boolean }).isLocked),
+    contentUpdatedAt: null
+  };
+}
