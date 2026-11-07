@@ -40,3 +40,6 @@ job-radar-apify/config/*.local.yaml
 
 # LLM cache + usage ledger (may reference private data)
 var/
+
+# Local path of the base checkout for npm run drift:intent-pages (never committed)
+job-radar-apify/.drift-base

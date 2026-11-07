@@ -70,6 +70,11 @@ misma transacción de solo lectura:
 - La consulta corre solo en las recargas de `intentPageCache`: como mucho,
   una cada 5 minutos por clave y por proceso.
 - El costo de CPU, en el peor caso, es de unos 2 s cada 5 min por clave.
+- **Pool de 5 conexiones:** `/sitemap-categories.xml` calcula los 5
+  conteos de uno en uno, no en paralelo. En frío, cinco consultas de
+  0,9–2 s a la vez ocuparían todo el pool, y el dashboard y las vacantes
+  esperarían detrás. La propia página de intención también espera a su
+  página hermana en serie.
 
 **Pendiente:** el MISS en frío de las páginas de intención (0,9–2 s) supera
 el del hub (0,75 s). SIP-051 pide que quede «dentro del rango de un hub»,
@@ -177,7 +182,9 @@ memoria en Render (tarea 7).
 - `npm run build`
 - `npm run test:unit`: 55 suites, incluida `validate-intent-pages.test.ts`
   (16 pruebas).
-- `npm run test:seo`: incluye `validate-intent-pages.ts`. Comprueba:
+- `npm run test:seo`: incluye `validate-intent-pages.ts`, que va solo en la
+  suite `seo` porque sus conteos exactos suponen una base sin vacantes aptas
+  remotas ni «sin experiencia» de otras suites. Comprueba:
   - la paridad SQL = memoria en los 20 casos (SIP-011);
   - SIP-001 a SIP-041 por HTTP;
   - el rollback.

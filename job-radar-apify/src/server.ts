@@ -93,6 +93,7 @@ import {
   resolveCategorySlug,
   resolveCategoryPath,
   isLegacyRemoteCopy,
+  type ResolvedCategory,
   RETIRED_ROLE_SLUGS,
   buildCategoryMeta,
   buildCategoryInsights,
@@ -2584,11 +2585,16 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     let xml: string;
     if (intentPagesEnabled()) {
       try {
-        const intents = listIntentCategories();
-        const totals = await Promise.all(
-          intents.map((intent) => getIntentPage(intentFilters(intent), CITY_HUB_PAGE_LIMIT).then((result) => result.total))
-        );
-        xml = buildCategoriesSitemapXml({ intents: intents.filter((_, index) => isIntentIndexable(totals[index])) });
+        // One count at a time: a cold intent query takes 0.9–2 s in
+        // production (validation.md §2) and the pool has 5 connections, so
+        // five at once would make dashboard and job requests queue behind
+        // the sitemap. Googlebot waits for a sitemap; visitors don't.
+        const indexable: ResolvedCategory[] = [];
+        for (const intent of listIntentCategories()) {
+          const { total } = await getIntentPage(intentFilters(intent), CITY_HUB_PAGE_LIMIT);
+          if (isIntentIndexable(total)) indexable.push(intent);
+        }
+        xml = buildCategoriesSitemapXml({ intents: indexable });
       } catch {
         res.writeHead(503, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store", "Retry-After": "60" });
         res.end("Sitemap temporalmente no disponible");
