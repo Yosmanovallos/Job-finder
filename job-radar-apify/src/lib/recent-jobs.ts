@@ -11,7 +11,7 @@
  * Pure and client-safe: server.ts and CategoryLanding.tsx render the same
  * links from the same function.
  */
-import { buildJobPath, type ResolvedCategory } from "./job-seo.js";
+import { assertNever, buildJobPath, cityHubPlaces, type IntentId, type ResolvedCategory } from "./job-seo.js";
 import { roleTitleMatcher } from "./job-filters.js";
 
 /** Window of /sitemap-jobs-recent.xml (task: last 48–72 h). */
@@ -98,8 +98,13 @@ export function hubMatcher(
   // rule applies here (ADR 0012).
   if (hub.kind === "intencion") return (job) => inCountry(job);
   if (hub.kind === "ciudad") {
-    const city = foldCityText(hub.label);
-    return (job) => inCountry(job) && foldCityText(job.location || "").includes(city);
+    // Same places as cityHubFilters (aliases included, seo-intent-wave2 D6).
+    const places = cityHubPlaces(hub.label).map(foldCityText);
+    return (job) => {
+      if (!inCountry(job)) return false;
+      const location = foldCityText(job.location || "");
+      return places.some((place) => location.includes(place));
+    };
   }
   const matchesRole = roleTitleMatcher(hub.label);
   return (job) => inCountry(job) && matchesRole(job.title);
@@ -109,8 +114,21 @@ export function newTodayHeading(hub: ResolvedCategory): string {
   if (hub.kind === "intencion") {
     // /empleos/remoto (CO) keeps the heading it had as the "Remoto" city
     // bucket (ADR 0012 §5).
-    if (hub.intent === "remoto") return hub.country === "CO" && !hub.city ? "Nuevas hoy en Remoto" : "Vacantes remotas nuevas hoy";
-    return hub.city ? `Vacantes sin experiencia nuevas hoy en ${hub.city}` : "Vacantes sin experiencia nuevas hoy";
+    const intent = hub.intent as IntentId;
+    switch (intent) {
+      case "remoto":
+        return hub.country === "CO" && !hub.city ? "Nuevas hoy en Remoto" : "Vacantes remotas nuevas hoy";
+      case "sin-experiencia":
+        return hub.city ? `Vacantes sin experiencia nuevas hoy en ${hub.city}` : "Vacantes sin experiencia nuevas hoy";
+      case "fines-de-semana":
+        return "Vacantes de fines de semana nuevas hoy";
+      case "medio-tiempo":
+        return "Vacantes de medio tiempo nuevas hoy";
+      case "temporada":
+        return "Vacantes por temporada nuevas hoy";
+      default:
+        return assertNever(intent);
+    }
   }
   return hub.kind === "ciudad"
     ? `Nuevas hoy en ${hub.label}`

@@ -40,6 +40,7 @@ import {
   intentRobots,
   isIntentIndexable,
   listIntentCategories,
+  collectIndexableIntents,
   renderHubIntentLinksHtml,
   renderIntentAnswerHtml,
   siblingIntent,
@@ -92,10 +93,8 @@ import {
   JOBS_SITEMAP_FOOTER,
   buildSitemapIndexXml,
   isUuid,
-  resolveCategorySlug,
   resolveCategoryPath,
   isLegacyRemoteCopy,
-  type ResolvedCategory,
   RETIRED_ROLE_SLUGS,
   buildCategoryMeta,
   buildCategoryInsights,
@@ -2624,11 +2623,13 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
         // production (validation.md §2) and the pool has 5 connections, so
         // five at once would make dashboard and job requests queue behind
         // the sitemap. Googlebot waits for a sitemap; visitors don't.
-        const indexable: ResolvedCategory[] = [];
-        for (const intent of listIntentCategories()) {
-          const { total } = await getIntentPage(intentFilters(intent), CITY_HUB_PAGE_LIMIT);
-          if (isIntentIndexable(total)) indexable.push(intent);
-        }
+        // seo-intent-wave2 (SIW-033): with ~10 pages, the totals the keeper
+        // already loaded are reused, and only the unknown ones are queried.
+        const indexable = await collectIndexableIntents(
+          listIntentCategories(),
+          (intent) => knownIntentTotal(intentFilters(intent), CITY_HUB_PAGE_LIMIT),
+          async (intent) => (await getIntentPage(intentFilters(intent), CITY_HUB_PAGE_LIMIT)).total
+        );
         xml = buildCategoriesSitemapXml({ intents: indexable });
       } catch {
         res.writeHead(503, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store", "Retry-After": "60" });

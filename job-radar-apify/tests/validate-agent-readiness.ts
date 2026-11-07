@@ -18,7 +18,7 @@ interface ApiErrorBody {
 
 // Each caller states the response fields it asserts on.
 async function json<T>(pathname: string, init?: RequestInit): Promise<{ response: Response; body: T }> {
-  const response = await fetch(`${base}${pathname}`, { signal: AbortSignal.timeout(10000), ...init });
+  const response = await fetch(`${base}${pathname}`, { signal: AbortSignal.timeout(10000), ...init, headers: { ...init?.headers, "X-Forwarded-For": pathname === "/api/v1/countries" ? "192.0.2.2" : pathname === "/mcp" ? "192.0.2.3" : pathname === "/a2a" ? "192.0.2.4" : "192.0.2.1" } });
   return { response, body: (await response.json()) as T };
 }
 
@@ -39,6 +39,12 @@ async function main(): Promise<void> {
       await delay(250);
     }
     assert.ok(ready, "El servidor de agent-readiness no inició.");
+    const coldStarted = performance.now();
+    const coldDashboard = await fetch(`${base}/dashboard?free-api-cold=${randomUUID()}`);
+    assert.equal(coldDashboard.status, 200);
+    await coldDashboard.arrayBuffer();
+    console.log(`Cold-process unique dashboard (synthetic database): ${Math.round(performance.now() - coldStarted)} ms.`);
+
 
     const home = await fetch(`${base}/`, { headers: { Accept: "text/html", "Accept-Encoding": "gzip" } });
     const homeHtml = await home.text();
@@ -200,6 +206,41 @@ async function main(): Promise<void> {
     assert.equal(a2a.response.status, 200);
     assert.equal(a2a.body.result.kind, "message");
     assert.equal(a2a.body.result.parts[0].data.jobs.length, 1);
+
+    // A synthetic client cannot reset its free quota by changing protocol.
+    const quotaHeaders = { "X-Forwarded-For": "192.0.2.50" };
+    for (let i = 0; i < 5; i++) {
+      const response = await fetch(`${base}/api/v1/countries`, { headers: quotaHeaders });
+      assert.equal(response.status, 200);
+      assert.equal(response.headers.get("cache-control"), "private, no-store");
+      await response.arrayBuffer();
+    }
+    for (const pathname of ["/api/v1/countries", "/mcp", "/a2a"]) {
+      const response = await fetch(`${base}${pathname}`, {
+        method: pathname.startsWith("/api/") ? "HEAD" : "POST", headers: quotaHeaders
+      });
+      assert.equal(response.status, 429, pathname);
+      assert.ok(Number(response.headers.get("retry-after")) > 0);
+      assert.equal(response.headers.get("cache-control"), "private, no-store");
+      await response.arrayBuffer();
+    }
+    const sample = await fetch(`${base}/api/v1/jobs?country=CO`, {
+      headers: { "X-Forwarded-For": "192.0.2.51" }
+    });
+    assert.equal(sample.status, 200);
+    const sampleBody = await sample.json() as { jobs: unknown[]; pagination: { limit: number; hasMore: boolean } };
+    assert.ok(sampleBody.jobs.length <= 3);
+    assert.equal(sampleBody.pagination.limit, 3);
+    assert.equal(sampleBody.pagination.hasMore, false);
+    assert.equal(sample.headers.get("cache-control"), "private, no-store");
+    const unavailablePage = await fetch(`${base}/api/v1/jobs?offset=1`, {
+      headers: { "X-Forwarded-For": "192.0.2.51" }
+    });
+    assert.equal(unavailablePage.status, 400);
+    await unavailablePage.arrayBuffer();
+    const dashboardAfterQuota = await fetch(`${base}/dashboard?quota-regression=1`, { headers: quotaHeaders });
+    assert.equal(dashboardAfterQuota.status, 200);
+    await dashboardAfterQuota.arrayBuffer();
 
     // RFC 9728: el resource identifier debe ser idéntico a aquel en el que se
     // insertó el sufijo well-known. Servido en la raíz => origen sin ruta.

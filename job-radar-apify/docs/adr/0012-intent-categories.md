@@ -218,3 +218,35 @@ Veredicto: aprobar con cambios. Se incorporaron así:
 
 El architect aceptó la desviación de la §5, con la condición de anotarla en
 D4/SIP-030; queda anotada en el design.
+
+## Enmienda 1 (2026-11-07): segunda ola (`seo-intent-wave2`)
+
+Cambio OpenSpec `openspec/changes/seo-intent-wave2/` (design D1–D6,
+requisitos SIW-001 a SIW-062). No crea un tipo nuevo: amplía `intencion`.
+
+- **Intenciones de jornada:** `fines-de-semana`, `medio-tiempo` y
+  `temporada`. Clasificador determinista por frases explícitas del
+  **título** (`src/lib/job-schedule.ts`, memoria = SQL). La descripción y
+  `employment_type` no cuentan: el conteo de producción mostró que no son
+  evidencia fiable (`validation.md` §1).
+- **Países por intención (`INTENT_COUNTRIES`):** una intención solo
+  resuelve en los países de su lista. Las de jornada son solo de CO: en VE
+  tienen 1–3 vacantes. Sin versión hermana no hay hreflang. Un país fuera
+  de la lista da 404, no `noindex`, así que no gasta caché, consultas del
+  keeper ni entradas del sitemap.
+- **Ciudad × intención:** Medellín y Cali se suman a Bogotá con
+  «sin experiencia».
+- **`switch` exhaustivo:** toda función que ramifica por intención usa un
+  `switch` con comprobación `never`.
+- **Caché y sitemap:** `intentPageCache` tiene tantas entradas como
+  páginas de intención más 4 (antes 8 fijas). `sitemap-categories.xml`
+  reutiliza los conteos que ya cargó el keeper y solo consulta, en serie,
+  los que no conoce.
+- **Alias de ubicación de un hub de ciudad:** `CITY_HUB_LOCATION_ALIASES`
+  (`"Ciudad Guayana": ["Puerto Ordaz"]`). Lo leen solo el filtro del hub,
+  su gemelo en memoria y su título y meta. La lista de ciudades del país no
+  cambia, así que no hay hub nuevo ni migas nuevas en las vacantes. Única
+  diferencia en vacantes: las vacantes relacionadas de las vacantes de
+  Ciudad Guayana.
+- **Sin cambios:** la API pública, MCP, `llms.txt`, OpenAPI y el filtro de
+  ciudad del dashboard. `/api/jobs` no lee `schedule`.

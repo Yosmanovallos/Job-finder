@@ -1,3 +1,5 @@
+import { PUBLIC_API_POLICY } from "./public-api-policy.js";
+
 interface WebMcpTool {
   name: string;
   description: string;
@@ -42,8 +44,8 @@ const searchTool: WebMcpTool = {
       sources: { type: "array", maxItems: 10, items: { type: "string", maxLength: 80 } },
       cities: { type: "array", maxItems: 10, items: { type: "string", maxLength: 80 } },
       roles: { type: "array", maxItems: 10, items: { type: "string", maxLength: 80 } },
-      limit: { type: "integer", minimum: 1, maximum: 50, default: 20 },
-      offset: { type: "integer", minimum: 0, maximum: 5000, default: 0 }
+      limit: { type: "integer", minimum: 1, maximum: PUBLIC_API_POLICY.results, default: PUBLIC_API_POLICY.results },
+      offset: { type: "integer", minimum: 0, maximum: PUBLIC_API_POLICY.offset, default: 0 }
     }
   },
   annotations: { readOnlyHint: true, untrustedContentHint: true },

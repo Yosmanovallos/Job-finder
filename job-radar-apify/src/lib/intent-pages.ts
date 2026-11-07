@@ -14,8 +14,10 @@ import {
   CITY_INTENTS,
   INTENT_LABELS,
   SITE_URL,
+  assertNever,
   buildCategoryPath,
   escapeHtml,
+  intentExistsIn,
   type IntentId,
   type ResolvedCategory
 } from "./job-seo.js";
@@ -47,8 +49,23 @@ export function intentRobots(total: number): string | null {
  * query's `total` is the guard's count.
  */
 export function intentFilters(category: ResolvedCategory): JobFilterParams {
-  const own: JobFilterParams =
-    category.intent === "remoto" ? { modality: "remoto" } : { experience: "sin-experiencia" };
+  const intent = category.intent as IntentId;
+  let own: JobFilterParams;
+  switch (intent) {
+    case "remoto":
+      own = { modality: "remoto" };
+      break;
+    case "sin-experiencia":
+      own = { experience: "sin-experiencia" };
+      break;
+    case "fines-de-semana":
+    case "medio-tiempo":
+    case "temporada":
+      own = { schedule: intent };
+      break;
+    default:
+      return assertNever(intent);
+  }
   return {
     ...(category.city ? { cities: [category.city] } : {}),
     ...own,
@@ -62,6 +79,7 @@ export function listIntentCategories(): ResolvedCategory[] {
   const national: ResolvedCategory[] = [];
   for (const intent of Object.keys(INTENT_LABELS) as IntentId[]) {
     for (const country of ["CO", "VE"]) {
+      if (!intentExistsIn(intent, country)) continue;
       national.push({ kind: "intencion", label: INTENT_LABELS[intent], country, intent });
     }
   }
@@ -77,8 +95,37 @@ export function listIntentCategories(): ResolvedCategory[] {
 
 /** The same intent in the other country, for hreflang; null for city × intent. */
 export function siblingIntent(category: ResolvedCategory): ResolvedCategory | null {
-  if (category.kind !== "intencion" || category.city) return null;
-  return { ...category, country: category.country === "VE" ? "CO" : "VE" };
+  if (category.kind !== "intencion" || category.city || !category.intent) return null;
+  const country = category.country === "VE" ? "CO" : "VE";
+  // SIW-022: an intent that only exists in one country has no sibling.
+  if (!intentExistsIn(category.intent, country)) return null;
+  return { ...category, country };
+}
+
+/**
+ * intentPageCache size (SIW-034): every intent page plus headroom. Fewer
+ * entries than pages would make the keeper and the pages evict each other,
+ * and every reload is a 1–2 s query on Nano (seo-intent-wave2 design D5).
+ */
+export const INTENT_PAGE_CACHE_ENTRIES = listIntentCategories().length + 4;
+
+/**
+ * The intent pages that pass the guard, for sitemap-categories.xml
+ * (SIW-033): the keeper's known totals first; only the pages without one are
+ * loaded, one at a time (the pool has 5 connections). Any failed load
+ * rejects, so the caller answers 503 rather than a sitemap missing URLs.
+ */
+export async function collectIndexableIntents(
+  categories: ResolvedCategory[],
+  knownTotal: (category: ResolvedCategory) => number | undefined,
+  loadTotal: (category: ResolvedCategory) => Promise<number>
+): Promise<ResolvedCategory[]> {
+  const indexable: ResolvedCategory[] = [];
+  for (const category of categories) {
+    const total = knownTotal(category) ?? (await loadTotal(category));
+    if (isIntentIndexable(total)) indexable.push(category);
+  }
+  return indexable;
 }
 
 /**
@@ -89,7 +136,7 @@ export function buildIntentHreflangTags(
   category: ResolvedCategory,
   totals: { CO: number; VE: number }
 ): string {
-  if (category.kind !== "intencion" || category.city) return "";
+  if (category.kind !== "intencion" || category.city || !siblingIntent(category)) return "";
   if (!isIntentIndexable(totals.CO) || !isIntentIndexable(totals.VE)) return "";
   const co = `${SITE_URL}${buildCategoryPath({ ...category, country: "CO" })}`;
   const ve = `${SITE_URL}${buildCategoryPath({ ...category, country: "VE" })}`;
@@ -168,20 +215,30 @@ export function buildIntentAnswer(
   }
   const sample = jobs.length < total ? `Entre las ${jobs.length} más recientes: ` : "";
   const countText = total === 1 ? "1 vacante activa" : `${total} vacantes activas`;
-  const items: IntentAnswer["items"] = [
-    {
-      question: "¿Cuántas vacantes hay?",
-      answer:
-        category.intent === "remoto"
-          ? `${countText} de trabajo remoto en ${place}.`
-          : `${countText} en ${place} cuyo aviso dice que no piden experiencia.`
-    }
-  ];
+  const items: IntentAnswer["items"] = [{ question: "¿Cuántas vacantes hay?", answer: countAnswer(category, countText, place) }];
   const topCities = top(cities, 1);
   if (topCities.length > 0) items.push({ question: "¿En qué ciudades?", answer: `${sample}${listOf(topCities)}.` });
   const topCompanies = top(companies, MIN_COMPANY_JOBS);
   if (topCompanies.length > 0) items.push({ question: "¿Qué empresas publican?", answer: `${sample}${listOf(topCompanies)}.` });
   return { heading: "Respuestas rápidas", items };
+}
+
+function countAnswer(category: ResolvedCategory, countText: string, place: string): string {
+  const intent = category.intent as IntentId;
+  switch (intent) {
+    case "remoto":
+      return `${countText} de trabajo remoto en ${place}.`;
+    case "sin-experiencia":
+      return `${countText} en ${place} cuyo aviso dice que no piden experiencia.`;
+    case "fines-de-semana":
+      return `${countText} en ${place} cuyo título dice que son de fines de semana.`;
+    case "medio-tiempo":
+      return `${countText} en ${place} cuyo título dice que son de medio tiempo.`;
+    case "temporada":
+      return `${countText} en ${place} cuyo título dice que son por temporada.`;
+    default:
+      return assertNever(intent);
+  }
 }
 
 /** Inner HTML of the answer block; React renders the same string (SIP-031). */
@@ -221,7 +278,21 @@ export function hubIntentCandidates(hub: ResolvedCategory): ResolvedCategory[] {
 
 export function intentLinkLabel(category: ResolvedCategory): string {
   const place = category.city || getCountryConfig(category.country).name;
-  return category.intent === "remoto" ? `Trabajo remoto en ${place}` : `Trabajo sin experiencia en ${place}`;
+  const intent = category.intent as IntentId;
+  switch (intent) {
+    case "remoto":
+      return `Trabajo remoto en ${place}`;
+    case "sin-experiencia":
+      return `Trabajo sin experiencia en ${place}`;
+    case "fines-de-semana":
+      return `Trabajo los fines de semana en ${place}`;
+    case "medio-tiempo":
+      return `Trabajo de medio tiempo en ${place}`;
+    case "temporada":
+      return `Trabajo por temporada en ${place}`;
+    default:
+      return assertNever(intent);
+  }
 }
 
 /**

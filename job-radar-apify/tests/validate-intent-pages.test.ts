@@ -96,8 +96,8 @@ test("SIP-002 Bogotá × sin experiencia is its own city-intent page", () => {
 test("SIP-003 any other second segment keeps the city hub", () => {
   assert.deepEqual(resolveCategoryPath(["bogota", "abc"], "CO"), resolveCategorySlug("bogota", "CO"));
   assert.equal(resolveCategoryPath(["bogota", "abc"], "CO")!.kind, "ciudad");
-  // Not whitelisted in this phase.
-  assert.equal(resolveCategoryPath(["medellin", "sin-experiencia"], "CO")!.kind, "ciudad");
+  // Not whitelisted (Medellín and Cali joined in seo-intent-wave2, SIW-001).
+  assert.equal(resolveCategoryPath(["barranquilla", "sin-experiencia"], "CO")!.kind, "ciudad");
   assert.equal(resolveCategoryPath(["bogota", "remoto"], "CO")!.kind, "ciudad");
   // A role never takes a second segment.
   assert.equal(resolveCategoryPath(["asesor-comercial", "sin-experiencia"], "CO")!.kind, "rol");
@@ -156,13 +156,15 @@ test("SIP-020/021 sitemap lists exactly the indexable intent pages, once", () =>
 test("SIP-022 every intent filter carries its own predicate (no filling)", () => {
   for (const c of listIntentCategories()) {
     const f = intentFilters(c);
-    assert.ok(f.modality === "remoto" || f.experience === "sin-experiencia", buildCategoryPath(c));
+    assert.ok(f.modality === "remoto" || f.experience === "sin-experiencia" || f.schedule === c.intent, buildCategoryPath(c));
     assert.equal(f.googleReady, true);
   }
-  assert.deepEqual(
-    listIntentCategories().map(buildCategoryPath),
-    ["/empleos/remoto", "/ve/empleos/remoto", "/empleos/sin-experiencia", "/ve/empleos/sin-experiencia", "/empleos/bogota/sin-experiencia"]
-  );
+  // The exact page list is SIW-021 (validate-intent-wave2.test.ts); the
+  // pages of this change stay in it.
+  const paths = listIntentCategories().map(buildCategoryPath);
+  for (const path of ["/empleos/remoto", "/ve/empleos/remoto", "/empleos/sin-experiencia", "/ve/empleos/sin-experiencia", "/empleos/bogota/sin-experiencia"]) {
+    assert.ok(paths.includes(path), path);
+  }
 });
 
 // ---- Content ------------------------------------------------------------------

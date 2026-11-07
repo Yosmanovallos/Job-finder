@@ -23,12 +23,15 @@ import { initialDetailStatus, refreshGoogleReadinessInTransaction } from "./job-
 import { sourceSupportsDetail } from "../sources/detail-capability.js";
 import { seoReadySql } from "../lib/google-job-readiness.js";
 import { experienceForFilter, sqlSinExperiencia } from "../lib/job-experience.js";
+import { scheduleForFilter, sqlSchedule } from "../lib/job-schedule.js";
+import { INTENT_PAGE_CACHE_ENTRIES } from "../lib/intent-pages.js";
 import { liveJobSql } from "../lib/job-freshness.js";
 import { findExpiredUrlHashes } from "./expired-job-repository.js";
 import { StaleWhileRevalidateCache } from "../lib/stale-while-revalidate-cache.js";
 import { clipVarchar } from "../lib/varchar.js";
 import { RECENT_SITEMAP_WINDOW_HOURS, type RecentReadyJob } from "../lib/recent-jobs.js";
 import { copySpecificCityMismatchSql } from "../lib/official-copy-location.js";
+import { trustedEmploymentType } from "../lib/employment-type-trust.js";
 import {
   VACANCY_IDENTITY_KEYS,
   companyKeySql,
@@ -359,7 +362,7 @@ export async function getJobs(
       description: row.description,
       requirements: Array.isArray(row.requirements) ? row.requirements : [],
       technologies: Array.isArray(row.technologies) ? row.technologies : [],
-      employmentType: row.employment_type,
+      employmentType: trustedEmploymentType(row.source, row.employment_type),
       applicantCount: row.applicant_count,
       salary: buildSalaryLabel(row)
     };
@@ -416,7 +419,7 @@ export async function getJobsLight(
       description: null,
       requirements: [] as string[],
       technologies: [] as string[],
-      employmentType: row.employment_type,
+      employmentType: trustedEmploymentType(row.source, row.employment_type),
       applicantCount: row.applicant_count,
       salary: buildSalaryLabel(row)
     };
@@ -932,6 +935,11 @@ function buildJobWhere(filters: JobFilterParams, sql: SqlParts): string[] {
     where.push(`(country IS NULL OR country = ${sql.param(filters.country.toUpperCase())})`);
   }
 
+  // Schedule intent pages (seo-intent-wave2): title only, so it runs on the
+  // canonical row like the modality classifier, never on descriptions.
+  const schedule = scheduleForFilter(filters.schedule);
+  if (schedule) where.push(sqlSchedule(schedule, "title"));
+
   // Intent pages (ADR 0012). The canonical CTE carries neither seo_ready nor
   // the description, so both are read with ONE primary-key probe per row
   // that already passed every other filter (country, modality, city), never
@@ -967,14 +975,14 @@ export async function getJobsPage(options: JobsPageOptions = {}): Promise<JobsPa
 }
 
 // Intent pages (ADR 0012 §6) keep their own small cache, outside the 64-entry
-// LRU above: 5 keys of page traffic must never evict the warmed dashboard
+// LRU above: 10 keys of page traffic must never evict the warmed dashboard
 // pages (same precedent as the homepage and company caches). Same freshness
 // policy and single-flight refresh. One entry is the first page of 60 rows
 // and its total, which is also the inventory guard's count.
 const intentPageCache = new StaleWhileRevalidateCache<string, JobsPage>({
   freshForMs: JOBS_PAGE_CACHE_FRESH_MS,
   staleForMs: JOBS_PAGE_CACHE_STALE_MS,
-  maxEntries: 8,
+  maxEntries: INTENT_PAGE_CACHE_ENTRIES,
   clone: cloneJobsPage,
   onBackgroundRefreshError: () => {
     console.warn("[intent-page-cache] Background refresh failed; serving the last valid page.");
@@ -1136,7 +1144,7 @@ async function queryJobsPage(options: JobsPageOptions, narrowSearch = true): Pro
       description: row.description ?? undefined,
       requirements: Array.isArray(row.requirements) ? row.requirements : [],
       technologies: Array.isArray(row.technologies) ? row.technologies : [],
-      employmentType: row.employment_type ?? undefined,
+      employmentType: trustedEmploymentType(row.source, row.employment_type),
       applicantCount: row.applicant_count ?? undefined,
       remoteType: row.remote_type ?? undefined,
       salary: buildSalaryLabel(row),
@@ -1597,7 +1605,7 @@ export async function getJobById(id: string) {
     description: row.description,
     requirements: Array.isArray(row.requirements) ? row.requirements : [],
     technologies: Array.isArray(row.technologies) ? row.technologies : [],
-    employmentType: row.employment_type,
+    employmentType: trustedEmploymentType(row.source, row.employment_type),
     applicantCount: row.applicant_count,
     salary: buildSalaryLabel(row),
     // Job SEO V2: the stored verdict of the shared gate (read through
