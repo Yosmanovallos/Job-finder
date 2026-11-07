@@ -246,6 +246,8 @@ su propio build) y después por esta rama. Cambios en el script:
 - `npm run test:companies-search`
 - `npm run bench:intent-pages`
 - `npm run drift:intent-pages`
+- `npm run test:agent-readiness` (tras el ajuste de la meta de temporada, junto con tsc, build y `test:unit`). Las páginas de intención no figuran en `llms.txt`, el catálogo de agentes ni OpenAPI (tampoco las del #123), así que no hay nada que sincronizar.
+- Ajuste final: la meta de `/empleos/temporada` ya no dice «como la navideña», porque después de enero puede no ser cierto. `test:seo` no comprueba esa frase y la unitaria SIW-040 (longitud 150–160) sigue en verde.
 - `npx eslint src/server.ts`: 0 errores. Se quitó la importación sin uso de
   `resolveCategorySlug`, que venía de `main`, y también `ResolvedCategory`,
   que este cambio dejó sin uso.

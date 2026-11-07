@@ -1356,7 +1356,7 @@ function buildIntentMeta(category: ResolvedCategory, totalCount: number): Catego
     case "temporada":
       return counting(
         `Trabajo por temporada en ${place}`,
-        `${count} de trabajo por temporada en ${place}, como la navideña: lo dice el título del aviso. Compara empresas`
+        `${count} de trabajo por temporada en ${place}: lo dice el título del aviso. Compara empresas`
       );
     default:
       return assertNever(intent);
