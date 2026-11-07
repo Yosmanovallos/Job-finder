@@ -91,21 +91,22 @@ comparten, y deciden la guarda de inventario y GSC después del lanzamiento.
 
 | # | Trabajo | Por qué | Cambio OpenSpec | Cuándo |
 |---|---|---|---|---|
-| 1 | **Páginas de intención y remoto:** `/empleos/remoto` (CO) potenciado, **`/ve/empleos/remoto` real**, `/empleos/sin-experiencia`, `/ve/empleos/sin-experiencia` (si pasa la guarda), `/empleos/bogota/sin-experiencia`, con guarda de inventario | Mayor demanda medida, URL nueva sin competir con las mediciones en curso, indexada antes de diciembre | `seo-intent-pages` (completo) | 2026-11-09 → 2026-11-21 |
-| 2 | **Atribución de registros** y enlace `/tiktok` (Fase A) | Sin esto no se sabe qué canal trae registros | Sesión propia (tarjeta Fase A); no se solapa con `signup-analytics`, que solo deduplica el evento | En paralelo con 1 |
+| 1 | ✅ **Páginas de intención y remoto:** `/ve/empleos/remoto` real, `/empleos/sin-experiencia`, `/ve/empleos/sin-experiencia`, `/empleos/bogota/sin-experiencia`; `/empleos/remoto` con filtro de modalidad (copia congelada hasta el 2026-11-26) | Mayor demanda medida | `seo-intent-pages`, en producción el 2026-11-07 (PR #123 y #124) | Hecho; checkpoints a +14 y +28 días |
+| 2 | 🔄 **Atribución de registros** y enlace `/tiktok` (Fase A) | Sin esto no se sabe qué canal trae registros | Sesión propia, iniciada el 2026-11-07; no se solapa con `signup-analytics` | En curso |
 | 3 | **Autoridad de los hubs existentes:** contenido propio, enlaces internos desde vacantes y empresas, enlaces externos | Los hubs pierden el resultado orgánico | `seo-hub-authority` (solo propuesta) | Después de la lectura del 2026-11-26 de `city-hub-pages`, `city-hub-stats`, `job-link-graph` y `home-role-hubs`, para no contaminar sus mediciones |
-| 4 | **Segunda ola de intención:** Medellín y Cali sin experiencia, fines de semana, medio tiempo, por días, temporada | Demanda alta pero el inventario por clasificador está por medir | Se decide con el conteo de `seo-intent-pages` | Diciembre |
+| 4 | 🔄 **Segunda ola de intención:** Medellín (33) y Cali (15) sin experiencia, fines de semana, medio tiempo (por días y temporada si los datos lo justifican) y **Puerto Ordaz dentro de `/empleos/ciudad-guayana`** (Ubersuggest 1,9 K frente a 390), solo si Ciudad Guayana no está en una medición abierta | Demanda alta; las URL nuevas no contaminan las mediciones | `seo-intent-wave2` | **Adelantada**: iniciada el 2026-11-07 para que quede indexada antes de enero |
 | 5 | **Experimento de título «Trabajo en {ciudad}»** en 3–5 hubs con control | Trends da 2×; revierte `city-hub-pages` | Cambio propio de experimento | Después del 3 |
+| 5b | **Experimento en la portada:** «buscador de empleos» (Ubersuggest 12,1 K, SD 54) y «bolsa de empleo» (14,8 K, SD 16) en la descripción o un H2, sin quitar «busco trabajo» (marca) | Consejo del video con datos de §8.5; experimento medido 28 días | Cambio propio de experimento | Después de la lectura de `home-role-hubs` (2026-11-26) y **sobre la portada SSR del PR #112** (sin desplegar) |
 | 6 | **AEO/GEO:** bloques de respuesta con datos reales en hubs e intención (cuántas vacantes, empresas, modalidad) y `llms.txt`/API en sincronía | ChatGPT ya trae el 12 % de las sesiones y cita hubs | Cambio propio | Enero |
 | 7 | **Alertas de vacantes** para registrados | Dan razón para registrarse y volver; necesitan aprobación para enviar correos (Ley 1581) | Cambio propio | Enero |
 | 8 | **Difusión orgánica:** TikTok con cadencia, informe mensual de empleo con datos propios (enlaces de prensa), SENA/universidades/alcaldías | La marca y los enlaces son el límite de autoridad | Sin código | Desde ya, continuo |
+
+**Comprobado el 2026-11-07:** las vacantes que llegan con `utm_*` (Google Empleos) tienen canonical a la URL limpia; no hace falta cambio.
 
 **Limpieza menor detectada**, revisarla en el cambio 3 con el runbook SEO:
 - `/empresas/elempleo` posiciona por la marca de un competidor;
 - `/ve/dashboard` posiciona por «trabajo en venezuela», cuando debería
   hacerlo un hub;
-- una URL de vacante aparece en GSC con `utm_campaign`: confirmar que su
-  canonical apunta a la URL limpia.
 
 ## 4. Puertas comunes a todas las fases
 
