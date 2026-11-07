@@ -2887,7 +2887,40 @@ if (!process.env.JOB_RADAR_TEST_MODE) {
   }
 }
 
+// City hubs only READ the intent totals (knownIntentTotal), on purpose: a hub
+// that started intent queries got slower (cold Caracas 44 → 84 ms). So after a
+// restart a hub had no «Búsquedas populares» links until something else loaded
+// the totals (an intent-page visit or the sitemap); on 2026-11-07 the Bogotá
+// hub lacked its /empleos/bogota/sin-experiencia link right after the deploy.
+// This keeper loads them off the request path: once, 60 s after listening, then
+// every 3 h. That is inside the totals' ~6 h validity, so the links never lapse.
+// It runs the intent queries serially (same as the sitemap: the pool is small).
+// It does ~5 queries per run, served from Postgres's cache (0 disk reads,
+// seo-intent-pages validation.md §2).
+const INTENT_TOTALS_FIRST_RUN_MS = 60_000;
+const INTENT_TOTALS_INTERVAL_MS = 3 * 60 * 60_000;
+
+async function refreshIntentTotals(): Promise<void> {
+  if (!intentPagesEnabled()) return;
+  for (const intent of listIntentCategories()) {
+    try {
+      await getIntentPage(intentFilters(intent), CITY_HUB_PAGE_LIMIT);
+    } catch {
+      console.warn("[intent-totals] Refresh failed; hubs keep their last known links.");
+      return;
+    }
+  }
+}
+
+function startIntentTotalsKeeper(): void {
+  setTimeout(() => {
+    void refreshIntentTotals();
+    setInterval(() => void refreshIntentTotals(), INTENT_TOTALS_INTERVAL_MS).unref();
+  }, INTENT_TOTALS_FIRST_RUN_MS).unref();
+}
+
 server.listen(PORT, () => {
+  startIntentTotalsKeeper();
   console.log(`\n==================================================`);
   console.log(`🚀 JOB RADAR DASHBOARD RUNNING AT: http://localhost:${PORT}`);
   console.log(`==================================================\n`);
