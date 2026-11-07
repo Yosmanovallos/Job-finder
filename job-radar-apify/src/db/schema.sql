@@ -1043,3 +1043,19 @@ WHERE notification_type = 'URL_DELETED'
   AND job_id IS NULL
   AND url ~ '/empleos/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/';
 -- END purged-lookup
+
+-- BEGIN signup-attribution
+-- Fase A de docs/seo-baseline/2026-11-06-checkpoint-y-plan-registros.md:
+-- primer contacto de cada registro nuevo, sin PII. Solo la ruta de llegada
+-- (sin query ni hash), el host del referrer (nunca la URL completa) y los
+-- tres utm_*. Lo escribe una sola vez POST /api/me/first-touch, y solo para
+-- cuentas de menos de 24 h; las cuentas anteriores quedan en NULL. Columnas
+-- nuevas y nulas, sin índice (unas 600 filas): ninguna fila existente cambia.
+-- Lo aplica scripts/migrate-signup-attribution.ts, con aprobación explícita.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS first_touch_path VARCHAR(200);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS first_touch_referrer_host VARCHAR(255);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS first_touch_utm_source VARCHAR(100);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS first_touch_utm_medium VARCHAR(100);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS first_touch_utm_campaign VARCHAR(100);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS first_touch_at TIMESTAMPTZ;
+-- END signup-attribution

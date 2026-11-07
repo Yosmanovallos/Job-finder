@@ -62,6 +62,8 @@
     "db:migrate-saved-jobs": "tsx scripts/migrate-saved-jobs.ts",
     "db:migrate-site-feedback": "tsx scripts/migrate-site-feedback.ts",
     "db:migrate-purged-lookup": "tsx scripts/migrate-purged-lookup.ts",
+    "db:migrate-signup-attribution": "tsx scripts/migrate-signup-attribution.ts",
+    "report:signups": "tsx scripts/report-signup-attribution.ts",
     "direct:seed": "tsx scripts/seed-direct-employers.ts",
     "direct:tick": "tsx scripts/run-direct-tick.ts",
     "direct:report": "tsx scripts/direct-report.ts",

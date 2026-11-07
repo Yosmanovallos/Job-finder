@@ -269,6 +269,8 @@ mide en el checkpoint siguiente. Nada de pago.
 
 ### Fase A — Medición y atribución de registros (base para todo)
 
+**Estado (2026-11-07):** implementada en `claude/vigorous-kare-1fb57c`, sin desplegar. Enlace `/tiktok` (302 con `utm_*`, noindex), primer contacto guardado una vez por cuenta nueva en `users.first_touch_*` y `npm run report:signups` (solo lectura). La migración aditiva espera la aprobación del propietario. Detalle: fila 25 de `docs/SEO-IMPROVEMENT-PLAN.md`.
+
 - Guardar en el registro, sin PII, el primer contacto: ruta de llegada, host
   de referencia y `utm_*`. Es una columna nueva en producción: hay que
   mostrar el SQL y esperar aprobación.
