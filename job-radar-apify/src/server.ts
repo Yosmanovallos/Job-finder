@@ -8,7 +8,7 @@ import {
   getJobsPage,
   peekJobsPage,
   getIntentPage,
-  peekIntentPage,
+  knownIntentTotal,
   getJobById,
   getHomeJobCounts,
   getHomeCompanies,
@@ -1514,11 +1514,12 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
           siblingTotal = 0;
         }
       }
-      // City hubs link the intent pages that pass the guard. peek() never
-      // waits: a cold count means no link yet, never a guess.
+      // City hubs link the intent pages that pass the guard, from their last
+      // known total (never a query of the hub's own): an unknown count means
+      // no link yet, never a guess.
       const hubIntentLinks =
         category.kind === "ciudad" && intentPagesEnabled()
-          ? buildHubIntentLinks(category, (intent) => peekIntentPage(intentFilters(intent), CITY_HUB_PAGE_LIMIT)?.total)
+          ? buildHubIntentLinks(category, (intent) => knownIntentTotal(intentFilters(intent), CITY_HUB_PAGE_LIMIT))
           : [];
 
       let indexHtml: string;

@@ -1,4 +1,4 @@
-import { likeAny, searchTitleText, sqlSearchTitle } from "./job-search-intent.js";
+import { likeAny, prefilterText, searchTitleText, sqlPrefilterText, sqlSearchTitle } from "./job-search-intent.js";
 
 // "Sin experiencia" classifier (seo-intent-pages design D3, ADR 0012).
 // Deterministic and explicit only: a job counts when its title or its
@@ -36,14 +36,35 @@ export const EXPERIENCE_REQUIRED_PATTERN =
 
 const PHRASE_LIKES = SIN_EXPERIENCIA_PHRASES.map((phrase) => `% ${phrase} %`);
 const REQUIRED_RE = new RegExp(EXPERIENCE_REQUIRED_PATTERN);
-// Cheap first test on the raw text: a phrase can only match when the word
-// "experiencia" or "empleo" is there.
-const PREFILTER_RE = /experi|empleo/i;
+// Cheap first test before any text is normalized (job-modality.ts uses the
+// same idea): the words of a phrase, in order, on the lowercase accent-free
+// raw text. Normalization only turns punctuation runs into one space, so a
+// text that contains a phrase always passes its stem; most descriptions
+// fail every stem and never pay for the normalization or the regex.
+// The title (short) is accent-folded first; the description (long) is only
+// lowercased, because folding thousands of descriptions dominated the cost
+// in production (EXPLAIN 2026-11-07: ~1.7 s of 1.9 s). "_" covers "años" and
+// "anos". JS and SQL apply the same rule, so they still agree row by row.
+const PHRASE_STEMS = [
+  "%sin%experiencia%",
+  "%requiere%experiencia%",
+  "%primer%empleo%",
+  "%0%a_os%experiencia%",
+  "%experiencia%requerida%"
+];
+
+function titlePassesStems(text: string): boolean {
+  return text.length > 0 && likeAny(prefilterText(text), PHRASE_STEMS);
+}
+
+function descriptionPassesStems(text: string): boolean {
+  return text.length > 0 && likeAny(text.toLowerCase(), PHRASE_STEMS);
+}
 
 export function classifyExperience(job: ExperienceInput): ExperienceLevel {
   const title = job.title || "";
   const description = job.description || "";
-  if (!PREFILTER_RE.test(title) && !PREFILTER_RE.test(description)) return "unknown";
+  if (!titlePassesStems(title) && !descriptionPassesStems(description)) return "unknown";
   const t = searchTitleText(title);
   const d = description ? searchTitleText(description) : " ";
   if (!likeAny(t, PHRASE_LIKES) && !likeAny(d, PHRASE_LIKES)) return "unknown";
@@ -61,7 +82,8 @@ const PHRASES_SQL = `ARRAY[${PHRASE_LIKES.map(sqlString).join(", ")}]::text[]`;
 export function sqlSinExperiencia(titleColumn: string, descriptionColumn: string): string {
   const t = sqlSearchTitle(titleColumn);
   const d = sqlSearchTitle(descriptionColumn);
-  const pre = `(COALESCE(${titleColumn}, '') ~* 'experi|empleo' OR COALESCE(${descriptionColumn}, '') ~* 'experi|empleo')`;
+  const stems = `ARRAY[${PHRASE_STEMS.map(sqlString).join(", ")}]::text[]`;
+  const pre = `(${sqlPrefilterText(titleColumn)} LIKE ANY (${stems}) OR LOWER(COALESCE(${descriptionColumn}, '')) LIKE ANY (${stems}))`;
   const required = sqlString(EXPERIENCE_REQUIRED_PATTERN);
   return (
     `(CASE WHEN ${pre} THEN ` +

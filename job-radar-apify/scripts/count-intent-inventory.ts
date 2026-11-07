@@ -89,6 +89,42 @@ try {
     SELECT COUNT(*) FROM ready
     WHERE EXISTS (SELECT 1 FROM jobs j WHERE j.id = ready.id AND (j.country IS NULL OR j.country = 'CO') AND ${sinExperiencia})`);
   console.log(explain.rows.map((r) => r["QUERY PLAN"]).filter((l: string) => /Execution Time|Planning Time|Buffers: shared|^\s*->\s*(Hash|Seq|Index|Unique|Sort)/.test(l)).join("\n"));
+
+  // The real page queries (queryJobsPage's exact SQL for each intent page,
+  // captured without running it), explained inside this same READ ONLY
+  // transaction.
+  const { queryJobsPageForParity } = await import("../src/db/job-repository.js");
+  const { intentFilters, listIntentCategories } = await import("../src/lib/intent-pages.js");
+  const { buildCategoryPath } = await import("../src/lib/job-seo.js");
+  const realQuery = pool.query.bind(pool);
+  for (const category of listIntentCategories()) {
+    let captured: { text: string; values: unknown[] } | null = null;
+    (pool as unknown as { query: unknown }).query = async (text: string, values: unknown[]) => {
+      captured = { text, values };
+      throw new Error("captured");
+    };
+    await queryJobsPageForParity({ filters: intentFilters(category), limit: 60, offset: 0, includeDetails: false }, true).catch(() => undefined);
+    (pool as unknown as { query: unknown }).query = realQuery;
+    if (!captured) continue;
+    const { text, values } = captured as { text: string; values: unknown[] };
+    const plan = await client.query(`EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) ${text}`, values);
+    const root = (plan.rows[0]["QUERY PLAN"] as Array<{ "Execution Time": number; Plan: { "Shared Hit Blocks": number; "Shared Read Blocks": number } }>)[0];
+    console.log(JSON.stringify({ page: buildCategoryPath(category), executionMs: Math.round(root["Execution Time"]), sharedHit: root.Plan["Shared Hit Blocks"], sharedRead: root.Plan["Shared Read Blocks"] }));
+  }
+  const { cityHubFilters } = await import("../src/lib/job-internal-links.js");
+  let hubSql: { text: string; values: unknown[] } | null = null;
+  (pool as unknown as { query: unknown }).query = async (text: string, values: unknown[]) => {
+    hubSql = { text, values };
+    throw new Error("captured");
+  };
+  await queryJobsPageForParity({ filters: cityHubFilters({ kind: "ciudad", label: "Bogotá", country: "CO" }), limit: 60, offset: 0, includeDetails: false }, true).catch(() => undefined);
+  (pool as unknown as { query: unknown }).query = realQuery;
+  if (hubSql) {
+    const { text, values } = hubSql as { text: string; values: unknown[] };
+    const plan = await client.query(`EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) ${text}`, values);
+    const root = (plan.rows[0]["QUERY PLAN"] as Array<{ "Execution Time": number; Plan: { "Shared Hit Blocks": number; "Shared Read Blocks": number } }>)[0];
+    console.log(JSON.stringify({ page: "/empleos/bogota (hub, referencia)", executionMs: Math.round(root["Execution Time"]), sharedHit: root.Plan["Shared Hit Blocks"], sharedRead: root.Plan["Shared Read Blocks"] }));
+  }
 } finally {
   await client.query("ROLLBACK").catch(() => undefined);
   client.release();

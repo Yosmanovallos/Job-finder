@@ -179,9 +179,10 @@ test("SIP-030 D4 titles carry the real total only from 10 up", () => {
     assert.equal(meta.title, title);
     assert.equal(meta.heading, heading);
     assert.ok(meta.description.includes("123"), meta.description);
-    for (const n of [10, 123, 4567]) {
-      const len = buildCategoryMeta(c, n).description.length;
-      assert.ok(len >= 150 && len <= 160, `${buildCategoryPath(c)} n=${n}: ${len}`);
+    for (const n of [0, 1, 9, 10, 123, 4567, 12345]) {
+      const description = buildCategoryMeta(c, n).description;
+      assert.ok(description.length >= 150 && description.length <= 160, `${buildCategoryPath(c)} n=${n}: ${description.length} ${description}`);
+      assert.match(description, /oferta\.$|original\.$/, description);
     }
     assert.ok(!/\d/.test(buildCategoryMeta(c, 9).title), buildCategoryMeta(c, 9).title);
   }

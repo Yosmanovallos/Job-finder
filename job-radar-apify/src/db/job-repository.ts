@@ -981,15 +981,27 @@ const intentPageCache = new StaleWhileRevalidateCache<string, JobsPage>({
   }
 });
 
-export function getIntentPage(filters: JobFilterParams, limit: number): Promise<JobsPage> {
+// Last total each intent page served, for the links from city hubs. Hubs
+// only read it: they never start an intent query, so a cold hub request
+// never competes with background loads (measured locally: a cold Caracas hub
+// went from 44 to 84 ms when hubs peeked the intent cache). Filled by the
+// intent page itself, the sitemap and /api/intent-page; expires with the
+// cache's stale window.
+const intentTotals = new Map<string, { total: number; at: number }>();
+
+export async function getIntentPage(filters: JobFilterParams, limit: number): Promise<JobsPage> {
   const options: JobsPageOptions = { filters, limit, offset: 0, includeDetails: false };
-  return intentPageCache.get(jobsPageCacheKey(options), () => queryJobsPage(options));
+  const key = jobsPageCacheKey(options);
+  const page = await intentPageCache.get(key, () => queryJobsPage(options));
+  intentTotals.set(key, { total: page.total, at: Date.now() });
+  return page;
 }
 
-/** Cached intent page or undefined (loads it in the background); never waits. */
-export function peekIntentPage(filters: JobFilterParams, limit: number): JobsPage | undefined {
-  const options: JobsPageOptions = { filters, limit, offset: 0, includeDetails: false };
-  return intentPageCache.peek(jobsPageCacheKey(options), () => queryJobsPage(options));
+/** The intent page's last known total, or undefined; never queries. */
+export function knownIntentTotal(filters: JobFilterParams, limit: number): number | undefined {
+  const known = intentTotals.get(jobsPageCacheKey({ filters, limit, offset: 0, includeDetails: false }));
+  if (!known || Date.now() - known.at > JOBS_PAGE_CACHE_FRESH_MS + JOBS_PAGE_CACHE_STALE_MS) return undefined;
+  return known.total;
 }
 
 /**

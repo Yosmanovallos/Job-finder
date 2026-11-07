@@ -34,6 +34,7 @@ import {
   SITE_URL
 } from "../src/lib/job-seo.js";
 import { CITY_OPTIONS } from "../src/lib/job-filters.js";
+import { listIntentCategories } from "../src/lib/intent-pages.js";
 import { DEFAULT_ROLES_200 } from "../src/queue/scheduler.js";
 import { COUNTRIES } from "../src/countries/index.js";
 import { buildJwtAssertion } from "../src/lib/google-indexing.js";
@@ -1391,11 +1392,15 @@ async function runHttpTests() {
 
     // sitemap-categories.xml + índice actualizado — ahora incluye ambos
     // países (CO+VE ciudades, y roles duplicados por país).
+    // ADR 0012: "Remoto" is no longer a CO city entry; it and the other
+    // intent pages are listed only when they pass the inventory guard
+    // (tests/validate-intent-pages.ts covers those), so they are counted apart.
+    const intentPaths = new Set(listIntentCategories().map((category) => `${SITE_URL}${buildCategoryPath(category)}`));
     const expectedCategoryCount =
-      CITY_OPTIONS.length + COUNTRIES.VE.cities.length + DEFAULT_ROLES_200.length * 2;
+      CITY_OPTIONS.filter((city) => city !== "Remoto").length + COUNTRIES.VE.cities.length + DEFAULT_ROLES_200.length * 2;
     const categoriesSitemapRes = await fetch(`${BASE_URL}/sitemap-categories.xml`);
     const categoriesSitemapXml = await categoriesSitemapRes.text();
-    const categoryLocsHttp = [...categoriesSitemapXml.matchAll(/<loc>(.*?)<\/loc>/g)];
+    const categoryLocsHttp = [...categoriesSitemapXml.matchAll(/<loc>(.*?)<\/loc>/g)].filter((match) => !intentPaths.has(match[1]));
     check(
       categoriesSitemapRes.status === 200 &&
         categoryLocsHttp.length === expectedCategoryCount &&

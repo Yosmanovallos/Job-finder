@@ -94,7 +94,8 @@ const suites: Record<string, string[]> = {
     "validate-saved-jobs.ts",
     "validate-site-feedback.ts",
     "validate-job-modality.ts",
-    "validate-search-narrowing.ts"
+    "validate-search-narrowing.ts",
+    "validate-intent-pages.ts"
   ],
     direct: ["validate-direct-employers.test.ts", "validate-direct-discovery.test.ts", "validate-direct-d5.test.ts", "validate-direct-d5-workday.test.ts", "validate-direct-d5-phenom.test.ts", "validate-direct-d5-eightfold.test.ts", "validate-direct-d5-magneto.test.ts", "validate-direct-d5-google.test.ts", "validate-direct-tp.test.ts", "validate-direct-frisby.test.ts", "validate-direct-altipal.test.ts", "validate-direct-workeando.test.ts", "validate-direct-inventory.test.ts", "validate-direct-inventory-probe.test.ts", "validate-computrabajo-backlog.test.ts", "validate-source-focus.test.ts", "validate-direct-employers.ts", "validate-direct-discovery.ts", "validate-direct-projection.ts", "validate-direct-inventory.ts", "validate-direct-inventory-probe.ts"],
   "source-closure": ["validate-source-closure.test.ts", "validate-source-closure.ts"],
@@ -103,7 +104,9 @@ const suites: Record<string, string[]> = {
   observability: ["validate-run-observability.ts"],
   pagination: ["validate-job-pagination.ts", "validate-search-narrowing.ts"],
   modality: ["validate-job-modality.test.ts", "validate-job-modality.ts"],
-  seo: ["validate-seo-job-pages.ts", "validate-job-page-blocks.ts"],
+  seo: ["validate-seo-job-pages.ts", "validate-job-page-blocks.ts", "validate-intent-pages.ts"],
+  "intent-bench": ["bench-intent-pages.ts"],
+  "intent-drift": ["drift-intent-pages.ts"],
   "job-page-blocks": ["validate-job-page-blocks.ts", "validate-job-page-blocks.test.ts"],
   companies: ["validate-company-identity.test.ts", "validate-companies-search.ts"],
   home: ["validate-home-stats.ts"],
@@ -121,7 +124,7 @@ const selection = process.argv[2] || "unit";
 const offline = selection === "unit" || selection === "job-render";
 if (!Object.hasOwn(suites, selection) || process.argv.slice(3).some((arg) => arg !== "--dry-run")) {
   throw new Error(
-    "[P0] Suite inválida. Usa unit, integration, job-render, sitemap, observability, pagination, modality, seo, companies, home, baseline, agent-readiness, job-seo, job-page-blocks, source-closure, job-freshness o direct; --dry-run es opcional."
+    "[P0] Suite inválida. Usa unit, integration, intent-bench, intent-drift, job-render, sitemap, observability, pagination, modality, seo, companies, home, baseline, agent-readiness, job-seo, job-page-blocks, source-closure, job-freshness o direct; --dry-run es opcional."
   );
 }
 

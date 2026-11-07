@@ -1260,7 +1260,8 @@ function buildIntentMeta(category: ResolvedCategory, totalCount: number): Catego
       heading,
       description: fitDescription(
         `${count} de trabajo remoto en ${place} para trabajar desde casa. Compara empresas`,
-        " y aplica gratis en la fuente original de cada oferta."
+        ". Aplica en la fuente original de cada oferta.",
+        category.city ? CITY_DESCRIPTION_FILLERS : DESCRIPTION_FILLERS
       ),
       canonicalUrl
     };
@@ -1271,26 +1272,27 @@ function buildIntentMeta(category: ResolvedCategory, totalCount: number): Catego
     heading,
     description: fitDescription(
       `${count} de trabajo sin experiencia en ${place}: el aviso dice que no la piden. Compara empresas`,
-      " y aplica en la fuente original."
+      ". Aplica en la fuente original de cada oferta.",
+      category.city ? CITY_DESCRIPTION_FILLERS : DESCRIPTION_FILLERS
     ),
     canonicalUrl
   };
 }
 
-// Grows "Compara empresas" with page-true list items until the text reaches
-// 150 characters, then trims at a word boundary under 160. No invented facts:
-// every hub and intent page shows companies, cities and publication dates.
-const DESCRIPTION_FILLERS = [", ciudades", ", fechas de publicación", " y fuentes"];
-function fitDescription(head: string, tail: string): string {
-  let text = `${head}${tail}`;
-  for (const filler of DESCRIPTION_FILLERS) {
-    if (text.length >= 150) break;
-    head = `${head}${filler}`;
-    text = `${head}${tail}`;
-  }
-  if (text.length <= 160) return text;
-  const cut = text.slice(0, 159);
-  return `${cut.slice(0, cut.lastIndexOf(" "))}.`;
+// Grows "Compara empresas" with page-true list items (every hub and intent
+// page shows companies, cities and publication dates), keeping the longest
+// version that fits in 160 characters. Never cuts a sentence and never adds
+// a fact the page doesn't show.
+const DESCRIPTION_FILLERS = ["", " y ciudades", ", ciudades y fechas", ", ciudades, fechas y fuentes", ", ciudades, fechas de publicación y fuentes"];
+// A city × intent page lists one city: its fillers never mention cities.
+const CITY_DESCRIPTION_FILLERS = ["", " y fechas", ", fechas y fuentes", ", fechas de publicación y fuentes", ", cargos, fechas de publicación y fuentes"];
+function fitDescription(head: string, tail: string, fillers: string[] = DESCRIPTION_FILLERS): string {
+  const candidates = fillers.map((filler) => `${head}${filler}${tail}`);
+  return (
+    candidates.find((text) => text.length >= 150 && text.length <= 160) ??
+    candidates.filter((text) => text.length <= 160).pop() ??
+    candidates[0]
+  );
 }
 
 /**
