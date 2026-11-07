@@ -40,7 +40,28 @@ the host OS temporary directory. Integration JSON report is under
 
 Before deployment, unique Cloudflare MISS requests returned dashboard CO 200
 in 400 ms and dashboard VE 200 in 243 ms. This includes network and TLS overhead.
-Post-deploy checks and deployment identity are pending.
+PR 126 merged as `108582cb99e877b0ec6da0d783677af7b1b02666` at
+2026-11-07 18.21 UTC (13.21 Bogotá). Both GitHub checks passed. Production
+OpenAPI advertised limit three at 18.23 UTC and health showed a freshly
+restarted process.
+
+Restrained production smoke passed at 18.23 UTC. The default search returned
+three real jobs, limit three and hasMore false with private/no-store and edge
+BYPASS. Limit four and offset one returned 400. After five total admitted calls
+across REST and MCP, A2A, REST search and REST HEAD returned 429 with Retry-After
+58–59 seconds. They were not served from a shared cache.
+
+After exhausting the sample quota, all six unique dashboard URLs returned 200
+with Cloudflare MISS. CO measured 246, 254 and 209 ms. VE measured 241, 221 and
+221 ms. These stay within or improve the runbook's 250–330 ms typical baseline.
+Health remained 200. Evidence is `free-api-production-smoke.json` in OS temp.
+
+Render's startup logs and explicit Live label could not be inspected. Browser
+control timed out twice and then stopped because the safety system could not
+verify Chrome's current URL. No further UI actions were attempted. The live
+route behavior and restart are independently confirmed by HTTP, but this does
+not substitute for reading dashboard_cache_warmed in Render logs. That audit
+item remains open, so this OpenSpec change is not archived yet.
 
 ## Operational limits
 

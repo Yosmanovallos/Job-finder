@@ -7,5 +7,6 @@
 - [x] Synchronize public schemas, docs and skill digests.
 - [x] Pass unit, integration, types, lint and synthetic baseline gates.
 - [x] Review complete diff and record validation evidence and inherited failures.
-- [ ] Confirm live deployment and restrained production smoke checks.
+- [x] Confirm live deployment and restrained production smoke checks.
+- [ ] Inspect Render startup logs for dashboard_cache_warmed when browser control is available.
 - [ ] Archive the change only when exit criteria pass.
