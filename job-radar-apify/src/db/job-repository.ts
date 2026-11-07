@@ -31,6 +31,7 @@ import { StaleWhileRevalidateCache } from "../lib/stale-while-revalidate-cache.j
 import { clipVarchar } from "../lib/varchar.js";
 import { RECENT_SITEMAP_WINDOW_HOURS, type RecentReadyJob } from "../lib/recent-jobs.js";
 import { copySpecificCityMismatchSql } from "../lib/official-copy-location.js";
+import { trustedEmploymentType } from "../lib/employment-type-trust.js";
 import {
   VACANCY_IDENTITY_KEYS,
   companyKeySql,
@@ -361,7 +362,7 @@ export async function getJobs(
       description: row.description,
       requirements: Array.isArray(row.requirements) ? row.requirements : [],
       technologies: Array.isArray(row.technologies) ? row.technologies : [],
-      employmentType: row.employment_type,
+      employmentType: trustedEmploymentType(row.source, row.employment_type),
       applicantCount: row.applicant_count,
       salary: buildSalaryLabel(row)
     };
@@ -418,7 +419,7 @@ export async function getJobsLight(
       description: null,
       requirements: [] as string[],
       technologies: [] as string[],
-      employmentType: row.employment_type,
+      employmentType: trustedEmploymentType(row.source, row.employment_type),
       applicantCount: row.applicant_count,
       salary: buildSalaryLabel(row)
     };
@@ -1143,7 +1144,7 @@ async function queryJobsPage(options: JobsPageOptions, narrowSearch = true): Pro
       description: row.description ?? undefined,
       requirements: Array.isArray(row.requirements) ? row.requirements : [],
       technologies: Array.isArray(row.technologies) ? row.technologies : [],
-      employmentType: row.employment_type ?? undefined,
+      employmentType: trustedEmploymentType(row.source, row.employment_type),
       applicantCount: row.applicant_count ?? undefined,
       remoteType: row.remote_type ?? undefined,
       salary: buildSalaryLabel(row),
@@ -1604,7 +1605,7 @@ export async function getJobById(id: string) {
     description: row.description,
     requirements: Array.isArray(row.requirements) ? row.requirements : [],
     technologies: Array.isArray(row.technologies) ? row.technologies : [],
-    employmentType: row.employment_type,
+    employmentType: trustedEmploymentType(row.source, row.employment_type),
     applicantCount: row.applicant_count,
     salary: buildSalaryLabel(row),
     // Job SEO V2: the stored verdict of the shared gate (read through
