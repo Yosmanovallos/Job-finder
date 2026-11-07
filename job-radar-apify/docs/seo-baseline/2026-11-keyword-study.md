@@ -289,6 +289,127 @@ Por demanda medida × posición × inventario. No es un pronóstico.
 En espera por no pasar la guarda o no tener demanda: Tierralta, medio tiempo
 por ciudad, Itagüí, Bello, Rionegro, enfermera jefe, analista de datos.
 
+## 6b. Segunda tanda (2026-11-07): demanda relativa en Google y quién posiciona
+
+Esta tanda se hizo sin cuentas nuevas ni pagos. Keyword Planner y Ubersuggest
+exigen crear o vincular una cuenta y aceptar sus términos, así que quedan para
+el propietario.
+
+### Método
+
+- **Google Trends** (12 meses, Web). Lotes de 5 términos, siempre con un ancla
+  común: «trabajo en bogota» en Colombia y «trabajo en caracas» en Venezuela.
+  Cada valor se reescala a **ancla = 100**, de modo que los lotes se pueden
+  comparar entre sí. Las ciudades pequeñas se midieron con «trabajo en
+  pereira» como ancla intermedia y luego se convirtieron.
+- Es un **índice relativo, no un volumen**. Por debajo de ~5 la resolución de
+  Trends es mala: solo sirve para ordenar.
+- **GSC «posiciona hoy»**, para las filas que en la sección 5 quedaron «sin
+  medir». Filtro de consulta «contiene», 28 días, pestaña Páginas, sin filtro
+  de país.
+- **Bing Keyword Research**: el volumen es demasiado bajo para medir. «empleo
+  bogota» tiene 47 impresiones en 3 meses, y el filtro de país no se aplicó
+  desde la URL. Se usó solo para ver el **top 10 de la SERP**.
+
+### Colombia — índice de demanda (trabajo en bogota = 100)
+
+| Consulta | Índice | Comentario |
+|---|---|---|
+| trabajo remoto | **182** | La mayor demanda medida. `/empleos/remoto` casi no tiene impresiones (49 en 28 d, todas de vacantes sueltas). |
+| trabajo sin experiencia | **145** | No hay página. La captan vacantes sueltas. |
+| auxiliar administrativo | 117 | Ambigua (también se busca como cargo o curso). Hay hub. |
+| **trabajo en bogota** | **100** | Ancla. |
+| trabajo medio tiempo / trabajo desde casa | 66 / 66 | |
+| trabajo en cali | 58 | |
+| empleos bogota | 46 | **«trabajo en X» se busca ~2 veces más que «empleos X»** (Bogotá 100 vs 46; Medellín 43 vs 33). |
+| trabajo en medellin | 43 | |
+| trabajo por dias / fines de semana | 34 / 28 | Intención nueva, sin página. |
+| trabajo en barranquilla / bucaramanga / cartagena | 27 / 24 / 21 | |
+| trabajo para estudiantes | 25 | |
+| trabajo de conductor | 21 | Sin hub de rol. |
+| trabajo en pereira | 15 | |
+| trabajo temporal | 13 | La temporada (diciembre) sube esto. |
+| trabajo en ibague | 9 | |
+| trabajo en pasto / villavicencio / santa marta | 6 / 6 / 6 | |
+| trabajo en soacha / cucuta | 5 / 5 | «empleos cucuta» ≈ 3. |
+| trabajo en neiva / manizales | 4,5 / 4,5 | Las 3.600 búsquedas al mes que Ubersuggest da para Neiva no cuadran con este orden. |
+| trabajo en armenia / valledupar | 2,6 / 1,6 | |
+| trabajo de vigilante / de enfermera | 6 / 2 | |
+| trabajo en monteria / popayan / barrancabermeja | 1,5 / 0,5 / 0,5 | Demanda casi nula en Google. **Barrancabermeja baja de prioridad**: sus impresiones en GSC las sostiene una vacante. |
+| **Marcas:** computrabajo / indeed / magneto / elempleo | **≈2.900** / 300 / 200 / 100 | Buscar el nombre de un portal es la forma dominante de buscar empleo. Construir la marca «buscotrabajo» (TikTok) es parte del SEO. |
+
+### Venezuela — índice (trabajo en caracas = 100)
+
+| Consulta | Índice |
+|---|---|
+| trabajo remoto | **148** |
+| empleo caracas | 119 |
+| **trabajo en caracas** | **100** |
+| trabajo en valencia | 17 |
+| trabajo en maracaibo | 7 |
+| barquisimeto, puerto ordaz, maturin, margarita | ≈ 2 cada una |
+
+En Venezuela la demanda está en **remoto y Caracas**. Las demás ciudades son
+casi nulas en Google, así que **Maturín baja de prioridad**.
+
+### GSC: quién posiciona hoy en las filas que faltaban (28 d)
+
+| Consulta contiene | Impresiones / clics / posición | Página con más impresiones | ¿Aparece el hub? |
+|---|---|---|---|
+| fines de semana | 57 / 0 / 4,6 | Vacantes («vendedor fines de semana Bogotá» 28 impr.) | No hay hub |
+| remoto | 49 / 0 / 4,5 | Vacantes («trabajo remoto investigación en salud» 26) | `/empleos/remoto` no está en el top 3 |
+| bogota | 164 / 3 / 7,4 | Vacantes (abogado de litigios, 22) | **`/empleos/bogota` no está en el top 3** |
+| cali | 147 / 2 / 5,9 | Vacantes (asesor de temporada Yumbo) | **`/empleos/cali` no está en el top 3** |
+| ibague | 52 / 0 / 5,5 | Vacante (posición 2,0) | Hub en la posición **15,2** |
+| armenia | 37 / 0 / 8,2 | **Hub** (22 impr.) | Hub en la posición **10,4** |
+| maracaibo | 64 / 0 / 16,9 | Hub (18 impr.) | Hub en la posición **45,6** |
+| manizales, pereira, valledupar | 52–55 / 0–2 / 5–7 | Vacantes | No en el top 2 |
+| soacha, envigado, bello, rionegro, itagui | 1–29 / 0 / 2–7 | Vacantes | No hay hub |
+| facatativa, yopal, sincelejo | 14–21 / 0 / 2–4 | Vacantes | No hay hub |
+| arquitecto | 83 / 6 / 4,2 | Vacante «arquitecto Bucaramanga» (6 clics) | No hay hub de rol |
+| ingeniero civil | 75 / 1 / 5,9 | Vacantes | El hub no está en el top 3 |
+| enfermer* | 195 / 1 / 5,3 | Vacantes | El hub de auxiliar de enfermería no está en el top 3 |
+| auxiliar administrativ* | 91 / 1 / 3,9 | Vacantes | El hub no está en el top 3 |
+| analista de datos | 35 / 0 / 5,7 | Vacantes | No hay hub |
+| nueva esparta | 37 / 2 / 5,6 | Vacante (Porlamar) | No hay hub |
+| merida | 20 / 0 / 7,1 | Vacante | No hay hub |
+
+Una URL de vacante aparece en GSC con el parámetro `utm_campaign` (enlace de
+Google Empleos). Hay que comprobar que su canonical apunte a la URL limpia.
+
+### SERP de «empleo bogota» (Bing, top 10)
+
+Aparecen elempleo.com (2 URL), co.computrabajo.com y bogotatrabaja.gov.co, que
+es la agencia distrital. Compiten páginas de ciudad de portales grandes y la
+bolsa pública, no vacantes sueltas.
+
+### Conclusiones de la segunda tanda
+
+1. **El problema principal no es que falten páginas, sino que los hubs no
+   posicionan.** En todas las ciudades medidas, Google prefiere nuestras
+   vacantes sueltas, que están en las posiciones 2–7, al hub. El hub está en
+   10–46 o ni aparece. Mejorar los hubs existentes (contenido propio,
+   enlaces internos desde las vacantes, título) va antes que crear hubs
+   nuevos.
+2. **Las páginas de intención nacionales pesan más que cualquier ciudad**:
+   «remoto» (182) y «sin experiencia» (145) superan a «trabajo en bogota»
+   (100). Por eso van primero en la Fase C: arreglar y potenciar
+   `/empleos/remoto` y crear `/empleos/sin-experiencia`.
+3. **Títulos de hub en la forma «Trabajo en {ciudad}»**: se busca el doble que
+   «empleos {ciudad}». Es un experimento barato, medido 28 días en 3–5 hubs.
+4. **Hay que reordenar las ciudades por demanda real**:
+   - prioridad: Bogotá, Cali, Medellín, Barranquilla, Bucaramanga, Cartagena
+     y Pereira;
+   - después: Ibagué, Pasto, Villavicencio, Santa Marta, Soacha y Cúcuta;
+   - **bajan**: Barrancabermeja, Montería, Popayán y, en Venezuela, Maturín.
+5. **Intenciones nuevas que merecen página**, si el clasificador real llega
+   a ≥10 vacantes: «por días», «fines de semana», «para estudiantes» y
+   «temporal» (diciembre).
+6. **Marca:** «computrabajo» tiene ~29 veces la demanda de «trabajo en
+   bogota». La gente busca portales por su nombre, así que la marca
+   «buscotrabajo» (TikTok, prensa, enlaces) es una palanca SEO de primer
+   nivel.
+
 ## 7. Límites de este estudio
 
 - La interfaz de GSC llegó a su tope de 1.000 filas en Colombia: falta la
@@ -300,6 +421,8 @@ por ciudad, Itagüí, Bello, Rionegro, enfermera jefe, analista de datos.
   sirven como guarda de la Fase C, que debe usar el clasificador real.
 - Bing es una fracción pequeña del mercado. Trends no da volumen.
   Autocomplete solo prueba que la consulta existe.
+- La segunda tanda (6b) usa índices relativos de Trends, no volúmenes. No hay
+  volumen absoluto de Google sin Keyword Planner.
 - No se abrieron Keyword Planner ni Ubersuggest: crear una cuenta y aceptar
   términos le corresponde al propietario. Las cifras de Ubersuggest citadas
   vienen del video y no están verificadas.
