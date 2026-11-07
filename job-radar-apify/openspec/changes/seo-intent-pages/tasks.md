@@ -5,13 +5,25 @@ código. Usa un reloj fijo en todas las pruebas nuevas.
 
 ## 0. Decisión y contrato
 
-- [ ] Leer `docs/SEO-IMPROVEMENT-PLAN.md`, `docs/SEO-PLAN.md` §9-10,
+- [x] Leer `docs/SEO-IMPROVEMENT-PLAN.md`, `docs/SEO-PLAN.md` §9-10,
       `docs/QA-CHECKLIST-SEO.md` y `docs/DASHBOARD-PERFORMANCE-RUNBOOK.md`.
-- [ ] Escribir `docs/adr/00xx-intent-categories.md`: tipo `intencion`, país
+- [x] Escribir `docs/adr/0012-intent-categories.md`: tipo `intencion`, país
       por prefijo, «Remoto» sale de la resolución como ciudad, nuevo
       canonical de `/ve/empleos/remoto` y si la API pública gana el filtro.
-- [ ] Revisión del agente `architect` sobre el ADR y el design. Registrar
+- [x] Revisión del agente `architect` sobre el ADR y el design. Registrar
       las conclusiones aquí.
+  - **Revisión del 2026-11-07:** aprobar con cambios. Todos se aplicaron en
+    el ADR 0012:
+    - `isRemoteBucket` cubre la intención remoto, con una prueba de hash de
+      la copia de `/empleos/remoto`;
+    - caché propia `intentPageCache` de 8 entradas, fuera del LRU de 64 del
+      dashboard;
+    - respaldo del cliente `/api/intent-page` con lista blanca, sin abrir
+      `/api/jobs`;
+    - columna derivada según el EXPLAIN del Bloque 1;
+    - portada sin cambios (SIP-050 frente a D2: gana SIP-050 hasta el
+      2026-11-26);
+    - nota sobre Cloudflare en el rollback.
 
 ## 1. Conteo previo (solo lectura, antes de escribir código)
 

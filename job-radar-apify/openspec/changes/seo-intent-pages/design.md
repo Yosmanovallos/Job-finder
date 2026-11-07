@@ -97,6 +97,10 @@ se muestra el aviso vacío que ya existe.
 | `/empleos/sin-experiencia` | «Trabajo sin experiencia en Colombia: {n} vacantes» |
 | `/empleos/bogota/sin-experiencia` | «Trabajo sin experiencia en Bogotá: {n} vacantes» |
 
+- **Desviación (ADR 0012 §5):** `/empleos/remoto` (CO) conserva byte a byte
+  su title, H1, meta y copia actuales hasta la lectura del 2026-11-26 de
+  `city-hub-pages`. La copia D4 aplica solo a las URL nuevas, y el bloque de
+  respuesta también.
 - `{n}` es el conteo real del momento. El título no lleva número si
   `n < 10`; en ese caso la página es `noindex` de todos modos.
 - La descripción tiene 150–160 caracteres y solo dice lo que la página
