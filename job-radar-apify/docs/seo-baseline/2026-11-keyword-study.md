@@ -22,6 +22,14 @@ El hallazgo principal: **la demanda de intención y de municipios ya la están
 captando vacantes sueltas, no páginas permanentes.** Cuando la vacante vence,
 la posición se pierde con ella.
 
+> **Vigencia (2026-11-07):** las prioridades de §6, §6b (conclusiones) y
+> §8.6 quedan sustituidas por `docs/SEO-GROWTH-ROADMAP-2026-11.md`. Allí está
+> la **corrección** a la conclusión 1 de §6b. Con la vista «aparición en
+> búsquedas» de GSC, casi todas las impresiones de vacantes en búsquedas de
+> ciudad o intención son de **Google Empleos**. Nuestras vacantes no le
+> quitan el puesto al hub; el hub pierde el resultado orgánico frente a
+> Computrabajo y elempleo.
+
 ## 1. El video: qué muestra y qué dice
 
 ### Método
@@ -61,11 +69,12 @@ la posición se pierde con ella.
 
 ### Verificación de sus cifras con nuestros datos
 
-- **El resumen del dominio estaba en Perú.** En los primeros segundos el
-  selector dice «Español / Perú», y a los 0:43 él cambia a Colombia. El
-  tráfico orgánico de 84 al mes, las 73 palabras clave y el Domain
-  Authority 5 son, por tanto, estimaciones para Perú o de la propia
-  herramienta.
+- En el video el selector empieza en «Español / Perú» y a los 0:43 él lo
+  cambia a Colombia. **Corrección (2026-11-07):** se repitió la consulta con
+  «Español / Colombia» (sección 8) y da las mismas cifras: 84 visitas
+  orgánicas al mes, 73 palabras clave, Domain Authority 5 y 38 backlinks.
+  Las 84 visitas no se deben al país. Son la estimación de Ubersuggest para
+  el «mes anterior», calculada con posiciones de hace 1–3 meses.
 - **Search Console da 559 clics en 28 días solo desde Colombia**, unas
   6–7 veces lo que muestra la herramienta para todo un mes. Las cifras de
   tráfico de estas herramientas son modelos, no mediciones.
@@ -118,7 +127,7 @@ usa. Sirve como referencia aproximada de los competidores, no como meta.
 | **Google Autocomplete**                     | Qué variantes existen de verdad (p. ej. «trabajo medio tiempo medellín de lunes a viernes»).                                                         | No da volumen. Depende de la ubicación de quien consulta: con IP en Antioquia salen Bello, Rionegro e Itagüí.                                                                                                                                                       | No                                                                                                                                                                                              |
 | **Bing Webmaster — Keyword Research**       | Impresiones en Bing por país y periodo (aquí, 6 ago–3 nov), palabras relacionadas, preguntas, y el **top 10 de URLs del SERP**. El sitio ya está verificado. | Son solo datos de Bing, una fracción pequeña del mercado en CO/VE. En la cola larga de Colombia dice «Bing no tiene datos suficientes».                                                                                                                              | No                                                                                                                                                                                              |
 | **Google Keyword Planner** (sin campañas)   | Volumen mensual en rangos (p. ej. 1K–10K) por país y ciudad, competencia y CPC.                                                                     | Sin gasto activo muestra rangos, no cifras exactas. Algunos usuarios reportan que a veces exige una campaña activa. No se verificó en la documentación de Google.                                                                                                  | **Sin confirmar.** Pasos para el propietario: Google Ads → «Cambiar a modo experto» → «Crear una cuenta sin campaña». **Si pide tarjeta, no continuar.**                                          |
-| **Ubersuggest, plan gratuito** (el del video) | Volumen estimado, dificultad, CPC y SERP con backlinks.                                                                                             | Unas 3 búsquedas al día según terceros. Las cifras son modelos (el video mostró 84 visitas al mes frente a ~600 clics reales al mes).                                                                                                                                | Al registrarse, no según las fuentes leídas. Lo hace el propietario si quiere.                                                                                                                  |
+| **Ubersuggest, plan gratuito** (el del video) | Volumen estimado, dificultad, CPC y SERP con backlinks. El análisis grupal acepta 50 palabras por consulta, y hay páginas principales de los competidores (sección 8). | La cuenta del propietario tenía 250 créditos y no bajaron tras 6 consultas el 2026-11-07. Fuentes de terceros hablan de unas 3 búsquedas al día. Las cifras son modelos (el video mostró 84 visitas al mes frente a ~600 clics reales al mes).                                                                                                                                | Al registrarse, no según las fuentes leídas. Lo hace el propietario si quiere.                                                                                                                  |
 | **Semrush, cuenta gratuita**                | Volumen y dificultad.                                                                                                                               | El 28 de octubre respondió `no_api_units` en el conector. La cuenta gratuita web tiene un cupo diario pequeño; el límite actual no se verificó.                                                                                                                     | No para la cuenta gratuita                                                                                                                                                                      |
 | **SERP manual** (Google, incógnito, CO/VE)  | Tipo de página que gana (agregador, Google Empleos, gobierno, vacante suelta), «Más preguntas» y «Búsquedas relacionadas».                            | Es manual y está sesgado por la ubicación.                                                                                                                                                                                                                         | No                                                                                                                                                                                              |
 
@@ -270,7 +279,8 @@ Columnas:
 
 ## 6. Prioridad propuesta (para la Fase C y la Fase E)
 
-Por demanda medida × posición × inventario. No es un pronóstico.
+Por demanda medida × posición × inventario. No es un pronóstico. **La
+sección 8.6 la actualiza con el volumen de Ubersuggest.**
 
 1. **Hubs existentes que están muy abajo:** Caracas (37), Valencia (35) y
    Cúcuta (35). La URL ya existe, el inventario es alto y hay demanda.
@@ -423,7 +433,253 @@ bolsa pública, no vacantes sueltas.
   Autocomplete solo prueba que la consulta existe.
 - La segunda tanda (6b) usa índices relativos de Trends, no volúmenes. No hay
   volumen absoluto de Google sin Keyword Planner.
-- No se abrieron Keyword Planner ni Ubersuggest: crear una cuenta y aceptar
-  términos le corresponde al propietario. Las cifras de Ubersuggest citadas
-  vienen del video y no están verificadas.
+- No se abrió Keyword Planner: crear la cuenta le corresponde al
+  propietario. Ubersuggest se consultó el 2026-11-07 con la cuenta gratuita
+  del propietario (sección 8). Sus volúmenes son estimaciones de terceros y
+  se contrastan con el índice de Trends de la sección 6b (sección 8.5).
 - No se cambió código ni datos, y no se pagó nada.
+
+## 8. Ubersuggest: análisis completo (2026-11-07)
+
+Leído con la sesión gratuita del propietario en Ubersuggest. Quedaban
+250 créditos antes y después de la lectura. Se rechazó el aviso de «Crear
+proyecto» porque cambia la configuración de la cuenta. Todo lo de esta
+sección son **estimaciones de Ubersuggest**. Cada fila trae su propia fecha
+de actualización («hace 1–5 meses» o «Outdated»). Se usa para ordenar
+prioridades, no como medición.
+
+### 8.1 Nuestro dominio (Español / Colombia)
+
+- 84 visitas orgánicas al mes, 73 palabras clave (−7), Domain Authority 5,
+  38 backlinks (+11). Ubersuggest asigna 70 palabras clave a CO y 3 a VE.
+- Solo 22 palabras clave tienen posición en Colombia, y todas están entre la
+  11 y la 38 (página 2–4). Las principales:
+
+| Palabra clave           | Volumen/mes | Posición | URL                        |
+| ----------------------- | ----------- | -------- | -------------------------- |
+| buscador de empleo(s)   | 12,1 K      | 25 / 28  | `/`                        |
+| empleo.com bogota       | 3,6 K       | 28       | `/empresas/elempleo`       |
+| trabajos neiva          | 3,6 K       | 27       | `/empleos/neiva`           |
+| trabajo(s) santa marta  | 4,4 K       | 29–30    | `/empleos/santa-marta`     |
+| el empleo.com colombia  | 2,4 K       | 11       | `/empresas/elempleo`       |
+| ingeniero civil empleo  | 2,4 K       | 20       | `/empleos/ingeniero-civil` |
+| buscojobs               | 480         | 17       | `/`                        |
+| trabajo en neiva huila  | 480         | 26       | `/empleos/neiva`           |
+| empleos santa marta hoy | 480         | 25       | `/empleos/santa-marta`     |
+| vacantes armenia        | 390         | 13       | `/empleos/armenia`         |
+| trabajo en venezuela    | 170         | 35–38    | `/ve/dashboard`            |
+
+Lectura:
+
+- Ubersuggest ve a los hubs de ciudad en la página 3 para las consultas
+  amplias («empleos X»). GSC muestra que la demanda que sí ganamos es de
+  cola larga y la captan vacantes sueltas (sección 5). Las dos lecturas
+  encajan: **para las consultas grandes de ciudad todavía no somos
+  competitivos**.
+- La segunda URL con más tráfico estimado es `/empresas/elempleo`, que
+  posiciona por la marca de un competidor. No es tráfico deseable para
+  registros.
+- `/ve/dashboard` posiciona por «trabajo en venezuela». Es una URL de
+  aplicación, no un hub.
+- **Con esto, Neiva y Santa Marta pasan a ser buenos candidatos, sin
+  verificar.** Ubersuggest les da 3,6 K y 4,4 K al mes y los ve en la
+  página 3. GSC muestra muy pocas impresiones para ellas, lo que es
+  coherente con no estar en la página 1.
+
+### 8.2 Volumen por palabra clave — Colombia (análisis grupal, 50 palabras)
+
+Columnas: volumen/mes · SEO Difficulty (0–100) · CPC. El CPC se muestra en
+pesos: en Venezuela la misma columna sale en bolívares.
+
+- **Genéricas:**
+  - «empleos» 60,5 K · SD 37
+  - «trabajo» 60,5 K · SD 45
+  - «trabajo remoto» 40,5 K · SD 17
+  - «bolsa de empleo» 14,8 K · SD 16
+  - «trabajo desde casa» 14,8 K · SD 18
+  - «buscador de empleos» 12,1 K · SD 54
+  - «trabajo fines de semana» 12,1 K · SD 16
+  - «vacantes» 8,1 K · SD 37
+  - «trabajo remoto colombia» 5,4 K · SD 15
+  - «ofertas de empleo» 4,4 K · SD 35
+  - «busco trabajo» 3,6 K · SD 66
+  - «trabajo nocturno» 1,3 K
+  - «trabajo por días» 590
+  - «trabajo de temporada» 590
+- **Sin experiencia:**
+  - «trabajo sin experiencia bogota» 18,1 K · SD 24
+  - «trabajo sin experiencia» 9,9 K · SD 18
+  - «trabajo sin experiencia cali» 6,6 K · SD 22
+  - «trabajo sin experiencia medellin» 4,4 K · SD 17
+- **Medio tiempo:**
+  - «trabajo medio tiempo medellin» 3,6 K · SD 16
+  - «trabajo medio tiempo cali» 2,4 K · SD 19
+  - «trabajo medio tiempo» y «… bogota» salen con 0 y «Outdated»: es un dato
+    vacío de la herramienta, no una demanda nula.
+- **Ciudades:**
+  - «empleos bogota» 14,8 K (SD 35)
+  - «empleos medellin» 12,1 K
+  - «empleos cali» 9,9 K
+  - «empleos barranquilla» 8,1 K
+  - «empleos cartagena», «bucaramanga» y «valledupar» 6,6 K cada una
+  - «empleos manizales» 5,4 K
+  - «empleos cucuta», «ibague», «pereira», «santa marta» y «villavicencio»
+    4,4 K cada una
+  - «trabajos neiva» 3,6 K
+  - **«empleos barrancabermeja» 2,9 K (SD 16)**
+  - **«empleos soacha» 2,4 K**
+  - «empleos rionegro» 1,9 K
+  - «empleos bello» 720
+  - «empleos envigado» e «itagui» 480 cada una
+  - «vacantes tierralta» 110
+- **Roles:**
+  - «auxiliar administrativo» 9,9 K · SD 14
+  - «auxiliar de enfermeria» 5,4 K · SD 13
+  - «ingeniero civil empleo» 2,4 K
+  - «empleo abogado» 1,9 K
+  - «analista de datos empleo» 1,6 K
+  - «empleo arquitecto» 1,3 K
+
+### 8.3 Volumen por palabra clave — Venezuela (36 palabras)
+
+- **Ciudades:**
+  - «empleos caracas» 8,1 K · SD 24
+  - «trabajo en caracas» 5,4 K
+  - «empleos maracay» 3,6 K
+  - «empleos valencia carabobo» 2,9 K
+  - «empleos barquisimeto» 2,9 K
+  - **«empleos maturin» 2,9 K**
+  - «empleos maracaibo» 2,4 K
+  - **«empleos puerto ordaz» 1,9 K** (y solo 390 para «empleos ciudad
+    guayana»)
+  - «empleos anzoategui» 1,9 K
+  - «empleos puerto cabello» 1,9 K
+  - «empleos la guaira» 1,6 K
+  - «empleos san cristobal» 1,3 K
+  - «empleos nueva esparta» 1 K
+  - «empleos margarita» 880
+  - «empleos ciudad bolivar» 880
+  - «empleos puerto la cruz» 720
+  - «empleos merida venezuela» 720
+- **Remoto:**
+  - «trabajo remoto» 9,9 K · SD 27
+  - «trabajo remoto venezuela» 3,6 K · SD 20
+  - «trabajo desde casa venezuela» 720
+- **Otras:**
+  - «empleos farmatodo» 1,9 K
+  - «empleos en venezuela» 1,6 K (SD 55)
+  - «empleos pdvsa» 1 K
+  - «empleo en caracas medio tiempo» 320
+  - «pasantias caracas» 170
+  - «empleo en caracas sin experiencia» 140
+  - «trabajo sin experiencia» 140
+- La SEO Difficulty de casi todas las consultas de ciudad en Venezuela está
+  entre 13 y 24 (baja).
+
+### 8.4 Competencia: qué páginas les traen el tráfico
+
+Páginas principales estimadas por Ubersuggest (visitas al mes):
+
+- **co.computrabajo.com (CO):**
+  - **`/empleos-en-bogota-dc-sin-experiencia` 49,6 K**: su página n.º 1,
+    por encima de la de Bogotá (33,4 K).
+  - Remoto en Bogotá 18,3 K; fin de semana en Bogotá 15,7 K; auxiliar de
+    enfermería en Bogotá 13,9 K.
+  - `/empleos-en-medellin-sin-experiencia` 7,4 K; medio tiempo en Cali
+    8,0 K; medio tiempo en Bogotá 7,9 K; remoto sin experiencia 7,5 K;
+    trabajo en casa en Bogotá 8,8 K.
+  - Ciudades: Cali 17,5 K, Medellín 16,1 K, Bucaramanga 13,5 K,
+    Manizales 11,8 K, Montería 10,7 K, Valledupar 9,1 K, Rionegro 9,1 K,
+    **Barrancabermeja 6,3 K**, **Soacha 5,7 K**, Cúcuta 4,3 K, Yopal 4,0 K.
+  - Tiene 19,0 K de un artículo de festivos 2026 y 5,9 K de una plantilla
+    de carta de recomendación.
+- **elempleo.com (CO):** la portada `/co/` 102,8 K; «agencia pública de
+  empleo SENA» 12,2 K; Bogotá 7,3 K; Cali 6,7 K; **Bogotá sin experiencia
+  5,1 K**; calculadora salarial 5,0 K; modalidad remoto 4,4 K; además
+  roles (fisioterapeuta, trabajador social, abogado, auxiliar de
+  enfermería) y noticias laborales.
+- **ve.computrabajo.com (VE):** **remoto 12,2 K (su n.º 1)**; Valencia
+  7,5 K; Aragua 7,4 K; Caracas 5,6 K; Anzoátegui 5,6 K; San Cristóbal
+  5,5 K; Lara 5,0 K; Maracaibo 4,6 K; Nueva Esparta 4,3 K; **Monagas
+  2,5 K**; Farmatodo 3,4 K; chofer, nocturno y vigilante en Caracas;
+  Caracas medio tiempo 1,8 K; desde casa sin experiencia 1,1 K.
+- **SERP de «trabajo sin experiencia medellin»** (actualizado el
+  30 ago 2026):
+  - n.º 1: el bloque «Ofertas de empleo» de Google Empleos;
+  - luego Computrabajo (4 backlinks a la página, DA 80), Magneto365 (20;
+    DA 49), medellinjoven.com (2; DA 43), Indeed (2; DA 91), LinkedIn,
+    Comfama.
+  - Una página del top 10 tiene de media **3 backlinks**. **La barrera no
+    son los enlaces sino tener la página permanente correcta**, más una
+    vacante bien marcada para Google Empleos.
+
+### 8.5 Comparación y conclusiones
+
+1. **El patrón que gana es ciudad × intención y rol × ciudad.**
+   Computrabajo lo confirma: su página más visitada es «Bogotá sin
+   experiencia», no «Bogotá». Es exactamente la Fase C, ahora con volumen
+   estimado:
+   - sin experiencia: Bogotá 18,1 K, nacional 9,9 K, Cali 6,6 K,
+     Medellín 4,4 K;
+   - fines de semana: 12,1 K;
+   - medio tiempo: Medellín 3,6 K, Cali 2,4 K.
+2. **Remoto es la demanda más grande y menos difícil.** En Colombia,
+   «trabajo remoto» tiene 40,5 K y SD 17. En Venezuela es la página n.º 1
+   de Computrabajo VE. Tenemos 2.528 vacantes remotas en CO y 1.290 en VE,
+   y hoy casi no posicionamos (sección 5). Hay que corregir antes
+   `/ve/empleos/remoto`, que muestra vacantes de Colombia.
+3. **Municipios: Ubersuggest y Trends no coinciden, y manda Trends.**
+   Ubersuggest da 2,9 K/mes a Barrancabermeja y a Maturín. Computrabajo
+   saca 6,3 K visitas de su página de Barrancabermeja y 2,5 K de Monagas.
+   Pero en Trends (sección 6b, dato de Google):
+   - Barrancabermeja vale 0,5 con «trabajo en bogota» = 100;
+   - Maturín vale ≈ 2 con «trabajo en caracas» = 100.
+
+   En Ubersuggest, en cambio, Maturín (2,9 K) sale con más de la mitad que
+   «trabajo en caracas» (5,4 K). **Ubersuggest infla las ciudades pequeñas
+   unas 10–20 veces respecto al orden de Google.** Lo mismo con Neiva: 3,6 K
+   en Ubersuggest, 4,5 en Trends.
+
+   Consecuencias:
+   - Barrancabermeja y Maturín se quedan en prioridad baja, como dice 6b.
+   - Las visitas que Computrabajo saca de esas páginas indican que la
+     página sirve cuando hay autoridad, no que la demanda sea grande.
+   - Soacha (2,4 K; Trends 5; 116 vacantes) va en el segundo grupo.
+   - Puerto Ordaz: 1,9 K frente a 390 de «ciudad guayana». Las dos son
+     pequeñas, pero **la gente dice Puerto Ordaz**, así que el hub tiene que
+     nombrarlo aunque el slug sea `ciudad-guayana`.
+   - Tierralta sigue fuera: 110/mes y 1 vacante.
+4. **«buscador de empleos» (12,1 K) frente a «busco trabajo» (3,6 K).** La
+   primera tiene más volumen y menor dificultad (SD 54 frente a 66), y
+   «bolsa de empleo» tiene 14,8 K con SD 16. Se mantiene la propuesta de la
+   sección 2: probar «buscador de empleos» y «bolsa de empleo» en la
+   descripción o un H2 de la portada, sin quitar «busco trabajo», que es
+   nuestra marca. El consejo del video tiene base, pero se aplica como
+   experimento medido.
+5. **Backlinks:** el top 10 de la cola larga necesita pocos. Los enlaces
+   valen más hacia los hubs nuevos (alcaldías, SENA, universidades por
+   ciudad) que hacia la portada.
+6. **Contenido de apoyo:** Computrabajo y elempleo sacan tráfico de
+   artículos útiles (festivos 2026, calculadora salarial, carta de
+   recomendación, SENA). Es una posible Fase D/E. No es prioritario frente
+   a los hubs, porque ese tráfico convierte peor a registro (sin medir).
+7. **Limpieza:** hay que decidir si `/empresas/elempleo` debe posicionar por
+   la marca del competidor, y sacar `/ve/dashboard` de los resultados en
+   favor de un hub de Venezuela. Hay que revisarlo con el runbook de SEO
+   antes de tocarlo.
+
+### 8.6 Prioridad revisada (sustituye a la sección 6)
+
+| #   | Página                                                                            | Volumen estimado (Ubersuggest)                      | Inventario                      | Fase              |
+| --- | --------------------------------------------------------------------------------- | --------------------------------------------------- | ------------------------------- | ----------------- |
+| 1   | `/empleos/remoto` (CO) + arreglar y mejorar `/ve/empleos/remoto`                   | 40,5 K CO; 9,9 K + 3,6 K VE                         | 2.528 CO; 1.290 VE              | Corrección + E    |
+| 2   | `/empleos/bogota/sin-experiencia`, `/empleos/sin-experiencia`, `/empleos/medellin/sin-experiencia`, Cali | 18,1 K; 9,9 K; 4,4 K; 6,6 K | Medir con el clasificador real | C |
+| 3   | Que los hubs grandes posicionen: Bogotá, Cali, Medellín, Barranquilla, Bucaramanga, Cartagena (6b) y Caracas, Valencia (posición 35–37); título «Trabajo en {ciudad}» | 14,8 K; 9,9 K; 12,1 K; 8,1 K; 6,6 K; 6,6 K; 8,1 K + 5,4 K; 2,9 K | Hubs existentes | E |
+| 4   | Fines de semana y medio tiempo (nacional, luego Medellín y Cali)                   | 12,1 K; 3,6 K; 2,4 K                                | 42 / 49 (texto)                 | C                 |
+| 5   | Portada: experimento con «buscador de empleos» / «bolsa de empleo»                 | 12,1 K / 14,8 K                                     | —                               | E                 |
+| 6   | Segundo grupo de ciudades: Pereira, Ibagué, Pasto, Villavicencio, Santa Marta, Soacha, Cúcuta, Neiva | 4,4 K c/u aprox.; Soacha 2,4 K; Neiva 3,6 K (Trends: 4–15) | Hubs existentes; Soacha 116 | E / C |
+| 7   | Puerto Ordaz dentro de `ciudad-guayana`; Barrancabermeja y Maturín en espera       | 1,9 K; 2,9 K; 2,9 K (Trends ≈ 0,5–2)                | 13; 60; 26                      | C, prioridad baja |
+
+Todo lo que sea página nueva cumple la guarda de la Fase C: al menos 10
+vacantes por clasificador real, noindex automático por debajo, y entrada en
+el sitemap solo si es indexable.
