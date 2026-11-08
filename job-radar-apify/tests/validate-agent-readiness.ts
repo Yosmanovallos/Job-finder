@@ -181,7 +181,11 @@ async function main(): Promise<void> {
     assert.equal(catalogHead.status, 200);
     assert.match(catalogHead.headers.get("link") || "", /rel="api-catalog"/);
 
-    for (const pathname of ["/.well-known/ai-catalog.json", "/.well-known/agent-skills/index.json", "/.well-known/mcp/server-card.json", "/.well-known/agent-card.json"]) {
+    // ARD: canonical /.well-known/ard.json serves the same manifest as the
+    // legacy ai-catalog.json, and every page advertises it with rel="ard".
+    assert.equal(await (await fetch(`${base}/.well-known/ard.json`)).text(), await (await fetch(`${base}/.well-known/ai-catalog.json`)).text());
+    assert.match((await fetch(`${base}/`)).headers.get("link") || "", /<\/\.well-known\/ard\.json>; rel="ard"/);
+    for (const pathname of ["/.well-known/ard.json", "/.well-known/ai-catalog.json", "/.well-known/agent-skills/index.json", "/.well-known/mcp/server-card.json", "/.well-known/agent-card.json"]) {
       const response = await fetch(`${base}${pathname}`);
       assert.equal(response.status, 200, pathname);
       assert.equal(response.headers.get("access-control-allow-origin"), "*", pathname);
