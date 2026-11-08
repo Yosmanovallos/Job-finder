@@ -1,6 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { ChevronDown, Check } from "lucide-react";
+// Per-icon modules, not the package root: Header is part of the server-
+// rendered homepage (src/server/home-ssr.tsx), and in Node the root resolves
+// to lucide's CommonJS bundle with every icon (~1 MB of code resident in the
+// web server). Same component and output; Vite tree-shook it either way.
+import ChevronDown from "lucide-react/dist/esm/icons/chevron-down.mjs";
+import Check from "lucide-react/dist/esm/icons/check.mjs";
 import { useAuth } from "../auth/auth-provider.js";
 import { PAYWALL_ENABLED } from "../config.js";
 import { FlagIcon } from "../components/FlagIcon.js";
@@ -118,7 +123,9 @@ function CountrySwitcher({ country, pathname, variant, onNavigate }: CountrySwit
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="listbox"
         aria-expanded={open}
-        aria-label={`País: ${COUNTRY_LABELS[country]}. Cambiar país`}
+        // Starts with the visible code ("CO"/"VE") so voice control can
+        // target it (WCAG 2.5.3, axe label-content-name-mismatch).
+        aria-label={`${country}, ${COUNTRY_LABELS[country]}: cambiar país`}
         className="flex items-center gap-1.5 h-11 rounded-full border-2 border-foreground bg-white px-3 text-sm font-bold text-foreground transition-colors hover:bg-green-soft focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gold-1/60"
       >
         <FlagIcon code={country} className="w-5 h-3.5 shrink-0" />

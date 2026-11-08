@@ -631,6 +631,11 @@ async function runHttpTests() {
     // each self-reference their own canonical (not both pointing at "/",
     // which told Google to consolidate "/ve" away) and carry the same
     // reciprocal hreflang pair + x-default.
+    // The home H1 is server rendered (classes + a <span>): compare its text.
+    const homeH1Text = (html: string): string => {
+      const match = html.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/);
+      return match ? match[1].replace(/<[^>]+>/g, "").trim() : "";
+    };
     const homeHtml = await (await fetch(`${BASE_URL}/`)).text();
     const veHtml = await (await fetch(`${BASE_URL}/ve`)).text();
     check(
@@ -655,9 +660,9 @@ async function runHttpTests() {
     }
     check(
       homeHtml.includes("<title>Busco trabajo en Colombia: ofertas de empleo | BuscoTrabajo</title>") &&
-        homeHtml.includes("<h1>Busco trabajo en Colombia: todas las ofertas de empleo en un solo lugar</h1>") &&
+        homeH1Text(homeHtml) === "Busco trabajo en Colombia: todas las ofertas de empleo en un solo lugar" &&
         veHtml.includes("<title>Busco trabajo en Venezuela: ofertas de empleo | BuscoTrabajo</title>") &&
-        veHtml.includes("<h1>Busco trabajo en Venezuela: todas las ofertas de empleo en un solo lugar</h1>") &&
+        homeH1Text(veHtml) === "Busco trabajo en Venezuela: todas las ofertas de empleo en un solo lugar" &&
         veHtml.includes('"alternateName": ["Busco Trabajo", "BuscoTrabajo.co"]'),
       "/ y /ve orientan title/H1 a la intención exacta 'busco trabajo', conservan el país correcto y declaran el nombre alternativo de marca.",
       "La portada de Colombia o Venezuela no sirve el nuevo title/H1 de intención, o falta alternateName en el HTML crudo."

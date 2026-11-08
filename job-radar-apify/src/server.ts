@@ -73,6 +73,7 @@ import { StaleWhileRevalidateCache } from "./lib/stale-while-revalidate-cache.js
 import { isPlaceholderEmployer } from "./lib/company-key.js";
 import { COMPANY_LOGO_DOMAINS, getCompanyLogoUrl } from "./data/company-logo-domains.js";
 import { handleLogoRoute, isLogoRoute } from "./server/routes/logo-proxy.js";
+import type { HomeSsrSeed } from "./lib/home-ssr-seed.js";
 import { getOfficialCareersUrl } from "./data/official-careers-links.js";
 import { getCountryConfig } from "./countries/index.js";
 import { PAYWALL_ENABLED } from "./config.js";
@@ -147,6 +148,7 @@ import {
   getHomeContent,
   injectPublicContent,
   injectRouteMeta,
+  renderContentHtml,
   renderContentMarkdown,
   wantsMarkdown
 } from "./lib/agent-readiness.js";
@@ -575,6 +577,143 @@ function readSmallBody(req: http.IncomingMessage, maxBytes: number): Promise<str
   });
 } // { plan?: "pro" | "pro_max" } — tiny payload, generous cap
 
+// Every figure the homepage shows, for GET /api/home-stats and for the
+// server render of "/" and "/ve". Both queries are cached in the repository
+// (homeJobCountsCache / homeCompaniesCache). A part whose query fails comes
+// back null/empty and `complete` is false.
+async function loadHomeStats(country: string): Promise<{ body: HomeData; complete: boolean }> {
+  const cities = getHomeCities(country);
+  const [counts, companies] = await Promise.allSettled([
+    getHomeJobCounts(country, cities),
+    getHomeCompanies(country, 12, Object.keys(COMPANY_LOGO_DOMAINS))
+  ]);
+  const jobs = counts.status === "fulfilled" ? counts.value : null;
+  const companyPage = companies.status === "fulfilled" ? companies.value : null;
+  const latest = jobs ? maskLockedFields(jobs.latestJobs, "free") : [];
+  const body: HomeData = {
+    totalJobs: jobs?.totalJobs ?? null,
+    last7Days: jobs?.last7Days ?? null,
+    last24Hours: jobs?.last24Hours ?? null,
+    onSite: jobs?.onSite ?? null,
+    remote: jobs?.remote ?? null,
+    totalCompanies: companyPage?.total ?? null,
+    cityCounts: Object.fromEntries(cities.map((city) => [city, jobs?.cityCounts[city] ?? null])),
+    latestJobs: latest.map((job) => ({
+      jobId: job.jobId,
+      title: job.title,
+      company: job.company,
+      location: job.location,
+      source: job.source,
+      dateText: job.dateText,
+      publishedAt: job.publishedAt
+    })),
+    companies: (companyPage?.companies ?? []).map((item) => ({
+      company: item.company,
+      count: item.count,
+      logoUrl: getCompanyLogoUrl(item.company)
+    }))
+  };
+  if (!jobs || !companyPage) {
+    console.warn(
+      JSON.stringify({
+        ts: new Date().toISOString(),
+        event: "home_stats_partial",
+        country,
+        countsFailed: !jobs,
+        companiesFailed: !companyPage
+      })
+    );
+  }
+  return { body, complete: Boolean(jobs && companyPage) };
+}
+
+// Server render of the homepage (src/server/home-ssr.tsx) — the real page
+// instead of the plain snippet React used to replace on mount (the unstyled
+// text visitors saw flash). Loaded lazily so server startup and every other
+// route are untouched; any failure falls back to the snippet. Figures wait
+// at most HOME_SSR_DATA_WAIT_MS on a cold cache, then the page renders
+// without them and the browser fetches them as before.
+//
+// Cache per country × layout so the home never waits on the database once
+// warm: one render in flight per key (concurrent misses share it), an
+// expired entry is served immediately while it refreshes in the background
+// (stale-while-revalidate), and a render missing figures (slow or failing
+// DB) only lives HOME_SSR_PARTIAL_TTL_MS so it is retried soon without
+// making every request pay the wait.
+const HOME_SSR_DATA_WAIT_MS = 1200;
+const HOME_SSR_HTML_TTL_MS = 60_000;
+const HOME_SSR_PARTIAL_TTL_MS = 15_000;
+type HomeSsrResult = { html: string; seed: HomeSsrSeed; expiresAt: number };
+const homeSsrCache = new Map<string, HomeSsrResult>();
+const homeSsrInFlight = new Map<string, Promise<HomeSsrResult | null>>();
+
+function isMobileRequest(req: http.IncomingMessage): boolean {
+  const hint = req.headers["sec-ch-ua-mobile"];
+  if (hint === "?1") return true;
+  if (hint === "?0") return false;
+  // Android phones say "Mobile"; bare "Android" is a tablet → desktop layout.
+  return /Mobi|iPhone|iPod|Opera Mini|IEMobile/i.test(req.headers["user-agent"] || "");
+}
+
+async function renderHomeSsr(country: "CO" | "VE", desktop: boolean): Promise<HomeSsrResult | null> {
+  const key = `${country}:${desktop ? "d" : "m"}`;
+  const cached = homeSsrCache.get(key);
+  if (cached && Date.now() < cached.expiresAt) return cached;
+  let pending = homeSsrInFlight.get(key);
+  if (!pending) {
+    pending = buildHomeSsr(country, desktop)
+      .then((result) => {
+        if (result) homeSsrCache.set(key, result);
+        return result;
+      })
+      .finally(() => homeSsrInFlight.delete(key));
+    homeSsrInFlight.set(key, pending);
+  }
+  // Stale entry: answer now, the refresh above completes in the background.
+  if (cached) return cached;
+  return pending;
+}
+
+async function buildHomeSsr(country: "CO" | "VE", desktop: boolean): Promise<HomeSsrResult | null> {
+  try {
+    const stats = await Promise.race([
+      loadHomeStats(country),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), HOME_SSR_DATA_WAIT_MS).unref())
+    ]);
+    const { renderHomeAppHtml } = await import("./server/home-ssr.js");
+    const seed = {
+      country,
+      data: stats?.body ?? EMPTY_HOME_DATA,
+      desktop,
+      now: new Date().toISOString()
+    };
+    const html = renderHomeAppHtml(country === "VE" ? "/ve" : "/", seed);
+    return { html, seed, expiresAt: Date.now() + (stats?.complete ? HOME_SSR_HTML_TTL_MS : HOME_SSR_PARTIAL_TTL_MS) };
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        ts: new Date().toISOString(),
+        event: "home_ssr_failed",
+        country,
+        error: error instanceof Error ? error.message : String(error)
+      })
+    );
+    return null;
+  }
+}
+
+const EMPTY_HOME_DATA: HomeData = {
+  totalJobs: null,
+  last7Days: null,
+  last24Hours: null,
+  onSite: null,
+  remote: null,
+  totalCompanies: null,
+  cityCounts: {},
+  latestJobs: [],
+  companies: []
+};
+
 // Native Node HTTP Server
 const server = http.createServer((req, res) => {
   void handleRequest(req, res).catch((error: unknown) => {
@@ -599,7 +738,8 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
   // while public HTML can be shared briefly without making vacancies stale.
   // Personalized APIs must never enter a shared cache.
   if (method === "GET" || method === "HEAD") {
-    if (pathname.startsWith("/assets/")) {
+    if (pathname.startsWith("/assets/") || pathname.startsWith("/fonts/")) {
+      // /fonts/ files are never edited in place: a new font gets a new name.
       res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
     } else if (pathname.startsWith("/api/")) {
       res.setHeader("Cache-Control", "private, no-store");
@@ -751,48 +891,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       res.end(JSON.stringify({ error: "País no soportado" }));
       return;
     }
-    const cities = getHomeCities(country);
-    const [counts, companies] = await Promise.allSettled([
-      getHomeJobCounts(country, cities),
-      getHomeCompanies(country, 12, Object.keys(COMPANY_LOGO_DOMAINS))
-    ]);
-    const jobs = counts.status === "fulfilled" ? counts.value : null;
-    const companyPage = companies.status === "fulfilled" ? companies.value : null;
-    const latest = jobs ? maskLockedFields(jobs.latestJobs, "free") : [];
-    const body: HomeData = {
-      totalJobs: jobs?.totalJobs ?? null,
-      last7Days: jobs?.last7Days ?? null,
-      last24Hours: jobs?.last24Hours ?? null,
-      onSite: jobs?.onSite ?? null,
-      remote: jobs?.remote ?? null,
-      totalCompanies: companyPage?.total ?? null,
-      cityCounts: Object.fromEntries(cities.map((city) => [city, jobs?.cityCounts[city] ?? null])),
-      latestJobs: latest.map((job) => ({
-        jobId: job.jobId,
-        title: job.title,
-        company: job.company,
-        location: job.location,
-        source: job.source,
-        dateText: job.dateText,
-        publishedAt: job.publishedAt
-      })),
-      companies: (companyPage?.companies ?? []).map((item) => ({
-        company: item.company,
-        count: item.count,
-        logoUrl: getCompanyLogoUrl(item.company)
-      }))
-    };
-    if (!jobs || !companyPage) {
-      console.warn(
-        JSON.stringify({
-          ts: new Date().toISOString(),
-          event: "home_stats_partial",
-          country,
-          countsFailed: !jobs,
-          companiesFailed: !companyPage
-        })
-      );
-    }
+    const { body, complete } = await loadHomeStats(country);
     await sendBody(
       req,
       res,
@@ -800,7 +899,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       {
         "Content-Type": "application/json",
         "Cache-Control":
-          jobs && companyPage ? "public, max-age=60, s-maxage=300, stale-while-revalidate=600" : "private, no-store"
+          complete ? "public, max-age=60, s-maxage=300, stale-while-revalidate=600" : "private, no-store"
       },
       JSON.stringify(body)
     );
@@ -2695,6 +2794,30 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     // post-hydration DOM never disagree.
     indexHtml = injectPublicContent(indexHtml, homeContent);
 
+    // Real page instead of that snippet when the server render succeeds
+    // (src/server/home-ssr.tsx): same H1 text, plus every section the
+    // visitor sees, and index.tsx hydrates it instead of replacing it — no
+    // unstyled flash, and LCP is the server-painted node. The seed lets the
+    // client's first render match the HTML exactly. On failure the snippet
+    // above stays, exactly as before.
+    const ssr = await renderHomeSsr(isVe ? "VE" : "CO", !isMobileRequest(req));
+    if (ssr) {
+      const snippetDiv = `<div id="app">${renderContentHtml(homeContent)}</div>`;
+      if (indexHtml.includes(snippetDiv)) {
+        indexHtml = indexHtml
+          .replace(snippetDiv, () => `<div id="app" data-ssr="home">${ssr.html}</div>`)
+          // The page is already painted from this HTML; the app bundle only
+          // hydrates it. Low fetch priority keeps it out of the way of the
+          // CSS and the first paint on slow phones.
+          .replace(/<script type="module" crossorigin src="/g, '<script type="module" fetchpriority="low" crossorigin src="')
+          .replace(/<link rel="modulepreload" crossorigin href="/g, '<link rel="modulepreload" fetchpriority="low" crossorigin href="')
+          .replace(
+            "</head>",
+            () => `  <script>window.__SSR_HOME__=${escapeJsonForScriptTag(ssr.seed)};</script>\n</head>`
+          );
+      }
+    }
+
     const selfUrl = isVe ? `${SITE_URL}/ve` : `${SITE_URL}/`;
     indexHtml = indexHtml.replace(
       /<link[^>]*rel=["']canonical["'][^>]*>/,
@@ -2750,7 +2873,8 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       {
         "Content-Type": "text/html; charset=utf-8",
         "Cache-Control": "private, no-store",
-        Vary: "Accept",
+        // Layout (desktop art or not) is chosen from Sec-CH-UA-Mobile / UA.
+        Vary: "Accept, User-Agent, Sec-CH-UA-Mobile",
         Link: DISCOVERY_LINKS
       },
       indexHtml
@@ -2851,7 +2975,9 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     ".webp": "image/webp",
     ".jpg": "image/jpeg",
     ".jpeg": "image/jpeg",
-    ".ico": "image/x-icon"
+    ".ico": "image/x-icon",
+    // Self-hosted web fonts (static/fonts/).
+    ".woff2": "font/woff2"
   };
 
   const contentType = mimeTypes[ext] || "text/plain";

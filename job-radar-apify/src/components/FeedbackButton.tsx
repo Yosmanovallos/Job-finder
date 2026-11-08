@@ -16,7 +16,9 @@ export default function FeedbackButton() {
     <Link
       to="/opiniones"
       state={state}
-      aria-label="Califica BuscoTrabajo y danos tu opinión"
+      // Starts with the visible text ("Califícanos…") so voice-control users
+      // can say what they see (WCAG 2.5.3, axe label-content-name-mismatch).
+      aria-label="Califícanos y opina sobre BuscoTrabajo"
       className="ink-card-sm ink-lift fixed z-30 right-3 md:right-6 bottom-[calc(76px+env(safe-area-inset-bottom))] md:bottom-6 inline-flex items-center gap-2 h-11 rounded-full bg-white px-4 text-sm font-bold text-foreground no-underline"
     >
       <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" className="text-gold-2" fill="currentColor" stroke="hsl(var(--foreground))" strokeWidth={1.6} strokeLinejoin="round">

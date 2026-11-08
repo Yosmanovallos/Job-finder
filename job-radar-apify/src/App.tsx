@@ -222,6 +222,17 @@ export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
+        <AppBody />
+      </BrowserRouter>
+    </AuthProvider>
+  );
+}
+
+// Everything inside the router, shared by the browser (BrowserRouter above)
+// and the server's home render (src/server/home-ssr.tsx, StaticRouter) so
+// both produce the same tree for hydrateRoot.
+export function AppBody() {
+  return (
         <SavedJobsProvider>
         <ScrollToTop />
         {/* No overflow-x-hidden here: setting overflow-x alone forces the
@@ -250,7 +261,5 @@ export default function App() {
           <FeedbackButton />
         </div>
         </SavedJobsProvider>
-      </BrowserRouter>
-    </AuthProvider>
   );
 }
