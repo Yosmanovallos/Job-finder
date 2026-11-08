@@ -163,6 +163,12 @@ async function main(): Promise<void> {
     const robots = await fetch(`${base}/robots.txt`);
     const robotsText = await robots.text();
     assert.match(robotsText, /Content-Signal: ai-train=no, search=yes, ai-input=yes/);
+    // Lighthouse "robots.txt is not valid": every non-comment line must be a
+    // known directive. "Agentmap:" is not one (it lives as a comment now).
+    assert.doesNotMatch(robotsText, /^Agentmap:/m);
+    // Lighthouse "llms.txt": an H1 plus at least one Markdown link.
+    assert.match(llmsText, /^# /m);
+    assert.match(llmsText, /\[[^\]]+\]\(https:\/\/buscotrabajo\.co\/docs\)/);
     const sitemap = await fetch(`${base}/sitemap-pages.xml`);
     const sitemapText = await sitemap.text();
     for (const pathname of ["/docs", "/about", "/contact", "/privacy"]) assert.match(sitemapText, new RegExp(`<loc>https://buscotrabajo.co${pathname}</loc>`));

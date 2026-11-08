@@ -9,4 +9,7 @@ Disallow: /api/
 Content-Signal: ai-train=no, search=yes, ai-input=yes
 
 Sitemap: https://buscotrabajo.co/sitemap.xml
-Agentmap: https://buscotrabajo.co/.well-known/ai-catalog.json
+# Agent discovery (ARD): https://buscotrabajo.co/.well-known/ai-catalog.json
+# Kept as a comment: "Agentmap" is not a robots.txt directive (RFC 9309)
+# and Lighthouse reports it as invalid. The catalog stays discoverable via
+# /.well-known and the Link headers.

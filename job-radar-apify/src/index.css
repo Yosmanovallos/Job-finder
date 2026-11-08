@@ -323,6 +323,13 @@
         animation-timeline: view();
         animation-range: cover 0% cover 100%;
       }
+      /* Dark bands (bg-foreground): light text that is half-faded over the
+         near-black background drops below WCAG AA (Lighthouse measured
+         2.49:1 on the stats band at load, mid-animation). Keep the rise
+         and scale there, but never fade the opacity. */
+      .bg-foreground .sr {
+        animation-name: sr-y-solid;
+      }
       /* Small per-column offset so a grid row cascades instead of moving
          as one block. */
       .sr-stagger > .sr:nth-child(4n + 2) {
@@ -373,6 +380,20 @@
     }
     100% {
       opacity: 0;
+      transform: translate3d(0, -32px, 0) scale(0.97);
+    }
+  }
+  @keyframes sr-y-solid {
+    0% {
+      transform: translate3d(0, 48px, 0) scale(0.96);
+    }
+    20% {
+      transform: none;
+    }
+    92% {
+      transform: none;
+    }
+    100% {
       transform: translate3d(0, -32px, 0) scale(0.97);
     }
   }

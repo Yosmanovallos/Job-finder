@@ -225,7 +225,7 @@ export default function Header() {
           className="flex shrink-0 items-center rounded-md focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gold-1/60"
           aria-label="BuscoTrabajo — inicio"
         >
-          <img src="/BT.png" alt="BuscoTrabajo.co" className="block h-7 w-auto" />
+          <img src="/BT.png" alt="BuscoTrabajo.co" width={482} height={59} className="block h-7 w-auto" />
         </Link>
 
         <nav className="hidden lg:flex items-center gap-1" aria-label="Navegación principal">
