@@ -73,6 +73,7 @@ import { StaleWhileRevalidateCache } from "./lib/stale-while-revalidate-cache.js
 import { isPlaceholderEmployer } from "./lib/company-key.js";
 import { COMPANY_LOGO_DOMAINS, getCompanyLogoUrl } from "./data/company-logo-domains.js";
 import { handleLogoRoute, isLogoRoute } from "./server/routes/logo-proxy.js";
+import type { HomeSsrSeed } from "./lib/home-ssr-seed.js";
 import { getOfficialCareersUrl } from "./data/official-careers-links.js";
 import { getCountryConfig } from "./countries/index.js";
 import { PAYWALL_ENABLED } from "./config.js";
@@ -642,7 +643,7 @@ async function loadHomeStats(country: string): Promise<{ body: HomeData; complet
 const HOME_SSR_DATA_WAIT_MS = 1200;
 const HOME_SSR_HTML_TTL_MS = 60_000;
 const HOME_SSR_PARTIAL_TTL_MS = 15_000;
-type HomeSsrResult = { html: string; seed: import("./lib/home-ssr-seed.js").HomeSsrSeed; expiresAt: number };
+type HomeSsrResult = { html: string; seed: HomeSsrSeed; expiresAt: number };
 const homeSsrCache = new Map<string, HomeSsrResult>();
 const homeSsrInFlight = new Map<string, Promise<HomeSsrResult | null>>();
 

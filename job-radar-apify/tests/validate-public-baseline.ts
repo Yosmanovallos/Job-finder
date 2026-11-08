@@ -151,7 +151,21 @@ async function main(): Promise<void> {
           { width: 1440, height: 900 },
           { width: 390, height: 844 }
         ]) {
-          const context = await browser.newContext({ viewport, serviceWorkers: "block" });
+          // The 390 px pass is a real phone (mobile UA + touch), so the home
+          // SSR picks its phone layout and its hydration is exercised too.
+          const phone = viewport.width < 768;
+          const context = await browser.newContext({
+            viewport,
+            serviceWorkers: "block",
+            ...(phone
+              ? {
+                  isMobile: true,
+                  hasTouch: true,
+                  userAgent:
+                    "Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36"
+                }
+              : {})
+          });
           await context.route("**/*", (request) =>
             new URL(request.request().url()).origin === base ? request.continue() : request.abort()
           );
@@ -170,6 +184,11 @@ async function main(): Promise<void> {
               await page.locator("#app").getAttribute("data-ssr"),
               "home",
               `[P0] ${route} no llegó renderizada desde el servidor.`
+            );
+            assert.equal(
+              await page.evaluate(() => (window as unknown as { __SSR_HOME__?: { desktop: boolean } }).__SSR_HOME__?.desktop),
+              !phone,
+              `[P0] ${route} eligió el layout equivocado para ${viewport.width}px.`
             );
           }
           if (categoryRoutes.has(route)) {

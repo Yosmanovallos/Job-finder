@@ -172,8 +172,12 @@ function Hero({ country, data }: { country: string; data: HomeData }) {
             Una sola búsqueda en {SOURCES_BY_COUNTRY[country]?.slice(1, 4).join(", ") ?? "los principales portales"} y más. Sin repetidas, sin vencidas, gratis.
           </p>
 
+          {/* action/name: a search sent before hydration (slow phones) still
+              lands on the dashboard with ?search=, instead of reloading "/". */}
           <form
             role="search"
+            action={dashboardPath}
+            method="get"
             onSubmit={submit}
             className="mt-6 md:mt-8 max-w-[620px] md:ink-card md:rounded-[22px] md:bg-white md:p-3.5 flex flex-col gap-2.5 md:shadow-[6px_6px_0_hsl(var(--foreground))]"
           >
@@ -184,6 +188,7 @@ function Hero({ country, data }: { country: string; data: HomeData }) {
               <SearchIcon className="w-5 h-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground md:hidden" />
               <input
                 id="home-search"
+                name="search"
                 type="search"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
