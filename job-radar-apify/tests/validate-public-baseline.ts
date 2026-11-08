@@ -157,8 +157,21 @@ async function main(): Promise<void> {
           );
           const page = await context.newPage();
           page.on("pageerror", (error) => pageErrors.push(error.message));
+          // Homepage SSR (index.tsx): a hydration mismatch makes React throw
+          // the server DOM away and re-render — the flash and the LCP cost
+          // the SSR exists to avoid. index.tsx logs it as a console warning.
+          page.on("console", (message) => {
+            if (message.text().includes("[home-ssr] hydration mismatch")) pageErrors.push(message.text());
+          });
           await page.goto(`${base}${route}`, { waitUntil: "networkidle", timeout: 15000 });
           await page.locator("#app").waitFor({ state: "visible", timeout: 10000 });
+          if (route === "/" || route === "/ve") {
+            assert.equal(
+              await page.locator("#app").getAttribute("data-ssr"),
+              "home",
+              `[P0] ${route} no llegó renderizada desde el servidor.`
+            );
+          }
           if (categoryRoutes.has(route)) {
             const overview = page.locator("[data-category-overview]");
             await overview.waitFor({ state: "visible", timeout: 10000 });

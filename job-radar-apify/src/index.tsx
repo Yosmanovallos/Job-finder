@@ -33,11 +33,17 @@ if (homeSeed && container.dataset.ssr === "home") {
   // the HTML; a mismatch would make React re-render the page from scratch,
   // so it is logged for the performance checks to catch.
   setHomeSsrSeed(homeSeed);
-  ReactDOM.hydrateRoot(container, tree, {
-    onRecoverableError(error) {
-      console.warn("[home-ssr] hydration mismatch", error);
-    }
-  });
+  const hydrate = () =>
+    ReactDOM.hydrateRoot(container, tree, {
+      onRecoverableError(error) {
+        console.warn("[home-ssr] hydration mismatch", error);
+      }
+    });
+  // The server HTML is already the finished page, so let the browser paint
+  // it before hydration takes the main thread (~1 s of CPU on a throttled
+  // phone). Without this the first paint waited for hydration to finish.
+  // rAF fires just before the next paint; the timeout runs right after it.
+  requestAnimationFrame(() => setTimeout(hydrate, 0));
 } else {
   // Every other route still replaces the server's plain SEO snippet.
   ReactDOM.createRoot(container).render(tree);

@@ -737,7 +737,8 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
   // while public HTML can be shared briefly without making vacancies stale.
   // Personalized APIs must never enter a shared cache.
   if (method === "GET" || method === "HEAD") {
-    if (pathname.startsWith("/assets/")) {
+    if (pathname.startsWith("/assets/") || pathname.startsWith("/fonts/")) {
+      // /fonts/ files are never edited in place: a new font gets a new name.
       res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
     } else if (pathname.startsWith("/api/")) {
       res.setHeader("Cache-Control", "private, no-store");
@@ -2804,6 +2805,11 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       if (indexHtml.includes(snippetDiv)) {
         indexHtml = indexHtml
           .replace(snippetDiv, () => `<div id="app" data-ssr="home">${ssr.html}</div>`)
+          // The page is already painted from this HTML; the app bundle only
+          // hydrates it. Low fetch priority keeps it out of the way of the
+          // CSS and the first paint on slow phones.
+          .replace(/<script type="module" crossorigin src="/g, '<script type="module" fetchpriority="low" crossorigin src="')
+          .replace(/<link rel="modulepreload" crossorigin href="/g, '<link rel="modulepreload" fetchpriority="low" crossorigin href="')
           .replace(
             "</head>",
             () => `  <script>window.__SSR_HOME__=${escapeJsonForScriptTag(ssr.seed)};</script>\n</head>`
@@ -2968,7 +2974,9 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     ".webp": "image/webp",
     ".jpg": "image/jpeg",
     ".jpeg": "image/jpeg",
-    ".ico": "image/x-icon"
+    ".ico": "image/x-icon",
+    // Self-hosted web fonts (static/fonts/).
+    ".woff2": "font/woff2"
   };
 
   const contentType = mimeTypes[ext] || "text/plain";

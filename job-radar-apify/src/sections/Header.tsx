@@ -123,7 +123,9 @@ function CountrySwitcher({ country, pathname, variant, onNavigate }: CountrySwit
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="listbox"
         aria-expanded={open}
-        aria-label={`País: ${COUNTRY_LABELS[country]}. Cambiar país`}
+        // Starts with the visible code ("CO"/"VE") so voice control can
+        // target it (WCAG 2.5.3, axe label-content-name-mismatch).
+        aria-label={`${country}, ${COUNTRY_LABELS[country]}: cambiar país`}
         className="flex items-center gap-1.5 h-11 rounded-full border-2 border-foreground bg-white px-3 text-sm font-bold text-foreground transition-colors hover:bg-green-soft focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gold-1/60"
       >
         <FlagIcon code={country} className="w-5 h-3.5 shrink-0" />
