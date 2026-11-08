@@ -369,6 +369,8 @@ async function handleAdmittedAgentRoute(
     return true;
   }
   const machineResources: Record<string, string> = {
+    // ARD manifest: canonical location plus the legacy one it started at.
+    "/.well-known/ard.json": aiCatalogBody,
     "/.well-known/ai-catalog.json": aiCatalogBody,
     "/.well-known/agent-skills/index.json": skillsIndexBody,
     "/.well-known/mcp/server-card.json": mcpCardBody,

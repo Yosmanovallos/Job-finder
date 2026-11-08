@@ -72,6 +72,7 @@ import type { Job } from "./sources/types.js";
 import { StaleWhileRevalidateCache } from "./lib/stale-while-revalidate-cache.js";
 import { isPlaceholderEmployer } from "./lib/company-key.js";
 import { COMPANY_LOGO_DOMAINS, getCompanyLogoUrl } from "./data/company-logo-domains.js";
+import { handleLogoRoute, isLogoRoute } from "./server/routes/logo-proxy.js";
 import { getOfficialCareersUrl } from "./data/official-careers-links.js";
 import { getCountryConfig } from "./countries/index.js";
 import { PAYWALL_ENABLED } from "./config.js";
@@ -693,6 +694,12 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       res.writeHead(429, { "Content-Type": "application/json", "Retry-After": "60" });
       res.end(JSON.stringify({ error: "Demasiadas solicitudes — intenta de nuevo en un minuto." }));
     }
+    return;
+  }
+
+  // Curated company/portal favicons, same-origin (see logo-proxy.ts).
+  if (isLogoRoute(pathname)) {
+    await handleLogoRoute(req, res, { pathname, method });
     return;
   }
 

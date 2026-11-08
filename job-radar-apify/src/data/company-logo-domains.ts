@@ -1,3 +1,5 @@
+import { logoPathFor } from "../lib/logo-path.js";
+
 // Hand-verified `jobs.company` (exact raw string) -> employer's own domain,
 // for the small curated subset of companies BuscoTrabajo already trusts a
 // real identity for: scripts/seed-merco-aliases.ts (Merco Talento) and
@@ -122,6 +124,11 @@ export const COMPANY_LOGO_DOMAINS: Record<string, string> = {
   "Kuehne+Nagel": "kuehne-nagel.com"
 };
 
+// Served same-origin at /logo/<domain>.ico (src/server/routes/logo-proxy.ts),
+// which fetches DuckDuckGo's icon service: the service 404s intermittently
+// even for domains that have an icon, and a hotlinked 404 is a console error
+// on every page that shows logos (Lighthouse Best Practices). The proxy
+// answers 204 instead, so the caller's fallback still kicks in silently.
 // DuckDuckGo's icon service — a single direct hop (no redirect chain), no
 // auth, no cost, no stored copy on our side. Switched from Google's
 // `s2/favicons` (used at first) after it turned out to 301-redirect to a
@@ -141,5 +148,5 @@ export function getCompanyLogoUrl(rawCompanyName: string | null | undefined): st
   if (!rawCompanyName) return null;
   const domain = COMPANY_LOGO_DOMAINS[rawCompanyName];
   if (!domain) return null;
-  return `https://icons.duckduckgo.com/ip3/${encodeURIComponent(domain)}.ico`;
+  return logoPathFor(domain);
 }

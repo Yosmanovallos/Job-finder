@@ -139,7 +139,7 @@ export default function Login() {
         <aside className="relative hidden overflow-hidden rounded-[28px] bg-green-deep p-10 text-white lg:flex lg:flex-col lg:justify-between">
           <div aria-hidden="true" className="absolute -right-24 -top-32 h-[420px] w-[420px] rounded-full bg-[radial-gradient(circle,rgba(212,165,55,0.45),rgba(212,165,55,0)_65%)]" />
           <div className="relative">
-            <img src="/BT.png" alt="" className="h-8 w-auto rounded bg-white p-1" />
+            <img src="/BT.png" alt="" width={482} height={59} className="h-8 w-auto rounded bg-white p-1" />
             <p className="mt-10 font-heading text-[40px] font-bold leading-[1.05] tracking-[-0.03em]">
               Tu búsqueda de empleo, en un solo lugar
             </p>
@@ -159,7 +159,7 @@ export default function Login() {
         </aside>
 
         <div className="ink-card rounded-[28px] bg-white p-6 md:p-9 md:shadow-[8px_8px_0_hsl(var(--foreground))]">
-          <img src="/BT.png" alt="BuscoTrabajo.co" className="mb-6 h-7 w-auto lg:hidden" />
+          <img src="/BT.png" alt="BuscoTrabajo.co" width={482} height={59} className="mb-6 h-7 w-auto lg:hidden" />
 
           {mode !== "forgot" && (
             <div role="tablist" aria-label="Acceso" className="mb-6 flex gap-1 rounded-xl border-2 border-foreground bg-[#f4f5f2] p-1">

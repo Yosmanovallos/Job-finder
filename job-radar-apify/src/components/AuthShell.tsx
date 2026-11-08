@@ -13,7 +13,7 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
   return (
     <section className="min-h-[calc(100vh-4rem)] bg-gradient-to-b from-green-soft to-white px-4 py-10 md:py-16">
       <div className="mx-auto w-full max-w-[460px] ink-card rounded-[28px] bg-white p-6 md:p-9 md:shadow-[8px_8px_0_hsl(var(--foreground))]">
-        <img src="/BT.png" alt="BuscoTrabajo.co" width={150} height={28} className="mb-6 h-7 w-auto" />
+        <img src="/BT.png" alt="BuscoTrabajo.co" width={482} height={59} className="mb-6 h-7 w-auto" />
         {children}
       </div>
     </section>

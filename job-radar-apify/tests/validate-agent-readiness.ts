@@ -163,6 +163,12 @@ async function main(): Promise<void> {
     const robots = await fetch(`${base}/robots.txt`);
     const robotsText = await robots.text();
     assert.match(robotsText, /Content-Signal: ai-train=no, search=yes, ai-input=yes/);
+    // Lighthouse "robots.txt is not valid": every non-comment line must be a
+    // known directive. "Agentmap:" is not one (it lives as a comment now).
+    assert.doesNotMatch(robotsText, /^Agentmap:/m);
+    // Lighthouse "llms.txt": an H1 plus at least one Markdown link.
+    assert.match(llmsText, /^# /m);
+    assert.match(llmsText, /\[[^\]]+\]\(https:\/\/buscotrabajo\.co\/docs\)/);
     const sitemap = await fetch(`${base}/sitemap-pages.xml`);
     const sitemapText = await sitemap.text();
     for (const pathname of ["/docs", "/about", "/contact", "/privacy"]) assert.match(sitemapText, new RegExp(`<loc>https://buscotrabajo.co${pathname}</loc>`));
@@ -175,7 +181,11 @@ async function main(): Promise<void> {
     assert.equal(catalogHead.status, 200);
     assert.match(catalogHead.headers.get("link") || "", /rel="api-catalog"/);
 
-    for (const pathname of ["/.well-known/ai-catalog.json", "/.well-known/agent-skills/index.json", "/.well-known/mcp/server-card.json", "/.well-known/agent-card.json"]) {
+    // ARD: canonical /.well-known/ard.json serves the same manifest as the
+    // legacy ai-catalog.json, and every page advertises it with rel="ard".
+    assert.equal(await (await fetch(`${base}/.well-known/ard.json`)).text(), await (await fetch(`${base}/.well-known/ai-catalog.json`)).text());
+    assert.match((await fetch(`${base}/`)).headers.get("link") || "", /<\/\.well-known\/ard\.json>; rel="ard"/);
+    for (const pathname of ["/.well-known/ard.json", "/.well-known/ai-catalog.json", "/.well-known/agent-skills/index.json", "/.well-known/mcp/server-card.json", "/.well-known/agent-card.json"]) {
       const response = await fetch(`${base}${pathname}`);
       assert.equal(response.status, 200, pathname);
       assert.equal(response.headers.get("access-control-allow-origin"), "*", pathname);

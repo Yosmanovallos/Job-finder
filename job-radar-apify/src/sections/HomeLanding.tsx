@@ -219,7 +219,7 @@ function Hero({ country, data }: { country: string; data: HomeData }) {
             </div>
           </div>
           <div className="home-float absolute left-0 bottom-0 w-[170px] overflow-hidden rounded-[26px] border-[6px] border-foreground bg-foreground shadow-[0_30px_60px_-20px_rgba(0,0,0,0.5)] -rotate-3">
-            <img src="/home/dash-mobile.webp" alt="" width={780} height={1688} decoding="async" className="block w-full h-auto" />
+            <img src="/home/dash-mobile-420.webp" alt="" width={420} height={909} decoding="async" className="block w-full h-auto" />
           </div>
           {formatCount(data.last24Hours) ? (
             <div className={`${T.small} ink-card-sm absolute right-2.5 top-0 rounded-[14px] bg-white px-4 py-3 rotate-2`}>
@@ -380,7 +380,7 @@ function Companies({ country, data }: { country: string; data: HomeData }) {
               <p className={`${T.body} mt-1.5 text-[#3d413e]`}>Un directorio con todas sus vacantes vigentes en un solo lugar.</p>
             </div>
             <div className="mx-[22px] overflow-hidden rounded-t-xl border-2 border-b-0 border-foreground">
-              <img src="/home/empresas.webp" alt="Directorio de empresas de BuscoTrabajo" loading="lazy" className="block w-full h-[220px] object-cover object-top" />
+              <img src="/home/empresas-840.webp" srcSet="/home/empresas-480.webp 480w, /home/empresas-840.webp 840w, /home/empresas.webp 1600w" sizes="(min-width: 768px) 440px, 100vw" width={840} height={525} alt="Directorio de empresas de BuscoTrabajo" loading="lazy" decoding="async" className="block w-full h-[220px] object-cover object-top" />
             </div>
           </div>
         </div>
@@ -550,7 +550,7 @@ function Why({ data }: { data: HomeData }) {
             <p className={`${T.body} mt-2 md:mb-5 text-[#3d413e]`}>Empresas, fuentes y fecha de la última publicación.</p>
           </div>
           <div className="hidden md:block mx-7 overflow-hidden rounded-t-xl border-2 border-b-0 border-foreground">
-            <img src="/home/city-bogota.webp" alt="Página de empleos en Bogotá" loading="lazy" className="block w-full h-[220px] object-cover object-top" />
+            <img src="/home/city-bogota-840.webp" srcSet="/home/city-bogota-480.webp 480w, /home/city-bogota-840.webp 840w, /home/city-bogota.webp 1600w" sizes="(min-width: 768px) 440px, 100vw" width={840} height={525} alt="Página de empleos en Bogotá" loading="lazy" decoding="async" className="block w-full h-[220px] object-cover object-top" />
           </div>
         </div>
         <div className="sr ink-card-sm md:ink-card ink-lift rounded-2xl md:rounded-3xl bg-primary text-white p-5 md:p-7 flex flex-col justify-between gap-3 md:gap-6">
@@ -566,7 +566,7 @@ function Why({ data }: { data: HomeData }) {
             </p>
           </div>
           <div className="hidden md:block mx-7 overflow-hidden rounded-t-xl border-2 border-b-0 border-foreground">
-            <img src="/home/dash-mobile.webp" alt="Vacantes recientes en el celular" loading="lazy" className="block w-full h-[220px] object-cover object-top" />
+            <img src="/home/dash-mobile-420.webp" srcSet="/home/dash-mobile-420.webp 420w, /home/dash-mobile.webp 780w" sizes="(min-width: 768px) 440px, 100vw" width={420} height={909} alt="Vacantes recientes en el celular" loading="lazy" decoding="async" className="block w-full h-[220px] object-cover object-top" />
           </div>
         </div>
       </div>
