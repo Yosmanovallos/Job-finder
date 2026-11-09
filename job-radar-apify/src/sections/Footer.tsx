@@ -105,7 +105,7 @@ export default function Footer() {
     <footer id="footer" className="border-t-2 border-foreground bg-[#fbfaf6] pb-16 md:pb-0">
       <div className="max-w-[1240px] mx-auto px-4 md:px-6 pt-[22px] md:pt-14 pb-6 md:pb-8 grid grid-cols-2 md:grid-cols-[repeat(auto-fit,minmax(190px,1fr))] gap-4 md:gap-8">
         <div className="col-span-2 md:col-span-1">
-          <img src="/BT.png" alt="Buscotrabajo.co" className="h-[18px] md:h-[22px] w-auto" />
+          <img src="/BT.png" alt="Buscotrabajo.co" width={482} height={59} className="h-[18px] md:h-[22px] w-auto" />
           <p className="hidden md:block mt-3.5 mb-[18px] text-sm leading-relaxed text-[#3d413e]">
             Todas las ofertas de empleo de Colombia en un solo lugar. Gratis.
           </p>

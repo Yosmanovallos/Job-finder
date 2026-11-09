@@ -23,6 +23,8 @@ export interface VerifiedSession {
   tier: "free" | "pro" | "pro_max";
   subscriptionEnd: string | null;
   preferredRoles: string[] | null;
+  /** Supabase `auth.users.created_at` (ISO), when the account was created. */
+  authCreatedAt: string | null;
 }
 
 function extractBearerToken(req: IncomingMessage): string | null {
@@ -55,6 +57,7 @@ export async function verifySession(req: IncomingMessage): Promise<VerifiedSessi
     name: appUser.name,
     tier: appUser.subscriptionTier,
     subscriptionEnd: appUser.subscriptionEnd,
-    preferredRoles: appUser.preferredRoles
+    preferredRoles: appUser.preferredRoles,
+    authCreatedAt: data.user.created_at || null
   };
 }

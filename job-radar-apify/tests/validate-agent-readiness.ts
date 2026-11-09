@@ -17,8 +17,15 @@ interface ApiErrorBody {
 }
 
 // Each caller states the response fields it asserts on.
+// Text of the page's single H1, tags stripped: the home H1 is server
+// rendered with classes and a <span> around its second half.
+function h1Text(html: string): string {
+  const match = html.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/);
+  return match ? match[1].replace(/<[^>]+>/g, "").replace(/<!-- -->/g, "").trim() : "";
+}
+
 async function json<T>(pathname: string, init?: RequestInit): Promise<{ response: Response; body: T }> {
-  const response = await fetch(`${base}${pathname}`, { signal: AbortSignal.timeout(10000), ...init });
+  const response = await fetch(`${base}${pathname}`, { signal: AbortSignal.timeout(10000), ...init, headers: { ...init?.headers, "X-Forwarded-For": pathname === "/api/v1/countries" ? "192.0.2.2" : pathname === "/mcp" ? "192.0.2.3" : pathname === "/a2a" ? "192.0.2.4" : "192.0.2.1" } });
   return { response, body: (await response.json()) as T };
 }
 
@@ -39,6 +46,12 @@ async function main(): Promise<void> {
       await delay(250);
     }
     assert.ok(ready, "El servidor de agent-readiness no inició.");
+    const coldStarted = performance.now();
+    const coldDashboard = await fetch(`${base}/dashboard?free-api-cold=${randomUUID()}`);
+    assert.equal(coldDashboard.status, 200);
+    await coldDashboard.arrayBuffer();
+    console.log(`Cold-process unique dashboard (synthetic database): ${Math.round(performance.now() - coldStarted)} ms.`);
+
 
     const home = await fetch(`${base}/`, { headers: { Accept: "text/html", "Accept-Encoding": "gzip" } });
     const homeHtml = await home.text();
@@ -48,7 +61,15 @@ async function main(): Promise<void> {
     assert.ok(textLength(homeHtml) >= 500);
     assert.equal((homeHtml.match(/<h1\b/g) || []).length, 1);
     assert.match(homeHtml, /<title>Busco trabajo en Colombia: ofertas de empleo \| BuscoTrabajo<\/title>/);
-    assert.match(homeHtml, /<h1>Busco trabajo en Colombia: todas las ofertas de empleo en un solo lugar<\/h1>/);
+    assert.equal(h1Text(homeHtml), "Busco trabajo en Colombia: todas las ofertas de empleo en un solo lugar");
+    // Server-rendered home (src/server/home-ssr.tsx): the real page, not the
+    // plain snippet React used to replace, and its descriptive copy is a
+    // visible section with the agent discovery links.
+    assert.match(homeHtml, /<div id="app" data-ssr="home">/);
+    assert.match(homeHtml, /window\.__SSR_HOME__=/);
+    assert.doesNotMatch(homeHtml, /data-public-content/);
+    assert.match(homeHtml, /aria-label="Sobre BuscoTrabajo"/);
+    for (const href of ["/llms.txt", "/sitemap.xml"]) assert.ok(homeHtml.includes(`href="${href}"`), href);
     assert.match(homeHtml, /"alternateName": \["Busco Trabajo", "BuscoTrabajo\.co"\]/);
     assert.match(homeHtml, /https:\/\/x\.com\/Buscotrabajoco/);
     assert.match(homeHtml, /href="\/docs"/);
@@ -62,7 +83,8 @@ async function main(): Promise<void> {
     const veHomeHtml = await veHome.text();
     assert.equal(veHome.status, 200);
     assert.match(veHomeHtml, /<title>Busco trabajo en Venezuela: ofertas de empleo \| BuscoTrabajo<\/title>/);
-    assert.match(veHomeHtml, /<h1>Busco trabajo en Venezuela: todas las ofertas de empleo en un solo lugar<\/h1>/);
+    assert.equal(h1Text(veHomeHtml), "Busco trabajo en Venezuela: todas las ofertas de empleo en un solo lugar");
+    assert.equal((veHomeHtml.match(/<h1\b/g) || []).length, 1);
     assert.match(veHomeHtml, /<meta property="og:locale" content="es_VE" \/>/);
 
     const sourcesPage = await fetch(`${base}/fuentes`, { headers: { Accept: "text/html" } });
@@ -157,6 +179,12 @@ async function main(): Promise<void> {
     const robots = await fetch(`${base}/robots.txt`);
     const robotsText = await robots.text();
     assert.match(robotsText, /Content-Signal: ai-train=no, search=yes, ai-input=yes/);
+    // Lighthouse "robots.txt is not valid": every non-comment line must be a
+    // known directive. "Agentmap:" is not one (it lives as a comment now).
+    assert.doesNotMatch(robotsText, /^Agentmap:/m);
+    // Lighthouse "llms.txt": an H1 plus at least one Markdown link.
+    assert.match(llmsText, /^# /m);
+    assert.match(llmsText, /\[[^\]]+\]\(https:\/\/buscotrabajo\.co\/docs\)/);
     const sitemap = await fetch(`${base}/sitemap-pages.xml`);
     const sitemapText = await sitemap.text();
     for (const pathname of ["/docs", "/about", "/contact", "/privacy"]) assert.match(sitemapText, new RegExp(`<loc>https://buscotrabajo.co${pathname}</loc>`));
@@ -169,7 +197,11 @@ async function main(): Promise<void> {
     assert.equal(catalogHead.status, 200);
     assert.match(catalogHead.headers.get("link") || "", /rel="api-catalog"/);
 
-    for (const pathname of ["/.well-known/ai-catalog.json", "/.well-known/agent-skills/index.json", "/.well-known/mcp/server-card.json", "/.well-known/agent-card.json"]) {
+    // ARD: canonical /.well-known/ard.json serves the same manifest as the
+    // legacy ai-catalog.json, and every page advertises it with rel="ard".
+    assert.equal(await (await fetch(`${base}/.well-known/ard.json`)).text(), await (await fetch(`${base}/.well-known/ai-catalog.json`)).text());
+    assert.match((await fetch(`${base}/`)).headers.get("link") || "", /<\/\.well-known\/ard\.json>; rel="ard"/);
+    for (const pathname of ["/.well-known/ard.json", "/.well-known/ai-catalog.json", "/.well-known/agent-skills/index.json", "/.well-known/mcp/server-card.json", "/.well-known/agent-card.json"]) {
       const response = await fetch(`${base}${pathname}`);
       assert.equal(response.status, 200, pathname);
       assert.equal(response.headers.get("access-control-allow-origin"), "*", pathname);
@@ -200,6 +232,41 @@ async function main(): Promise<void> {
     assert.equal(a2a.response.status, 200);
     assert.equal(a2a.body.result.kind, "message");
     assert.equal(a2a.body.result.parts[0].data.jobs.length, 1);
+
+    // A synthetic client cannot reset its free quota by changing protocol.
+    const quotaHeaders = { "X-Forwarded-For": "192.0.2.50" };
+    for (let i = 0; i < 5; i++) {
+      const response = await fetch(`${base}/api/v1/countries`, { headers: quotaHeaders });
+      assert.equal(response.status, 200);
+      assert.equal(response.headers.get("cache-control"), "private, no-store");
+      await response.arrayBuffer();
+    }
+    for (const pathname of ["/api/v1/countries", "/mcp", "/a2a"]) {
+      const response = await fetch(`${base}${pathname}`, {
+        method: pathname.startsWith("/api/") ? "HEAD" : "POST", headers: quotaHeaders
+      });
+      assert.equal(response.status, 429, pathname);
+      assert.ok(Number(response.headers.get("retry-after")) > 0);
+      assert.equal(response.headers.get("cache-control"), "private, no-store");
+      await response.arrayBuffer();
+    }
+    const sample = await fetch(`${base}/api/v1/jobs?country=CO`, {
+      headers: { "X-Forwarded-For": "192.0.2.51" }
+    });
+    assert.equal(sample.status, 200);
+    const sampleBody = await sample.json() as { jobs: unknown[]; pagination: { limit: number; hasMore: boolean } };
+    assert.ok(sampleBody.jobs.length <= 3);
+    assert.equal(sampleBody.pagination.limit, 3);
+    assert.equal(sampleBody.pagination.hasMore, false);
+    assert.equal(sample.headers.get("cache-control"), "private, no-store");
+    const unavailablePage = await fetch(`${base}/api/v1/jobs?offset=1`, {
+      headers: { "X-Forwarded-For": "192.0.2.51" }
+    });
+    assert.equal(unavailablePage.status, 400);
+    await unavailablePage.arrayBuffer();
+    const dashboardAfterQuota = await fetch(`${base}/dashboard?quota-regression=1`, { headers: quotaHeaders });
+    assert.equal(dashboardAfterQuota.status, 200);
+    await dashboardAfterQuota.arrayBuffer();
 
     // RFC 9728: el resource identifier debe ser idéntico a aquel en el que se
     // insertó el sufijo well-known. Servido en la raíz => origen sin ruta.

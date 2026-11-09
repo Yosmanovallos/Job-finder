@@ -21,11 +21,15 @@ const suites: Record<string, string[]> = {
     "validate-test-safety.test.ts",
     "validate-stale-cache.test.ts",
     "validate-job-internal-links.test.ts",
+    "validate-recent-jobs.test.ts",
     "validate-job-page-blocks.test.ts",
     "validate-ssr-dollar.test.ts",
     "validate-client-ip.test.ts",
     "validate-job-meta.test.ts",
+    "validate-employment-type-trust.test.ts",
     "validate-city-hub-stats.test.ts",
+    "validate-intent-pages.test.ts",
+    "validate-intent-wave2.test.ts",
     "validate-dashboard-filters.ts",
     "validate-role-matching.ts",
     "validate-job-search-intent.test.ts",
@@ -37,6 +41,7 @@ const suites: Record<string, string[]> = {
     "validate-fetch-context.test.ts",
     "validate-source-contract.test.ts",
     "validate-agent-readiness.test.ts",
+    "validate-public-api-limits.test.ts",
     "validate-page-meta.test.ts",
     "validate-source-closure.test.ts",
     "validate-job-freshness.test.ts",
@@ -68,7 +73,8 @@ const suites: Record<string, string[]> = {
     "validate-placeholder-employer.test.ts",
     "validate-auth-error-messages.test.ts",
     "validate-email-typo.test.ts",
-    "validate-site-feedback.test.ts"
+    "validate-site-feedback.test.ts",
+    "validate-first-touch.test.ts"
   ],
   integration: [
     "validate-isolated-database.ts",
@@ -102,7 +108,9 @@ const suites: Record<string, string[]> = {
   observability: ["validate-run-observability.ts"],
   pagination: ["validate-job-pagination.ts", "validate-search-narrowing.ts"],
   modality: ["validate-job-modality.test.ts", "validate-job-modality.ts"],
-  seo: ["validate-seo-job-pages.ts", "validate-job-page-blocks.ts"],
+  seo: ["validate-seo-job-pages.ts", "validate-job-page-blocks.ts", "validate-intent-pages.ts"],
+  "intent-bench": ["bench-intent-pages.ts"],
+  "intent-drift": ["drift-intent-pages.ts"],
   "job-page-blocks": ["validate-job-page-blocks.ts", "validate-job-page-blocks.test.ts"],
   companies: ["validate-company-identity.test.ts", "validate-companies-search.ts"],
   home: ["validate-home-stats.ts"],
@@ -120,7 +128,7 @@ const selection = process.argv[2] || "unit";
 const offline = selection === "unit" || selection === "job-render";
 if (!Object.hasOwn(suites, selection) || process.argv.slice(3).some((arg) => arg !== "--dry-run")) {
   throw new Error(
-    "[P0] Suite inválida. Usa unit, integration, job-render, sitemap, observability, pagination, modality, seo, companies, home, baseline, agent-readiness, job-seo, job-page-blocks, source-closure, job-freshness o direct; --dry-run es opcional."
+    "[P0] Suite inválida. Usa unit, integration, intent-bench, intent-drift, job-render, sitemap, observability, pagination, modality, seo, companies, home, baseline, agent-readiness, job-seo, job-page-blocks, source-closure, job-freshness o direct; --dry-run es opcional."
   );
 }
 

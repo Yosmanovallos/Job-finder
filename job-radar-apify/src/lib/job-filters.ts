@@ -10,6 +10,7 @@ import {
   type SearchPlan
 } from "./job-search-intent.js";
 import { classifyModality, isFreelanceProject, modalityForFilter } from "./job-modality.js";
+import type { ScheduleIntent } from "./job-schedule.js";
 
 // Shared between the server (GET /api/jobs, so a 10k+ job corpus is filtered
 // before it's ever serialized to the browser) and, previously, the client —
@@ -197,6 +198,13 @@ export interface JobFilterParams {
   // `country === value` alone; that silently drops every remote job (see
   // GET /api/jobs in server.ts for the same rule applied server-side).
   country?: string;
+  // Intent pages only (ADR 0012), never from a request parameter:
+  // "sin-experiencia" (job-experience.ts) and Google-ready rows only.
+  experience?: "sin-experiencia";
+  // Intent pages only (seo-intent-wave2), never from a request parameter:
+  // explicit title phrases of job-schedule.ts.
+  schedule?: ScheduleIntent;
+  googleReady?: boolean;
 }
 
 const normalizeText = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();

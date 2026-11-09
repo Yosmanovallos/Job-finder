@@ -8,6 +8,7 @@ import { countryNameFor } from "./country-codes.js";
 import { isPlaceholderEmployer } from "./company-key.js";
 import { getOfficialCareersUrl } from "../data/official-careers-links.js";
 import { reputationLabel, reputationReviewText, reputationScoreText } from "./reputation-labels.js";
+import { trustedEmploymentType } from "./employment-type-trust.js";
 
 export const SITE_URL = "https://buscotrabajo.co";
 // Job SEO V2 (docs/JOBPOSTING-GOOGLE-CONTRACT.md): there is deliberately no
@@ -241,7 +242,8 @@ export function buildJobPageBody(job: SeoJob): string {
     facts.push(`<li>Candidatos desde: ${escapeHtml(eligible.join(", "))}</li>`);
   const published = formatPublishedDate(job.publishedAt);
   if (published) facts.push(`<li>Publicada: ${escapeHtml(published)}</li>`);
-  if (job.employmentType) facts.push(`<li>Tipo de empleo: ${escapeHtml(job.employmentType)}</li>`);
+  const employmentType = trustedEmploymentType(job.source, job.employmentType);
+  if (employmentType) facts.push(`<li>Tipo de empleo: ${escapeHtml(employmentType)}</li>`);
   if (job.salary) facts.push(`<li>Salario: ${escapeHtml(String(job.salary))}</li>`);
   const official = officialEmployerSource(job);
   facts.push(
@@ -313,7 +315,7 @@ export function buildJobPagePayload(job: SeoJob): { job: SeoJob } {
     url: job.url, dateText: job.dateText, source: job.source,
     publishedAt: job.publishedAt, country: job.country,
     description: job.description, requirements: job.requirements,
-    technologies: job.technologies, employmentType: job.employmentType,
+    technologies: job.technologies, employmentType: trustedEmploymentType(job.source, job.employmentType),
     salary: job.salary, salaryMin: job.salaryMin, salaryMax: job.salaryMax,
     salaryCurrency: job.salaryCurrency, salaryRaw: job.salaryRaw,
     applicantCount: job.applicantCount, remoteType: job.remoteType,
@@ -348,7 +350,7 @@ const foldForCompare = (text: string) =>
 
 // Emoji plus the invisible pieces they leave behind: variation selector,
 // zero-width joiner, keycap, skin tones and regional indicators.
-const EMOJI = /[\p{Extended_Pictographic}\u{FE0F}\u{200D}\u{20E3}\u{1F3FB}-\u{1F3FF}\u{1F1E6}-\u{1F1FF}]/gu;
+const EMOJI = /\p{Extended_Pictographic}|\u{FE0F}|\u{200D}|\u{20E3}|[\u{1F3FB}-\u{1F3FF}]|[\u{1F1E6}-\u{1F1FF}]/gu;
 
 /** Cuts at the last space within `max` code points; never inside a word or a character. */
 export function clipAtWord(text: string, max: number): string {
@@ -443,7 +445,7 @@ export function buildJobMetaDescription(job: SeoJob): string {
   // "Bogotá, D.C." already ends the sentence.
   const endSentence = (part: string) => (/[.!?]$/.test(part) ? part : `${part}.`);
   let text = endSentence(`${collapseSpaces(job.title)}${company ? ` en ${company}` : ""}${location ? `, ${location}` : ""}`);
-  const employmentType = collapseSpaces(job.employmentType || "");
+  const employmentType = collapseSpaces(trustedEmploymentType(job.source, job.employmentType) || "");
   if (employmentType && codePoints(`${text} ${endSentence(employmentType)}`) <= JOB_META_DESCRIPTION_MAX) {
     text = `${text} ${endSentence(employmentType)}`;
   }
@@ -560,9 +562,10 @@ export function buildJobPosting(job: SeoJob): Record<string, unknown> | null {
     }
   };
 
-  const employmentTypeToken = job.employmentType
-    ? EMPLOYMENT_TYPE_LABEL_TO_SCHEMA[job.employmentType]
-    : undefined;
+  // Only a source whose value means the schedule (employment-type-trust.ts):
+  // Magneto's PART_TIME/FULL_TIME is its contract term, so it is omitted.
+  const employmentType = trustedEmploymentType(job.source, job.employmentType);
+  const employmentTypeToken = employmentType ? EMPLOYMENT_TYPE_LABEL_TO_SCHEMA[employmentType] : undefined;
   if (employmentTypeToken) posting.employmentType = employmentTypeToken;
 
   if (job.validThrough) posting.validThrough = new Date(job.validThrough).toISOString();
@@ -601,7 +604,61 @@ export function isUuid(value: string): boolean {
   return UUID_RE.test(value);
 }
 
-export type CategoryKind = "ciudad" | "rol";
+export type CategoryKind = "ciudad" | "rol" | "intencion";
+
+// Intent pages (seo-intent-pages, ADR 0012): a search intent, not a place
+// or a role. Like a role, the country comes from the URL prefix
+// (/empleos/<intent> is CO, /ve/empleos/<intent> is VE). A city × intent
+// page (/empleos/<city>/<intent>) exists only for the whitelisted pairs.
+// seo-intent-wave2 adds the schedule intents (job-schedule.ts). Every
+// function that branches on an intent uses an exhaustive switch, so a new
+// IntentId without its filter, copy, label or answer does not compile.
+export type IntentId = "remoto" | "sin-experiencia" | "fines-de-semana" | "medio-tiempo" | "temporada";
+export const INTENT_LABELS: Record<IntentId, string> = {
+  remoto: "Remoto",
+  "sin-experiencia": "Sin experiencia",
+  "fines-de-semana": "Fines de semana",
+  "medio-tiempo": "Medio tiempo",
+  temporada: "Temporada"
+};
+// Countries where each national intent page exists (seo-intent-wave2 design
+// D2/D3, decided by the 2026-11-07 count). A country left out has no route
+// (404), so no cache key, keeper query, sitemap entry or hreflang either.
+export const INTENT_COUNTRIES: Record<IntentId, readonly string[]> = {
+  remoto: ["CO", "VE"],
+  "sin-experiencia": ["CO", "VE"],
+  "fines-de-semana": ["CO"],
+  "medio-tiempo": ["CO"],
+  temporada: ["CO"]
+};
+export const CITY_INTENTS: ReadonlyArray<{ city: string; country: string; intent: IntentId }> = [
+  { city: "Bogotá", country: "CO", intent: "sin-experiencia" },
+  { city: "Medellín", country: "CO", intent: "sin-experiencia" },
+  { city: "Cali", country: "CO", intent: "sin-experiencia" }
+];
+
+function isIntentId(value: string): value is IntentId {
+  return Object.hasOwn(INTENT_LABELS, value);
+}
+
+export function intentExistsIn(intent: IntentId, country: string): boolean {
+  return INTENT_COUNTRIES[intent].includes(country);
+}
+
+// Location aliases of a city hub (seo-intent-wave2 design D6): people search
+// "Puerto Ordaz" (Ubersuggest 1,9 K) far more than "Ciudad Guayana" (390),
+// and the jobs say "Puerto Ordaz". Read ONLY by the hub's filters
+// (cityHubFilters / hubMatcher) and its title/meta: the country's city list
+// stays as it is, so there is no new hub, no new job breadcrumb and no new
+// dashboard option. Rollback: remove the entry.
+export const CITY_HUB_LOCATION_ALIASES: Readonly<Record<string, readonly string[]>> = {
+  "Ciudad Guayana": ["Puerto Ordaz"]
+};
+
+/** The hub's city plus its aliases, in display order. */
+export function cityHubPlaces(city: string): string[] {
+  return [city, ...(Object.hasOwn(CITY_HUB_LOCATION_ALIASES, city) ? CITY_HUB_LOCATION_ALIASES[city] : [])];
+}
 
 export interface ResolvedCategory {
   kind: CategoryKind;
@@ -618,6 +675,10 @@ export interface ResolvedCategory {
   // mixes both countries' listings under one URL the way it did before
   // this field existed.
   country: string;
+  /** Only for "intencion". */
+  intent?: IntentId;
+  /** Only for a city × intent page. */
+  city?: string;
 }
 
 // Role slugs removed from DEFAULT_ROLES_200 in a taxonomy swap (see
@@ -643,6 +704,13 @@ export function resolveCategorySlug(
   requestCountry: string = DEFAULT_COUNTRY
 ): ResolvedCategory | null {
   const target = (slug || "").toLowerCase();
+  // Intents first: "remoto" used to resolve as a CO city (CITY_OPTIONS keeps
+  // it for the dashboard's city filter), so /ve/empleos/remoto listed
+  // Colombia under a Colombia canonical. ADR 0012.
+  if (isIntentId(target)) {
+    if (!intentExistsIn(target, requestCountry)) return null;
+    return { kind: "intencion", label: INTENT_LABELS[target], country: requestCountry, intent: target };
+  }
   for (const city of CITY_OPTIONS) {
     if (slugify(city) === target) return { kind: "ciudad", label: city, country: "CO" };
   }
@@ -655,24 +723,50 @@ export function resolveCategorySlug(
   return null;
 }
 
-// City pages never get a /ve prefix (see ResolvedCategory's comment) — only
-// role pages do, since two countries' role pages would otherwise be
-// indistinguishable URLs serving different (and previously silently mixed)
-// data.
-export function buildCategoryPath(category: {
+/**
+ * All the path segments after /empleos/. A second segment only means
+ * something for a whitelisted city × intent pair (CITY_INTENTS); anything
+ * else keeps the first segment's page, as before (SIP-003).
+ */
+export function resolveCategoryPath(
+  segments: string[],
+  requestCountry: string = DEFAULT_COUNTRY
+): ResolvedCategory | null {
+  const first = resolveCategorySlug(segments[0] || "", requestCountry);
+  const second = (segments[1] || "").toLowerCase();
+  if (first?.kind === "ciudad" && second) {
+    const pair = CITY_INTENTS.find(
+      (entry) => entry.city === first.label && entry.country === first.country && entry.intent === second
+    );
+    if (pair) {
+      return { kind: "intencion", label: INTENT_LABELS[pair.intent], country: pair.country, intent: pair.intent, city: pair.city };
+    }
+  }
+  return first;
+}
+
+interface CategoryPathInput {
   kind: CategoryKind;
   label: string;
   country: string;
-}): string {
+  intent?: IntentId;
+  city?: string;
+}
+
+// City pages never get a /ve prefix (see ResolvedCategory's comment) — only
+// role and intent pages do, since two countries' pages would otherwise be
+// indistinguishable URLs serving different (and previously silently mixed)
+// data. A city × intent page follows its city: no prefix.
+export function buildCategoryPath(category: CategoryPathInput): string {
+  if (category.kind === "intencion" && category.intent) {
+    if (category.city) return `/empleos/${slugify(category.city)}/${category.intent}`;
+    return `${category.country === "VE" ? "/ve" : ""}/empleos/${category.intent}`;
+  }
   const prefix = category.kind === "rol" && category.country === "VE" ? "/ve" : "";
   return `${prefix}/empleos/${slugify(category.label)}`;
 }
 
-export function buildCategoryUrl(category: {
-  kind: CategoryKind;
-  label: string;
-  country: string;
-}): string {
+export function buildCategoryUrl(category: CategoryPathInput): string {
   return `${SITE_URL}${buildCategoryPath(category)}`;
 }
 
@@ -745,7 +839,11 @@ export function buildCompanyMeta(
   return {
     title: `Empleos en ${companyName} | BuscoTrabajo`,
     heading: companyName,
-    description: `Empleos en ${companyName}: ${countLabel} en ${countryName}. Compara sus ofertas y su reputación, y postúlate en el portal original.`,
+    // ~150-165 chars for usual names (Bing flagged the old ~120-char copy as
+    // too short, 2026-11-06). Every claim is on the page: each row shows city
+    // and modality (CategoryJobRow), reputation shows when a source has it,
+    // and applying is free on the original portal.
+    description: `Empleos en ${companyName}: ${countLabel} en ${countryName}. Compara sus ofertas por ciudad y modalidad, revisa su reputación y postúlate gratis en el portal original.`,
     canonicalUrl: buildCompanyUrl(companyName, country)
   };
 }
@@ -864,6 +962,9 @@ export interface CategoryInternalLink {
 // (see server.ts's 60-item cap), so the description never claims fewer or
 // more vacancies than truly exist right now.
 export function buildCategoryMeta(category: ResolvedCategory, totalCount: number): CategoryMeta {
+  // ADR 0012 §5: /empleos/remoto (CO) keeps its measured city-hub-pages copy
+  // until the 2026-11-26 reading; every other intent page uses design D4.
+  if (category.kind === "intencion" && !isLegacyRemoteCopy(category)) return buildIntentMeta(category, totalCount);
   const { kind, label, country } = category;
   const countLabel = totalCount === 1 ? "1 vacante" : `${totalCount} vacantes`;
   // City headings stay country-neutral text ("Vacantes de empleo en
@@ -879,10 +980,13 @@ export function buildCategoryMeta(category: ResolvedCategory, totalCount: number
   // empleo en <ciudad>" — docs/seo-baseline/2026-10-24-measurement-baseline.md).
   // "Remoto" lives in CITY_OPTIONS as a modality bucket, not a place
   // ("trabajos remotos" is its own query in Search Console).
+  // A city hub with location aliases names them too (seo-intent-wave2 D6):
+  // "Ciudad Guayana y Puerto Ordaz". Every other hub reads exactly as before.
+  const places = kind === "ciudad" ? cityHubPlaces(label) : [label];
   const heading = isRemoteBucket(category)
     ? `Trabajos remotos en ${countryName}: empleos y ofertas de empleo`
     : kind === "ciudad"
-      ? `Empleos en ${label}: trabajo y ofertas de empleo`
+      ? `Empleos en ${places.join(" y ")}: trabajo y ofertas de empleo`
       : `Trabajo de ${label} en ${countryName}`;
   const target = isRemoteBucket(category)
     ? `trabajo remoto en ${countryName}`
@@ -900,7 +1004,7 @@ export function buildCategoryMeta(category: ResolvedCategory, totalCount: number
     // under ~160 characters for the longest city name.
     description:
       kind === "ciudad" && !isRemoteBucket(category)
-        ? `¿Buscas trabajo en ${label}? ${totalCount === 1 ? "1 vacante activa" : `${countLabel} y ofertas de empleo activas`}. Compara las empresas y cargos que más contratan y aplica en la fuente original.`
+        ? `¿Buscas trabajo en ${places.join(" o ")}? ${totalCount === 1 ? "1 vacante activa" : `${countLabel} y ofertas de empleo activas`}. ${places.length > 1 ? "Compara empresas y cargos y aplica en la fuente original." : "Compara las empresas y cargos que más contratan y aplica en la fuente original."}`
         : `Encuentra ${countLabel} de ${target}. Compara ofertas de empleo actuales y visita la fuente original para aplicar.`,
     canonicalUrl: buildCategoryUrl(category)
   };
@@ -975,7 +1079,7 @@ export function formatSalaryAmount(currency: string, amount: number): string {
 let roleMatchers: Array<{ role: string; matches: (title: string | null | undefined) => boolean }> | null = null;
 
 function buildTopRoles(category: ResolvedCategory, jobs: SeoJob[]): CategoryInsights["topRoles"] {
-  if (category.kind !== "ciudad" || jobs.length === 0) return [];
+  if (category.kind === "rol" || jobs.length === 0) return [];
   roleMatchers ??= DEFAULT_ROLES_200.map((role) => ({ role, matches: roleTitleMatcher(role) }));
   const counts: Array<{ label: string; count: number }> = [];
   for (const { role, matches } of roleMatchers) {
@@ -1034,11 +1138,16 @@ export function buildCategoryInsights(
 
   const visibleCount = jobs.length;
   const countLabel = totalCount === 1 ? "1 vacante activa" : `${totalCount} vacantes activas`;
+  const schedule = scheduleWording(category);
   const target = isRemoteBucket(category)
     ? `trabajo remoto en ${getCountryConfig(category.country).name}`
-    : category.kind === "ciudad"
-      ? `trabajo en ${category.label}`
-      : `${category.label} en ${getCountryConfig(category.country).name}`;
+    : isSinExperiencia(category)
+      ? `trabajo sin experiencia en ${intentPlace(category)}`
+      : schedule
+        ? `trabajo ${schedule} en ${intentPlace(category)}`
+        : category.kind === "ciudad"
+        ? `trabajo en ${category.label}`
+        : `${category.label} en ${getCountryConfig(category.country).name}`;
   const sampleLabel =
     visibleCount < totalCount
       ? `las ${visibleCount} ofertas más recientes que aparecen en esta página`
@@ -1110,9 +1219,13 @@ export function buildCategoryStatsCopy(
   const countryName = getCountryConfig(category.country).name;
   const place = isRemoteBucket(category)
     ? `Trabajos remotos en ${countryName}`
-    : category.kind === "ciudad"
-      ? `Trabajos en ${category.label}`
-      : `${category.label} en ${countryName}`;
+    : isSinExperiencia(category)
+      ? `Trabajos sin experiencia en ${intentPlace(category)}`
+      : scheduleWording(category)
+        ? `Trabajos ${scheduleWording(category)} en ${intentPlace(category)}`
+        : category.kind === "ciudad"
+        ? `Trabajos en ${category.label}`
+        : `${category.label} en ${countryName}`;
   const active = insights.activeLast30Days;
   const fresh = insights.freshLast7DaysIsLowerBound
     ? `al menos ${insights.freshLast7Days}`
@@ -1159,7 +1272,118 @@ export function buildCategoryInternalLinks(category: ResolvedCategory): Category
 }
 
 function isRemoteBucket(category: ResolvedCategory): boolean {
-  return category.kind === "ciudad" && category.label === "Remoto";
+  return (
+    (category.kind === "ciudad" && category.label === "Remoto") ||
+    (category.kind === "intencion" && category.intent === "remoto")
+  );
+}
+
+/** The CO remote page, whose copy stays the city-hub-pages one (ADR 0012 §5). */
+export function isLegacyRemoteCopy(category: ResolvedCategory): boolean {
+  return isRemoteBucket(category) && category.country === "CO" && !category.city;
+}
+
+function isSinExperiencia(category: ResolvedCategory): boolean {
+  return category.kind === "intencion" && category.intent === "sin-experiencia";
+}
+
+/** "de fines de semana" / "de medio tiempo" / "por temporada", or null (seo-intent-wave2). */
+function scheduleWording(category: ResolvedCategory): string | null {
+  if (category.kind !== "intencion" || !category.intent) return null;
+  const intent: IntentId = category.intent;
+  switch (intent) {
+    case "remoto":
+    case "sin-experiencia":
+      return null;
+    case "fines-de-semana":
+      return "de fines de semana";
+    case "medio-tiempo":
+      return "de medio tiempo";
+    case "temporada":
+      return "por temporada";
+    default:
+      return assertNever(intent);
+  }
+}
+
+/** "Colombia", "Venezuela" or the city of a city × intent page. */
+function intentPlace(category: ResolvedCategory): string {
+  return category.city || getCountryConfig(category.country).name;
+}
+
+const INTENT_TITLE_MIN_COUNT = 10;
+
+// Design D4. The count in the title is the real total and only shows from
+// 10 up (below it the page is noindex anyway). Descriptions stay within
+// 150–160 characters and only state what the page lists.
+function buildIntentMeta(category: ResolvedCategory, totalCount: number): CategoryMeta {
+  const place = intentPlace(category);
+  const counted = totalCount >= INTENT_TITLE_MIN_COUNT;
+  const canonicalUrl = buildCategoryUrl(category);
+  const count = totalCount === 1 ? "1 vacante" : `${totalCount} vacantes`;
+  const fillers = category.city ? CITY_DESCRIPTION_FILLERS : DESCRIPTION_FILLERS;
+  const tail = ". Aplica en la fuente original de cada oferta.";
+  // "{heading}: {n} vacantes" pages; remoto keeps its own shape.
+  const counting = (heading: string, head: string): CategoryMeta => ({
+    title: `${counted ? `${heading}: ${totalCount} vacantes` : heading} | BuscoTrabajo`,
+    heading,
+    description: fitDescription(head, tail, fillers),
+    canonicalUrl
+  });
+  const intent = category.intent as IntentId;
+  switch (intent) {
+    case "remoto": {
+      const heading = `Trabajo remoto en ${place}: vacantes desde casa`;
+      return {
+        title: `${counted ? `Trabajo remoto en ${place}: ${totalCount} vacantes desde casa` : heading} | BuscoTrabajo`,
+        heading,
+        description: fitDescription(`${count} de trabajo remoto en ${place} para trabajar desde casa. Compara empresas`, tail, fillers),
+        canonicalUrl
+      };
+    }
+    case "sin-experiencia":
+      return counting(
+        `Trabajo sin experiencia en ${place}`,
+        `${count} de trabajo sin experiencia en ${place}: el aviso dice que no la piden. Compara empresas`
+      );
+    case "fines-de-semana":
+      return counting(
+        `Trabajo los fines de semana en ${place}`,
+        `${count} para trabajar los fines de semana en ${place}: lo dice el título del aviso. Compara empresas`
+      );
+    case "medio-tiempo":
+      return counting(
+        `Trabajo de medio tiempo en ${place}`,
+        `${count} de trabajo de medio tiempo en ${place}: lo dice el título del aviso. Compara empresas`
+      );
+    case "temporada":
+      return counting(
+        `Trabajo por temporada en ${place}`,
+        `${count} de trabajo por temporada en ${place}: lo dice el título del aviso. Compara empresas`
+      );
+    default:
+      return assertNever(intent);
+  }
+}
+
+export function assertNever(value: never): never {
+  throw new Error(`Unhandled intent: ${String(value)}`);
+}
+
+// Grows "Compara empresas" with page-true list items (every hub and intent
+// page shows companies, cities and publication dates), keeping the longest
+// version that fits in 160 characters. Never cuts a sentence and never adds
+// a fact the page doesn't show.
+const DESCRIPTION_FILLERS = ["", " y ciudades", ", ciudades y fechas", ", ciudades, fechas y fuentes", ", ciudades, fechas de publicación y fuentes"];
+// A city × intent page lists one city: its fillers never mention cities.
+const CITY_DESCRIPTION_FILLERS = ["", " y fechas", ", fechas y fuentes", ", fechas de publicación y fuentes", ", cargos, fechas de publicación y fuentes"];
+function fitDescription(head: string, tail: string, fillers: string[] = DESCRIPTION_FILLERS): string {
+  const candidates = fillers.map((filler) => `${head}${filler}${tail}`);
+  return (
+    candidates.find((text) => text.length >= 150 && text.length <= 160) ??
+    candidates.filter((text) => text.length <= 160).pop() ??
+    candidates[0]
+  );
 }
 
 /**
@@ -1168,7 +1392,8 @@ function isRemoteBucket(category: ResolvedCategory): boolean {
  * each link resolves to a real category page. Role pages get none.
  */
 export function buildRelatedCityLinks(category: ResolvedCategory): CategoryInternalLink[] {
-  if (category.kind !== "ciudad") return [];
+  // The remote page keeps its city network (ADR 0012 §5); other intents have none.
+  if (category.kind !== "ciudad" && !isRemoteBucket(category)) return [];
   const self = slugify(category.label);
   // Same lists resolveCategorySlug() matches against, so every href is a
   // real city page. "Remoto" is a modality bucket, not another city.
@@ -1193,6 +1418,19 @@ export function buildCategorySectionHeadings(category: ResolvedCategory): {
   if (isRemoteBucket(category)) {
     return {
       jobs: `Vacantes remotas recientes en ${countryName}`,
+      relatedCities: `Empleos por ciudad en ${countryName}`
+    };
+  }
+  if (isSinExperiencia(category)) {
+    return {
+      jobs: `Vacantes sin experiencia recientes en ${intentPlace(category)}`,
+      relatedCities: `Empleos por ciudad en ${countryName}`
+    };
+  }
+  const schedule = scheduleWording(category);
+  if (schedule) {
+    return {
+      jobs: `Vacantes ${schedule} recientes en ${intentPlace(category)}`,
       relatedCities: `Empleos por ciudad en ${countryName}`
     };
   }
@@ -1252,13 +1490,20 @@ export function buildCategoryItemList(meta: CategoryMeta, jobs: SeoJob[]): objec
 // Role labels appear twice (once per country, at their two distinct URLs —
 // see ResolvedCategory's comment); city labels appear once each, since a
 // city page never has a /ve-prefixed alias.
-export function buildCategoriesSitemapXml(): string {
+//
+// `intents` (ADR 0012): the intent pages that pass the inventory guard right
+// now. With it, "Remoto" is listed only as an intent (and only if it passes);
+// without it (INTENT_PAGES_ENABLED=false) the legacy list, where "Remoto" is
+// the CO city bucket.
+export function buildCategoriesSitemapXml(options: { intents?: ResolvedCategory[] } = {}): string {
   const veCities = getCountryConfig("VE").cities;
+  const coCities = options.intents ? CITY_OPTIONS.filter((label) => label !== "Remoto") : CITY_OPTIONS;
   const categories: ResolvedCategory[] = [
-    ...CITY_OPTIONS.map((label) => ({ kind: "ciudad" as const, label, country: "CO" })),
+    ...coCities.map((label) => ({ kind: "ciudad" as const, label, country: "CO" })),
     ...veCities.map((label) => ({ kind: "ciudad" as const, label, country: "VE" })),
     ...DEFAULT_ROLES_200.map((label) => ({ kind: "rol" as const, label, country: "CO" })),
-    ...DEFAULT_ROLES_200.map((label) => ({ kind: "rol" as const, label, country: "VE" }))
+    ...DEFAULT_ROLES_200.map((label) => ({ kind: "rol" as const, label, country: "VE" })),
+    ...(options.intents ?? [])
   ];
   const urls = categories.map((category) => xmlUrlEntry(buildCategoryUrl(category))).join("\n");
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`;

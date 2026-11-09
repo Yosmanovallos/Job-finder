@@ -22,11 +22,16 @@ import { FREELANCE_SOURCES, modalityForFilter, sqlJobModality } from "../lib/job
 import { initialDetailStatus, refreshGoogleReadinessInTransaction } from "./job-readiness-repository.js";
 import { sourceSupportsDetail } from "../sources/detail-capability.js";
 import { seoReadySql } from "../lib/google-job-readiness.js";
+import { experienceForFilter, sqlSinExperiencia } from "../lib/job-experience.js";
+import { scheduleForFilter, sqlSchedule } from "../lib/job-schedule.js";
+import { INTENT_PAGE_CACHE_ENTRIES } from "../lib/intent-pages.js";
 import { liveJobSql } from "../lib/job-freshness.js";
 import { findExpiredUrlHashes } from "./expired-job-repository.js";
 import { StaleWhileRevalidateCache } from "../lib/stale-while-revalidate-cache.js";
 import { clipVarchar } from "../lib/varchar.js";
+import { RECENT_SITEMAP_WINDOW_HOURS, type RecentReadyJob } from "../lib/recent-jobs.js";
 import { copySpecificCityMismatchSql } from "../lib/official-copy-location.js";
+import { trustedEmploymentType } from "../lib/employment-type-trust.js";
 import {
   VACANCY_IDENTITY_KEYS,
   companyKeySql,
@@ -357,7 +362,7 @@ export async function getJobs(
       description: row.description,
       requirements: Array.isArray(row.requirements) ? row.requirements : [],
       technologies: Array.isArray(row.technologies) ? row.technologies : [],
-      employmentType: row.employment_type,
+      employmentType: trustedEmploymentType(row.source, row.employment_type),
       applicantCount: row.applicant_count,
       salary: buildSalaryLabel(row)
     };
@@ -414,7 +419,7 @@ export async function getJobsLight(
       description: null,
       requirements: [] as string[],
       technologies: [] as string[],
-      employmentType: row.employment_type,
+      employmentType: trustedEmploymentType(row.source, row.employment_type),
       applicantCount: row.applicant_count,
       salary: buildSalaryLabel(row)
     };
@@ -568,6 +573,104 @@ export async function streamCanonicalSitemapJobs(options: SitemapStreamOptions):
     await cancelPromise;
     client.release();
   }
+}
+
+// --- SEO Fase B: recent Google-ready jobs (src/lib/recent-jobs.ts) ----------
+
+interface RecentReadyRow extends SitemapJobRow {
+  country: string | null;
+}
+
+/**
+ * The rows sitemap-jobs.xml lists (same DISTINCT ON identity, same
+ * "canonical first, THEN seoReadySql" order as streamCanonicalSitemapJobs),
+ * restricted to rows published in the last `windowHours`. Restricting the
+ * DISTINCT ON input to the window keeps the canonical pick identical: the
+ * newest row of a group that has any row in the window is itself in the
+ * window. test:seo checks every URL here is in sitemap-jobs.xml with the
+ * same <lastmod>. Read-only, bounded by a statement timeout.
+ */
+export async function queryRecentSeoReadyJobs(
+  windowHours: number = RECENT_SITEMAP_WINDOW_HOURS,
+  options: { limit?: number; statementTimeoutMs?: number } = {}
+): Promise<RecentReadyJob[]> {
+  const hours = Math.min(Math.max(Math.floor(windowHours), 1), RECENT_SITEMAP_WINDOW_HOURS);
+  const limit = Math.min(Math.max(options.limit ?? 10_000, 1), 10_000);
+  const statementTimeoutMs = Math.min(Math.max(options.statementTimeoutMs ?? 10_000, 1_000), 30_000);
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN READ ONLY");
+    await client.query("SELECT set_config('statement_timeout', $1, true)", [`${statementTimeoutMs}ms`]);
+    const result = await client.query<RecentReadyRow>(
+      `SELECT id, title, company, location, url, country, published_at, content_updated_at,
+              (published_at > NOW() - INTERVAL '48 hours') AS is_locked
+       FROM (
+         SELECT DISTINCT ON (lower(trim(title)), lower(trim(COALESCE(company, 'confidencial'))), lower(trim(COALESCE(location, CASE country WHEN 'VE' THEN 'venezuela' ELSE 'colombia' END))))
+                id, title, company, location, url, country, published_at, content_updated_at,
+                seo_ready, is_active, valid_through
+         FROM jobs
+         WHERE is_active = TRUE AND ${liveJobSql()} AND published_at >= NOW() - ($1::int * INTERVAL '1 hour')
+         ORDER BY lower(trim(title)), lower(trim(COALESCE(company, 'confidencial'))), lower(trim(COALESCE(location, CASE country WHEN 'VE' THEN 'venezuela' ELSE 'colombia' END))), published_at DESC, id DESC
+       ) canonical
+       WHERE ${seoReadySql("canonical")}
+       ORDER BY published_at DESC, id DESC
+       LIMIT ${limit}`,
+      [hours]
+    );
+    await client.query("COMMIT");
+    const jobs: RecentReadyJob[] = result.rows.map((row) => ({
+      jobId: row.id,
+      title: row.title,
+      company: row.company,
+      location: row.location,
+      url: row.url ? resolveOutboundUrl(row.url) : row.url,
+      country: row.country,
+      publishedAt: row.published_at,
+      isLocked: row.is_locked,
+      contentUpdatedAt: row.content_updated_at
+    }));
+    // Same public view as the sitemap and hubs (anonymous visitor).
+    return maskLockedFields(jobs, "free");
+  } catch (error) {
+    try {
+      await client.query("ROLLBACK");
+    } catch {
+      // The connection may already be closed.
+    }
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+// One shared snapshot (not one per hub): ~1.5k light rows, refreshed at most
+// every 10 minutes. Its own cache instance, so it never competes with the
+// dashboard first pages in jobsPageCache (DASHBOARD-PERFORMANCE-RUNBOOK.md).
+// Rows are frozen and shared, so reads do not copy them.
+const RECENT_READY_CACHE_KEY = "recent";
+const recentReadyCache = new StaleWhileRevalidateCache<string, readonly RecentReadyJob[]>({
+  freshForMs: 10 * 60_000,
+  staleForMs: 2 * 60 * 60_000,
+  maxEntries: 1,
+  clone: (value) => value,
+  onBackgroundRefreshError: () => {
+    console.warn("[recent-ready-cache] Background refresh failed; serving the last valid snapshot.");
+  }
+});
+
+async function loadRecentReadyJobs(): Promise<readonly RecentReadyJob[]> {
+  const jobs = await queryRecentSeoReadyJobs(RECENT_SITEMAP_WINDOW_HOURS);
+  return Object.freeze(jobs.map((job) => Object.freeze(job)));
+}
+
+/** Recent Google-ready jobs; waits on Postgres only when the snapshot is cold (sitemap route). */
+export function getRecentSeoReadyJobs(): Promise<readonly RecentReadyJob[]> {
+  return recentReadyCache.get(RECENT_READY_CACHE_KEY, loadRecentReadyJobs);
+}
+
+/** Never waits: the snapshot if cached, else undefined (and one background load starts). Hubs use this. */
+export function peekRecentSeoReadyJobs(): readonly RecentReadyJob[] | undefined {
+  return recentReadyCache.peek(RECENT_READY_CACHE_KEY, loadRecentReadyJobs);
 }
 
 export interface JobsPageOptions {
@@ -831,6 +934,25 @@ function buildJobWhere(filters: JobFilterParams, sql: SqlParts): string[] {
   if (filters.country) {
     where.push(`(country IS NULL OR country = ${sql.param(filters.country.toUpperCase())})`);
   }
+
+  // Schedule intent pages (seo-intent-wave2): title only, so it runs on the
+  // canonical row like the modality classifier, never on descriptions.
+  const schedule = scheduleForFilter(filters.schedule);
+  if (schedule) where.push(sqlSchedule(schedule, "title"));
+
+  // Intent pages (ADR 0012). The canonical CTE carries neither seo_ready nor
+  // the description, so both are read with ONE primary-key probe per row
+  // that already passed every other filter (country, modality, city), never
+  // inside the materialized projection, which would read every description.
+  // Only queryJobsPage's `filtered` CTE uses these filters.
+  const experience = experienceForFilter(filters.experience);
+  if (filters.googleReady || experience) {
+    const checks = [
+      ...(filters.googleReady ? ["intent_row.seo_ready = TRUE"] : []),
+      ...(experience ? [sqlSinExperiencia("intent_row.title", "intent_row.description")] : [])
+    ];
+    where.push(`EXISTS (SELECT 1 FROM jobs intent_row WHERE intent_row.id = canonical.id AND ${checks.join(" AND ")})`);
+  }
   return where;
 }
 
@@ -850,6 +972,44 @@ export async function getJobsPage(options: JobsPageOptions = {}): Promise<JobsPa
   const page = await jobsPageCache.get(jobsPageCacheKey(blockOptions), () => queryJobsPage(blockOptions));
   // `get` already returned a private copy, so slicing it is safe.
   return { jobs: page.jobs.slice(offset - block, offset - block + limit), total: page.total };
+}
+
+// Intent pages (ADR 0012 §6) keep their own small cache, outside the 64-entry
+// LRU above: 10 keys of page traffic must never evict the warmed dashboard
+// pages (same precedent as the homepage and company caches). Same freshness
+// policy and single-flight refresh. One entry is the first page of 60 rows
+// and its total, which is also the inventory guard's count.
+const intentPageCache = new StaleWhileRevalidateCache<string, JobsPage>({
+  freshForMs: JOBS_PAGE_CACHE_FRESH_MS,
+  staleForMs: JOBS_PAGE_CACHE_STALE_MS,
+  maxEntries: INTENT_PAGE_CACHE_ENTRIES,
+  clone: cloneJobsPage,
+  onBackgroundRefreshError: () => {
+    console.warn("[intent-page-cache] Background refresh failed; serving the last valid page.");
+  }
+});
+
+// Last total each intent page served, for the links from city hubs. Hubs
+// only read it: they never start an intent query, so a cold hub request
+// never competes with background loads (measured locally: a cold Caracas hub
+// went from 44 to 84 ms when hubs peeked the intent cache). Filled by the
+// intent page itself, the sitemap and /api/intent-page; expires with the
+// cache's stale window.
+const intentTotals = new Map<string, { total: number; at: number }>();
+
+export async function getIntentPage(filters: JobFilterParams, limit: number): Promise<JobsPage> {
+  const options: JobsPageOptions = { filters, limit, offset: 0, includeDetails: false };
+  const key = jobsPageCacheKey(options);
+  const page = await intentPageCache.get(key, () => queryJobsPage(options));
+  intentTotals.set(key, { total: page.total, at: Date.now() });
+  return page;
+}
+
+/** The intent page's last known total, or undefined; never queries. */
+export function knownIntentTotal(filters: JobFilterParams, limit: number): number | undefined {
+  const known = intentTotals.get(jobsPageCacheKey({ filters, limit, offset: 0, includeDetails: false }));
+  if (!known || Date.now() - known.at > JOBS_PAGE_CACHE_FRESH_MS + JOBS_PAGE_CACHE_STALE_MS) return undefined;
+  return known.total;
 }
 
 /**
@@ -984,7 +1144,7 @@ async function queryJobsPage(options: JobsPageOptions, narrowSearch = true): Pro
       description: row.description ?? undefined,
       requirements: Array.isArray(row.requirements) ? row.requirements : [],
       technologies: Array.isArray(row.technologies) ? row.technologies : [],
-      employmentType: row.employment_type ?? undefined,
+      employmentType: trustedEmploymentType(row.source, row.employment_type),
       applicantCount: row.applicant_count ?? undefined,
       remoteType: row.remote_type ?? undefined,
       salary: buildSalaryLabel(row),
@@ -1445,7 +1605,7 @@ export async function getJobById(id: string) {
     description: row.description,
     requirements: Array.isArray(row.requirements) ? row.requirements : [],
     technologies: Array.isArray(row.technologies) ? row.technologies : [],
-    employmentType: row.employment_type,
+    employmentType: trustedEmploymentType(row.source, row.employment_type),
     applicantCount: row.applicant_count,
     salary: buildSalaryLabel(row),
     // Job SEO V2: the stored verdict of the shared gate (read through
@@ -1660,6 +1820,56 @@ export async function updateUserPreferredRoles(authUid: string, roles: string[])
     subscriptionEnd: row.subscription_end,
     preferredRoles: row.preferred_roles
   };
+}
+
+/**
+ * Signup attribution (Fase A): writes the first touch ONCE per account —
+ * never overwrites (`first_touch_at IS NULL`). The caller has already
+ * checked the account is new and sanitized every field
+ * (src/lib/first-touch.ts). Returns false when nothing was written (already
+ * set) and throws `SignupAttributionUnavailableError` while the migration
+ * (scripts/migrate-signup-attribution.ts) has not run yet.
+ */
+export class SignupAttributionUnavailableError extends Error {}
+
+export async function recordUserFirstTouch(
+  authUid: string,
+  touch: {
+    landingPath: string;
+    referrerHost: string | null;
+    utmSource: string | null;
+    utmMedium: string | null;
+    utmCampaign: string | null;
+    capturedAt: string;
+  }
+): Promise<boolean> {
+  try {
+    const result = await pool.query(
+      `UPDATE users SET
+         first_touch_path = $2,
+         first_touch_referrer_host = $3,
+         first_touch_utm_source = $4,
+         first_touch_utm_medium = $5,
+         first_touch_utm_campaign = $6,
+         first_touch_at = $7
+       WHERE id = $1 AND first_touch_at IS NULL`,
+      [
+        authUid,
+        touch.landingPath,
+        touch.referrerHost,
+        touch.utmSource,
+        touch.utmMedium,
+        touch.utmCampaign,
+        touch.capturedAt
+      ]
+    );
+    return (result.rowCount ?? 0) > 0;
+  } catch (error) {
+    if ((error as { code?: string })?.code === "42703") {
+      throw new SignupAttributionUnavailableError("signup-attribution columns missing");
+    }
+    throw error;
+  }
 }
 
 export async function getUserTier(authUid: string): Promise<SubscriptionTier> {

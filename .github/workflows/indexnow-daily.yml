@@ -1,0 +1,60 @@
+name: IndexNow daily submit
+
+# SEO Fase B (ADR 0011): once a day, tell IndexNow (Bing, which feeds
+# Copilot and ChatGPT Search; also Yandex, Seznam, Naver) about the
+# Google-ready jobs published in the last 26 h. 26 h, not 24, so a late
+# GitHub schedule never leaves a gap; re-sending a URL is harmless. The
+# script reads Postgres in one bounded READ ONLY transaction and makes a
+# single POST (<=10k URLs, 3 attempts only on 429/5xx). Owner-approved
+# 2026-11-06 after the first manual submission returned HTTP 200.
+
+on:
+  schedule:
+    - cron: "20 11 * * *" # 06:20 America/Bogota
+  workflow_dispatch:
+    inputs:
+      hours:
+        description: "Window in hours (1-72)"
+        required: false
+        default: "26"
+      dry_run:
+        description: "Dry-run only (no POST)"
+        type: boolean
+        required: false
+        default: false
+
+concurrency:
+  group: indexnow-daily
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  indexnow:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "24.18.0"
+          package-manager-cache: false
+
+      - name: Install Dependencies
+        run: |
+          cd job-radar-apify
+          npm ci || npm install
+
+      - name: Submit recent jobs to IndexNow
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          HOURS: ${{ github.event.inputs.hours || '26' }}
+          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+        run: |
+          cd job-radar-apify
+          if [ "$DRY_RUN" = "true" ]; then MODE="--dry-run"; else MODE="--execute"; fi
+          npm run indexnow:submit -- $MODE --hours "$HOURS"

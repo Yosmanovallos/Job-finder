@@ -23,16 +23,13 @@
     />
     <link rel="service-doc" href="https://buscotrabajo.co/docs" />
 
-    <!-- Google AdSense: verificación de cuenta + Auto ads (async, no bloquea el render) -->
+    <!-- Google AdSense: verificación de cuenta (meta). El script de Auto ads
+         se carga diferido más abajo, junto con gtag.js. -->
     <meta name="google-adsense-account" content="ca-pub-2247075733653451" />
-    <script
-      async
-      src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2247075733653451"
-      crossorigin="anonymous"
-    ></script>
 
-    <!-- Google tag (gtag.js) -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-QV1E0K4KZF"></script>
+    <!-- Google tag (gtag.js). gtag() and the config call below run right
+         away and queue in dataLayer, so the page view and every later event
+         are kept; only the library itself loads late (see the loader). -->
     <script>
       window.dataLayer = window.dataLayer || [];
       function gtag() {
@@ -54,26 +51,51 @@
         page_title: document.title
       });
     </script>
+    <!-- Deferred third parties (approved 2026-11-08): gtag.js (~180 KB) and
+         AdSense Auto ads (~230 KB with show_ads_impl) used to download and
+         run during first load, which was most of the mobile main-thread
+         blocking time (Lighthouse TBT 460-620 ms). They now load on the
+         visitor's first interaction, or 4 s after the page finished
+         loading, whichever comes first. Events queued in dataLayer before
+         then are sent when gtag.js arrives; a visit that leaves within
+         those first seconds without interacting is the only one not
+         counted. -->
+    <script>
+      (function () {
+        var loaded = false;
+        var events = ["pointerdown", "keydown", "scroll", "touchstart"];
+        function inject(src, crossOrigin) {
+          var script = document.createElement("script");
+          script.async = true;
+          script.src = src;
+          if (crossOrigin) script.crossOrigin = "anonymous";
+          document.head.appendChild(script);
+        }
+        function loadThirdParties() {
+          if (loaded) return;
+          loaded = true;
+          events.forEach(function (name) {
+            window.removeEventListener(name, loadThirdParties);
+          });
+          inject("https://www.googletagmanager.com/gtag/js?id=G-QV1E0K4KZF", false);
+          inject("https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2247075733653451", true);
+        }
+        events.forEach(function (name) {
+          window.addEventListener(name, loadThirdParties, { once: true, passive: true });
+        });
+        function afterLoad() {
+          setTimeout(loadThirdParties, 4000);
+        }
+        if (document.readyState === "complete") afterLoad();
+        else window.addEventListener("load", afterLoad, { once: true });
+      })();
+    </script>
 
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <!-- Non-render-blocking: the stylesheet is fetched as a preload and only
-         applied once it arrives (display=swap keeps text visible with the
-         fallback meanwhile), so first paint no longer waits on a second
-         origin. Space Grotesk 700 and JetBrains Mono 600 are used by the
-         homepage redesign; without them the browser synthesised fake bold. -->
-    <link
-      rel="preload"
-      as="style"
-      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
-      onload="this.onload=null;this.rel='stylesheet'"
-    />
-    <noscript>
-      <link
-        rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
-      />
-    </noscript>
+    <!-- Self-hosted web fonts (OFL, latin subset — covers Spanish), declared
+         in src/index.css. Was Google Fonts: two extra origins (CSS, then the
+         font files) on the critical path of every first visit. The heading
+         face is preloaded because it is the homepage H1 (the mobile LCP). -->
+    <link rel="preload" as="font" type="font/woff2" href="/fonts/space-grotesk-latin.woff2" crossorigin />
 
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="BuscoTrabajo" />

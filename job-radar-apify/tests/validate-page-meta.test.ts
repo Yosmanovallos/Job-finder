@@ -5,7 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { ROUTE_META, companiesDirectoryMeta, dashboardDescription } from "../src/lib/page-meta.js";
 import { getHomeContent, injectPublicContent, injectRouteMeta } from "../src/lib/agent-readiness.js";
-import { buildCompanyMeta } from "../src/lib/job-seo.js";
+import { buildCompanyMeta, firstSourceSentence } from "../src/lib/job-seo.js";
 
 // Offline guard for the per-page head the server injects into the SPA
 // shell (SEO fase B, 2026-10-25). Runs against the real index.html source,
@@ -72,10 +72,16 @@ test("shared builders stay within the length limits", () => {
     const directory = companiesDirectoryMeta(name);
     assert.ok(directory.title.length <= 60, directory.title);
     assert.ok(directory.title.startsWith(directory.heading));
+    // Bing flags descriptions under ~150 chars as too short (2026-11-06).
+    assert.ok(directory.description.length >= 145 && directory.description.length <= 165, directory.description);
   }
   const company = buildCompanyMeta("Bancolombia", 97, "CO");
   assert.equal(company.title, "Empleos en Bancolombia | BuscoTrabajo");
   assert.match(company.description, /97 vacantes activas en Colombia/);
+  for (const name of ["BBVA", "Deloitte", "Bancolombia"]) {
+    const { description } = buildCompanyMeta(name, 45, "CO");
+    assert.ok(description.length >= 150 && description.length <= 170, description);
+  }
 });
 
 test("Organization schema lists every official social profile", () => {
@@ -88,4 +94,15 @@ test("Organization schema lists every official social profile", () => {
     assert.ok(indexHtml.includes(`"${profile}"`), profile);
   }
   assert.ok(indexHtml.includes('<meta property="og:site_name" content="BuscoTrabajo" />'));
+});
+
+
+test("source sentences strip emoji components and preserve ordinary Unicode text", () => {
+  const sentence = "Buscamos una persona con experiencia en análisis y reportes.";
+  for (const emoji of ["😀", "👩🏽‍💻", "🇨🇴", "1️⃣", "\u200d", "\ufe0f"]) {
+    const actual = firstSourceSentence(`${emoji} ${sentence}`, "Analista");
+    // A keycap's base digit is retained by the existing single-code-point cleanup.
+    const expected = emoji === "1️⃣" ? `1 ${sentence}` : sentence;
+    assert.equal(actual, expected, emoji);
+  }
 });
