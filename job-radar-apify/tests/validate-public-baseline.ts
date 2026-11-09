@@ -151,14 +151,46 @@ async function main(): Promise<void> {
           { width: 1440, height: 900 },
           { width: 390, height: 844 }
         ]) {
-          const context = await browser.newContext({ viewport, serviceWorkers: "block" });
+          // The 390 px pass is a real phone (mobile UA + touch), so the home
+          // SSR picks its phone layout and its hydration is exercised too.
+          const phone = viewport.width < 768;
+          const context = await browser.newContext({
+            viewport,
+            serviceWorkers: "block",
+            ...(phone
+              ? {
+                  isMobile: true,
+                  hasTouch: true,
+                  userAgent:
+                    "Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36"
+                }
+              : {})
+          });
           await context.route("**/*", (request) =>
             new URL(request.request().url()).origin === base ? request.continue() : request.abort()
           );
           const page = await context.newPage();
           page.on("pageerror", (error) => pageErrors.push(error.message));
+          // Homepage SSR (index.tsx): a hydration mismatch makes React throw
+          // the server DOM away and re-render — the flash and the LCP cost
+          // the SSR exists to avoid. index.tsx logs it as a console warning.
+          page.on("console", (message) => {
+            if (message.text().includes("[home-ssr] hydration mismatch")) pageErrors.push(message.text());
+          });
           await page.goto(`${base}${route}`, { waitUntil: "networkidle", timeout: 15000 });
           await page.locator("#app").waitFor({ state: "visible", timeout: 10000 });
+          if (route === "/" || route === "/ve") {
+            assert.equal(
+              await page.locator("#app").getAttribute("data-ssr"),
+              "home",
+              `[P0] ${route} no llegó renderizada desde el servidor.`
+            );
+            assert.equal(
+              await page.evaluate(() => (window as unknown as { __SSR_HOME__?: { desktop: boolean } }).__SSR_HOME__?.desktop),
+              !phone,
+              `[P0] ${route} eligió el layout equivocado para ${viewport.width}px.`
+            );
+          }
           if (categoryRoutes.has(route)) {
             const overview = page.locator("[data-category-overview]");
             await overview.waitFor({ state: "visible", timeout: 10000 });

@@ -44,6 +44,19 @@ function fakeHttp(routes: Record<string, Route>): HttpGet & { calls: string[] } 
 // ---------- SuccessFactors ----------
 
 const SF = "successfactors";
+// SuccessFactors drops listing rows older than 30 days by Date.now(). The
+// fixtures were captured in October 2026, so the listing tests run at NOW;
+// otherwise they start failing once real time passes the fixture dates
+// (they broke on 2026-11-07 UTC, when the 8 oct rows turned 30 days old).
+async function listSf(...args: Parameters<typeof listBoard>): ReturnType<typeof listBoard> {
+  const realNow = Date.now;
+  Date.now = () => NOW.getTime();
+  try {
+    return await listBoard(...args);
+  } finally {
+    Date.now = realNow;
+  }
+}
 const BCO = "https://empleo.grupobancolombia.com";
 const bcoSearch = (start: number) => `${BCO}/bancolombia/search/?q=&sortColumn=referencedate&sortDirection=desc&startrow=${start}`;
 const relabel = (html: string, from: number, to: number, total: number) =>
@@ -143,7 +156,7 @@ test("SuccessFactors: a tile label with the page's row count instead of the last
     [search(2)]: { status: 200, body: countLabelTiles(3, ["10003", "10004"], 5) },
     [search(4)]: { status: 200, body: countLabelTiles(5, ["10005"], 5) }
   });
-  const listing = await listBoard({ atsType: SF, atsRef: "careers.mota-engil.com" }, http, {});
+  const listing = await listSf({ atsType: SF, atsRef: "careers.mota-engil.com" }, http, {});
   assert.equal(listing.kind, "complete");
   if (listing.kind !== "complete") return;
   assert.equal(listing.boardTotal, 5);
@@ -162,7 +175,7 @@ test("SuccessFactors: tiles without any location are read through the site's Col
     [search(0, true)]: { status: 200, body: noLocation(countLabelTiles(1, ["1449122633", "1449131133"], 3)) },
     [search(2, true)]: { status: 200, body: noLocation(countLabelTiles(3, ["1435875733"], 3)) }
   });
-  const listing = await listBoard({ atsType: SF, atsRef: "careers.mota-engil.com" }, http, {});
+  const listing = await listSf({ atsType: SF, atsRef: "careers.mota-engil.com" }, http, {});
   assert.equal(listing.kind, "complete");
   if (listing.kind !== "complete") return;
   assert.equal(listing.boardTotal, 3, "the Colombia search, not the 351 worldwide");
@@ -187,7 +200,7 @@ test("SuccessFactors: real Mota-Engil pages (2026-10-29) — count label, no til
     [search(true)]: { status: 200, body: relabelTiles(colombia, "Showing 1 to 10 of 10 Jobs") },
     [`${MOTA}/job/Cartagena-SECRETARIA-BOL/1449122633/`]: { status: 200, body: fixture(SF, "mota-engil-job-1449122633.trimmed.html") }
   });
-  const listing = await listBoard({ atsType: SF, atsRef: "careers.mota-engil.com" }, http, {
+  const listing = await listSf({ atsType: SF, atsRef: "careers.mota-engil.com" }, http, {
     knownIds: new Set(parseSearchPage(colombia)!.rows.map((row) => row.id).filter((id) => id !== "1449122633")),
     detailBudget: 1
   });
@@ -235,7 +248,7 @@ function bancolombiaHttp(options: { trimmedLabel?: boolean; robots?: { status: n
 
 test("SuccessFactors: complete listing; details only for new postings, within budget", async () => {
   const { http, total } = bancolombiaHttp();
-  const listing = await listBoard({ atsType: SF, atsRef: "empleo.grupobancolombia.com/bancolombia" }, http, {
+  const listing = await listSf({ atsType: SF, atsRef: "empleo.grupobancolombia.com/bancolombia" }, http, {
     knownIds: new Set(["1441844000"]),
     detailBudget: 2
   });
@@ -258,7 +271,7 @@ test("SuccessFactors: complete listing; details only for new postings, within bu
 });
 
 test("SuccessFactors: a short read, a robots ban or an unreachable robots.txt is never complete", async () => {
-  const short = await listBoard({ atsType: SF, atsRef: "empleo.grupobancolombia.com/bancolombia" }, bancolombiaHttp({ trimmedLabel: true }).http, {});
+  const short = await listSf({ atsType: SF, atsRef: "empleo.grupobancolombia.com/bancolombia" }, bancolombiaHttp({ trimmedLabel: true }).http, {});
   assert.equal(short.kind, "error", "label says 43 but fewer rows were read");
   const banned = await listBoard(
     { atsType: SF, atsRef: "empleo.grupobancolombia.com/bancolombia" },
@@ -266,7 +279,7 @@ test("SuccessFactors: a short read, a robots ban or an unreachable robots.txt is
     {}
   );
   assert.deepEqual(banned, { kind: "error", detail: "robots.txt no permite /search/" });
-  const down = await listBoard({ atsType: SF, atsRef: "empleo.grupobancolombia.com/bancolombia" }, bancolombiaHttp({ robots: { status: 503, body: "" } }).http, {});
+  const down = await listSf({ atsType: SF, atsRef: "empleo.grupobancolombia.com/bancolombia" }, bancolombiaHttp({ robots: { status: 503, body: "" } }).http, {});
   assert.equal(down.kind, "error", "5xx robots.txt = nothing allowed (RFC 9309)");
   const redirect = await listBoard(
     { atsType: SF, atsRef: "empleo.grupobancolombia.com/bancolombia" },
@@ -284,7 +297,7 @@ test("SuccessFactors: foreign rows get no page request and are filtered out", as
     [`${AV}/robots.txt`]: { status: 200, body: fixture(SF, "robots.bancolombia.txt") },
     [`${AV}/search/?q=&sortColumn=referencedate&sortDirection=desc&startrow=0`]: { status: 200, body: relabel(page, 1, rows.length, rows.length) }
   });
-  const listing = await listBoard({ atsType: SF, atsRef: "jobs.avianca.com" }, http, { knownIds: new Set(rows.map((row) => row.id)) });
+  const listing = await listSf({ atsType: SF, atsRef: "jobs.avianca.com" }, http, { knownIds: new Set(rows.map((row) => row.id)) });
   assert.equal(listing.kind, "complete");
   if (listing.kind !== "complete") return;
   const { postings, stats } = selectColombianPostings(listing.postings, NOW);

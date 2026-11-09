@@ -18,6 +18,7 @@ import { Input } from "../components/ui/input.js";
 import { Button } from "../components/ui/button.js";
 import { Search, SlidersHorizontal, Unlock, ArrowUpRight, X } from "lucide-react";
 import type { Job } from "../sources/types.js";
+import type { FeedbackLinkState } from "../lib/site-feedback.js";
 import { useSavedJobs } from "../lib/saved-jobs.js";
 
 type CheckoutBannerState = "confirming" | "success" | "pending" | null;
@@ -840,6 +841,16 @@ export default function Dashboard() {
               <Button className="mt-5" onClick={() => setRetryNonce((value) => value + 1)}>
                 Reintentar
               </Button>
+              <p className="mt-4 text-sm">
+                ¿Sigue fallando?{" "}
+                <Link
+                  to="/opiniones"
+                  state={{ feedback: { kind: "problem", category: "no-carga", pagePath: location.pathname, search: filters.search } } satisfies FeedbackLinkState}
+                  className="font-bold underline underline-offset-2"
+                >
+                  Repórtalo aquí
+                </Link>
+              </p>
             </div>
           ) : visibleJobs.length > 0 ? (
             <>
@@ -986,6 +997,16 @@ export default function Dashboard() {
                   ?
                 </p>
               )}
+              <p className="mt-4 text-sm">
+                ¿Esperabas ver ofertas?{" "}
+                <Link
+                  to="/opiniones"
+                  state={{ feedback: { kind: "problem", category: "busqueda", pagePath: location.pathname, search: filters.search } } satisfies FeedbackLinkState}
+                  className="font-bold underline underline-offset-2"
+                >
+                  Cuéntanos qué buscabas
+                </Link>
+              </p>
             </div>
           )}
         </div>

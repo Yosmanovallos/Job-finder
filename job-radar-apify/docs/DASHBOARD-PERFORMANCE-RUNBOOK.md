@@ -318,6 +318,140 @@ only when the source text contains `$`.
 - **After deploy (pending):** the same 5 URLs with unique query strings and
   `MISS`. The limit is +10 % of 264 ms.
 
+### 2026-11-02 searches read only the matching vacancy groups (`codex/search-latency`, before deploy)
+
+A search on `/api/jobs` that is not cached cost about 1.0-1.4 s in
+production, against about 0.25 s once cached. `EXPLAIN (ANALYZE, BUFFERS)` on
+a disposable PostgreSQL 16 shows the cause. The canonical projection
+(country-only sibling window, sort and `DISTINCT ON` over every live row)
+took about 380 ms of a 590 ms `contador` search. The search predicate over
+the ~38k canonical rows took about 175 ms. `COUNT(*) OVER()`, the `details`
+join and the `LIMIT` took under 40 ms.
+
+Two tweaks were measured and discarded:
+
+- Dropping `description` from the projection: no change.
+- `COLLATE "C"` on the identity keys: slower, because it loses the
+  incremental sort.
+
+What changed (`queryJobsPage`, searches only):
+
+- A `search_hits` CTE (`MATERIALIZED`, hash semi-join) collects the
+  `(identity_title, identity_company, identity_instance)` keys
+  (`vacancyGroupKeySql`) of the live rows that pass the same WHERE.
+- The canonical projection then reads only the live rows of those groups.
+- A `DISTINCT ON` group only adds the location, and a `has_city_sibling`
+  partition only adds the country. Every kept group therefore elects the
+  same canonical row. The unchanged WHERE then gives the same rows, total
+  and order.
+- None of the three keys can be NULL.
+- Broad searches skip the narrowing. `search_hits` stops at
+  `SEARCH_NARROW_MAX_HITS` + 1 rows (10,001). If it fills up, the projection
+  reads every live row as before. Otherwise it holds every match.
+  - Without this cutoff, `empresa`, which matches ~96 % of the synthetic
+    rows, went from 560 to 808 ms.
+  - With it, `empresa` takes 504 ms against 564 ms before.
+- `tests/validate-search-narrowing.ts` (`test:integration`, `test:job-pagination`)
+  compares every page of 91 queries with and without the narrowing. The
+  queries cover:
+  - a canonical row that fails while an older sibling passes;
+  - country-only rows;
+  - official postings;
+  - confidential employers;
+  - NULL company/location;
+  - the same title in CO and VE;
+  - the modality filters;
+  - a search with 10,050 hits (the broad branch).
+
+  A naive pre-filter (rows instead of groups) fails it.
+- Queries without a search (dashboard, warmup, category and company pages,
+  home stats) send exactly the same SQL as before. The job-page LRU, the
+  block cache and the CO/VE warmup are untouched. No migration.
+
+Local measurement, `scripts/bench-search-latency.ts`:
+
+- Setup: disposable PostgreSQL 16 in Docker with `--cpus 1` and 512 MB.
+  56.5k synthetic rows, 49.9k active, including 1.5k official projections.
+- Method: old and new SQL timed alternately in the same process, 9 rounds,
+  median (range). Parity was identical on every page of all 28 queries.
+- The old SQL is bimodal (about 0.5 s or about 1.0 s per run, depending on
+  whether its sort spills), so look at both columns, not one number.
+
+| Query (`country=CO`, `limit=20`) | Before (median) | After (median) |
+| --- | ---: | ---: |
+| contador / analista / vendedor | 635 / 999 / 827 ms | 417 / 296 / 426 ms |
+| auxiliar / desarrollador | 527 / 514 ms | 277 / 332 ms |
+| AI Engineer / community manager / marketing | 647 / 528 / 514 ms | 434 / 302 / 282 ms |
+| markerting / zzzzqx (0 results) | 1,026 / 519 ms | 213 / 194 ms |
+| AI Engineer + remoto / marketing + hibrido / contador + presencial | 580 / 525 / 603 ms | 377 / 262 / 318 ms |
+| analista offset 24 / 120 (blocks) | 1,105 / 1,186 ms | 298 / 328 ms |
+| Broad: empresa (33k hits) / colombia (4.6k) | 564 / 753 ms | 504 / 331 ms |
+| No search (dashboard) / modality only | 470 / 858 ms | 494 / 865 ms (same SQL) |
+
+Cold process, measured locally:
+
+- Setup: `NODE_ENV=production` and the same disposable database, with only
+  synthetic environment variables and no `.env`.
+- Startup logged `dashboard_cache_warmed` for CO/VE in 1,183 ms before the
+  port opened.
+- `/dashboard` on 5 unique URLs: 6-24 ms.
+- New searches through HTTP: `contador`, `analista`, `vendedor`, `auxiliar`
+  and `desarrollador` took 0.27-0.50 s; `markerting` took 0.13 s. Repeats
+  took about 5 ms, served from cache.
+
+What remains of a search:
+
+- Two sequential scans: the predicate over the live rows (about 90 ms) and
+  the group join (about 110 ms).
+- A precomputed normalized title with a trigram index could remove the first.
+  That is an additive migration, deferred until production numbers show it
+  is needed.
+- Network time to the database is unchanged, so expect production to drop by
+  the database share only, roughly 0.3-0.6 s of the 1.0-1.4 s.
+
+**After deploy:**
+
+- Request `/api/jobs?country=CO&search=<term>&limit=20` for `contador`,
+  `analista`, `vendedor`, `auxiliar` and `desarrollador`, with a unique
+  `&coldcheck=<random>` so the edge answers `MISS`. Then repeat each URL once.
+- Keep `limit=20` exactly. The dashboard asks for 24, so visitors never warm
+  these app-cache keys. `coldcheck` only defeats the edge.
+- Also request one broad term, `search=colombia`, which matches most
+  production locations. It must not be slower than before (about 1-1.4 s).
+- Compare the first requests with the 2026-11-02 baseline of 1.03-1.39 s.
+  The repeats should stay at about 0.25 s.
+- `/dashboard` on unique URLs must stay at 250-330 ms. The Render log must
+  show `dashboard_cache_warmed`.
+
+**Verified 2026-11-03** after PR #106 (`15feb3f`):
+
+- Deploy: merged 11:25 UTC; the process restarted at about 11:25:45 UTC
+  (`/api/health` uptime). No other restart followed in the next 9 minutes.
+- `/api/jobs` answers Cloudflare `BYPASS`, so every request reached Render.
+  "Cold" means an app-cache key nobody had requested.
+- Cold samples: before = the same day on the old code; after = varying
+  `limit` (11-20) on the new code, which gives new cache keys for the same
+  SQL work.
+
+| `/api/jobs?country=CO&search=…` | Before | After |
+| --- | ---: | ---: |
+| analista | 1.20 s | 0.72-0.75 s (6 samples) |
+| auxiliar / desarrollador | 1.19 / 1.17 s | 0.75 / 0.81 s |
+| contador | 2.30 s (2026-11-02: 1.03-1.39 s) | 0.81-0.92 s (5 samples), one 1.50 s |
+| vendedor | 1.47 s | 1.18 s |
+| colombia (16,529 results, broad path = old SQL) | 1.26 s | 1.21-1.34 s (5 samples), one 2.03 s |
+| Repeats (cached) | ~0.25 s | 0.23-0.32 s |
+
+- Selective searches lost about 0.35-0.5 s. A cached response, which is
+  mostly network and server overhead, takes ~0.25 s; so the database part of
+  `analista` went from ~0.95 s to ~0.48 s.
+- The broad search stays where it was, as designed.
+- `/dashboard` with Cloudflare `MISS`: 257, 266 and 312 ms. `/ve/dashboard`:
+  260, 276 and 284 ms. Both are inside the 250-330 ms baseline.
+- The Render deploy log was not read in this check, so `dashboard_cache_warmed`
+  is not confirmed from the log. The fast `MISS` responses of the SSR first
+  page are consistent with a successful warmup.
+
 ## Required regression check
 
 For any change that can affect this path:
@@ -344,3 +478,10 @@ and `git diff --check` passed. Repository-wide typecheck still had unrelated,
 pre-existing errors. Docker Desktop was unavailable, so the isolated PostgreSQL
 suite was not run. Do not treat those two limitations as new failures from the
 dashboard optimization, and do not use them to waive validation of future code.
+
+## SEO Fase B: copia de vacantes aptas recientes (2026-11-06, sin desplegar)
+
+- Una consulta de solo lectura (aptas publicadas en 72 h) alimenta `/sitemap-jobs-recent.xml`, «Nuevas hoy» de los hubs e IndexNow. Tiene su propia caché (`recentReadyCache`, 1 entrada, 10 min fresca, 2 h usable), separada de `jobsPageCache`, así que no desaloja las primeras páginas del dashboard.
+- Arranque: se carga **después** del warmup del dashboard y antes de `listen`, con 5 s como máximo (evento `recent_ready_cache_warmed`). Si el warmup del dashboard falla o se pasa de tiempo, no se carga y los hubs omiten el bloque hasta que la copia exista.
+- Los hubs solo hacen `peek()`: nunca esperan a Postgres. Medición local en frío (3 procesos por lado, mediana): Bogotá 63→68 ms, VE project-manager 37→32 ms, Medellín 29→31 ms. Producción antes (MISS, URL única): 0,26–0,30 s con caché de app caliente.
+- Tras desplegar: comprobar `dashboard_cache_warmed` y `recent_ready_cache_warmed` en los logs de Render, y el TTFB MISS de `/empleos/bogota`, `/empleos/medellin`, `/empleos/cali`, `/empleos/asesor-comercial` y `/ve/empleos/project-manager`.

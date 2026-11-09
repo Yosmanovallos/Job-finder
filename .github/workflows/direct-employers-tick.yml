@@ -17,7 +17,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "tick | dry-run | dry-run-one | tick-one | migrate-dry-run | migrate | seed-dry-run | seed | seed-one-dry-run | seed-one | domain-census | discover-dry-run | discover | coverage | computrabajo-coverage | computrabajo-backlog | browser-boards-coverage | directory-export | frisby-canary | altipal-canary | identity-canary | copy-audit | copy-audit-all | db-size | cc-tenants | ats-inventory-dry-run | ats-inventory | ats-probe-dry-run | ats-probe | inventory-review-list | inventory-approve-dry-run | inventory-approve | inventory-revert-dry-run | inventory-revert | review-list | review-approve-dry-run | review-approve | cv-purge-dry-run | cv-purge | saved-jobs-migrate-dry-run | saved-jobs-migrate"
+        description: "tick | dry-run | dry-run-one | tick-one | migrate-dry-run | migrate | seed-dry-run | seed | seed-one-dry-run | seed-one | domain-census | discover-dry-run | discover | coverage | computrabajo-coverage | computrabajo-backlog | browser-boards-coverage | directory-export | frisby-canary | altipal-canary | identity-canary | copy-audit | copy-audit-all | db-size | cc-tenants | ats-inventory-dry-run | ats-inventory | ats-probe-dry-run | ats-probe | inventory-review-list | inventory-approve-dry-run | inventory-approve | inventory-revert-dry-run | inventory-revert | review-list | review-approve-dry-run | review-approve | cv-purge-dry-run | cv-purge | saved-jobs-migrate-dry-run | saved-jobs-migrate | site-feedback-migrate-dry-run | site-feedback-migrate | signup-attribution-migrate-dry-run | signup-attribution-migrate | signups-report"
         required: true
         default: "dry-run"
         type: choice
@@ -88,6 +88,18 @@ on:
           # new table, nothing existing altered; dry-run only reads.
           - saved-jobs-migrate-dry-run
           - saved-jobs-migrate
+          # Not direct-employer work either: creates the site_feedback table of
+          # /opiniones (scripts/migrate-site-feedback.ts, SQL approved by the
+          # owner 2026-11-02). One new table, nothing existing altered.
+          - site-feedback-migrate-dry-run
+          - site-feedback-migrate
+          # Not direct-employer work either: signup attribution, Fase A of
+          # docs/seo-baseline/2026-11-06-* (scripts/migrate-signup-attribution.ts).
+          # Six NULL columns on users, nothing existing altered; needs the
+          # owner's approval of the SQL in the PR. signups-report is read-only.
+          - signup-attribution-migrate-dry-run
+          - signup-attribution-migrate
+          - signups-report
       company_key:
         description: "review-approve: company_key del candidato"
         required: false
@@ -209,6 +221,11 @@ jobs:
             cv-purge)         cmd="npx tsx scripts/purge-cv-data.ts --execute --allow-remote-db" ;;
             saved-jobs-migrate-dry-run) cmd="npx tsx scripts/migrate-saved-jobs.ts --dry-run --allow-remote-db" ;;
             saved-jobs-migrate) cmd="npx tsx scripts/migrate-saved-jobs.ts --allow-remote-db" ;;
+            site-feedback-migrate-dry-run) cmd="npx tsx scripts/migrate-site-feedback.ts --dry-run --allow-remote-db" ;;
+            site-feedback-migrate) cmd="npx tsx scripts/migrate-site-feedback.ts --allow-remote-db" ;;
+            signup-attribution-migrate-dry-run) cmd="npx tsx scripts/migrate-signup-attribution.ts --dry-run --allow-remote-db" ;;
+            signup-attribution-migrate) cmd="npx tsx scripts/migrate-signup-attribution.ts --allow-remote-db" ;;
+            signups-report) cmd="npx tsx scripts/report-signup-attribution.ts --days 14" ;;
             *) echo "modo desconocido: $MODE"; exit 1 ;;
           esac
           echo "## Direct employers — $MODE" >> "$GITHUB_STEP_SUMMARY"

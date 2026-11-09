@@ -1,5 +1,5 @@
-import { useState } from "react";
 import { cn } from "../lib/utils.js";
+import { useBrokenImage } from "../lib/use-broken-image.js";
 
 function initialFor(name: string): string {
   return name.trim().charAt(0).toUpperCase() || "?";
@@ -21,16 +21,17 @@ interface CompanyAvatarProps {
 // covers the full uncurated corpus, where no domain is verified (see its
 // own comment on why guessing one is unsafe).
 export function CompanyAvatar({ name, logoUrl, className }: CompanyAvatarProps) {
-  const [failed, setFailed] = useState(false);
+  const { failed, imgRef, onError } = useBrokenImage();
 
   if (logoUrl && !failed) {
     return (
       <img
+        ref={imgRef}
         src={logoUrl}
         alt=""
         loading="lazy"
         decoding="async"
-        onError={() => setFailed(true)}
+        onError={onError}
         className={cn(
           "shrink-0 rounded-lg object-contain bg-white border border-border p-1.5",
           className

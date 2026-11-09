@@ -3,7 +3,7 @@ import { SOURCES_BY_COUNTRY } from "../countries/index.js";
 import { getEffectiveCountry } from "../lib/country-context.js";
 import { ROUTE_META } from "../lib/page-meta.js";
 import { TINTS } from "../lib/brand-tints.js";
-import { ContentCta, ContentSection, PageHero } from "../components/ContentPage.js";
+import { ContentCta, ContentSection, PageHero, PillLink } from "../components/ContentPage.js";
 
 // Every item except faq-1 is country-neutral (how the product works, not
 // what it's connected to).
@@ -97,6 +97,10 @@ export default function Faq({ country }: FaqProps) {
             );
           })}
         </div>
+        <p className="sr mt-6 md:mt-8 flex flex-wrap items-center gap-3 text-[15px] text-[#3d413e]">
+          ¿No encontraste tu respuesta o algo falló?
+          <PillLink href="/opiniones">Opiniones y ayuda</PillLink>
+        </p>
       </ContentSection>
       <ContentCta />
     </div>

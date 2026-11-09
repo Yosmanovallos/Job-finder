@@ -1,6 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { ChevronDown, Check } from "lucide-react";
+// Per-icon modules, not the package root: Header is part of the server-
+// rendered homepage (src/server/home-ssr.tsx), and in Node the root resolves
+// to lucide's CommonJS bundle with every icon (~1 MB of code resident in the
+// web server). Same component and output; Vite tree-shook it either way.
+import ChevronDown from "lucide-react/dist/esm/icons/chevron-down.mjs";
+import Check from "lucide-react/dist/esm/icons/check.mjs";
 import { useAuth } from "../auth/auth-provider.js";
 import { PAYWALL_ENABLED } from "../config.js";
 import { FlagIcon } from "../components/FlagIcon.js";
@@ -118,7 +123,9 @@ function CountrySwitcher({ country, pathname, variant, onNavigate }: CountrySwit
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="listbox"
         aria-expanded={open}
-        aria-label={`País: ${COUNTRY_LABELS[country]}. Cambiar país`}
+        // Starts with the visible code ("CO"/"VE") so voice control can
+        // target it (WCAG 2.5.3, axe label-content-name-mismatch).
+        aria-label={`${country}, ${COUNTRY_LABELS[country]}: cambiar país`}
         className="flex items-center gap-1.5 h-11 rounded-full border-2 border-foreground bg-white px-3 text-sm font-bold text-foreground transition-colors hover:bg-green-soft focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gold-1/60"
       >
         <FlagIcon code={country} className="w-5 h-3.5 shrink-0" />
@@ -161,15 +168,35 @@ export default function Header() {
     ? "/login"
     : `/login?return_to=${encodeURIComponent(location.pathname + location.search)}`;
 
+  // Lock page scroll on <html>, NOT <body>. index.css gives <html>
+  // `overflow-x: hidden`, so a non-visible overflow on <body> no longer
+  // propagates to the viewport — <body> becomes its own (non-scrolling)
+  // scroll container, this sticky header unsticks, and it jumps back to
+  // its in-flow spot at the top of the document. Opening the menu after
+  // scrolling down then showed nothing: the panel rendered thousands of
+  // pixels above the viewport. Same class of bug as the Dashboard.tsx and
+  // App.tsx comments describe. Clearing the inline style restores the
+  // stylesheet's overflow-x: hidden.
   useEffect(() => {
-    if (mobileNavOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
+    if (!mobileNavOpen) return;
+    const root = document.documentElement;
+    root.style.overflow = "hidden";
     return () => {
-      document.body.style.overflow = "";
+      root.style.overflow = "";
     };
+  }, [mobileNavOpen]);
+
+  // Close the menu if the viewport grows past the lg breakpoint (rotation,
+  // resize) — the panel is lg:hidden, so it would otherwise keep the page
+  // scroll-locked with nothing visible to close it.
+  useEffect(() => {
+    if (!mobileNavOpen) return;
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const onChange = () => {
+      if (mq.matches) setMobileNavOpen(false);
+    };
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
   }, [mobileNavOpen]);
 
   const handleNavClick = () => {
@@ -205,7 +232,7 @@ export default function Header() {
           className="flex shrink-0 items-center rounded-md focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gold-1/60"
           aria-label="BuscoTrabajo — inicio"
         >
-          <img src="/BT.png" alt="BuscoTrabajo.co" className="block h-7 w-auto" />
+          <img src="/BT.png" alt="BuscoTrabajo.co" width={482} height={59} className="block h-7 w-auto" />
         </Link>
 
         <nav className="hidden lg:flex items-center gap-1" aria-label="Navegación principal">
@@ -274,7 +301,7 @@ export default function Header() {
 
       {mobileNavOpen && (
         <div
-          className="lg:hidden w-full border-t-2 border-foreground bg-white"
+          className="lg:hidden w-full max-h-[calc(100dvh-4rem)] overflow-y-auto overscroll-contain border-t-2 border-foreground bg-white"
           role="dialog"
           aria-modal="true"
           aria-label="Menú de navegación"

@@ -8,6 +8,7 @@ import Faq from "./sections/Faq.js";
 import Footer from "./sections/Footer.js";
 import ScrollToTop from "./components/ScrollToTop.js";
 import BottomNav from "./components/BottomNav.js";
+import FeedbackButton from "./components/FeedbackButton.js";
 import { usePageMeta, PageMeta } from "./lib/use-page-meta.js";
 import { ROUTE_META } from "./lib/page-meta.js";
 import { getHomeContent } from "./lib/agent-readiness.js";
@@ -42,6 +43,7 @@ const Pricing = lazy(() => import("./sections/Pricing.js"));
 const Legal = lazy(() => import("./sections/Legal.js"));
 const Account = lazy(() => import("./sections/Account.js"));
 const PublicInfoPage = lazy(() => import("./sections/PublicInfoPage.js"));
+const Opiniones = lazy(() => import("./sections/Opiniones.js"));
 
 function Landing() {
   // "/" (Colombia, default) vs "/ve" (Venezuela) — same pattern as
@@ -178,6 +180,15 @@ function AppRoutes() {
           </>
         }
       />
+      <Route
+        path="/opiniones"
+        element={
+          <>
+            <PageMeta {...ROUTE_META["/opiniones"]!} />
+            <Opiniones />
+          </>
+        }
+      />
     </Routes>
   );
 }
@@ -211,6 +222,17 @@ export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
+        <AppBody />
+      </BrowserRouter>
+    </AuthProvider>
+  );
+}
+
+// Everything inside the router, shared by the browser (BrowserRouter above)
+// and the server's home render (src/server/home-ssr.tsx, StaticRouter) so
+// both produce the same tree for hydrateRoot.
+export function AppBody() {
+  return (
         <SavedJobsProvider>
         <ScrollToTop />
         {/* No overflow-x-hidden here: setting overflow-x alone forces the
@@ -236,9 +258,8 @@ export default function App() {
           </RevealMain>
           <Footer />
           <BottomNav />
+          <FeedbackButton />
         </div>
         </SavedJobsProvider>
-      </BrowserRouter>
-    </AuthProvider>
   );
 }

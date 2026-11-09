@@ -34,6 +34,7 @@ import {
   SITE_URL
 } from "../src/lib/job-seo.js";
 import { CITY_OPTIONS } from "../src/lib/job-filters.js";
+import { listIntentCategories } from "../src/lib/intent-pages.js";
 import { DEFAULT_ROLES_200 } from "../src/queue/scheduler.js";
 import { COUNTRIES } from "../src/countries/index.js";
 import { buildJwtAssertion } from "../src/lib/google-indexing.js";
@@ -543,9 +544,27 @@ async function runHttpTests() {
   // so the noindex path is too. This runs only against the runner's
   // disposable PostgreSQL (require-isolated-database), never production.
   const fixtureRows = await pool.query<{ id: string }>(
-    `SELECT id FROM jobs WHERE is_active AND country = 'CO' AND location = 'Bogotá, Colombia' ORDER BY id LIMIT 3`
+    `SELECT id FROM jobs WHERE is_active AND country = 'CO' AND location = 'Bogotá, Colombia' ORDER BY id LIMIT 4`
   );
-  const [readyId, thinId, dollarId] = fixtureRows.rows.map((row) => row.id);
+  const [readyId, thinId, dollarId, freshId] = fixtureRows.rows.map((row) => row.id);
+  // SEO Fase B: one Google-ready job published a minute ago, so
+  // /sitemap-jobs-recent.xml and the Bogotá hub's «Nuevas hoy» have a row.
+  // The other fixtures are 3+ days old (outside the 72 h window).
+  let freshPublishedAt: Date | null = null;
+  if (freshId) {
+    const fresh = await pool.query<{ published_at: Date }>(
+      `UPDATE jobs SET title = 'Analista de cartera Fase B', published_at = NOW() - INTERVAL '1 minute',
+              description = $2, requirements = $3::jsonb, detail_status = 'complete', description_kind = 'full'
+       WHERE id = $1 RETURNING published_at`,
+      [
+        freshId,
+        "Buscamos analista de cartera para el equipo de cobranza.\nHarás seguimiento diario de pagos y prepararás informes semanales para la gerencia.",
+        JSON.stringify(["Técnico o tecnólogo en áreas administrativas.", "Un año de experiencia en cartera.", "Excel intermedio."])
+      ]
+    );
+    freshPublishedAt = fresh.rows[0]?.published_at ?? null;
+    await refreshGoogleReadiness(freshId, { contentObtained: true });
+  }
   // A Google-ready job whose source text carries every String.replace
   // pattern ($&, $`, $', $$): the SSR page must reproduce it verbatim.
   if (dollarId) {
@@ -612,6 +631,11 @@ async function runHttpTests() {
     // each self-reference their own canonical (not both pointing at "/",
     // which told Google to consolidate "/ve" away) and carry the same
     // reciprocal hreflang pair + x-default.
+    // The home H1 is server rendered (classes + a <span>): compare its text.
+    const homeH1Text = (html: string): string => {
+      const match = html.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/);
+      return match ? match[1].replace(/<[^>]+>/g, "").trim() : "";
+    };
     const homeHtml = await (await fetch(`${BASE_URL}/`)).text();
     const veHtml = await (await fetch(`${BASE_URL}/ve`)).text();
     check(
@@ -636,9 +660,9 @@ async function runHttpTests() {
     }
     check(
       homeHtml.includes("<title>Busco trabajo en Colombia: ofertas de empleo | BuscoTrabajo</title>") &&
-        homeHtml.includes("<h1>Busco trabajo en Colombia: todas las ofertas de empleo en un solo lugar</h1>") &&
+        homeH1Text(homeHtml) === "Busco trabajo en Colombia: todas las ofertas de empleo en un solo lugar" &&
         veHtml.includes("<title>Busco trabajo en Venezuela: ofertas de empleo | BuscoTrabajo</title>") &&
-        veHtml.includes("<h1>Busco trabajo en Venezuela: todas las ofertas de empleo en un solo lugar</h1>") &&
+        homeH1Text(veHtml) === "Busco trabajo en Venezuela: todas las ofertas de empleo en un solo lugar" &&
         veHtml.includes('"alternateName": ["Busco Trabajo", "BuscoTrabajo.co"]'),
       "/ y /ve orientan title/H1 a la intención exacta 'busco trabajo', conservan el país correcto y declaran el nombre alternativo de marca.",
       "La portada de Colombia o Venezuela no sirve el nuevo title/H1 de intención, o falta alternateName en el HTML crudo."
@@ -1043,6 +1067,28 @@ async function runHttpTests() {
       `GET /pricing respondió ${pricingRes.status} (Location: ${pricingRes.headers.get("location")}) en vez de 301 a /.`
     );
 
+    // /tiktok (Fase A): the bio short link is a 302 to / tagged with utm_*,
+    // never indexed and never listed in a sitemap.
+    const tiktokRes = await fetch(`${BASE_URL}/tiktok`, { redirect: "manual" });
+    check(
+      tiktokRes.status === 302 &&
+        tiktokRes.headers.get("location") === "/?utm_source=tiktok&utm_medium=social&utm_campaign=bio" &&
+        /noindex/.test(tiktokRes.headers.get("x-robots-tag") || ""),
+      "GET /tiktok responde 302 a /?utm_source=tiktok&utm_medium=social&utm_campaign=bio con X-Robots-Tag noindex.",
+      `GET /tiktok respondió ${tiktokRes.status} (Location: ${tiktokRes.headers.get("location")}, X-Robots-Tag: ${tiktokRes.headers.get("x-robots-tag")}).`
+    );
+    check(
+      !pagesXml.includes("/tiktok") && !indexXml.includes("/tiktok"),
+      "/tiktok no aparece en sitemap.xml ni en sitemap-pages.xml.",
+      "/tiktok aparece en un sitemap."
+    );
+    const firstTouchAnonRes = await fetch(`${BASE_URL}/api/me/first-touch`, { method: "POST", body: "{}" });
+    check(
+      firstTouchAnonRes.status === 401,
+      "POST /api/me/first-touch sin sesión responde 401 (no escribe nada).",
+      `POST /api/me/first-touch sin sesión respondió ${firstTouchAnonRes.status}.`
+    );
+
     const jobsSitemapRes = await fetch(`${BASE_URL}/sitemap-jobs.xml`);
     const jobsSitemapXml = await jobsSitemapRes.text();
     const sitemapLocs = [...jobsSitemapXml.matchAll(/<loc>(.*?)<\/loc>/g)].map((m) => m[1]);
@@ -1062,11 +1108,70 @@ async function runHttpTests() {
       );
     }
 
+    // SEO Fase B: the recent sitemap is in the index and is a strict subset of
+    // sitemap-jobs.xml with identical <lastmod> (a non-canonical or unready id
+    // here would be a soft-404 generator).
+    check(
+      indexXml.includes("https://buscotrabajo.co/sitemap-jobs-recent.xml"),
+      "/sitemap.xml referencia sitemap-jobs-recent.xml.",
+      "/sitemap.xml no referencia sitemap-jobs-recent.xml."
+    );
+    const urlEntries = (xml: string) =>
+      new Map(
+        [...xml.matchAll(/<url>\s*<loc>(.*?)<\/loc>(?:\s*<lastmod>(.*?)<\/lastmod>)?\s*<\/url>/g)].map((m) => [m[1], m[2] ?? null])
+      );
+    const recentRes = await fetch(`${BASE_URL}/sitemap-jobs-recent.xml`);
+    const recentXml = await recentRes.text();
+    const recentEntries = urlEntries(recentXml);
+    const fullEntries = urlEntries(jobsSitemapXml);
+    check(
+      recentRes.status === 200 &&
+        (recentRes.headers.get("content-type") || "").includes("application/xml") &&
+        recentXml.includes("<urlset") &&
+        recentXml.trimEnd().endsWith("</urlset>"),
+      `/sitemap-jobs-recent.xml responde 200 con un <urlset> completo (${recentEntries.size} URLs).`,
+      `/sitemap-jobs-recent.xml respondió ${recentRes.status} o no es un urlset completo.`
+    );
+    const notInFull = [...recentEntries].filter(([loc, lastmod]) => !fullEntries.has(loc) || fullEntries.get(loc) !== lastmod);
+    check(
+      notInFull.length === 0,
+      "Cada URL de sitemap-jobs-recent.xml está en sitemap-jobs.xml con el mismo <lastmod>.",
+      `sitemap-jobs-recent.xml tiene URLs fuera de sitemap-jobs.xml o con otro <lastmod>: ${notInFull.map(([loc]) => loc).join(", ")}`
+    );
+    const freshInRecent = freshId ? [...recentEntries.keys()].some((loc) => loc.includes(`/empleos/${freshId}/`)) : false;
+    const oldInRecent = readyId ? [...recentEntries.keys()].some((loc) => loc.includes(`/empleos/${readyId}/`)) : false;
+    check(
+      freshInRecent && !oldInRecent,
+      "sitemap-jobs-recent.xml lista la vacante apta de hace 1 minuto y no la apta de hace más de 72 h.",
+      `sitemap-jobs-recent.xml: fresca=${freshInRecent}, antigua=${oldInRecent} (se esperaba true/false).`
+    );
+
     // Category pages (Fase 4) — real city.
     const cityCategory = resolveCategorySlug(slugify(CITY_OPTIONS[0]))!;
     const cityPath = buildCategoryPath(cityCategory);
     const cityRes = await fetch(`${BASE_URL}${cityPath}`);
     const cityHtml = await cityRes.text();
+    // SEO Fase B «Nuevas hoy»: the recent snapshot was loaded by the sitemap
+    // request above, so the hub (which only peeks it) renders the block — only
+    // if the fresh job's Bogotá calendar day is still today (a run right after
+    // midnight in Bogotá legitimately has no block).
+    const bogotaDay = (date: Date) =>
+      new Intl.DateTimeFormat("en-CA", { timeZone: "America/Bogota", year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
+    if (freshPublishedAt && bogotaDay(freshPublishedAt) === bogotaDay(new Date())) {
+      const newTodaySection = /<section data-category-new-today[^>]*>([\s\S]*?)<\/section>/.exec(cityHtml)?.[1] ?? "";
+      const payload = /window\.__SSR_CATEGORY__=(\{[\s\S]*?\});<\/script>/.exec(cityHtml)?.[1] ?? "";
+      check(
+        newTodaySection.includes(`<h2>Nuevas hoy en ${cityCategory.label}</h2>`) &&
+          newTodaySection.includes(`href="/empleos/${freshId}/`) &&
+          !newTodaySection.includes(`href="/empleos/${readyId}/`) &&
+          payload.includes('"newToday"') &&
+          payload.includes(`/empleos/${freshId}/`),
+        `${cityPath} muestra «Nuevas hoy» en el HTML crudo y en __SSR_CATEGORY__ con la vacante apta de hoy (y no la antigua).`,
+        `${cityPath} no muestra el bloque «Nuevas hoy» esperado en el HTML crudo o en el payload.`
+      );
+    } else {
+      console.log("ℹ️  «Nuevas hoy»: la vacante fresca cae en el día anterior de Bogotá; se omite esa comprobación.");
+    }
     check(
       cityRes.status === 200,
       `GET ${cityPath} (categoría de ciudad real) responde 200.`,
@@ -1314,11 +1419,15 @@ async function runHttpTests() {
 
     // sitemap-categories.xml + índice actualizado — ahora incluye ambos
     // países (CO+VE ciudades, y roles duplicados por país).
+    // ADR 0012: "Remoto" is no longer a CO city entry; it and the other
+    // intent pages are listed only when they pass the inventory guard
+    // (tests/validate-intent-pages.ts covers those), so they are counted apart.
+    const intentPaths = new Set(listIntentCategories().map((category) => `${SITE_URL}${buildCategoryPath(category)}`));
     const expectedCategoryCount =
-      CITY_OPTIONS.length + COUNTRIES.VE.cities.length + DEFAULT_ROLES_200.length * 2;
+      CITY_OPTIONS.filter((city) => city !== "Remoto").length + COUNTRIES.VE.cities.length + DEFAULT_ROLES_200.length * 2;
     const categoriesSitemapRes = await fetch(`${BASE_URL}/sitemap-categories.xml`);
     const categoriesSitemapXml = await categoriesSitemapRes.text();
-    const categoryLocsHttp = [...categoriesSitemapXml.matchAll(/<loc>(.*?)<\/loc>/g)];
+    const categoryLocsHttp = [...categoriesSitemapXml.matchAll(/<loc>(.*?)<\/loc>/g)].filter((match) => !intentPaths.has(match[1]));
     check(
       categoriesSitemapRes.status === 200 &&
         categoryLocsHttp.length === expectedCategoryCount &&

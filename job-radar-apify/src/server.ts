@@ -7,6 +7,8 @@ import dotenv from "dotenv";
 import {
   getJobsPage,
   peekJobsPage,
+  getIntentPage,
+  knownIntentTotal,
   getJobById,
   getHomeJobCounts,
   getHomeCompanies,
@@ -19,10 +21,31 @@ import {
   maskLockedFields,
   updateUserName,
   updateUserPreferredRoles,
+  recordUserFirstTouch,
+  SignupAttributionUnavailableError,
   getTransactionsForUser,
   streamCanonicalSitemapJobs,
-  SitemapStreamAbortedError
+  SitemapStreamAbortedError,
+  getRecentSeoReadyJobs,
+  peekRecentSeoReadyJobs
 } from "./db/job-repository.js";
+import { buildNewTodayBlock, type RecentReadyJob } from "./lib/recent-jobs.js";
+import {
+  buildHubIntentLinks,
+  buildIntentAnswer,
+  buildIntentHreflangTags,
+  intentCategoryForPath,
+  intentFilters,
+  intentPagesEnabled,
+  intentRobots,
+  isIntentIndexable,
+  listIntentCategories,
+  collectIndexableIntents,
+  renderHubIntentLinksHtml,
+  renderIntentAnswerHtml,
+  siblingIntent,
+  type IntentAnswer
+} from "./lib/intent-pages.js";
 import { markRoleForImmediateRescan } from "./db/scheduler-repository.js";
 import {
   listSavedJobs,
@@ -32,6 +55,10 @@ import {
   SavedJobsUnavailableError,
   SAVED_JOBS_LIMIT
 } from "./db/saved-jobs-repository.js";
+import { getOpinionsSummary, insertFeedback, listPublishedOpinions, SiteFeedbackUnavailableError } from "./db/site-feedback-repository.js";
+import { FEEDBACK_BODY_MAX_BYTES, FEEDBACK_LIMITS, formatRating, opinionCategoryLabel, publicDisplayName, validateFeedback } from "./lib/site-feedback.js";
+import type { OpinionsSummary, PublishedOpinion } from "./lib/site-feedback.js";
+import { SITE_CHANGELOG, formatChangelogDate } from "./lib/site-changelog.js";
 import { wasJobPurged } from "./db/indexing-repository.js";
 import { wasJobArchived } from "./db/job-archive-repository.js";
 import {
@@ -45,6 +72,8 @@ import type { Job } from "./sources/types.js";
 import { StaleWhileRevalidateCache } from "./lib/stale-while-revalidate-cache.js";
 import { isPlaceholderEmployer } from "./lib/company-key.js";
 import { COMPANY_LOGO_DOMAINS, getCompanyLogoUrl } from "./data/company-logo-domains.js";
+import { handleLogoRoute, isLogoRoute } from "./server/routes/logo-proxy.js";
+import type { HomeSsrSeed } from "./lib/home-ssr-seed.js";
 import { getOfficialCareersUrl } from "./data/official-careers-links.js";
 import { getCountryConfig } from "./countries/index.js";
 import { PAYWALL_ENABLED } from "./config.js";
@@ -66,7 +95,8 @@ import {
   JOBS_SITEMAP_FOOTER,
   buildSitemapIndexXml,
   isUuid,
-  resolveCategorySlug,
+  resolveCategoryPath,
+  isLegacyRemoteCopy,
   RETIRED_ROLE_SLUGS,
   buildCategoryMeta,
   buildCategoryInsights,
@@ -103,6 +133,7 @@ import {
 } from "./lib/job-company-links.js";
 import { reputationLabel, reputationReviewText, reputationScoreText } from "./lib/reputation-labels.js";
 import { verifySession } from "./auth/verify-session.js";
+import { isNewAccount, parseFirstTouch, TIKTOK_SHORT_LINK_TARGET } from "./lib/first-touch.js";
 import { startPaymentCheckout } from "./payments/checkout.js";
 import { handleWompiWebhook } from "./payments/webhook.js";
 import { handleRunsRoute, isRunsRoute } from "./server/routes/runs.js";
@@ -117,6 +148,7 @@ import {
   getHomeContent,
   injectPublicContent,
   injectRouteMeta,
+  renderContentHtml,
   renderContentMarkdown,
   wantsMarkdown
 } from "./lib/agent-readiness.js";
@@ -174,8 +206,73 @@ const SPA_ROUTES = new Set([
   "/cuenta/ai/providers",
   "/como-funciona",
   "/fuentes",
-  "/preguntas"
+  "/preguntas",
+  "/opiniones"
 ]);
+
+// "Opiniones y ayuda": 5 messages per IP every 10 minutes is plenty for a
+// person and keeps a script from filling the table.
+const FEEDBACK_RATE_LIMIT = 5;
+const FEEDBACK_RATE_WINDOW_MS = 10 * 60 * 1000;
+const OPINIONS_CACHE_TTL_MS = 5 * 60 * 1000;
+type OpinionsPayload = { opinions: PublishedOpinion[]; summary: OpinionsSummary };
+const EMPTY_OPINIONS: OpinionsPayload = { opinions: [], summary: { count: 0, average: null, distribution: [0, 0, 0, 0, 0] } };
+let opinionsCache: { at: number; value: OpinionsPayload } | null = null;
+
+// Published opinions change only when someone publishes one by hand, so a
+// 5-minute copy serves both /api/opinions and the /opiniones server HTML.
+// Before the migration (or on a DB error) the page renders with none.
+async function getPublishedOpinionsCached(): Promise<OpinionsPayload> {
+  if (opinionsCache && Date.now() - opinionsCache.at < OPINIONS_CACHE_TTL_MS) return opinionsCache.value;
+  try {
+    const [opinions, summary] = await Promise.all([listPublishedOpinions(), getOpinionsSummary()]);
+    const value = { opinions, summary };
+    opinionsCache = { at: Date.now(), value };
+    return value;
+  } catch (error) {
+    if (error instanceof SiteFeedbackUnavailableError) {
+      opinionsCache = { at: Date.now(), value: EMPTY_OPINIONS };
+      return EMPTY_OPINIONS;
+    }
+    throw error;
+  }
+}
+
+// Server HTML of /opiniones beyond its H1/intro: the rating summary, the
+// published opinions and the changelog as plain text (escaped by
+// renderContentHtml), so crawlers read what the React page shows. No
+// Review or AggregateRating markup: Google shows no review stars for
+// reviews of an Organization placed on its own site ("self-serving").
+async function opinionsPageSections(): Promise<Array<{ heading: string; paragraphs: string[] }>> {
+  let payload = EMPTY_OPINIONS;
+  try {
+    payload = await getPublishedOpinionsCached();
+  } catch {
+    payload = EMPTY_OPINIONS;
+  }
+  const { opinions, summary } = payload;
+  return [
+    {
+      heading: "Opiniones publicadas",
+      paragraphs: opinions.length
+        ? [
+            ...(summary.average !== null
+              ? [`Calificación promedio: ${formatRating(summary.average)} de 5, con ${summary.count} ${summary.count === 1 ? "opinión" : "opiniones"} publicadas.`]
+              : []),
+            ...opinions.map(
+              (o) =>
+                `${o.rating} de 5 estrellas · ${opinionCategoryLabel(o.category)} — «${o.message}» ${o.displayName}, cuenta registrada.` +
+                (o.teamReply ? ` Respuesta del equipo: ${o.teamReply}` : "")
+            )
+          ]
+        : ["Todavía no hay opiniones publicadas. Puedes escribir la primera desde esta página."]
+    },
+    {
+      heading: "Lo que mejoramos",
+      paragraphs: SITE_CHANGELOG.slice(0, 6).map((entry) => `${formatChangelogDate(entry.date)}: ${entry.text}`)
+    }
+  ];
+}
 
 const MIN_COMPRESSIBLE_BYTES = 1024;
 const COMPRESSIBLE_CONTENT_TYPE = /^(?:text\/|application\/(?:javascript|json|xml))/i;
@@ -456,6 +553,8 @@ function peekCompanyJobs(scope: CompanyJobsScope, res: http.ServerResponse): Com
 const GENERAL_API_RATE_LIMIT = 120;
 const GENERAL_API_RATE_WINDOW_MS = 60 * 1000;
 const CHECKOUT_START_BODY_MAX_BYTES = 1 * 1024;
+// Signup first touch (src/lib/first-touch.ts): five short strings and a date.
+const FIRST_TOUCH_BODY_MAX_BYTES = 2 * 1024;
 const SAVED_JOB_BODY_MAX_BYTES = 1 * 1024; // { applied?: boolean }
 
 // Reads a request body up to maxBytes; null when it's larger (the rest is
@@ -477,6 +576,143 @@ function readSmallBody(req: http.IncomingMessage, maxBytes: number): Promise<str
     req.on("error", reject);
   });
 } // { plan?: "pro" | "pro_max" } — tiny payload, generous cap
+
+// Every figure the homepage shows, for GET /api/home-stats and for the
+// server render of "/" and "/ve". Both queries are cached in the repository
+// (homeJobCountsCache / homeCompaniesCache). A part whose query fails comes
+// back null/empty and `complete` is false.
+async function loadHomeStats(country: string): Promise<{ body: HomeData; complete: boolean }> {
+  const cities = getHomeCities(country);
+  const [counts, companies] = await Promise.allSettled([
+    getHomeJobCounts(country, cities),
+    getHomeCompanies(country, 12, Object.keys(COMPANY_LOGO_DOMAINS))
+  ]);
+  const jobs = counts.status === "fulfilled" ? counts.value : null;
+  const companyPage = companies.status === "fulfilled" ? companies.value : null;
+  const latest = jobs ? maskLockedFields(jobs.latestJobs, "free") : [];
+  const body: HomeData = {
+    totalJobs: jobs?.totalJobs ?? null,
+    last7Days: jobs?.last7Days ?? null,
+    last24Hours: jobs?.last24Hours ?? null,
+    onSite: jobs?.onSite ?? null,
+    remote: jobs?.remote ?? null,
+    totalCompanies: companyPage?.total ?? null,
+    cityCounts: Object.fromEntries(cities.map((city) => [city, jobs?.cityCounts[city] ?? null])),
+    latestJobs: latest.map((job) => ({
+      jobId: job.jobId,
+      title: job.title,
+      company: job.company,
+      location: job.location,
+      source: job.source,
+      dateText: job.dateText,
+      publishedAt: job.publishedAt
+    })),
+    companies: (companyPage?.companies ?? []).map((item) => ({
+      company: item.company,
+      count: item.count,
+      logoUrl: getCompanyLogoUrl(item.company)
+    }))
+  };
+  if (!jobs || !companyPage) {
+    console.warn(
+      JSON.stringify({
+        ts: new Date().toISOString(),
+        event: "home_stats_partial",
+        country,
+        countsFailed: !jobs,
+        companiesFailed: !companyPage
+      })
+    );
+  }
+  return { body, complete: Boolean(jobs && companyPage) };
+}
+
+// Server render of the homepage (src/server/home-ssr.tsx) — the real page
+// instead of the plain snippet React used to replace on mount (the unstyled
+// text visitors saw flash). Loaded lazily so server startup and every other
+// route are untouched; any failure falls back to the snippet. Figures wait
+// at most HOME_SSR_DATA_WAIT_MS on a cold cache, then the page renders
+// without them and the browser fetches them as before.
+//
+// Cache per country × layout so the home never waits on the database once
+// warm: one render in flight per key (concurrent misses share it), an
+// expired entry is served immediately while it refreshes in the background
+// (stale-while-revalidate), and a render missing figures (slow or failing
+// DB) only lives HOME_SSR_PARTIAL_TTL_MS so it is retried soon without
+// making every request pay the wait.
+const HOME_SSR_DATA_WAIT_MS = 1200;
+const HOME_SSR_HTML_TTL_MS = 60_000;
+const HOME_SSR_PARTIAL_TTL_MS = 15_000;
+type HomeSsrResult = { html: string; seed: HomeSsrSeed; expiresAt: number };
+const homeSsrCache = new Map<string, HomeSsrResult>();
+const homeSsrInFlight = new Map<string, Promise<HomeSsrResult | null>>();
+
+function isMobileRequest(req: http.IncomingMessage): boolean {
+  const hint = req.headers["sec-ch-ua-mobile"];
+  if (hint === "?1") return true;
+  if (hint === "?0") return false;
+  // Android phones say "Mobile"; bare "Android" is a tablet → desktop layout.
+  return /Mobi|iPhone|iPod|Opera Mini|IEMobile/i.test(req.headers["user-agent"] || "");
+}
+
+async function renderHomeSsr(country: "CO" | "VE", desktop: boolean): Promise<HomeSsrResult | null> {
+  const key = `${country}:${desktop ? "d" : "m"}`;
+  const cached = homeSsrCache.get(key);
+  if (cached && Date.now() < cached.expiresAt) return cached;
+  let pending = homeSsrInFlight.get(key);
+  if (!pending) {
+    pending = buildHomeSsr(country, desktop)
+      .then((result) => {
+        if (result) homeSsrCache.set(key, result);
+        return result;
+      })
+      .finally(() => homeSsrInFlight.delete(key));
+    homeSsrInFlight.set(key, pending);
+  }
+  // Stale entry: answer now, the refresh above completes in the background.
+  if (cached) return cached;
+  return pending;
+}
+
+async function buildHomeSsr(country: "CO" | "VE", desktop: boolean): Promise<HomeSsrResult | null> {
+  try {
+    const stats = await Promise.race([
+      loadHomeStats(country),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), HOME_SSR_DATA_WAIT_MS).unref())
+    ]);
+    const { renderHomeAppHtml } = await import("./server/home-ssr.js");
+    const seed = {
+      country,
+      data: stats?.body ?? EMPTY_HOME_DATA,
+      desktop,
+      now: new Date().toISOString()
+    };
+    const html = renderHomeAppHtml(country === "VE" ? "/ve" : "/", seed);
+    return { html, seed, expiresAt: Date.now() + (stats?.complete ? HOME_SSR_HTML_TTL_MS : HOME_SSR_PARTIAL_TTL_MS) };
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        ts: new Date().toISOString(),
+        event: "home_ssr_failed",
+        country,
+        error: error instanceof Error ? error.message : String(error)
+      })
+    );
+    return null;
+  }
+}
+
+const EMPTY_HOME_DATA: HomeData = {
+  totalJobs: null,
+  last7Days: null,
+  last24Hours: null,
+  onSite: null,
+  remote: null,
+  totalCompanies: null,
+  cityCounts: {},
+  latestJobs: [],
+  companies: []
+};
 
 // Native Node HTTP Server
 const server = http.createServer((req, res) => {
@@ -502,7 +738,8 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
   // while public HTML can be shared briefly without making vacancies stale.
   // Personalized APIs must never enter a shared cache.
   if (method === "GET" || method === "HEAD") {
-    if (pathname.startsWith("/assets/")) {
+    if (pathname.startsWith("/assets/") || pathname.startsWith("/fonts/")) {
+      // /fonts/ files are never edited in place: a new font gets a new name.
       res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
     } else if (pathname.startsWith("/api/")) {
       res.setHeader("Cache-Control", "private, no-store");
@@ -600,6 +837,12 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     return;
   }
 
+  // Curated company/portal favicons, same-origin (see logo-proxy.ts).
+  if (isLogoRoute(pathname)) {
+    await handleLogoRoute(req, res, { pathname, method });
+    return;
+  }
+
   if (
     await handleAgentReadinessRoute(req, res, {
       pathname,
@@ -648,48 +891,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       res.end(JSON.stringify({ error: "País no soportado" }));
       return;
     }
-    const cities = getHomeCities(country);
-    const [counts, companies] = await Promise.allSettled([
-      getHomeJobCounts(country, cities),
-      getHomeCompanies(country, 12, Object.keys(COMPANY_LOGO_DOMAINS))
-    ]);
-    const jobs = counts.status === "fulfilled" ? counts.value : null;
-    const companyPage = companies.status === "fulfilled" ? companies.value : null;
-    const latest = jobs ? maskLockedFields(jobs.latestJobs, "free") : [];
-    const body: HomeData = {
-      totalJobs: jobs?.totalJobs ?? null,
-      last7Days: jobs?.last7Days ?? null,
-      last24Hours: jobs?.last24Hours ?? null,
-      onSite: jobs?.onSite ?? null,
-      remote: jobs?.remote ?? null,
-      totalCompanies: companyPage?.total ?? null,
-      cityCounts: Object.fromEntries(cities.map((city) => [city, jobs?.cityCounts[city] ?? null])),
-      latestJobs: latest.map((job) => ({
-        jobId: job.jobId,
-        title: job.title,
-        company: job.company,
-        location: job.location,
-        source: job.source,
-        dateText: job.dateText,
-        publishedAt: job.publishedAt
-      })),
-      companies: (companyPage?.companies ?? []).map((item) => ({
-        company: item.company,
-        count: item.count,
-        logoUrl: getCompanyLogoUrl(item.company)
-      }))
-    };
-    if (!jobs || !companyPage) {
-      console.warn(
-        JSON.stringify({
-          ts: new Date().toISOString(),
-          event: "home_stats_partial",
-          country,
-          countsFailed: !jobs,
-          companiesFailed: !companyPage
-        })
-      );
-    }
+    const { body, complete } = await loadHomeStats(country);
     await sendBody(
       req,
       res,
@@ -697,9 +899,44 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       {
         "Content-Type": "application/json",
         "Cache-Control":
-          jobs && companyPage ? "public, max-age=60, s-maxage=300, stale-while-revalidate=600" : "private, no-store"
+          complete ? "public, max-age=60, s-maxage=300, stale-while-revalidate=600" : "private, no-store"
       },
       JSON.stringify(body)
+    );
+    return;
+  }
+
+  // 4a. GET /api/intent-page?path=<path> — the client fallback of an intent
+  //     page (CategoryLanding after a client-side navigation), served from
+  //     the same intent cache as the SSR page. Only the whitelisted intent
+  //     paths are accepted, so it can never run an arbitrary filter
+  //     (ADR 0012 §6). Same public, anonymous view as the SSR page.
+  if (pathname === "/api/intent-page" && method === "GET") {
+    const intent = intentPagesEnabled() ? intentCategoryForPath(parsedUrl.searchParams.get("path") || "") : null;
+    if (!intent) {
+      res.writeHead(404, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Página de intención desconocida" }));
+      return;
+    }
+    const result = await getIntentPage(intentFilters(intent), CITY_HUB_PAGE_LIMIT);
+    const jobs = maskLockedFields(result.jobs, "free").filter(isPubliclyDescribable);
+    const answer = isLegacyRemoteCopy(intent) ? null : buildIntentAnswer(intent, result.total, jobs);
+    const newToday = buildNewTodayBlock(intent, jobs.map(toRecentReadyJob));
+    await sendBody(
+      req,
+      res,
+      200,
+      { "Content-Type": "application/json", "Cache-Control": "public, max-age=60, s-maxage=300, stale-while-revalidate=600" },
+      JSON.stringify({
+        country: intent.country,
+        intent: intent.intent,
+        jobs,
+        total: result.total,
+        indexable: isIntentIndexable(result.total),
+        insights: buildCategoryInsights(intent, result.total, jobs),
+        ...(answer ? { answer } : {}),
+        ...(newToday ? { newToday } : {})
+      })
     );
     return;
   }
@@ -948,6 +1185,67 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     }
   }
 
+  // 4b-ter. /api/feedback and /api/opinions — "Opiniones y ayuda"
+  // (/opiniones). Outside /api/v1 on purpose: the public agent API stays
+  // read-only. POST is anonymous, so: its own rate limit, a JSON-only
+  // content type (a cross-site form can't send it without CORS, which this
+  // server never grants), a small body cap, a honeypot and allowlists
+  // (validateFeedback). Opinions are stored as pending; nothing is
+  // published automatically. Until scripts/migrate-site-feedback.ts runs,
+  // both answer 503 and the page falls back to the contact email.
+  if (pathname === "/api/feedback" || pathname === "/api/opinions") {
+    const json = (status: number, body: unknown, cacheControl = "private, no-store") => {
+      res.writeHead(status, { "Content-Type": "application/json", "Cache-Control": cacheControl });
+      res.end(JSON.stringify(body));
+    };
+    try {
+      if (pathname === "/api/opinions") {
+        if (method !== "GET") return json(405, { error: "Método no permitido" });
+        return json(200, await getPublishedOpinionsCached(), "public, max-age=300");
+      }
+      if (method !== "POST") return json(405, { error: "Método no permitido" });
+      if (!checkRateLimit(clientIp, FEEDBACK_RATE_LIMIT, FEEDBACK_RATE_WINDOW_MS, "feedback")) {
+        recordSuspiciousEvent(clientIp, "rate-limit POST /api/feedback");
+        res.writeHead(429, { "Content-Type": "application/json", "Retry-After": "600" });
+        res.end(JSON.stringify({ error: "Recibimos varios mensajes seguidos. Intenta de nuevo en unos minutos." }));
+        return;
+      }
+      if (!String(req.headers["content-type"] || "").toLowerCase().startsWith("application/json")) {
+        return json(415, { error: "Formato no soportado" });
+      }
+      const bodyText = await readSmallBody(req, FEEDBACK_BODY_MAX_BYTES);
+      if (bodyText === null) return json(413, { error: "Mensaje demasiado largo" });
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(bodyText || "{}");
+      } catch {
+        return json(400, { error: "JSON inválido" });
+      }
+      const result = validateFeedback(parsed);
+      if (!result.ok) return json(400, { error: result.error });
+      if ("spam" in result) return json(201, { ok: true });
+      // Opinions and stars only from registered accounts (owner decision
+      // 2026-11-03): the account comes from the JWT, and the public name
+      // from that account, never from the body. Problem reports stay open
+      // to everyone (someone the app fails for may not be able to sign in);
+      // their stars are kept only when signed in.
+      const session = await verifySession(req);
+      if (result.value.kind === "opinion" && !session) {
+        return json(401, { error: "Inicia sesión o crea tu cuenta gratis para calificar y dejar tu opinión." });
+      }
+      const value =
+        result.value.kind === "opinion" ? { ...result.value, displayName: publicDisplayName(session!.name) } : result.value;
+      const userAgent =
+        value.pagePath || value.search ? String(req.headers["user-agent"] || "").slice(0, FEEDBACK_LIMITS.userAgent) || null : null;
+      await insertFeedback(value, userAgent, session?.id ?? null);
+      return json(201, { ok: true });
+    } catch (e) {
+      if (e instanceof SiteFeedbackUnavailableError) return json(503, { error: "Aún no podemos recibir mensajes aquí." });
+      respondToUnexpectedError(res, e, pathname, "No se pudo enviar tu mensaje.");
+      return;
+    }
+  }
+
   // 4c. PATCH /api/me — lets a user edit their own display name. The id
   // updated is always the one verifySession resolved from the JWT, never
   // anything from the request body.
@@ -1044,6 +1342,36 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
         );
       }
     });
+    return;
+  }
+
+  // 4c-ter. POST /api/me/first-touch — signup attribution (Fase A). The
+  // browser sends where the visitor first came from (src/lib/first-touch.ts)
+  // right after the account is created. Written once per account, only for
+  // accounts younger than 24 h (an old account that logs in again is not a
+  // new signup), every field re-sanitized here. Always 204 to the client:
+  // attribution must never surface as an error in the signup flow.
+  if (pathname === "/api/me/first-touch" && method === "POST") {
+    const session = await verifySession(req);
+    if (!session) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "No autenticado" }));
+      return;
+    }
+    const body = await readJsonBodyCapped(req, FIRST_TOUCH_BODY_MAX_BYTES);
+    const now = new Date();
+    const touch = body.ok ? parseFirstTouch(body.value, now) : null;
+    if (touch && isNewAccount(session.authCreatedAt, now)) {
+      try {
+        await recordUserFirstTouch(session.id, touch);
+      } catch (e) {
+        if (!(e instanceof SignupAttributionUnavailableError)) {
+          console.warn("[first-touch] no se pudo guardar:", (e as Error)?.message || e);
+        }
+      }
+    }
+    res.writeHead(204, { "Cache-Control": "no-store" });
+    res.end();
     return;
   }
 
@@ -1247,7 +1575,25 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     // anonymous visitor already gets.
     if (id && !isUuid(id)) {
       const requestCountry = isVeEmpleos ? "VE" : "CO";
-      const category = resolveCategorySlug(id, requestCountry);
+      // Intent pages (ADR 0012): /empleos/<intent>, /ve/empleos/<intent> and
+      // the whitelisted /empleos/<city>/<intent>. Any other second segment
+      // keeps the first segment's page, as before.
+      const resolved = resolveCategoryPath(segments, requestCountry);
+      let category = resolved;
+      if (resolved?.kind === "intencion" && !intentPagesEnabled()) {
+        // Rollback (ADR 0012 §10): remoto goes back to the CO "Remoto" city
+        // bucket; the URLs that only exist as intent pages answer 410 so
+        // Google drops them cleanly.
+        if (resolved.intent === "remoto" && !resolved.city) {
+          category = { kind: "ciudad", label: "Remoto", country: "CO" };
+        } else {
+          res.writeHead(410, { "Content-Type": "text/html; charset=utf-8" });
+          res.end(
+            '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Categoría ya no disponible | BuscoTrabajo</title><meta name="robots" content="noindex"></head><body><h1>Esta categoría ya no está disponible</h1><p><a href="/dashboard">Ver todas las vacantes</a></p></body></html>'
+          );
+          return;
+        }
+      }
       if (!category) {
         // A role slug that used to resolve (crawled/sitemapped before a
         // taxonomy swap, see job-seo.ts's RETIRED_ROLE_SLUGS comment) is a
@@ -1273,22 +1619,49 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       // country filter at all and would silently mix both countries' jobs
       // under a URL whose own heading claimed just one — see
       // ResolvedCategory's comment.
-      const filterParams: JobFilterParams =
-        category.kind === "ciudad"
+      const isIntent = category.kind === "intencion";
+      const filterParams: JobFilterParams = isIntent
+        ? intentFilters(category)
+        : category.kind === "ciudad"
           ? cityHubFilters(category)
           : { roles: [category.label], country: category.country };
       // isPubliclyDescribable filters out any locked job the same way
       // buildJobsSitemapXml/the job-detail branch already do — a category
       // page must never list a job it can't also link a working page for.
       // Job pages peek this same cache entry for their related links.
-      const matched = await getJobsPage({
-        filters: filterParams,
-        limit: CITY_HUB_PAGE_LIMIT,
-        offset: 0,
-        includeDetails: false
-      });
+      // Intent pages read their own small cache (ADR 0012 §6), never the
+      // dashboard's 64-entry LRU.
+      const matched = isIntent
+        ? await getIntentPage(filterParams, CITY_HUB_PAGE_LIMIT)
+        : await getJobsPage({
+            filters: filterParams,
+            limit: CITY_HUB_PAGE_LIMIT,
+            offset: 0,
+            includeDetails: false
+          });
       const page = maskLockedFields(matched.jobs, "free").filter(isPubliclyDescribable);
       const total = matched.total;
+      // Intent pages only: the guard (total = Google-ready rows), the answer
+      // block from the rows already loaded, and the sibling country's total
+      // for hreflang, from the same cache (a failure only drops hreflang).
+      const intentAnswer: IntentAnswer | null =
+        isIntent && !isLegacyRemoteCopy(category) ? buildIntentAnswer(category, total, page) : null;
+      const sibling = isIntent ? siblingIntent(category) : null;
+      let siblingTotal = 0;
+      if (sibling) {
+        try {
+          siblingTotal = (await getIntentPage(intentFilters(sibling), CITY_HUB_PAGE_LIMIT)).total;
+        } catch {
+          siblingTotal = 0;
+        }
+      }
+      // City hubs link the intent pages that pass the guard, from their last
+      // known total (never a query of the hub's own): an unknown count means
+      // no link yet, never a guess.
+      const hubIntentLinks =
+        category.kind === "ciudad" && intentPagesEnabled()
+          ? buildHubIntentLinks(category, (intent) => knownIntentTotal(intentFilters(intent), CITY_HUB_PAGE_LIMIT))
+          : [];
 
       let indexHtml: string;
       try {
@@ -1352,7 +1725,24 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
         relatedCityLinks.length > 0
           ? `\n<section data-related-cities aria-label="${escapeHtml(sectionHeadings.relatedCities)}"><h2>${escapeHtml(sectionHeadings.relatedCities)}</h2><ul>${relatedCityLinks.map((link) => `<li><a href="${escapeHtml(link.href)}">${escapeHtml(link.label)}</a></li>`).join("")}</ul></section>`
           : "";
-      const ssrSnippet = `<h1>${escapeHtml(meta.heading)}</h1>\n${emptyNotice}${overviewHtml}${statsHtml}${jobsHeading}<nav aria-label="Vacantes"><ul>\n${items}\n</ul></nav>${relatedCitiesHtml}`;
+      // SEO Fase B «Nuevas hoy»: Google-ready jobs of this hub published
+      // today (hub country's calendar day), from the shared recent snapshot.
+      // peek() never waits on Postgres: a cold snapshot just omits the block
+      // and loads in the background, so the hub's TTFB is unchanged.
+      // Intent pages read «Nuevas hoy» from their own rows, already filtered
+      // by their SQL (sorted newest first), so no other snapshot is needed.
+      const newToday = buildNewTodayBlock(
+        category,
+        isIntent ? page.map(toRecentReadyJob) : peekRecentSeoReadyJobs()
+      );
+      const newTodayHtml = newToday
+        ? `<section data-category-new-today aria-label="${escapeHtml(newToday.heading)}"><h2>${escapeHtml(newToday.heading)}</h2><ul>${newToday.links.map((link) => `<li><a href="${escapeHtml(link.path)}">${escapeHtml(link.title)}</a> — ${escapeHtml(link.company)} · ${escapeHtml(link.location)}</li>`).join("")}</ul></section>\n`
+        : "";
+      const intentAnswerHtml = intentAnswer
+        ? `<section data-intent-answer aria-label="${escapeHtml(intentAnswer.heading)}">${renderIntentAnswerHtml(intentAnswer)}</section>\n`
+        : "";
+      const hubIntentLinksHtml = renderHubIntentLinksHtml(hubIntentLinks);
+      const ssrSnippet = `<h1>${escapeHtml(meta.heading)}</h1>\n${intentAnswerHtml}${emptyNotice}${overviewHtml}${newTodayHtml}${statsHtml}${jobsHeading}<nav aria-label="Vacantes"><ul>\n${items}\n</ul></nav>${relatedCitiesHtml}${hubIntentLinksHtml}`;
       indexHtml = indexHtml.replace('<div id="app"></div>', () => `<div id="app">${ssrSnippet}</div>`);
 
       // Same fix /dashboard already had (Fase 1, §5.4) applied here too —
@@ -1370,11 +1760,16 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       // removes the redundant fetch's failure mode entirely for the
       // common case.
       const ssrCategoryPayload = escapeJsonForScriptTag({
-        slug: id,
+        // A city × intent page carries both segments, so the Bogotá hub's
+        // client never mistakes it for its own payload (and vice versa).
+        slug: isIntent && category.city ? `${segments[0]}/${segments[1]}` : id,
         country: category.country,
         jobs: page,
         total,
-        insights
+        insights,
+        ...(newToday ? { newToday } : {}),
+        ...(isIntent ? { intent: category.intent, indexable: isIntentIndexable(total), ...(intentAnswer ? { answer: intentAnswer } : {}) } : {}),
+        ...(hubIntentLinks.length > 0 ? { intentLinks: hubIntentLinks } : {})
       });
       indexHtml = indexHtml.replace(
         "</head>",
@@ -1418,6 +1813,20 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       // URL for Caracas) — emitting a self-only hreflang set there would be
       // exactly what seo-hreflang flags as Critical (missing reciprocal),
       // so this must stay gated on kind === "rol".
+      // Intent pages: reciprocal es-CO/es-VE only when both national pages
+      // pass the guard; city × intent pages never (design D5).
+      if (isIntent) {
+        const intentHreflangTags = buildIntentHreflangTags(
+          category,
+          category.country === "VE" ? { CO: siblingTotal, VE: total } : { CO: total, VE: siblingTotal }
+        );
+        if (intentHreflangTags) {
+          indexHtml = indexHtml.replace(
+            /<link[^>]*rel=["']canonical["'][^>]*>/,
+            (canonicalTag) => `${canonicalTag}\n${intentHreflangTags}`
+          );
+        }
+      }
       if (category.kind === "rol") {
         const coRoleUrl = `${SITE_URL}${buildCategoryPath({ ...category, country: "CO" })}`;
         const veRoleUrl = `${SITE_URL}${buildCategoryPath({ ...category, country: "VE" })}`;
@@ -1457,10 +1866,13 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       // but noindex — same "thin content" mitigation docs/SEO-PLAN.md §6
       // already applies elsewhere, so an empty category never sits in
       // Google's index looking like a doorway page until it fills up.
-      if (total === 0) {
+      // Intent pages: the inventory guard (design D2) — below 10 Google-ready
+      // jobs, a 200 with noindex,follow, out of the sitemap and unlinked.
+      const categoryRobots = isIntent ? intentRobots(total) : total === 0 ? "noindex" : null;
+      if (categoryRobots) {
         indexHtml = indexHtml
           .replace(/<meta[^>]*name=["']robots["'][^>]*>/i, "")
-          .replace("</head>", () => `  <meta name="robots" content="noindex">\n</head>`);
+          .replace("</head>", () => `  <meta name="robots" content="${categoryRobots}">\n</head>`);
       }
 
       await sendBody(req, res, 200, { "Content-Type": "text/html; charset=utf-8" }, indexHtml);
@@ -2146,6 +2558,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     const xml = buildSitemapIndexXml([
       "https://buscotrabajo.co/sitemap-pages.xml",
       "https://buscotrabajo.co/sitemap-jobs.xml",
+      "https://buscotrabajo.co/sitemap-jobs-recent.xml",
       "https://buscotrabajo.co/sitemap-categories.xml"
     ]);
     await sendBody(req, res, 200, { "Content-Type": "application/xml; charset=utf-8" }, xml);
@@ -2271,10 +2684,67 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     return;
   }
 
+  // SEO Fase B: Google-ready jobs published in the last 72 h. A subset of
+  // sitemap-jobs.xml with the same <loc>/<lastmod> (test:seo checks it), so a
+  // crawler that re-reads this small file often finds new jobs sooner. Served
+  // from the shared 10-minute snapshot (src/lib/recent-jobs.ts); a failed cold
+  // read is a 503 no-store, never a truncated 200.
+  if (pathname === "/sitemap-jobs-recent.xml" && method === "GET") {
+    let recent: Awaited<ReturnType<typeof getRecentSeoReadyJobs>>;
+    try {
+      recent = await getRecentSeoReadyJobs();
+    } catch (error) {
+      console.error("[sitemap-jobs-recent] No se pudo leer:", error instanceof Error ? error.message : "error");
+      res.writeHead(503, {
+        "Content-Type": "text/plain; charset=utf-8",
+        "Retry-After": "60",
+        "Cache-Control": "no-store"
+      });
+      res.end("Sitemap temporalmente no disponible.");
+      return;
+    }
+    const entries = recent
+      .map((job) => buildJobSitemapEntry(job))
+      .filter((entry): entry is string => entry !== null);
+    await sendBody(
+      req,
+      res,
+      200,
+      { "Content-Type": "application/xml; charset=utf-8" },
+      `${JOBS_SITEMAP_HEADER}${entries.join("\n")}${JOBS_SITEMAP_FOOTER}`
+    );
+    return;
+  }
+
   if (pathname === "/sitemap-categories.xml" && method === "GET") {
-    // Static taxonomy (CITY_OPTIONS + DEFAULT_ROLES_200) — no DB query
-    // needed, unlike sitemap-jobs.xml above.
-    const xml = buildCategoriesSitemapXml();
+    // Static taxonomy (CITY_OPTIONS + DEFAULT_ROLES_200), plus the intent
+    // pages that pass the inventory guard right now (ADR 0012). Their counts
+    // are awaited from the intent cache, never peeked: a cold start must not
+    // publish a sitemap without them that Cloudflare then keeps. A failed
+    // count is a 503 no-store, never a 200 missing URLs.
+    let xml: string;
+    if (intentPagesEnabled()) {
+      try {
+        // One count at a time: a cold intent query takes 0.9–2 s in
+        // production (validation.md §2) and the pool has 5 connections, so
+        // five at once would make dashboard and job requests queue behind
+        // the sitemap. Googlebot waits for a sitemap; visitors don't.
+        // seo-intent-wave2 (SIW-033): with ~10 pages, the totals the keeper
+        // already loaded are reused, and only the unknown ones are queried.
+        const indexable = await collectIndexableIntents(
+          listIntentCategories(),
+          (intent) => knownIntentTotal(intentFilters(intent), CITY_HUB_PAGE_LIMIT),
+          async (intent) => (await getIntentPage(intentFilters(intent), CITY_HUB_PAGE_LIMIT)).total
+        );
+        xml = buildCategoriesSitemapXml({ intents: indexable });
+      } catch {
+        res.writeHead(503, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store", "Retry-After": "60" });
+        res.end("Sitemap temporalmente no disponible");
+        return;
+      }
+    } else {
+      xml = buildCategoriesSitemapXml();
+    }
     await sendBody(req, res, 200, { "Content-Type": "application/xml; charset=utf-8" }, xml);
     return;
   }
@@ -2323,6 +2793,30 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     // HeroDemo.tsx already renders client-side, verbatim, so raw HTML and
     // post-hydration DOM never disagree.
     indexHtml = injectPublicContent(indexHtml, homeContent);
+
+    // Real page instead of that snippet when the server render succeeds
+    // (src/server/home-ssr.tsx): same H1 text, plus every section the
+    // visitor sees, and index.tsx hydrates it instead of replacing it — no
+    // unstyled flash, and LCP is the server-painted node. The seed lets the
+    // client's first render match the HTML exactly. On failure the snippet
+    // above stays, exactly as before.
+    const ssr = await renderHomeSsr(isVe ? "VE" : "CO", !isMobileRequest(req));
+    if (ssr) {
+      const snippetDiv = `<div id="app">${renderContentHtml(homeContent)}</div>`;
+      if (indexHtml.includes(snippetDiv)) {
+        indexHtml = indexHtml
+          .replace(snippetDiv, () => `<div id="app" data-ssr="home">${ssr.html}</div>`)
+          // The page is already painted from this HTML; the app bundle only
+          // hydrates it. Low fetch priority keeps it out of the way of the
+          // CSS and the first paint on slow phones.
+          .replace(/<script type="module" crossorigin src="/g, '<script type="module" fetchpriority="low" crossorigin src="')
+          .replace(/<link rel="modulepreload" crossorigin href="/g, '<link rel="modulepreload" fetchpriority="low" crossorigin href="')
+          .replace(
+            "</head>",
+            () => `  <script>window.__SSR_HOME__=${escapeJsonForScriptTag(ssr.seed)};</script>\n</head>`
+          );
+      }
+    }
 
     const selfUrl = isVe ? `${SITE_URL}/ve` : `${SITE_URL}/`;
     indexHtml = indexHtml.replace(
@@ -2379,11 +2873,26 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       {
         "Content-Type": "text/html; charset=utf-8",
         "Cache-Control": "private, no-store",
-        Vary: "Accept",
+        // Layout (desktop art or not) is chosen from Sec-CH-UA-Mobile / UA.
+        Vary: "Accept, User-Agent, Sec-CH-UA-Mobile",
         Link: DISCOVERY_LINKS
       },
       indexHtml
     );
+    return;
+  }
+
+  // /tiktok — short link for the TikTok bio and videos (Fase A/F): lands on
+  // the homepage tagged with utm_*, so GA4 and the signup's first touch
+  // stop counting TikTok as Direct. A 302 (the target may change), never
+  // indexed and absent from every sitemap.
+  if (pathname === "/tiktok" && (method === "GET" || method === "HEAD")) {
+    res.writeHead(302, {
+      Location: TIKTOK_SHORT_LINK_TARGET,
+      "Cache-Control": "no-store",
+      "X-Robots-Tag": "noindex, nofollow"
+    });
+    res.end();
     return;
   }
 
@@ -2433,7 +2942,11 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
         res,
         200,
         { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "private, no-store", Vary: "Accept" },
-        injectRouteMeta(indexHtml, pathname, routeMeta)
+        injectRouteMeta(
+          indexHtml,
+          pathname,
+          pathname === "/opiniones" ? { ...routeMeta, sections: await opinionsPageSections() } : routeMeta
+        )
       );
     } catch {
       res.writeHead(500, { "Content-Type": "text/plain" });
@@ -2462,7 +2975,9 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     ".webp": "image/webp",
     ".jpg": "image/jpeg",
     ".jpeg": "image/jpeg",
-    ".ico": "image/x-icon"
+    ".ico": "image/x-icon",
+    // Self-hosted web fonts (static/fonts/).
+    ".woff2": "font/woff2"
   };
 
   const contentType = mimeTypes[ext] || "text/plain";
@@ -2532,9 +3047,63 @@ if (!process.env.JOB_RADAR_TEST_MODE) {
   } else if (outcome === "failed") {
     console.warn("[dashboard-cache] Warmup failed; the first request will retry normally.");
   }
+
+  // SEO Fase B: load the recent Google-ready snapshot AFTER the dashboard
+  // warmup (never competing with it) and before listening, so the first hub
+  // requests only peek() it instead of racing its query. Bounded to 5 s; on
+  // timeout or failure the hubs simply omit «Nuevas hoy» until it loads.
+  if (outcome === "ready") {
+    const recentStartedAt = Date.now();
+    const recentOutcome = await Promise.race([
+      getRecentSeoReadyJobs().then((jobs) => jobs.length).catch(() => "failed" as const),
+      new Promise<"timeout">((resolve) => setTimeout(() => resolve("timeout"), 5_000).unref())
+    ]);
+    console.log(
+      JSON.stringify({
+        ts: new Date().toISOString(),
+        event: "recent_ready_cache_warmed",
+        durationMs: Date.now() - recentStartedAt,
+        outcome: typeof recentOutcome === "number" ? "ready" : recentOutcome,
+        jobs: typeof recentOutcome === "number" ? recentOutcome : null
+      })
+    );
+  }
+}
+
+// City hubs only READ the intent totals (knownIntentTotal), on purpose: a hub
+// that started intent queries got slower (cold Caracas 44 → 84 ms). So after a
+// restart a hub had no «Búsquedas populares» links until something else loaded
+// the totals (an intent-page visit or the sitemap); on 2026-11-07 the Bogotá
+// hub lacked its /empleos/bogota/sin-experiencia link right after the deploy.
+// This keeper loads them off the request path: once, 60 s after listening, then
+// every 3 h. That is inside the totals' ~6 h validity, so the links never lapse.
+// It runs the intent queries serially (same as the sitemap: the pool is small).
+// It does ~5 queries per run, served from Postgres's cache (0 disk reads,
+// seo-intent-pages validation.md §2).
+const INTENT_TOTALS_FIRST_RUN_MS = 60_000;
+const INTENT_TOTALS_INTERVAL_MS = 3 * 60 * 60_000;
+
+async function refreshIntentTotals(): Promise<void> {
+  if (!intentPagesEnabled()) return;
+  for (const intent of listIntentCategories()) {
+    try {
+      await getIntentPage(intentFilters(intent), CITY_HUB_PAGE_LIMIT);
+    } catch {
+      console.warn("[intent-totals] Refresh failed; hubs keep their last known links.");
+      return;
+    }
+  }
+}
+
+function startIntentTotalsKeeper(): void {
+  setTimeout(() => {
+    void refreshIntentTotals();
+    setInterval(() => void refreshIntentTotals(), INTENT_TOTALS_INTERVAL_MS).unref();
+  }, INTENT_TOTALS_FIRST_RUN_MS).unref();
 }
 
 server.listen(PORT, () => {
+  startIntentTotalsKeeper();
   console.log(`\n==================================================`);
   console.log(`🚀 JOB RADAR DASHBOARD RUNNING AT: http://localhost:${PORT}`);
   console.log(`==================================================\n`);
@@ -2542,3 +3111,19 @@ server.listen(PORT, () => {
     "ℹ️  El scraping corre fuera de este proceso (GitHub Actions, scripts/run-scrape-tick.ts) — el servidor web nunca scrapea."
   );
 });
+
+// An intent page's own rows, in the shape buildNewTodayBlock() reads (ADR
+// 0012: «Nuevas hoy» of an intent page comes from its already-filtered rows).
+function toRecentReadyJob(job: Job): RecentReadyJob {
+  return {
+    jobId: job.jobId,
+    title: job.title,
+    company: job.company ?? null,
+    location: job.location ?? null,
+    url: job.url ?? null,
+    country: job.country ?? null,
+    publishedAt: job.publishedAt ?? "",
+    isLocked: Boolean((job as { isLocked?: boolean }).isLocked),
+    contentUpdatedAt: null
+  };
+}

@@ -242,7 +242,10 @@ for (const [name, fixture] of Object.entries(FIXTURES)) {
 }
 
 test("JobPosting (physical): required fields, HTML description = visible body, no invented properties", () => {
-  const page = asStoredPage(base());
+  // Computrabajo: a source whose employmentType is the schedule. Elempleo's
+  // (the base fixture) is its contract term and is omitted
+  // (employment-type-trust, tests/validate-employment-type-trust.test.ts).
+  const page = asStoredPage(base({ source: "Computrabajo" }));
   const posting = buildJobPosting(page) as PostingShape;
   assert.equal(posting.title, "Analista de Datos");
   assert.equal(posting.hiringOrganization!.name, "Banco Ejemplo S.A.");

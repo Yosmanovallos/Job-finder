@@ -11,7 +11,7 @@
  * render the same links from the same functions.
  */
 import { getCountryConfig } from "../countries/index.js";
-import { SITE_URL, buildCategoryPath, buildCategoryUrl, buildJobPath, buildJobUrl, escapeHtml, type ResolvedCategory } from "./job-seo.js";
+import { SITE_URL, buildCategoryPath, buildCategoryUrl, buildJobPath, buildJobUrl, cityHubPlaces, escapeHtml, type ResolvedCategory } from "./job-seo.js";
 
 /** City hubs list their first 60 jobs (server.ts). Sharing it keeps one cache entry per city. */
 export const CITY_HUB_PAGE_LIMIT = 60;
@@ -56,7 +56,9 @@ export function resolveJobCityHub(job: { location?: string | null; country?: str
 
 /** Filters of the city hub page; server.ts's hub and job routes must both use this. */
 export function cityHubFilters(hub: ResolvedCategory): { cities: string[]; country: string } {
-  return { cities: [hub.label], country: hub.country };
+  // A hub with location aliases (Ciudad Guayana + Puerto Ordaz, seo-intent-wave2 D6)
+  // lists them too; every other hub keeps exactly { cities: [label] }.
+  return { cities: cityHubPlaces(hub.label), country: hub.country };
 }
 
 // FNV-1a: a stable, cheap spread so each job links a different slice of its hub.

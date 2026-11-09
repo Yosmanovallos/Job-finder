@@ -46,6 +46,11 @@
     <priority>0.5</priority>
   </url>
   <url>
+    <loc>https://buscotrabajo.co/opiniones</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
     <loc>https://buscotrabajo.co/docs</loc>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>

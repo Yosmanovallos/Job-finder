@@ -13,6 +13,7 @@ import { CompanyAvatar } from "../components/CompanyAvatar.js";
 import { getSourceColor } from "../lib/source-colors.js";
 import { SourceLogo } from "../components/SourceLogo.js";
 import { YouTubeLite } from "../components/YouTubeLite.js";
+import { getHomeSsrSeed } from "../lib/home-ssr-seed.js";
 
 // Homepage approved on the design canvas (R3, 2026-10-25): one DOM for both
 // layouts — sections only change arrangement at `md`, and the phone order
@@ -83,15 +84,23 @@ function useCountUp(target: number | null, durationMs = 1600): number | null {
   return value;
 }
 
-// Read synchronously on first render (this page is client-rendered), so
-// the desktop-only art never mounts — and never downloads — on a phone.
+// The first render uses the server's phone/desktop guess when the page was
+// server-rendered (so hydration matches and phones never get the desktop
+// art in their HTML), otherwise the real media query, so the desktop-only
+// art never mounts — and never downloads — on a phone. The effect then
+// corrects a wrong guess (e.g. a tablet) right after mount.
 function useMinWidth(px: number): boolean {
   const query = `(min-width: ${px}px)`;
-  const [matches, setMatches] = useState(() => window.matchMedia?.(query).matches ?? true);
+  const [matches, setMatches] = useState(() => {
+    const seed = getHomeSsrSeed();
+    if (seed) return seed.desktop;
+    return typeof window === "undefined" ? true : window.matchMedia?.(query).matches ?? true;
+  });
   useEffect(() => {
     const mq = window.matchMedia?.(query);
     if (!mq) return;
     const onChange = () => setMatches(mq.matches);
+    onChange();
     mq.addEventListener("change", onChange);
     return () => mq.removeEventListener("change", onChange);
   }, [query]);
@@ -155,7 +164,7 @@ function Hero({ country, data }: { country: string; data: HomeData }) {
               as a backstop for the few widths where the two still differ;
               browsers without the lh unit ignore it. */}
           <h1 className={`${T.h1} min-h-[4lh] md:min-h-0`}>
-            {headingLead}: <span className="text-primary">{headingTail}</span>
+            {`${headingLead}: `}<span className="text-primary">{headingTail}</span>
           </h1>
           {/* Desktop only: on a phone the hero keeps one message (the H1)
               and one action (the search). */}
@@ -163,8 +172,12 @@ function Hero({ country, data }: { country: string; data: HomeData }) {
             Una sola búsqueda en {SOURCES_BY_COUNTRY[country]?.slice(1, 4).join(", ") ?? "los principales portales"} y más. Sin repetidas, sin vencidas, gratis.
           </p>
 
+          {/* action/name: a search sent before hydration (slow phones) still
+              lands on the dashboard with ?search=, instead of reloading "/". */}
           <form
             role="search"
+            action={dashboardPath}
+            method="get"
             onSubmit={submit}
             className="mt-6 md:mt-8 max-w-[620px] md:ink-card md:rounded-[22px] md:bg-white md:p-3.5 flex flex-col gap-2.5 md:shadow-[6px_6px_0_hsl(var(--foreground))]"
           >
@@ -175,6 +188,7 @@ function Hero({ country, data }: { country: string; data: HomeData }) {
               <SearchIcon className="w-5 h-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground md:hidden" />
               <input
                 id="home-search"
+                name="search"
                 type="search"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
@@ -219,7 +233,7 @@ function Hero({ country, data }: { country: string; data: HomeData }) {
             </div>
           </div>
           <div className="home-float absolute left-0 bottom-0 w-[170px] overflow-hidden rounded-[26px] border-[6px] border-foreground bg-foreground shadow-[0_30px_60px_-20px_rgba(0,0,0,0.5)] -rotate-3">
-            <img src="/home/dash-mobile.webp" alt="" width={780} height={1688} decoding="async" className="block w-full h-auto" />
+            <img src="/home/dash-mobile-420.webp" alt="" width={420} height={909} decoding="async" className="block w-full h-auto" />
           </div>
           {formatCount(data.last24Hours) ? (
             <div className={`${T.small} ink-card-sm absolute right-2.5 top-0 rounded-[14px] bg-white px-4 py-3 rotate-2`}>
@@ -301,6 +315,9 @@ function Stats({ country, data }: { country: string; data: HomeData }) {
 function LatestJobs({ country, data }: { country: string; data: HomeData }) {
   if (data.latestJobs.length === 0) return null;
   const dashboardPath = country === "VE" ? "/ve/dashboard" : "/dashboard";
+  // Server-rendered page: same clock as the HTML, so "hace 3 h" matches.
+  const seedNow = getHomeSsrSeed(country)?.now;
+  const now = seedNow ? new Date(seedNow) : new Date();
   return (
     <section className={`sr-host order-4 md:hidden ${CONTAINER} ${SECTION_Y}`}>
       <SectionHeader title="Lo más nuevo ahora" link={{ to: dashboardPath, label: "Ver todo" }} />
@@ -315,7 +332,7 @@ function LatestJobs({ country, data }: { country: string; data: HomeData }) {
                 <p className={`${T.small} mt-0.5 text-muted-foreground truncate`}>{job.company} · {job.location}</p>
                 <div className={`${T.small} mt-2 flex flex-wrap gap-1.5 font-mono`}>
                   <span className="rounded-full px-2 py-0.5" style={{ backgroundColor: color.bg, color: color.text }}>{job.source}</span>
-                  <span className="rounded-full px-2 py-0.5 bg-green-soft text-primary">{jobDateLabel(job)}</span>
+                  <span className="rounded-full px-2 py-0.5 bg-green-soft text-primary">{jobDateLabel(job, now)}</span>
                 </div>
               </div>
             </Link>
@@ -380,7 +397,7 @@ function Companies({ country, data }: { country: string; data: HomeData }) {
               <p className={`${T.body} mt-1.5 text-[#3d413e]`}>Un directorio con todas sus vacantes vigentes en un solo lugar.</p>
             </div>
             <div className="mx-[22px] overflow-hidden rounded-t-xl border-2 border-b-0 border-foreground">
-              <img src="/home/empresas.webp" alt="Directorio de empresas de BuscoTrabajo" loading="lazy" className="block w-full h-[220px] object-cover object-top" />
+              <img src="/home/empresas-840.webp" srcSet="/home/empresas-480.webp 480w, /home/empresas-840.webp 840w, /home/empresas.webp 1600w" sizes="(min-width: 768px) 440px, 100vw" width={840} height={525} alt="Directorio de empresas de BuscoTrabajo" loading="lazy" decoding="async" className="block w-full h-[220px] object-cover object-top" />
             </div>
           </div>
         </div>
@@ -550,7 +567,7 @@ function Why({ data }: { data: HomeData }) {
             <p className={`${T.body} mt-2 md:mb-5 text-[#3d413e]`}>Empresas, fuentes y fecha de la última publicación.</p>
           </div>
           <div className="hidden md:block mx-7 overflow-hidden rounded-t-xl border-2 border-b-0 border-foreground">
-            <img src="/home/city-bogota.webp" alt="Página de empleos en Bogotá" loading="lazy" className="block w-full h-[220px] object-cover object-top" />
+            <img src="/home/city-bogota-840.webp" srcSet="/home/city-bogota-480.webp 480w, /home/city-bogota-840.webp 840w, /home/city-bogota.webp 1600w" sizes="(min-width: 768px) 440px, 100vw" width={840} height={525} alt="Página de empleos en Bogotá" loading="lazy" decoding="async" className="block w-full h-[220px] object-cover object-top" />
           </div>
         </div>
         <div className="sr ink-card-sm md:ink-card ink-lift rounded-2xl md:rounded-3xl bg-primary text-white p-5 md:p-7 flex flex-col justify-between gap-3 md:gap-6">
@@ -566,7 +583,7 @@ function Why({ data }: { data: HomeData }) {
             </p>
           </div>
           <div className="hidden md:block mx-7 overflow-hidden rounded-t-xl border-2 border-b-0 border-foreground">
-            <img src="/home/dash-mobile.webp" alt="Vacantes recientes en el celular" loading="lazy" className="block w-full h-[220px] object-cover object-top" />
+            <img src="/home/dash-mobile-420.webp" srcSet="/home/dash-mobile-420.webp 420w, /home/dash-mobile.webp 780w" sizes="(min-width: 768px) 440px, 100vw" width={420} height={909} alt="Vacantes recientes en el celular" loading="lazy" decoding="async" className="block w-full h-[220px] object-cover object-top" />
           </div>
         </div>
       </div>
@@ -592,6 +609,48 @@ function FinalCta({ country }: { country: string }) {
   );
 }
 
+// The homepage's descriptive copy (getHomeContent: introduction plus the
+// shared sections after the city discovery, which Explore already shows).
+// It used to exist only in the raw HTML snippet that React replaced on
+// mount, so visitors flashed it unstyled and Google's rendered DOM never
+// had it. Now it is real, visible page content in both. Text verbatim.
+function About({ country }: { country: string }) {
+  const content = getHomeContent(country === "VE" ? "VE" : "CO");
+  const sections = content.sections.slice(1);
+  return (
+    <section aria-label="Sobre BuscoTrabajo" className={`order-10 md:order-9 border-t-2 border-foreground bg-[#fbfaf6]`}>
+      <div className={`${CONTAINER} py-10 md:py-14 grid gap-8 md:grid-cols-3 md:gap-10 text-[#3d413e]`}>
+        <div>
+          {content.introduction.map((paragraph) => (
+            <p key={paragraph} className={`${T.small} md:text-sm leading-relaxed mb-3`}>{paragraph}</p>
+          ))}
+        </div>
+        {sections.map((section) => (
+          <div key={section.heading}>
+            <h2 className="font-heading font-bold text-base text-foreground mb-2">{section.heading}</h2>
+            {section.paragraphs.map((paragraph) => (
+              <p key={paragraph} className={`${T.small} md:text-sm leading-relaxed mb-3`}>{paragraph}</p>
+            ))}
+            {section.links?.length ? (
+              <ul className="flex flex-wrap gap-x-4 gap-y-1">
+                {section.links.map((link) =>
+                  <li key={link.href}>
+                    {/\.(txt|xml)$/.test(link.href) ? (
+                      <a href={link.href} className={`${T.small} md:text-sm font-semibold text-primary underline underline-offset-4`}>{link.label}</a>
+                    ) : (
+                      <Link to={link.href} className={`${T.small} md:text-sm font-semibold text-primary underline underline-offset-4`}>{link.label}</Link>
+                    )}
+                  </li>
+                )}
+              </ul>
+            ) : null}
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export default function HomeLanding({ country }: { country: string }) {
   const data = useHomeData(country);
   return (
@@ -608,6 +667,7 @@ export default function HomeLanding({ country }: { country: string }) {
       <Video />
       <Why data={data} />
       <FinalCta country={country} />
+      <About country={country} />
     </div>
   );
 }

@@ -975,3 +975,87 @@ CREATE INDEX IF NOT EXISTS idx_user_saved_jobs_user_saved
 ALTER TABLE user_saved_jobs ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON user_saved_jobs FROM anon, authenticated;
 -- END saved-jobs
+
+-- BEGIN site-feedback
+-- "Opiniones y ayuda" (/opiniones, 2026-11-02). Aditivo e idempotente; lo
+-- aplica scripts/migrate-site-feedback.ts. Una fila = un reporte privado
+-- (kind 'problem') o una opinión (kind 'opinion'). Las opiniones entran como
+-- 'pending' y solo se publican a mano (status 'published' + published_at).
+-- Sin correo ni IP. page_path / search_text / user_agent solo si la persona
+-- marcó "adjuntar datos técnicos".
+CREATE TABLE IF NOT EXISTS site_feedback (
+    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    kind          VARCHAR(16) NOT NULL CHECK (kind IN ('problem', 'opinion')),
+    category      VARCHAR(32) NOT NULL,
+    message       VARCHAR(2000) NOT NULL DEFAULT '',
+    rating        SMALLINT CHECK (rating BETWEEN 1 AND 5),
+    display_name  VARCHAR(60),
+    city          VARCHAR(60),
+    page_path     VARCHAR(300),
+    search_text   VARCHAR(200),
+    user_agent    VARCHAR(300),
+    status        VARCHAR(16) NOT NULL DEFAULT 'pending'
+                  CHECK (status IN ('pending', 'published', 'rejected', 'resolved')),
+    team_reply    VARCHAR(1000),
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    published_at  TIMESTAMPTZ,
+    -- Una opinión publicada siempre tiene estrellas (la API las exige).
+    CHECK (kind <> 'opinion' OR rating IS NOT NULL)
+);
+CREATE INDEX IF NOT EXISTS idx_site_feedback_created
+    ON site_feedback (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_site_feedback_published
+    ON site_feedback (published_at DESC)
+    WHERE kind = 'opinion' AND status = 'published';
+
+-- 2026-11-03: opiniones y estrellas solo de cuentas registradas. Aditivo:
+-- user_id enlaza la fila con la cuenta (se borra con ella, Ley 1581); una
+-- opinión por cuenta (volver a escribir reemplaza la anterior). La regla
+-- "opinión ⇒ cuenta" es NOT VALID: no toca filas anónimas anteriores, que
+-- además nunca se publican (el listado exige user_id). Reportes de errores
+-- siguen abiertos a todos.
+ALTER TABLE site_feedback ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES users(id) ON DELETE CASCADE;
+CREATE INDEX IF NOT EXISTS idx_site_feedback_user
+    ON site_feedback (user_id) WHERE user_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_site_feedback_opinion_per_user
+    ON site_feedback (user_id) WHERE kind = 'opinion';
+DO $$ BEGIN
+    ALTER TABLE site_feedback ADD CONSTRAINT site_feedback_opinion_needs_user
+        CHECK (kind <> 'opinion' OR user_id IS NOT NULL) NOT VALID;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+ALTER TABLE site_feedback ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON site_feedback FROM anon, authenticated;
+-- END site-feedback
+
+-- BEGIN purged-lookup
+-- wasJobPurged() (src/db/indexing-repository.ts) busca la lápida 410 por
+-- job_id (idx_indexing_queue_job) en vez de un LIKE '%/empleos/<id>/%' que
+-- recorría toda indexing_queue en cada visita a una vacante vencida y agotaba
+-- el presupuesto de Disk IO de Supabase (2026-11-03). Las filas URL_DELETED
+-- anteriores a la columna job_id la reciben aquí, sacada de su propia URL.
+-- Solo rellena NULLs; re-ejecutarlo no cambia nada. Lo aplica
+-- scripts/migrate-purged-lookup.ts ANTES de desplegar el código que lo lee.
+UPDATE indexing_queue
+SET job_id = substring(url FROM '/empleos/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})/')::uuid
+WHERE notification_type = 'URL_DELETED'
+  AND job_id IS NULL
+  AND url ~ '/empleos/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/';
+-- END purged-lookup
+
+-- BEGIN signup-attribution
+-- Fase A de docs/seo-baseline/2026-11-06-checkpoint-y-plan-registros.md:
+-- primer contacto de cada registro nuevo, sin PII. Solo la ruta de llegada
+-- (sin query ni hash), el host del referrer (nunca la URL completa) y los
+-- tres utm_*. Lo escribe una sola vez POST /api/me/first-touch, y solo para
+-- cuentas de menos de 24 h; las cuentas anteriores quedan en NULL. Columnas
+-- nuevas y nulas, sin índice (unas 600 filas): ninguna fila existente cambia.
+-- Lo aplica scripts/migrate-signup-attribution.ts, con aprobación explícita.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS first_touch_path VARCHAR(200);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS first_touch_referrer_host VARCHAR(255);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS first_touch_utm_source VARCHAR(100);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS first_touch_utm_medium VARCHAR(100);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS first_touch_utm_campaign VARCHAR(100);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS first_touch_at TIMESTAMPTZ;
+-- END signup-attribution
