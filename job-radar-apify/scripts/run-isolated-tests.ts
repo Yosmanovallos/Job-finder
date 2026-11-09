@@ -24,6 +24,7 @@ const suites: Record<string, string[]> = {
     "validate-recent-jobs.test.ts",
     "validate-job-page-blocks.test.ts",
     "validate-ssr-dollar.test.ts",
+    "validate-client-ip.test.ts",
     "validate-job-meta.test.ts",
     "validate-employment-type-trust.test.ts",
     "validate-city-hub-stats.test.ts",
