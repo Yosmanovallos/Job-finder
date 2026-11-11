@@ -290,13 +290,86 @@ async function httpChecks(): Promise<void> {
       "Respaldo del cliente /api/intent-page: mismo total que el SSR y solo rutas de la lista blanca.",
       `/api/intent-page: ${api.status} total ${apiBody.total}, desconocida ${bad.status}.`
     );
+
+    // seo-empleos-coverage (ADR 0014): the /empleos index pages and the
+    // guarded city hubs, over HTTP against the same fixture.
+    console.log("\n--- seo-empleos-coverage ---\n");
+    const index = await get(base, "/empleos");
+    const indexVe = await get(base, "/ve/empleos");
+    check(
+      index.status === 200 &&
+        canonicalOf(index.html) === `${SITE_URL}/empleos` &&
+        indexVe.status === 200 &&
+        canonicalOf(indexVe.html) === `${SITE_URL}/ve/empleos` &&
+        index.html.includes("<h1>Empleos en Colombia</h1>") &&
+        indexVe.html.includes("<h1>Empleos en Venezuela</h1>") &&
+        robotsOf(index.html) !== "noindex",
+      "SEC-020 /empleos y /ve/empleos responden 200 con su canonical y su H1.",
+      `SEC-020 falló: ${index.status} ${canonicalOf(index.html)} / ${indexVe.status} ${canonicalOf(indexVe.html)}.`
+    );
+    check(
+      [index.html, indexVe.html].every(
+        (html) =>
+          html.includes(`hreflang="es-CO" href="${SITE_URL}/empleos"`) &&
+          html.includes(`hreflang="es-VE" href="${SITE_URL}/ve/empleos"`) &&
+          html.includes(`hreflang="x-default" href="${SITE_URL}/empleos"`)
+      ),
+      "SEC-021 hreflang recíproco es-CO / es-VE y x-default en las dos páginas índice.",
+      "SEC-021 falta algún hreflang en /empleos o /ve/empleos."
+    );
+    check(
+      index.html.includes('<a href="/empleos/bogota">') &&
+        indexVe.html.includes('<a href="/empleos/caracas">') &&
+        index.html.includes("window.__SSR_EMPLEOS__=") &&
+        index.html.includes('"@type":"BreadcrumbList"') &&
+        (index.html.match(/<title>/g) || []).length === 1,
+      "SEC-023/024 /empleos enlaza los hubs de su país y trae payload, BreadcrumbList y un solo <title>.",
+      "SEC-023/024 a /empleos le faltan enlaces a hubs, el payload o el JSON-LD."
+    );
+    const slash = await fetch(`${base}/empleos/`, { redirect: "manual" });
+    check(
+      slash.status === 301 && slash.headers.get("location") === "/empleos",
+      "SEC-025 /empleos/ redirige 301 a /empleos.",
+      `SEC-025 /empleos/ respondió ${slash.status} → ${slash.headers.get("location")}.`
+    );
+    const indexApi = await fetch(`${base}/api/empleos-index?country=VE`);
+    const indexApiBody = (await indexApi.json()) as { country: string; sections: { cities: unknown[] } };
+    const indexApiBad = await fetch(`${base}/api/empleos-index?country=AR`);
+    check(
+      indexApi.status === 200 && indexApiBody.country === "VE" && indexApiBody.sections.cities.length > 0 && indexApiBad.status === 404,
+      "Respaldo del cliente /api/empleos-index: datos del país pedido y 404 para un país desconocido.",
+      `/api/empleos-index: ${indexApi.status}, país desconocido ${indexApiBad.status}.`
+    );
+    // The fixture has no jobs in Yopal: the guarded hub is a 200 below the guard.
+    const yopal = await get(base, "/empleos/yopal");
+    const coverageSitemap = await (await fetch(`${base}/sitemap-categories.xml`)).text();
+    check(
+      yopal.status === 200 &&
+        canonicalOf(yopal.html) === `${SITE_URL}/empleos/yopal` &&
+        robotsOf(yopal.html) === "noindex,follow" &&
+        !coverageSitemap.includes(`<loc>${SITE_URL}/empleos/yopal</loc>`) &&
+        !index.html.includes('href="/empleos/yopal"'),
+      "SEC-010/012/013 un hub con guarda por debajo de 10 es noindex,follow, sin sitemap y sin enlace desde /empleos.",
+      `SEC-010/012/013 falló: ${yopal.status}, robots ${robotsOf(yopal.html)}.`
+    );
+    check(
+      coverageSitemap.includes(`<loc>${SITE_URL}/empleos</loc>`) && coverageSitemap.includes(`<loc>${SITE_URL}/ve/empleos</loc>`),
+      "SEC-012 el sitemap de categorías lista /empleos y /ve/empleos.",
+      "SEC-012 el sitemap de categorías no lista las páginas índice."
+    );
+    const bogotaHub = await get(base, "/empleos/bogota");
+    check(
+      robotsOf(bogotaHub.html) !== "noindex,follow" && !bogotaHub.html.includes('href="/empleos/yopal"') && !bogotaHub.html.includes('href="/empleos/soacha"'),
+      "SEC-030 el hub de Bogotá no enlaza los hubs con guarda ni cambia su robots.",
+      "SEC-030 el hub de Bogotá cambió."
+    );
   } finally {
     await stop(server);
   }
 
   console.log("\n--- Rollback: INTENT_PAGES_ENABLED=false ---\n");
   const rbBase = `http://127.0.0.1:${ROLLBACK_PORT}`;
-  const rollback = startServer(ROLLBACK_PORT, { INTENT_PAGES_ENABLED: "false" });
+  const rollback = startServer(ROLLBACK_PORT, { INTENT_PAGES_ENABLED: "false", EMPLEOS_COVERAGE_ENABLED: "false" });
   try {
     await waitFor(rollback, rbBase);
     const gone = await Promise.all(["/empleos/sin-experiencia", "/ve/empleos/sin-experiencia", "/empleos/bogota/sin-experiencia", "/empleos/medellin/sin-experiencia", "/empleos/fines-de-semana", "/empleos/medio-tiempo", "/empleos/temporada"].map((route) => fetch(`${rbBase}${route}`).then((r) => r.status)));
@@ -309,6 +382,12 @@ async function httpChecks(): Promise<void> {
         !legacySitemap.includes("sin-experiencia"),
       "Rollback: URL nuevas 410, remoto vuelve al hub «Remoto» de CO y el sitemap al de hoy.",
       `Rollback falló: ${gone.join(",")}, canonical VE ${canonicalOf(veRemote.html)}.`
+    );
+    const coverageOff = await Promise.all(["/empleos", "/ve/empleos", "/empleos/yopal", "/empleos/maturin"].map(async (route) => (await fetch(`${rbBase}${route}`)).status));
+    check(
+      coverageOff.join(",") === "404,404,410,410" && !legacySitemap.includes(`<loc>${SITE_URL}/empleos</loc>`) && !legacySitemap.includes("/empleos/yopal"),
+      "SEC-040 con EMPLEOS_COVERAGE_ENABLED=false: /empleos 404, hubs con guarda 410 y fuera del sitemap.",
+      `SEC-040 falló: ${coverageOff.join(",")}.`
     );
   } finally {
     await stop(rollback);

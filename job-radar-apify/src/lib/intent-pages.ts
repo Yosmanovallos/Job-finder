@@ -12,6 +12,7 @@ import { isPlaceholderEmployer } from "./company-key.js";
 import type { JobFilterParams } from "./job-filters.js";
 import {
   CITY_INTENTS,
+  GUARDED_CITY_HUBS,
   INTENT_LABELS,
   SITE_URL,
   assertNever,
@@ -107,7 +108,17 @@ export function siblingIntent(category: ResolvedCategory): ResolvedCategory | nu
  * entries than pages would make the keeper and the pages evict each other,
  * and every reload is a 1–2 s query on Nano (seo-intent-wave2 design D5).
  */
-export const INTENT_PAGE_CACHE_ENTRIES = listIntentCategories().length + 4;
+export const INTENT_PAGE_CACHE_ENTRIES = listIntentCategories().length + GUARDED_CITY_HUBS.length + 4;
+
+/**
+ * Rollback flag of seo-empleos-coverage (ADR 0014). Read per request; unset
+ * means on. Off: /empleos and /ve/empleos answer 404, guarded city hubs 410,
+ * and neither is in the sitemap.
+ */
+export function empleosCoverageEnabled(env: Record<string, string | undefined> = process.env): boolean {
+  const value = (env.EMPLEOS_COVERAGE_ENABLED || "").trim().toLowerCase();
+  return !(value === "false" || value === "0" || value === "off");
+}
 
 /**
  * The intent pages that pass the guard, for sitemap-categories.xml

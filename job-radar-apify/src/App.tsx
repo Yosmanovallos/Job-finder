@@ -34,6 +34,8 @@ const Dashboard = lazy(() => import("./sections/Dashboard.js"));
 // slug) — see EmpleosRoute.tsx / job-seo.ts's isUuid for why one route
 // pattern still covers both without colliding with server.ts's split.
 const EmpleosRoute = lazy(() => import("./sections/EmpleosRoute.js"));
+// /empleos and /ve/empleos: the national index page (ADR 0014).
+const EmpleosIndex = lazy(() => import("./sections/EmpleosIndex.js"));
 const CompanyLanding = lazy(() => import("./sections/CompanyLanding.js"));
 const CompaniesDirectory = lazy(() => import("./sections/CompaniesDirectory.js"));
 const Login = lazy(() => import("./sections/Login.js"));
@@ -122,6 +124,8 @@ function AppRoutes() {
           job-seo.ts's ResolvedCategory comment). */}
       <Route path="/ve" element={<Landing />} />
       <Route path="/ve/dashboard" element={<Dashboard />} />
+      <Route path="/empleos" element={<EmpleosIndex />} />
+      <Route path="/ve/empleos" element={<EmpleosIndex />} />
       <Route path="/empleos/:id/:slug?" element={<EmpleosRoute />} />
       <Route path="/ve/empleos/:id" element={<EmpleosRoute />} />
       <Route path="/empresas" element={<CompaniesDirectory />} />
