@@ -37,6 +37,7 @@ import {
   intentCategoryForPath,
   intentFilters,
   intentPagesEnabled,
+  empleosCoverageEnabled,
   intentRobots,
   isIntentIndexable,
   listIntentCategories,
@@ -46,6 +47,19 @@ import {
   siblingIntent,
   type IntentAnswer
 } from "./lib/intent-pages.js";
+import {
+  EMPLEOS_INDEX_JOB_LIMIT,
+  buildEmpleosIndexBreadcrumbList,
+  buildEmpleosIndexHreflangTags,
+  buildEmpleosIndexItemList,
+  buildEmpleosIndexMeta,
+  buildEmpleosIndexSections,
+  empleosIndexCountryForPath,
+  renderEmpleosIndexHtml,
+  toEmpleosIndexJob,
+  type EmpleosIndexCountry,
+  type EmpleosIndexPayload
+} from "./lib/empleos-index.js";
 import { markRoleForImmediateRescan } from "./db/scheduler-repository.js";
 import {
   listSavedJobs,
@@ -108,6 +122,9 @@ import {
   buildCategoryBreadcrumbList,
   buildCategoryItemList,
   buildCategoriesSitemapXml,
+  isGuardedCityHub,
+  listGuardedCityHubs,
+  type ResolvedCategory,
   resolveCompanyNameFromJobs,
   buildCompanyPath,
   buildCompanyMeta,
@@ -910,6 +927,26 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     return;
   }
 
+  // 4a-bis. GET /api/empleos-index?country=CO|VE — the client fallback of
+  //     the /empleos index page (a client-side navigation has no SSR
+  //     payload). Same data and the same public, anonymous view.
+  if (pathname === "/api/empleos-index" && method === "GET") {
+    const requested = (parsedUrl.searchParams.get("country") || "CO").toUpperCase();
+    if (!empleosCoverageEnabled() || (requested !== "CO" && requested !== "VE")) {
+      res.writeHead(404, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Página desconocida" }));
+      return;
+    }
+    await sendBody(
+      req,
+      res,
+      200,
+      { "Content-Type": "application/json", "Cache-Control": "public, max-age=60, s-maxage=300, stale-while-revalidate=600" },
+      JSON.stringify(await loadEmpleosIndexPayload(requested))
+    );
+    return;
+  }
+
   // 4a. GET /api/intent-page?path=<path> — the client fallback of an intent
   //     page (CategoryLanding after a client-side navigation), served from
   //     the same intent cache as the SSR page. Only the whitelisted intent
@@ -1540,6 +1577,77 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     return;
   }
 
+  // 7a. /empleos and /ve/empleos — the national index page
+  // (seo-empleos-coverage, ADR 0014). No query of its own on the request
+  // path: the total and the recent jobs are the dashboard's first page (the
+  // entry the startup warmup loads), and the links to guarded pages come
+  // from their last known totals. A failed read keeps the page up with its
+  // links and no number.
+  if (
+    (pathname === "/empleos/" || pathname === "/ve/empleos/") &&
+    (method === "GET" || method === "HEAD") &&
+    empleosCoverageEnabled()
+  ) {
+    res.writeHead(301, { Location: pathname.slice(0, -1), "Cache-Control": "public, max-age=3600" });
+    res.end();
+    return;
+  }
+  const empleosIndexCountry = empleosIndexCountryForPath(pathname);
+  if (empleosIndexCountry && method === "GET" && empleosCoverageEnabled()) {
+    let indexHtml: string;
+    try {
+      indexHtml = fs.readFileSync(path.join(PUBLIC_DIR, "index.html"), "utf-8");
+    } catch {
+      res.writeHead(500, { "Content-Type": "text/plain" });
+      res.end("Server Error: build not found");
+      return;
+    }
+    const payload = await loadEmpleosIndexPayload(empleosIndexCountry);
+    const meta = buildEmpleosIndexMeta(empleosIndexCountry, payload.total);
+    const itemList = buildEmpleosIndexItemList(payload);
+    indexHtml = indexHtml
+      .replace('<div id="app"></div>', () => `<div id="app">${renderEmpleosIndexHtml(payload)}</div>`)
+      .replace(/<title>[\s\S]*?<\/title>/, () => `<title>${escapeHtml(meta.title)}</title>`)
+      .replace(
+        /<meta[^>]*name=["']description["'][^>]*>/,
+        () => `<meta name="description" content="${escapeHtml(meta.description)}" />`
+      )
+      .replace(
+        /<link[^>]*rel=["']canonical["'][^>]*>/,
+        () => `<link rel="canonical" href="${escapeHtml(meta.canonicalUrl)}" />\n${buildEmpleosIndexHreflangTags()}`
+      )
+      .replace(
+        /<meta[^>]*property=["']og:title["'][^>]*>/,
+        () => `<meta property="og:title" content="${escapeHtml(meta.title)}" />`
+      )
+      .replace(
+        /<meta[^>]*property=["']og:description["'][^>]*>/,
+        () => `<meta property="og:description" content="${escapeHtml(meta.description)}" />`
+      )
+      .replace(
+        /<meta[^>]*property=["']og:url["'][^>]*>/,
+        () => `<meta property="og:url" content="${escapeHtml(meta.canonicalUrl)}" />`
+      )
+      .replace(
+        /<meta[^>]*name=["']twitter:title["'][^>]*>/,
+        () => `<meta name="twitter:title" content="${escapeHtml(meta.title)}" />`
+      )
+      .replace(
+        /<meta[^>]*name=["']twitter:description["'][^>]*>/,
+        () => `<meta name="twitter:description" content="${escapeHtml(meta.description)}" />`
+      )
+      .replace(
+        "</head>",
+        () =>
+          `  <script>window.__SSR_EMPLEOS__=${escapeJsonForScriptTag(payload)};</script>\n` +
+          `  <script type="application/ld+json">${escapeJsonForScriptTag(buildEmpleosIndexBreadcrumbList(empleosIndexCountry))}</script>\n` +
+          (itemList ? `  <script type="application/ld+json">${escapeJsonForScriptTag(itemList)}</script>\n` : "") +
+          `</head>`
+      );
+    await sendBody(req, res, 200, { "Content-Type": "text/html; charset=utf-8" }, indexHtml);
+    return;
+  }
+
   // 7b. GET /empleos/:id/:slug — server-rendered per-job page for
   // crawlers (SEO Fase 1, ver docs/SEO-PLAN.md). The `:slug` segment is
   // purely decorative for click-through readability; matching is always by
@@ -1628,6 +1736,17 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       // under a URL whose own heading claimed just one — see
       // ResolvedCategory's comment.
       const isIntent = category.kind === "intencion";
+      // Guarded city hubs (ADR 0014): the same city filter as any hub, but
+      // read from the intent cache (never the dashboard's LRU) and indexable
+      // only from 10 jobs. With the rollback flag off they answer 410.
+      const isGuardedCity = isGuardedCityHub(category);
+      if (isGuardedCity && !empleosCoverageEnabled()) {
+        res.writeHead(410, { "Content-Type": "text/html; charset=utf-8" });
+        res.end(
+          '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Categoría ya no disponible | BuscoTrabajo</title><meta name="robots" content="noindex"></head><body><h1>Esta categoría ya no está disponible</h1><p><a href="/dashboard">Ver todas las vacantes</a></p></body></html>'
+        );
+        return;
+      }
       const filterParams: JobFilterParams = isIntent
         ? intentFilters(category)
         : category.kind === "ciudad"
@@ -1639,7 +1758,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       // Job pages peek this same cache entry for their related links.
       // Intent pages read their own small cache (ADR 0012 §6), never the
       // dashboard's 64-entry LRU.
-      const matched = isIntent
+      const matched = isIntent || isGuardedCity
         ? await getIntentPage(filterParams, CITY_HUB_PAGE_LIMIT)
         : await getJobsPage({
             filters: filterParams,
@@ -1876,7 +1995,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       // Google's index looking like a doorway page until it fills up.
       // Intent pages: the inventory guard (design D2) — below 10 Google-ready
       // jobs, a 200 with noindex,follow, out of the sitemap and unlinked.
-      const categoryRobots = isIntent ? intentRobots(total) : total === 0 ? "noindex" : null;
+      const categoryRobots = isIntent || isGuardedCity ? intentRobots(total) : total === 0 ? "noindex" : null;
       if (categoryRobots) {
         indexHtml = indexHtml
           .replace(/<meta[^>]*name=["']robots["'][^>]*>/i, "")
@@ -2744,7 +2863,21 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
           (intent) => knownIntentTotal(intentFilters(intent), CITY_HUB_PAGE_LIMIT),
           async (intent) => (await getIntentPage(intentFilters(intent), CITY_HUB_PAGE_LIMIT)).total
         );
-        xml = buildCategoriesSitemapXml({ intents: indexable });
+        // Guarded city hubs and the /empleos index pages (ADR 0014): same
+        // rule, known total first, otherwise one count at a time.
+        const coverage = empleosCoverageEnabled();
+        const guardedCities = coverage
+          ? await collectIndexableIntents(
+              listGuardedCityHubs(),
+              (hub) => knownIntentTotal(cityHubFilters(hub), CITY_HUB_PAGE_LIMIT),
+              async (hub) => (await getIntentPage(cityHubFilters(hub), CITY_HUB_PAGE_LIMIT)).total
+            )
+          : [];
+        xml = buildCategoriesSitemapXml({
+          intents: indexable,
+          guardedCities,
+          indexPaths: coverage ? ["/empleos", "/ve/empleos"] : []
+        });
       } catch {
         res.writeHead(503, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store", "Retry-After": "60" });
         res.end("Sitemap temporalmente no disponible");
@@ -3078,6 +3211,34 @@ if (!process.env.JOB_RADAR_TEST_MODE) {
   }
 }
 
+/**
+ * Data of the /empleos index page (ADR 0014). The jobs and the total are the
+ * dashboard's first page of the country: the same cache entry the startup
+ * warmup fills, so this adds no query of its own. Links to guarded pages use
+ * their last known totals only (never a query here).
+ */
+async function loadEmpleosIndexPayload(country: EmpleosIndexCountry): Promise<EmpleosIndexPayload> {
+  let total: number | null = null;
+  let jobs: EmpleosIndexPayload["jobs"] = [];
+  try {
+    const firstPage = await getJobsPage({ filters: { country }, limit: 24, offset: 0, includeDetails: true });
+    total = firstPage.total;
+    jobs = maskLockedFields(firstPage.jobs, "free")
+      .filter(isPubliclyDescribable)
+      .slice(0, EMPLEOS_INDEX_JOB_LIMIT)
+      .map((job) => toEmpleosIndexJob(job, country));
+  } catch {
+    console.warn("[empleos-index] Jobs unavailable; serving the page with links only.");
+  }
+  const knownTotal = (category: ResolvedCategory): number | undefined =>
+    category.kind === "intencion"
+      ? intentPagesEnabled()
+        ? knownIntentTotal(intentFilters(category), CITY_HUB_PAGE_LIMIT)
+        : undefined
+      : knownIntentTotal(cityHubFilters(category), CITY_HUB_PAGE_LIMIT);
+  return { country, total, jobs, sections: buildEmpleosIndexSections(country, knownTotal) };
+}
+
 // City hubs only READ the intent totals (knownIntentTotal), on purpose: a hub
 // that started intent queries got slower (cold Caracas 44 → 84 ms). So after a
 // restart a hub had no «Búsquedas populares» links until something else loaded
@@ -3098,6 +3259,17 @@ async function refreshIntentTotals(): Promise<void> {
       await getIntentPage(intentFilters(intent), CITY_HUB_PAGE_LIMIT);
     } catch {
       console.warn("[intent-totals] Refresh failed; hubs keep their last known links.");
+      return;
+    }
+  }
+  // Guarded city hubs (ADR 0014): /empleos links them and the sitemap lists
+  // them from these totals, so they are kept the same way.
+  if (!empleosCoverageEnabled()) return;
+  for (const hub of listGuardedCityHubs()) {
+    try {
+      await getIntentPage(cityHubFilters(hub), CITY_HUB_PAGE_LIMIT);
+    } catch {
+      console.warn("[intent-totals] Guarded city refresh failed; /empleos keeps its last known links.");
       return;
     }
   }

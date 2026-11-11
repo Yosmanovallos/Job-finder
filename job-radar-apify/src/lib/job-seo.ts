@@ -660,6 +660,40 @@ export function cityHubPlaces(city: string): string[] {
   return [city, ...(Object.hasOwn(CITY_HUB_LOCATION_ALIASES, city) ? CITY_HUB_LOCATION_ALIASES[city] : [])];
 }
 
+// City hubs with an inventory guard (seo-empleos-coverage, ADR 0014): cities
+// with measured search demand and real jobs that are NOT in CITY_OPTIONS or
+// COUNTRIES.*.cities. Kept apart on purpose: those lists also feed the
+// dashboard's city filter, the links between existing hubs and the job
+// pages' breadcrumb, none of which this change may alter. A guarded hub is
+// indexable only with at least 10 jobs (intent-pages.ts's guard); below that
+// it is noindex, out of the sitemap and unlinked. Rollback: remove the entry.
+export const GUARDED_CITY_HUBS: ReadonlyArray<{ label: string; country: "CO" | "VE" }> = [
+  { label: "Barrancabermeja", country: "CO" },
+  { label: "Yopal", country: "CO" },
+  { label: "Rionegro", country: "CO" },
+  { label: "Soacha", country: "CO" },
+  { label: "Zipaquirá", country: "CO" },
+  { label: "Tocancipá", country: "CO" },
+  { label: "Facatativá", country: "CO" },
+  { label: "Apartadó", country: "CO" },
+  { label: "Quibdó", country: "CO" },
+  { label: "Fusagasugá", country: "CO" },
+  { label: "Maturín", country: "VE" },
+  { label: "Lechería", country: "VE" }
+];
+
+export function isGuardedCityHub(category: Pick<ResolvedCategory, "kind" | "label" | "country">): boolean {
+  return (
+    category.kind === "ciudad" &&
+    GUARDED_CITY_HUBS.some((hub) => hub.label === category.label && hub.country === category.country)
+  );
+}
+
+/** Every guarded city hub as a category, in a stable order. */
+export function listGuardedCityHubs(): ResolvedCategory[] {
+  return GUARDED_CITY_HUBS.map((hub) => ({ kind: "ciudad", label: hub.label, country: hub.country }));
+}
+
 export interface ResolvedCategory {
   kind: CategoryKind;
   label: string;
@@ -716,6 +750,10 @@ export function resolveCategorySlug(
   }
   for (const city of getCountryConfig("VE").cities) {
     if (slugify(city) === target) return { kind: "ciudad", label: city, country: "VE" };
+  }
+  // Guarded city hubs (ADR 0014): like any city, one URL whatever the prefix.
+  for (const hub of GUARDED_CITY_HUBS) {
+    if (slugify(hub.label) === target) return { kind: "ciudad", label: hub.label, country: hub.country };
   }
   for (const role of DEFAULT_ROLES_200) {
     if (slugify(role) === target) return { kind: "rol", label: role, country: requestCountry };
@@ -1495,7 +1533,13 @@ export function buildCategoryItemList(meta: CategoryMeta, jobs: SeoJob[]): objec
 // now. With it, "Remoto" is listed only as an intent (and only if it passes);
 // without it (INTENT_PAGES_ENABLED=false) the legacy list, where "Remoto" is
 // the CO city bucket.
-export function buildCategoriesSitemapXml(options: { intents?: ResolvedCategory[] } = {}): string {
+//
+// `guardedCities` and `indexPaths` (ADR 0014): the guarded city hubs that pass
+// the guard right now, and the /empleos index pages. Both absent = the
+// sitemap of before seo-empleos-coverage.
+export function buildCategoriesSitemapXml(
+  options: { intents?: ResolvedCategory[]; guardedCities?: ResolvedCategory[]; indexPaths?: string[] } = {}
+): string {
   const veCities = getCountryConfig("VE").cities;
   const coCities = options.intents ? CITY_OPTIONS.filter((label) => label !== "Remoto") : CITY_OPTIONS;
   const categories: ResolvedCategory[] = [
@@ -1503,9 +1547,13 @@ export function buildCategoriesSitemapXml(options: { intents?: ResolvedCategory[
     ...veCities.map((label) => ({ kind: "ciudad" as const, label, country: "VE" })),
     ...DEFAULT_ROLES_200.map((label) => ({ kind: "rol" as const, label, country: "CO" })),
     ...DEFAULT_ROLES_200.map((label) => ({ kind: "rol" as const, label, country: "VE" })),
-    ...(options.intents ?? [])
+    ...(options.intents ?? []),
+    ...(options.guardedCities ?? [])
   ];
-  const urls = categories.map((category) => xmlUrlEntry(buildCategoryUrl(category))).join("\n");
+  const urls = [
+    ...(options.indexPaths ?? []).map((indexPath) => xmlUrlEntry(`${SITE_URL}${indexPath}`)),
+    ...categories.map((category) => xmlUrlEntry(buildCategoryUrl(category)))
+  ].join("\n");
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`;
 }
 

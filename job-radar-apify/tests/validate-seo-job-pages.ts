@@ -35,6 +35,7 @@ import {
 } from "../src/lib/job-seo.js";
 import { CITY_OPTIONS } from "../src/lib/job-filters.js";
 import { listIntentCategories } from "../src/lib/intent-pages.js";
+import { listGuardedCityHubs } from "../src/lib/job-seo.js";
 import { DEFAULT_ROLES_200 } from "../src/queue/scheduler.js";
 import { COUNTRIES } from "../src/countries/index.js";
 import { buildJwtAssertion } from "../src/lib/google-indexing.js";
@@ -1422,7 +1423,15 @@ async function runHttpTests() {
     // ADR 0012: "Remoto" is no longer a CO city entry; it and the other
     // intent pages are listed only when they pass the inventory guard
     // (tests/validate-intent-pages.ts covers those), so they are counted apart.
-    const intentPaths = new Set(listIntentCategories().map((category) => `${SITE_URL}${buildCategoryPath(category)}`));
+    // ADR 0014: the guarded city hubs and the /empleos index pages are also
+    // listed by their own rule (tests/validate-empleos-coverage.test.ts), so
+    // they are counted apart too.
+    const intentPaths = new Set([
+      ...listIntentCategories().map((category) => `${SITE_URL}${buildCategoryPath(category)}`),
+      ...listGuardedCityHubs().map((category) => `${SITE_URL}${buildCategoryPath(category)}`),
+      `${SITE_URL}/empleos`,
+      `${SITE_URL}/ve/empleos`
+    ]);
     const expectedCategoryCount =
       CITY_OPTIONS.filter((city) => city !== "Remoto").length + COUNTRIES.VE.cities.length + DEFAULT_ROLES_200.length * 2;
     const categoriesSitemapRes = await fetch(`${BASE_URL}/sitemap-categories.xml`);

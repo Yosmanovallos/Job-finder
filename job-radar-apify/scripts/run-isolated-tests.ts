@@ -30,6 +30,7 @@ const suites: Record<string, string[]> = {
     "validate-city-hub-stats.test.ts",
     "validate-intent-pages.test.ts",
     "validate-intent-wave2.test.ts",
+    "validate-empleos-coverage.test.ts",
     "validate-dashboard-filters.ts",
     "validate-role-matching.ts",
     "validate-job-search-intent.test.ts",
