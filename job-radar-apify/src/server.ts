@@ -3135,11 +3135,16 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     );
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code;
+    // A missing or unreadable file must never inherit the year-long
+    // `immutable` header set above for /assets/ and /fonts/. During a deploy
+    // the old instance answers 404 to the new build's hashed CSS; with that
+    // header the 404 stayed in browsers and in Cloudflare for a year, and the
+    // page rendered without styles (/empleos, 2026-11-11).
     if (code === "ENOENT") {
-      res.writeHead(404, { "Content-Type": "text/html" });
+      res.writeHead(404, { "Content-Type": "text/html", "Cache-Control": "no-store" });
       res.end("<h1>404 Not Found</h1>");
     } else {
-      res.writeHead(500);
+      res.writeHead(500, { "Cache-Control": "no-store" });
       res.end(`Server Error: ${code || "UNKNOWN"}`);
     }
   }
