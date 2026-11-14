@@ -6,7 +6,7 @@
 > preparación de evidencia para que un abogado en Colombia la revise antes
 > del lanzamiento (§7). Nada aquí está auditado.
 
-Fuentes (consulta 2026-11-14, a través de `research-ai-pricing-legal.md`):
+Fuentes (consulta 2026-11-14, a través de `research/ai-pricing-legal-2026-11-14.md`):
 Ley 1581 de 2012 en el normograma de la DIAN
 (`normograma.dian.gov.co/dian/compilacion/docs/ley_1581_2012.htm`); Decreto
 1074 de 2015, cap. 25 (compila el Decreto 1377 de 2013), en el normograma de
@@ -47,9 +47,9 @@ error de certificado: se usaron normogramas oficiales alternos.
 
 | Proveedor | Entrena con los datos | Retención | Ubicación | DPA | Mecanismo en Colombia | Viable |
 |---|---|---|---|---|---|---|
-| Gemini API **de pago** | No | «Periodo limitado» solo contra abuso | EE. UU. (Vertex: regiones us/eu/São Paulo) | Sí | Transmisión con contrato (EE. UU. adecuado) | **Sí** |
+| Gemini API **de pago** | No | «Periodo limitado» solo contra abuso | Google global, **no fijable** | Sí | Transmisión con contrato; destino no garantizado en país adecuado | [?] |
 | Gemini API gratis | **Sí**, puede haber revisión humana; los términos piden no enviar datos personales | — | — | — | — | **No** |
-| Vertex AI | No; caché ≤ 24 h; retención cero disponible | Mínima | Región elegible | Sí | Transmisión con contrato | Sí |
+| Vertex AI (región EE. UU. fijada) | No; caché ≤ 24 h; retención cero disponible | Mínima | Región elegible (us/eu; São Paulo no está en la lista SIC) | Cloud DPA [?] | Transmisión con contrato | **Sí (recomendado)** |
 | OpenAI API | No, salvo autorización | 30 días contra abuso; ZDR con aprobación | EE. UU. | Sí | Transmisión con contrato | Sí |
 | Anthropic API | No | 30 días | EE. UU. | Incorporado | Transmisión con contrato | Sí |
 | Groq | [?] | ZDR activable | EE. UU. | [?] | Transmisión con contrato | Con verificación |
@@ -61,8 +61,9 @@ error de certificado: se usaron normogramas oficiales alternos.
 | Moonshot (Kimi) | **Sí** | — | Singapur | — | — | **No** |
 
 Conclusión [P]: el proveedor lo define primero la ley y después el precio.
-Los viables sin trámites extra son los de EE. UU. con API de pago: Gemini
-(pago o Vertex), OpenAI, Anthropic. Recomendación de costo en doc 05 §7.3.
+Los viables sin trámites extra son los de EE. UU. con API de pago: Vertex AI
+con región fijada, OpenAI, Anthropic. La Gemini API directa queda en duda
+porque no permite fijar dónde se procesa. Recomendación de costo en doc 05 §7.3.
 
 Configuraciones obligatorias antes de habilitar cualquiera [P]:
 

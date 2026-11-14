@@ -2,8 +2,8 @@
 
 **Fecha:** 2026-11-14 · **Marcas:** [V] verificado · [P] propuesto · [?] pendiente
 
-Fuente de precios y términos: `research-ai-pricing-legal.md` (notas compartidas
-de la sesión, consultado 2026-11-14, URL oficial y fecha en cada dato). Las
+Fuente de precios y términos: `research/ai-pricing-legal-2026-11-14.md` (investigación
+de esta fase, consultado 2026-11-14, URL oficial y fecha en cada dato). Las
 cifras se leyeron a través de resúmenes de páginas oficiales: **volver a abrir
 cada URL antes de contratar**.
 
@@ -159,7 +159,8 @@ del ledger de costos tras la beta (doc 10, R3).
 
 | Modelo (precio oficial USD/1M entrada / salida) | Medio | Pesado | ¿Viable legalmente? (doc 07) |
 |---|---|---|---|
-| Gemini 2.5 Flash-Lite, **API de pago** (0,10 / 0,40) | USD 0,0126 | 0,038 | Sí, con contrato de transmisión; EE. UU. está en la lista de la SIC |
+| Gemini 2.5 Flash-Lite en **Vertex AI, región EE. UU.** (precio de la API: 0,10 / 0,40; precio en Vertex [?] por confirmar) | USD 0,0126 | 0,038 | Sí, con contrato de transmisión; región fijable; EE. UU. está en la lista de la SIC |
+| Gemini 2.5 Flash-Lite, **Gemini API de pago** (0,10 / 0,40) | 0,0126 | 0,038 | [?] La región **no se puede fijar** («Google global») [V research §B]; el argumento de país adecuado queda débil |
 | Gemini 3.1 Flash-Lite, pago (0,25 / 1,50) | 0,036 | 0,109 | Igual que arriba |
 | OpenAI gpt-5-nano (0,05 / 0,40) | 0,0082 | 0,025 | Sí, igual; es lo que declara JobStep (familia GPT-5) |
 | Claude Haiku 5.5 (0,10 / 0,50, prompts ≤ 100K) | 0,0136 | 0,041 | Sí, igual |
@@ -175,14 +176,16 @@ el escenario medio cuesta **COP 33–146** por CV y el pesado **COP 100–436**.
 
 ### 7.3 Recomendación [P]
 
-**Gemini 2.5 Flash-Lite por la API de pago** (o Vertex AI en región de EE. UU.
-si se quiere retención cero formal), con **gpt-5-nano** como alternativa de
+**Gemini 2.5 Flash-Lite en Vertex AI con región de EE. UU. fijada** (no el
+endpoint global; retención cero disponible), con **gpt-5-nano** como alternativa de
 respaldo detrás de un alias (patrón de gateway con alias, presupuesto y ledger
 del monorepo, Fase 5). Motivos, en orden:
 
-1. Legal: proveedor en EE. UU. (país con nivel adecuado según Circular SIC
-   005/2017 [V, vía normograma de Cancillería]), sin entrenamiento en el nivel
-   de pago, DPA disponible.
+1. Legal: procesamiento en una región de EE. UU. que se puede fijar (país
+   con nivel adecuado según Circular SIC 005/2017 [V, vía normograma de
+   Cancillería]), sin entrenamiento, caché ≤ 24 h, DPA de Cloud [?: no
+   verificado en esta investigación]. La Gemini API directa no permite fijar
+   región, por eso queda como opción [?].
 2. Costo: ~USD 0,013 por CV medio.
 3. Riesgo: Gemini 2.5 Flash se depreca el 2026-12-01 [V]; Flash-Lite 2.5 no
    tiene fecha publicada [?]. Planear migración a 3.1 Flash-Lite (×3 de costo,

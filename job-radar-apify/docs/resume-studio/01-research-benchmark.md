@@ -12,7 +12,7 @@ Convención de todos los documentos de esta carpeta:
 |---|---|
 | Flujo de JobStep pantalla por pantalla | [V] grabación del 2026-11-14 (6 min 6 s, 1868×926) |
 | Precio de JobStep | [V] en la grabación: suscripción, no pago único |
-| Modelo de IA que usa JobStep | [?] no publicado; ver `research-ai-pricing-legal.md` en notas compartidas y doc 05 |
+| Modelo de IA que usa JobStep | [V] su política de privacidad declara OpenAI (GPT-5); ver `research/ai-pricing-legal-2026-11-14.md` §C y doc 05 §8 |
 | Página jobstep.io/features/resume/new y TikTok | [?] ver §4 (limitaciones de acceso) |
 | Qué copiar, qué mejorar, qué descartar | [P] §3 |
 
@@ -47,7 +47,7 @@ abierto; no muestra la landing ni la carga inicial del archivo.
 | 16 | 02:26 | «¡Vamos a mejorar tu currículum paso a paso!» | Tres pasos: 1 Estructura, 2 Experiencia laboral, 3 Formación. | |
 | 17 | 02:34– | Editor: pestañas «Chat IA» / «Estilo» a la izquierda, vista previa a la derecha, «Tu puntuación de currículum» arriba a la derecha. | La IA propone reordenar secciones (Experiencia → Formación → Habilidades → Idiomas → Publicaciones) con botones «Editar» y «Aceptar». | Propuesta visible antes de aplicar. |
 | 18 | 02:50 | «Reordenación de secciones aprobada» | Etiqueta verde «Puntuación del CV +7». Vista previa actualizada; aviso «Actualizando vista previa». | Recompensa por puntos tras cada cambio. |
-| 19 | 03:00–05:00 | Chat sobre la experiencia | La IA pregunta el cargo exacto, luego «qué haces, responsabilidad o logro», luego cifras («¿cuántas cirugías al año o al mes?»), luego el tipo. El usuario responde con palabras sueltas («operar», «100», «mes», «retina», «vitreo»). La IA escribe viñetas con verbo fuerte y cifra, y las muestra en la vista previa. | **Buen patrón:** la IA pregunta los datos y no los inventa. Las cifras salen del usuario. |
+| 19 | 03:00–05:00 | Chat sobre la experiencia | La IA pregunta el cargo exacto, luego «qué haces, responsabilidad o logro», luego una cifra de volumen y su periodo, luego el tipo de trabajo. El usuario responde con palabras sueltas: un verbo, una cifra, un periodo, una especialidad. La IA escribe viñetas con verbo fuerte y cifra, y las muestra en la vista previa. | **Buen patrón:** la IA pregunta los datos y no los inventa. Las cifras salen del usuario. |
 | 20 | 05:10 | «Iniciando chat y vista previa…» | Cambio a otra sección. | |
 | 21 | 05:44–06:06 | **Muro de pago** «Empleos relevantes cada día» | Planes: **1 mes COP 18.900/mes** o **3 meses COP 12.300/mes** («Más popular», «Ahorra 35 %»). Botón «Desbloquear ahora». «Cancela cuando quieras». Ventajas: adaptar CV en segundos, plantillas ilimitadas, CVs y cartas ilimitados, seguimiento de postulaciones, puntuación completa, garantía de devolución del 100 %, atención 24/7. Prueba social: «532 personas eligieron este plan en 24 h», «120.000+ personas», «4,8 sobre 5». Medios: Apple Pay, Mastercard, Visa, PayPal, Klarna. | El usuario trabajó gratis ~5 minutos y el pago aparece al final. |
 
