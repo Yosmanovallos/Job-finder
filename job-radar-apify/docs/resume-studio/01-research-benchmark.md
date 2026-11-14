@@ -114,12 +114,18 @@ COP 12.300 y COP 18.900.
 
 ## 4. Referencias web y limitaciones
 
-- `https://www.jobstep.io/features/resume/new` y el video de TikTok
-  `@dani.trabaja/7707018090118237448`: se consultaron en la investigación de
-  fondo; el resultado y cualquier limitación de acceso están en
-  `research-ai-pricing-legal.md` (notas compartidas de la sesión) y resumidos
-  en el doc 05 §8. Si una página no cargó, se usó solo la grabación y no se
-  atribuye a JobStep nada que no aparezca en ella.
+- `https://www.jobstep.io/features/resume/new` (consulta 2026-11-14): HTTP
+  200, pero solo un cascarón «Dashboard | JobStep» con el logo; el contenido
+  se pinta con JavaScript o exige sesión. **No se pudo leer.**
+- Video de TikTok `@dani.trabaja/7707018090118237448` (2026-11-14): HTTP 200,
+  solo el título genérico de TikTok; la descripción no está en el HTML.
+  **No se pudo leer.**
+- Por eso este análisis se basa solo en la grabación. No se atribuye a
+  JobStep nada que no aparezca en ella o en su política de privacidad y su
+  home (`jobstep.io/en/privacy`, `jobstep.io`, consultadas el mismo día:
+  planes Gratis, Mensual y Trimestral; «Unlimited Downloads» solo en los de
+  pago; proveedor de IA declarado OpenAI GPT-5; opera desde Zúrich; montos en
+  euros no visibles en la versión /es).
 - Alternativas revisadas (políticas de privacidad y subprocesadores
   publicados): ver doc 05 §8. No se usan como fuente de diseño visual.
 
