@@ -24,11 +24,16 @@ ahora esta versión.
 | Listo | S12 | Descargar PDF/DOCX, aplicar, versiones, exportar o borrar datos |
 | — | S2 (onboarding) | **Eliminado**: los datos salen de la vacante |
 
-Lenguaje visual: fondo blanco, una sola cosa importante por vista, bordes
-finos en vez de sombras duras, tinta y verde de la marca, Space Grotesk en
-titulares, un orbe con degradado verde-dorado como señal del agente
-(gira cuando trabaja), texto que aparece al escribirse, transiciones cortas
-que respetan `prefers-reduced-motion`.
+Lenguaje visual (revisión 3, aprobada por el propietario como «el flujo me
+gusta»): el **design system de buscotrabajo.co** sobre el flujo minimalista.
+Header con el logo de carpeta verde y borde inferior de 2 px; héroe
+`green-soft → blanco`; pastillas eyebrow con punto verde (`#fdf1d3`);
+tarjetas ink (borde 2 px + sombra dura 3–4 px, `ink-lift` al pasar);
+botón principal dorado (`gold-2`, texto `#2a1d06`); acciones de flujo en
+`primary`; TINTS en sugerencias, pasos del agente y ventajas del pase;
+banner de la vacante en `green-deep` con los halos dorado/verde de
+`ContentCta`; Space Grotesk, Inter y JetBrains Mono. El agente conserva su
+orbe (verde-dorado, gira cuando trabaja) y el texto que se escribe solo.
 
 ## 1. Sistema visual aplicado [V]
 
