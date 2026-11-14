@@ -20,7 +20,7 @@ solo cuando quiera descargar el CV final.
 
 | ID | Principio |
 |---|---|
-| RS-P1 | Las vacantes, la búsqueda, el detalle y el enlace de aplicación siguen gratis, sin registro obligatorio y sin depender del Resume Studio. |
+| RS-P1 | Las vacantes, la búsqueda, el detalle y el enlace de aplicación siguen gratis y funcionan exactamente como hoy (el detalle es público; «Aplicar» pide sesión desde `openspec/changes/job-trust-2026-10`, `ApplyGateModal`), sin pago y sin depender del Resume Studio. |
 | RS-P2 | Nunca se inventan empleos, fechas, estudios, certificaciones, habilidades, cifras ni logros. Solo se reescribe lo que el usuario dio o confirmó. |
 | RS-P3 | Todo cambio de **hechos** (no de redacción) requiere confirmación explícita del usuario. |
 | RS-P4 | La puntuación es una estimación propia y explicable, nunca «puntuación ATS» ni garantía de pasar filtros o de ser contratado. |
