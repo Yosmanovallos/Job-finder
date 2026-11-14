@@ -89,6 +89,18 @@ Separación clara de tres cosas distintas:
 | Recordar plantilla, idioma | Preferencia | Ajustes; no es consentimiento. |
 | Correos de marketing | Autorización opcional | Fuera del MVP; nunca premarcada. |
 
+**Revisión 2 (presentación):** en la vista «Tu CV» solo aparecen tres
+casillas de una línea, sin marcar. Cada una enlaza a un panel con el texto
+completo: (1) autorización y aviso de privacidad (responsable, datos,
+finalidades, encargado y transmisión a EE. UU., datos sensibles, derechos
+del art. 8, canales y plazos de 10 y 15 días hábiles, retención); (2)
+términos del servicio de pago (qué es gratis, pase sin renovación,
+garantía, retracto, sin promesa de ATS); (3) almacenamiento opcional. La
+carga se activa solo con (1) y (2). [?: el abogado debe confirmar que una
+autorización con el texto completo a un clic cumple el carácter
+«informado»; es la práctica habitual, pero no se ha validado para este
+caso.]
+
 Finalidades (lista cerrada): (1) crear y editar la hoja de vida; (2)
 compararla con vacantes que el titular elija; (3) proponer cambios de
 redacción y preguntas; (4) generar el documento descargable; (5) cobrar y

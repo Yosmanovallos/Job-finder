@@ -34,14 +34,14 @@ solo cuando quiera descargar el CV final.
 ### MVP (Fase de implementación R1–R4, doc 10) [P]
 
 1. Entrada desde el detalle de vacante («Analizar mi perfil para esta vacante»), desde la home y desde `/hoja-de-vida` (landing pública con contenido útil).
-2. Onboarding corto (máx. 6 preguntas, todas omitibles salvo cargo objetivo).
+2. ~~Onboarding~~ Eliminado en la revisión 2: cargo, ciudad y requisitos salen de la vacante elegida.
 3. Crear desde cero (formulario guiado) o subir PDF/DOCX (≤ 2 MB, ≤ 4 páginas).
 4. Revisión de datos extraídos campo por campo antes de usarlos.
 5. 3 plantillas ATS-friendly de una columna (doc 05 §6).
 6. Editor con chat IA y vista previa por páginas, propuestas «Aplicar / Editar / Descartar», historial y deshacer/rehacer.
 7. Análisis de compatibilidad contra una vacante de BuscoTrabajo con requisitos, evidencia y brechas.
 8. Comparación antes/después.
-9. Pago único con Wompi para desbloquear la descarga PDF (y DOCX [?]).
+9. Pase de 1 mes (COP 14.900) o 3 meses (COP 9.900/mes, COP 29.700 en un pago) con Wompi, sin renovación automática, para desbloquear descargas PDF/DOCX, plantillas y adaptaciones (revisión 2, doc 06 §9.3).
 10. Versiones: una base y hasta 5 adaptaciones por vacante.
 11. Derechos del titular: ver, descargar, corregir y borrar todo.
 

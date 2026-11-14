@@ -9,7 +9,37 @@
 | Consentimiento actual | [V] solo texto pasivo «Al crear tu cuenta aceptas…» (`src/sections/Login.tsx:350-354`); nada se guarda |
 | Recorrido propuesto | [P] |
 
-## 1. Recorrido completo [P]
+## 0. Revisión 2 (2026-11-14, pedido del propietario) [P] — reemplaza §1 y §2
+
+Más corto, minimalista y con estilo de agente:
+
+```
+Vacante ─[✦ Analizar mi perfil para esta vacante]─► Tu CV ─► Agente ─► Descarga
+            (Aplicar sigue igual)                     │          │          │
+                                     3 casillas + subir PDF/DOCX │   pases 1 o 3 meses
+                                                       chat con el agente + CV en vivo
+```
+
+1. **Vacante.** Título, empresa, «Aplicar en {fuente}» y el botón con borde
+   animado «✦ Analizar mi perfil para esta vacante».
+2. **Tu CV.** Va directo a subir el archivo. **Sin onboarding**: el cargo y
+   la ciudad salen de la vacante. Encima de la zona de carga van solo tres
+   casillas sin marcar, de una línea cada una; el texto legal completo está
+   detrás del enlace de cada una (panel lateral):
+   - «Autorizo el tratamiento de mis datos personales. *Ver autorización*» (obligatoria);
+   - «Acepto los términos del servicio. *Ver términos*» (obligatoria);
+   - «Guardar mi hoja de vida en mi cuenta (opcional). *Qué guardamos*».
+   La carga se activa solo con las dos obligatorias marcadas.
+3. **Agente.** Izquierda: el agente trabaja a la vista (pasos con
+   progreso), pregunta lo que falta con respuestas rápidas, muestra la
+   compatibilidad y propone cambios con «Aplicar / Omitir». Derecha: el CV
+   en vivo con marca de agua, puntaje, Antes/Después, plantilla y
+   deshacer/rehacer. En móvil, pestañas «Agente / Tu CV».
+4. **Descarga.** Pantalla de pase como la referencia, con la vacante arriba
+   (empresa, cargo, compatibilidad). Dos planes, ventajas, «Desbloquear».
+   Luego, descarga, aplicar y versiones.
+
+## 1. Recorrido completo (versión 1, reemplazada por §0) [P]
 
 ```
 Vacante /empleos/:id ──► [Analizar mi perfil para esta vacante]
