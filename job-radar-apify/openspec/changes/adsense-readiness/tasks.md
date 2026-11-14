@@ -51,11 +51,22 @@ anterior. **No se pulsa «Solicitar revisión» antes de F6.**
 - [x] `/opiniones` vacía: sin anuncios (no lleva marcador); la invitación a
       opinar se mantiene porque es diseño, no una sección en construcción
 
-### F1b — pendiente de decisiones del propietario
+### F1b — hecho (2026-11-14)
 
-- [ ] «Acerca de» con responsable, historia y funcionamiento (D2)
-- [ ] `/metodologia`: deduplicación, vigencia, retención (AV-5)
-- [ ] Retiro de contenido + «Reportar esta vacante» (SP-17, SP-19)
+- [x] `/metodologia` (en `PUBLIC_PAGES`: HTML y Markdown, sitemap, pie,
+      enlazada desde «Acerca de» y «Contacto»): fuentes, deduplicación por
+      URL normalizada y huella cargo + empresa + ubicación, prioridad del
+      portal oficial (ADR 0006), máximo de 30 días (ADR 0005), archivo
+      privado de 180 días (ADR 0008), qué no se hace y cómo reportar (AV-5)
+- [x] «Reportar esta vacante» en cada vacante → `/opiniones` con la
+      categoría nueva «Una oferta parece falsa o pide dinero» (SP-19)
+- [x] Sección «Retirar una vacante o reportar una oferta» en `/contact`
+      (SP-17). Sin plazo de respuesta publicado: no hay uno comprometido
+- [x] Pruebas ADS-020 en `validate-adsense-readiness.test.ts`
+
+### F1c — pendiente de datos del propietario
+
+- [ ] «Acerca de» con responsable real: nombre y rol (D2)
 - [ ] Correo con dominio propio (D4)
 - [ ] Actualizar `llms.txt`, API Catalog, docs y digests con las rutas reales
 - [ ] lint, typecheck, `test:unit`, `test:integration`, `test:baseline`

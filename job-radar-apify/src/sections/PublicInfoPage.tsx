@@ -10,6 +10,7 @@ import { ContentCta, ContentSection, InkPanel, PageHero, PillLink } from "../com
 const EYEBROW: Record<string, string> = {
   "/docs": "Documentación",
   "/about": "Sobre BuscoTrabajo",
+  "/metodologia": "Metodología",
   "/contact": "Contacto",
   "/privacy": "Privacidad"
 };

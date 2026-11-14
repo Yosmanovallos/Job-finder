@@ -5,7 +5,8 @@ import { Job } from "../sources/types.js";
 import { getSourceColor } from "../lib/source-colors.js";
 import { getJobModalityLabel } from "../lib/job-filters.js";
 import { extractTechnologies } from "../lib/extract-technologies.js";
-import { buildCompanyPath, officialCareersLink, officialEmployerSource } from "../lib/job-seo.js";
+import { buildCompanyPath, buildJobPath, officialCareersLink, officialEmployerSource } from "../lib/job-seo.js";
+import type { FeedbackLinkState } from "../lib/site-feedback.js";
 import { isPlaceholderEmployer } from "../lib/company-key.js";
 import { buildLocationLabel } from "../countries/index.js";
 import { useAuth } from "../auth/auth-provider.js";
@@ -303,6 +304,16 @@ export const JobDetailPanel: React.FC<JobDetailPanelProps> = ({
           {job.description
             ? `La postulación se hace en ${job.source === "Portal oficial" ? `el portal oficial de ${job.company || "la empresa"}` : job.source} — el botón de arriba te lleva directo a la oferta original.`
             : `La fuente no publicó una descripción que podamos mostrar; el detalle completo y la postulación están en ${job.source === "Portal oficial" ? `el portal oficial de ${job.company || "la empresa"}` : job.source}.`}
+        </p>
+        <p data-report-job className="text-xs text-muted-foreground mt-2">
+          ¿La oferta ya cerró, parece falsa o pide dinero?{" "}
+          <Link
+            to="/opiniones"
+            state={{ feedback: { kind: "problem", category: "sospechosa", pagePath: buildJobPath(job) } } satisfies FeedbackLinkState}
+            className="font-semibold underline hover:text-primary"
+          >
+            Reportar esta vacante
+          </Link>
         </p>
       </div>
     </div>

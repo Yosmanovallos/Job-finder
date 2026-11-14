@@ -124,3 +124,30 @@ test("ADS-018 the privacy summary and the policy tell the same payment story", (
   assert.match(policy, /Google AdSense/);
   assert.match(policy, /adssettings\.google\.com/);
 });
+
+test("ADS-020 /metodologia is a substantial public page with real rules", () => {
+  const page = PUBLIC_PAGES["/metodologia"];
+  assert.ok(page, "/metodologia exists in PUBLIC_PAGES (served as HTML and Markdown)");
+  const html = renderContentHtml(page);
+  assert.ok(words(html) >= 400, `/metodologia has ${words(html)} words`);
+  for (const rule of [/30 días/, /Portal oficial/, /180 días/, /cargo, la empresa y la ubicación/, /Reportar esta vacante/]) {
+    assert.match(html, rule);
+  }
+  assert.equal(isMarkedAdEligible(injectRouteMeta(indexHtml, "/metodologia", { title: page.title, description: page.description, heading: page.heading })), false);
+  const sitemap = fs.readFileSync(path.join(here, "..", "static", "sitemap.xml"), "utf-8");
+  assert.match(sitemap, /<loc>https:\/\/buscotrabajo\.co\/metodologia<\/loc>/);
+});
+
+test("ADS-020 contact explains removal requests and links the methodology", () => {
+  const html = renderContentHtml(PUBLIC_PAGES["/contact"]!);
+  assert.match(html, /Retirar una vacante o reportar una oferta/);
+  assert.match(html, /href="\/metodologia"/);
+});
+
+test("ADS-020 every job page offers «Reportar esta vacante»", () => {
+  const panel = fs.readFileSync(path.join(here, "..", "src", "components", "JobDetailPanel.tsx"), "utf-8");
+  assert.match(panel, /Reportar esta vacante/);
+  assert.match(panel, /category: "sospechosa"/);
+  const footer = fs.readFileSync(path.join(here, "..", "src", "sections", "Footer.tsx"), "utf-8");
+  for (const href of ["/metodologia", "/contact"]) assert.ok(footer.includes(`href: "${href}"`), href);
+});

@@ -127,8 +127,77 @@ export const PUBLIC_PAGES: Record<string, PublicContent> = {
         ],
         links: [
           { label: "Cómo funciona", href: "/como-funciona" },
+          { label: "Metodología: cómo seleccionamos y retiramos vacantes", href: "/metodologia" },
           { label: "Fuentes", href: "/fuentes" },
           { label: "Documentación", href: "/docs" }
+        ]
+      }
+    ]
+  },
+  // adsense-readiness AV-5 / SP-19: the real selection and maintenance rules
+  // (ADR 0005, 0006, 0008; job-repository.ts dedupe). Only rules the code
+  // enforces today; no cadence figures, which vary by source.
+  "/metodologia": {
+    pathname: "/metodologia",
+    title: "Metodología: cómo seleccionamos vacantes | BuscoTrabajo",
+    description: "Cómo BuscoTrabajo obtiene, deduplica, verifica y retira vacantes: reglas de vigencia, portales oficiales y cómo reportar una oferta.",
+    heading: "Metodología de BuscoTrabajo",
+    introduction: [
+      "Esta página explica las reglas que aplica BuscoTrabajo a cada vacante: de dónde la obtiene, cómo evita mostrarla repetida, cuánto tiempo puede estar publicada y cuándo la retira. Son las mismas reglas que ejecuta el sistema; si una cambia, cambia también aquí.",
+      "El objetivo es que cada oferta que veas sea pública, reciente, única y enlazada a su publicación original, para que revises y apliques en la fuente."
+    ],
+    sections: [
+      {
+        heading: "De dónde vienen las vacantes",
+        paragraphs: [
+          "Hay dos orígenes. El primero son portales de empleo públicos, como LinkedIn, Computrabajo, Elempleo o Magneto. El segundo son los portales de empleo propios de las empresas, los sistemas de selección donde cada empleador publica sus vacantes (por ejemplo Greenhouse, Lever, Ashby, SmartRecruiters, Workday o SuccessFactors).",
+          "Cada vacante conserva el nombre de la fuente donde se encontró y el enlace a la publicación original. BuscoTrabajo solo lee información publicada para cualquier visitante: no entra a cuentas privadas ni usa datos de candidatos."
+        ],
+        links: [{ label: "Lista de fuentes por país", href: "/fuentes" }]
+      },
+      {
+        heading: "Cómo evitamos los duplicados",
+        paragraphs: [
+          "La misma oferta suele aparecer en varios portales. Al guardarla, BuscoTrabajo normaliza su enlace y calcula una huella con el cargo, la empresa y la ubicación: si coincide con una vacante que ya existe, no crea otra, sino que añade el nuevo portal a la lista de fuentes de esa vacante.",
+          "En los listados, las publicaciones con el mismo cargo, la misma empresa y la misma ubicación se muestran una sola vez."
+        ]
+      },
+      {
+        heading: "La versión oficial tiene prioridad",
+        paragraphs: [
+          "Cuando una empresa publica la vacante en su propio portal de empleo, BuscoTrabajo muestra esa versión, marcada como «Portal oficial», y oculta las copias de otros portales. Los enlaces que ya existían hacia una copia llevan a la versión oficial mientras esta siga abierta.",
+          "El portal de la empresa es la referencia más confiable: si la vacante deja de estar allí, la empresa la cerró."
+        ]
+      },
+      {
+        heading: "Cuánto tiempo se muestra una vacante",
+        paragraphs: [
+          "Ninguna vacante se muestra más de 30 días después de su fecha de publicación. Sale antes si la fuente indica una fecha límite que ya pasó o si se confirma que la oferta se cerró. Volver a encontrar la misma oferta no reinicia su fecha.",
+          "Las vacantes se ordenan por fecha de publicación, de la más reciente a la más antigua."
+        ]
+      },
+      {
+        heading: "Qué pasa cuando se retira",
+        paragraphs: [
+          "La página de una vacante retirada responde que ya no está disponible, sale del mapa del sitio y deja de anunciarse como oferta activa a los buscadores.",
+          "Se guarda una copia interna y privada durante 180 días para no volver a publicar la misma oferta vencida. Esa copia no contiene datos de candidatos ni postulaciones y no es visible en el sitio."
+        ]
+      },
+      {
+        heading: "Lo que no hacemos",
+        paragraphs: [
+          "No inventamos salarios, requisitos, horarios ni fechas: si la fuente no publica un dato, no se muestra. No aplicamos a ofertas por nadie; la postulación siempre se hace en la publicación original.",
+          "Ninguna oferta legítima debería pedirte dinero para postularte, para una entrevista o para un curso obligatorio. Si una vacante lo hace, o parece falsa, repórtala."
+        ]
+      },
+      {
+        heading: "Cómo reportar una vacante",
+        paragraphs: [
+          "Cada página de vacante tiene el enlace «Reportar esta vacante». También puedes usar la página de opiniones y ayuda o escribir al correo de contacto con la URL de la oferta. Los reportes de problemas son privados."
+        ],
+        links: [
+          { label: "Opiniones y ayuda", href: "/opiniones" },
+          { label: "Contacto", href: "/contact" }
         ]
       }
     ]
@@ -148,6 +217,17 @@ export const PUBLIC_PAGES: Record<string, PublicContent> = {
         paragraphs: [
           "Puedes escribir por dudas sobre el funcionamiento del buscador, atribución de una vacante, enlaces que dejaron de funcionar, acceso o corrección de datos de cuenta, eliminación de información personal y consultas sobre una suscripción. Para una solicitud de privacidad, indica claramente el derecho que deseas ejercer.",
           "BuscoTrabajo no controla los procesos de selección de las empresas ni puede confirmar el estado de una candidatura enviada en otro portal. Las preguntas sobre requisitos, entrevistas, contratación o cierre de una oferta deben dirigirse al empleador o a la fuente original."
+        ]
+      },
+      {
+        heading: "Retirar una vacante o reportar una oferta",
+        paragraphs: [
+          "Si eres el empleador o el portal que publicó una vacante y quieres que deje de aparecer en BuscoTrabajo, escribe desde un correo de la empresa con la URL de la vacante en BuscoTrabajo y la de la publicación original. Si la oferta ya se cerró en la fuente, también sale sola según las reglas de la metodología.",
+          "Si una oferta parece falsa, pide dinero o usa el nombre de una empresa sin serlo, usa el enlace «Reportar esta vacante» de su página o escribe a este correo con su URL."
+        ],
+        links: [
+          { label: "Metodología: cómo se retiran las vacantes", href: "/metodologia" },
+          { label: "Opiniones y ayuda", href: "/opiniones" }
         ]
       },
       {
