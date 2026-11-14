@@ -1,4 +1,5 @@
 import { ROUTE_META } from "../lib/page-meta.js";
+import { PROCESS_STEPS } from "../lib/process-steps.js";
 import { TINTS } from "../lib/brand-tints.js";
 import { YouTubeLite } from "../components/YouTubeLite.js";
 import { ContentCta, ContentSection, PageHero, PillLink, SectionHeading } from "../components/ContentPage.js";
@@ -7,12 +8,8 @@ import { ContentCta, ContentSection, PageHero, PillLink, SectionHeading } from "
 // does today: no "AI" claim for what is really a synonym dictionary
 // (ai-role-agent.ts), and no mention of Notion sync, which isn't a
 // user-facing step in this flow.
-const processSteps = [
+const processIcons = [
   {
-    number: "01",
-    title: "Escribe qué buscas",
-    description:
-      "Un cargo, una palabra clave o el área en la que quieres trabajar. Sin formularios largos.",
     icon: (
       <svg
         width="24"
@@ -30,10 +27,6 @@ const processSteps = [
     ),
   },
   {
-    number: "02",
-    title: "Buscamos en varios portales a la vez",
-    description:
-      "Cruzamos sinónimos y variantes del cargo para no dejar publicaciones por fuera, en español o inglés.",
     icon: (
       <svg
         width="24"
@@ -51,10 +44,6 @@ const processSteps = [
     ),
   },
   {
-    number: "03",
-    title: "Filtramos lo que no sirve",
-    description:
-      "Duplicados fusionados y enlaces caídos descartados antes de que los veas.",
     icon: (
       <svg
         width="24"
@@ -71,10 +60,6 @@ const processSteps = [
     ),
   },
   {
-    number: "04",
-    title: "Resultados listos para aplicar",
-    description:
-      "Ordenados por frescura, con scroll infinito y filtros por ciudad, modalidad y portal.",
     icon: (
       <svg
         width="24"
@@ -94,6 +79,7 @@ const processSteps = [
     ),
   },
 ];
+const processSteps = PROCESS_STEPS.map((step, index) => ({ ...step, icon: processIcons[index]!.icon }));
 
 export default function ComparisonAndProcess() {
   const meta = ROUTE_META["/como-funciona"]!;

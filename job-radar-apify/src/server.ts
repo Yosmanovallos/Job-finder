@@ -192,6 +192,8 @@ import {
   isBlocked,
   recordSuspiciousEvent
 } from "./lib/security-monitor.js";
+import { isAdEligibleJobPage, isAdEligibleListing, markAdEligible } from "./lib/ad-eligibility.js";
+import { withServerText } from "./lib/route-server-text.js";
 
 dotenv.config();
 
@@ -1644,6 +1646,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
           (itemList ? `  <script type="application/ld+json">${escapeJsonForScriptTag(itemList)}</script>\n` : "") +
           `</head>`
       );
+    if (isAdEligibleListing(payload.total, null)) indexHtml = markAdEligible(indexHtml);
     await sendBody(req, res, 200, { "Content-Type": "text/html; charset=utf-8" }, indexHtml);
     return;
   }
@@ -2001,6 +2004,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
           .replace(/<meta[^>]*name=["']robots["'][^>]*>/i, "")
           .replace("</head>", () => `  <meta name="robots" content="${categoryRobots}">\n</head>`);
       }
+      if (isAdEligibleListing(total, categoryRobots)) indexHtml = markAdEligible(indexHtml);
 
       await sendBody(req, res, 200, { "Content-Type": "text/html; charset=utf-8" }, indexHtml);
       return;
@@ -2130,6 +2134,9 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       jobPosting
     });
     indexHtml = injectJobHeadMeta(indexHtml, meta);
+    // Ads only on the employer's own vacancy; a copy from another job
+    // board is replicated content (adsense-readiness PP-4).
+    if (isAdEligibleJobPage(visible, Boolean(googleReady && jobPosting))) indexHtml = markAdEligible(indexHtml);
 
     await sendBody(req, res, 200, { "Content-Type": "text/html; charset=utf-8" }, indexHtml);
     return;
@@ -2350,6 +2357,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
           () =>
             `<meta name="twitter:description" content="${escapeHtml(meta.description)}" />`
         );
+      if (isAdEligibleListing(total, null)) indexHtml = markAdEligible(indexHtml);
 
       await sendBody(req, res, 200, { "Content-Type": "text/html; charset=utf-8" }, indexHtml);
       return;
@@ -2484,6 +2492,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
         () =>
           `<meta name="twitter:description" content="${escapeHtml(meta.description)}" />`
       );
+    if (isAdEligibleListing(matched.total, null)) indexHtml = markAdEligible(indexHtml);
 
     await sendBody(req, res, 200, { "Content-Type": "text/html; charset=utf-8" }, indexHtml);
     return;
@@ -3006,6 +3015,8 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
           `<meta property="og:locale" content="es_VE" />`
       );
     }
+    // The home is our own copy (intro, how it works, city discovery).
+    indexHtml = markAdEligible(indexHtml);
 
     await sendBody(
       req,
@@ -3086,7 +3097,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
         injectRouteMeta(
           indexHtml,
           pathname,
-          pathname === "/opiniones" ? { ...routeMeta, sections: await opinionsPageSections() } : routeMeta
+          pathname === "/opiniones" ? { ...routeMeta, sections: await opinionsPageSections() } : withServerText(pathname, routeMeta)
         )
       );
     } catch {

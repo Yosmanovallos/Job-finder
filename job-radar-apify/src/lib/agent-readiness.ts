@@ -166,14 +166,14 @@ export const PUBLIC_PAGES: Record<string, PublicContent> = {
     description: "Resumen accesible de la política de privacidad de BuscoTrabajo.",
     heading: "Privacidad en BuscoTrabajo",
     introduction: [
-      "BuscoTrabajo utiliza correo electrónico y credenciales de sesión gestionadas por Supabase Auth para las cuentas humanas. También conserva el estado de suscripción, el historial de transacciones procesadas con Wompi y las vacantes que una persona marca como guardadas o aplicadas asociadas a su sesión.",
+      "BuscoTrabajo utiliza correo electrónico y credenciales de sesión gestionadas por Supabase Auth para las cuentas humanas, y conserva las vacantes que una persona marca como guardadas o aplicadas asociadas a su sesión. Hoy el servicio es gratuito y no procesa pagos; si una cuenta tiene suscripciones o transacciones de cuando existieron funciones de pago con Wompi, ese historial queda asociado a la cuenta.",
       "La API y las herramientas públicas para agentes no exponen perfiles, correos, sesiones, transacciones, candidaturas, CV, claves ni información administrativa. Sus respuestas se limitan al catálogo público de vacantes y a documentación del servicio."
     ],
     sections: [
       {
         heading: "Datos que no procesa directamente BuscoTrabajo",
         paragraphs: [
-          "BuscoTrabajo no almacena directamente datos de tarjetas de crédito ni información financiera; Wompi procesa esos datos bajo sus propios controles. La información de las cuentas no se vende ni se comparte con anunciantes; el sitio muestra anuncios de Google AdSense, que usa cookies según se explica en /legal/privacidad y /legal/cookies.",
+          "BuscoTrabajo no recibe ni almacena datos de tarjetas de crédito ni información financiera; cuando existieron pagos, Wompi los procesaba bajo sus propios controles. La información de las cuentas no se vende ni se comparte con anunciantes; el sitio muestra anuncios de Google AdSense, que usa cookies según se explica en /legal/privacidad y /legal/cookies.",
           "Los datos de las vacantes proceden de publicaciones de terceros. El enlace a la fuente original permite revisar el contexto y sus propias políticas antes de abrir o completar un formulario externo."
         ]
       },

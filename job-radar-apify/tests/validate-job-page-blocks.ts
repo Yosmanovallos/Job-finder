@@ -212,6 +212,15 @@ try {
 
   // --- JPD-009 on the served page: no template copy inside #app's new blocks --
   for (const html of [warmBlock, coldBlock!]) assert.ok(!/agregada de|BuscoTrabajo encontrar/i.test(html));
+
+  // --- adsense-readiness ADS-010: a job-board copy never loads ads ----------
+  // «Portal oficial» rows only enter through the direct-employer projection
+  // (saveJobs refuses them), so the positive branch is covered by
+  // validate-adsense-readiness.test.ts, not here.
+  const AD_MARKER = '<meta name="bt-ads" content="on" />';
+  for (const html of [anonymous.html, cold.html, placeholder.html, lone.html]) {
+    assert.ok(!html.includes(AD_MARKER), "ADS-010 a LinkedIn copy never loads ads");
+  }
 } finally {
   // The integration suites share one database: leave no claimable rows
   // (validate-job-seo-v2.ts counts LinkedIn detail claims) or reputation behind.

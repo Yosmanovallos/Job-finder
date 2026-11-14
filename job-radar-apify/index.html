@@ -78,7 +78,12 @@
             window.removeEventListener(name, loadThirdParties);
           });
           inject("https://www.googletagmanager.com/gtag/js?id=G-QV1E0K4KZF", false);
-          inject("https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2247075733653451", true);
+          // AdSense only where the server marked the page as publisher
+          // content (src/lib/ad-eligibility.ts). Sign-in, account, search,
+          // 404, legal pages and third-party job copies carry no marker.
+          if (document.querySelector('meta[name="bt-ads"][content="on"]')) {
+            inject("https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2247075733653451", true);
+          }
         }
         events.forEach(function (name) {
           window.addEventListener(name, loadThirdParties, { once: true, passive: true });
