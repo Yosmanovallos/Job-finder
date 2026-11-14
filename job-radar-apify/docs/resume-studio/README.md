@@ -28,10 +28,21 @@ vacante real `mockups/sample-job-2026-11-14.json`.
 ## Resumen para decidir
 
 - **Precio recomendado:** COP 9.900 IVA incluido, pago único por CV (30 días
-  de re-ediciones). Margen bruto 63–79 % según la condición tributaria.
-- **Proveedor de IA recomendado:** Gemini 2.5 Flash-Lite por API de pago
-  (EE. UU., sin entrenamiento, DPA), respaldo gpt-5-nano. ~USD 0,013 por CV.
-- **El costo dominante es la comisión de Wompi**, no la IA.
+  de re-ediciones). Margen bruto 63–79 % con 10 CV gratis por cada pago;
+  baja a 17–33 % si son 100 gratis por pago (doc 06 §9.1), de ahí los topes
+  de IA por sesión.
+- **Qué compra el pago:** PDF/DOCX limpio, 30 días de re-ediciones y más
+  adaptaciones. El contenido del CV no queda bloqueado (vive en el
+  navegador y exportar los propios datos es un derecho).
+- **Proveedor de IA recomendado:** Gemini 2.5 Flash-Lite en **Vertex AI con
+  región de EE. UU. fijada** (la Gemini API directa no deja fijar región),
+  respaldo gpt-5-nano. ~USD 0,013 por CV.
+- **Con pocos usuarios gratis, el costo dominante es la comisión de Wompi**, no la IA.
+- **AdSense:** el beneficio posible viene de la landing `/hoja-de-vida` y de
+  guías editoriales indexables; los rastreadores no ven la herramienta
+  interactiva ni lo que hay tras el pago. Nada garantiza la aprobación.
+- **Fuentes:** `research/ai-pricing-legal-2026-11-14.md` (precios, términos y
+  normas con URL y fecha).
 - **Corrección de premisa:** COP 12.300 de JobStep es el precio mensual del
   plan trimestral (suscripción), no un pago único.
 - **Vacantes intactas:** el módulo vive detrás de banderas propias;

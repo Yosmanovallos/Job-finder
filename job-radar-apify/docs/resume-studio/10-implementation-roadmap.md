@@ -12,7 +12,7 @@
 |---|---|---|
 | D1 | Aprobar el diseño (este paquete) y escribir el ADR que levanta el congelamiento de implementación | Propietario |
 | D2 | Precio: COP 9.900 IVA incluido (recomendado) o COP 12.900 | Propietario |
-| D3 | Proveedor de IA: Gemini 2.5 Flash-Lite de pago (recomendado) + respaldo gpt-5-nano | Propietario |
+| D3 | Proveedor de IA: Gemini 2.5 Flash-Lite en Vertex AI con región de EE. UU. (recomendado) + respaldo gpt-5-nano | Propietario |
 | D4 | Revisión legal (doc 07 §8) | Abogado |
 | D5 | Condición tributaria y facturación (IVA, retenciones) | Contador |
 | D6 | Auditoría de solo lectura de las tablas viejas del CV Generator en Supabase | Propietario aprueba; agente ejecuta |

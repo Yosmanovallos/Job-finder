@@ -125,9 +125,15 @@ duración.
   [riesgo, ver §10].
 - Desbloqueo: el servidor entrega el `facts_json` sin marca de agua solo si
   hay un `rs_entitlements` vigente. La vista previa con marca de agua se
-  pinta en el cliente. [?: un usuario técnico puede quitar la marca de agua
-  de la vista previa en su navegador; se acepta el riesgo porque el costo
-  por CV es bajo y el valor está en el análisis y la edición.]
+  pinta en el cliente.
+- **Qué compra realmente el pago.** El contenido del CV no queda bloqueado:
+  el borrador vive en el navegador, la vista previa es texto HTML
+  seleccionable, y exportar los propios datos (JSON) es un derecho del
+  titular que no se puede cobrar. El pago compra la **comodidad**: PDF/DOCX
+  limpio con la plantilla, 30 días de re-ediciones y re-descargas, y las
+  adaptaciones adicionales. Un usuario técnico puede reconstruir el
+  documento sin pagar; se acepta, y el precio se aprueba con ese modelo en
+  mente.
 - DOCX: opcional en R4 con una librería JS en el cliente [?].
 
 ## 7. Pagos: reutilizar Wompi sin tocar el paywall [V código · P cambios]
@@ -195,10 +201,24 @@ hay desglose oficial por medio de pago [?].
 | **Margen bruto con IVA** | **6.221 (63 %)** | **8.090 (66 %)** | **10.115 (68 %)** |
 | **Margen bruto sin IVA** (vendedor no responsable) | **7.802 (79 %)** | **10.054 (82 %)** | **12.494 (84 %)** |
 
+**Sensibilidad a quienes no pagan** (el supuesto que más mueve el margen en
+un embudo «trabajo gratis, pago al final»):
+
+| CV gratis por cada CV pagado | IA de no pagadores | Margen con IVA a 9.900 | Sin IVA a 9.900 | Con IVA a 12.300 |
+|---|---|---|---|---|
+| 10 : 1 | 504 | 6.221 (63 %) | 7.802 (79 %) | 8.090 (66 %) |
+| 30 : 1 | 1.512 | 5.213 (53 %) | 6.794 (69 %) | 7.082 (58 %) |
+| 100 : 1 | 5.040 | 1.685 (17 %) | 3.266 (33 %) | 3.554 (29 %) |
+
+Por eso el presupuesto de IA por sesión y por día (doc 08 §3) es también una
+salvaguarda de precio, no solo de abuso: con un tope de ~40 llamadas por
+sesión anónima, el escenario pesado por usuario gratis queda acotado en
+≈ USD 0,038.
+
 Notas:
 
-- La comisión de Wompi pesa **7–9 veces más que la IA** incluso contando la IA
-  de quienes no pagan.
+- Con 10 : 1, la comisión de Wompi pesa más del doble que toda la IA
+  (incluida la de quienes no pagan); con 100 : 1 la IA pasa a dominar.
 - Retenciones en la fuente, ICA y la condición tributaria del propietario
   (persona natural o jurídica, responsable o no de IVA) quedan **pendientes
   de un contador** [?].
