@@ -239,19 +239,31 @@ es cercano a cero.
 
 ### 9.3 Recomendación de precio [P]
 
-**COP 9.900, IVA incluido, pago único por CV** que desbloquea PDF (y DOCX si
-entra en R4), re-ediciones y re-descargas por 30 días, y hasta 5
-adaptaciones a otras vacantes en ese plazo.
+**Revisión 2 (2026-11-14, pedido del propietario):** la pantalla de pago
+funciona como la de la referencia: dos planes, el de 3 meses destacado,
+lista de ventajas y un botón «Desbloquear». Se adapta a lo que Wompi ya
+hace en este repo (pases de 30 días con `subscription_end`, sin cobro
+recurrente) [V: `job-repository.ts:1884,1894`]:
 
-- Comparación con la referencia [V grabación]: JobStep cobra COP 18.900 por
-  un mes o COP 12.300 al mes en el plan trimestral (≈ COP 36.900 por
-  adelantado), con renovación. Nuestro pago único queda por debajo de
-  cualquiera de las dos y sin renovación automática.
-- Margen bruto 63 % en el peor caso tributario.
-- Alternativa: COP 12.900 (margen 66–82 %) si el propietario prefiere
-  igualar la referencia mensual de JobStep.
-- Por debajo de ~COP 6.000 la comisión fija de Wompi (COP 833 con IVA)
-  supera el 14 % y no conviene.
+| Pase | Precio mostrado | Cobro único (IVA incl.) | IA supuesta (pesado) | Margen con IVA | Margen sin IVA |
+|---|---|---|---|---|---|
+| 1 mes | COP 14.900/mes | COP 14.900 | 5 adaptaciones: 760 | 9.507 (64 %) | 11.886 (80 %) |
+| 3 meses («Recomendado», ahorra 34 %) | COP 9.900/mes | COP 29.700 | 15 adaptaciones: 2.280 | 19.513 (66 %) | 24.255 (82 %) |
+
+Mismos supuestos que §9.1 (Wompi 2,65 % + COP 700 + IVA; 10 CV gratis por
+pago; reserva 3 %; TRM 4.000). COP 14.900 coincide con
+`PRO_MONTHLY_PRICE_COP` [V], pero **es un producto distinto** y no toca
+`users.subscription_tier`.
+
+- Frente a la referencia [V grabación]: JobStep cobra COP 18.900 (1 mes) o
+  COP 12.300/mes (3 meses) con renovación. Ambos pases quedan por debajo y
+  **sin renovación automática** («Pago único con Wompi»).
+- No se copian sus señales sin respaldo («532 personas en 24 h», «120.000+
+  personas», estrellas): no tenemos esos datos.
+- «Garantía de devolución de 7 días» es una propuesta [P]; su texto lo
+  define el abogado (retracto, Ley 1480) [?].
+- La opción anterior (pago único de COP 9.900 por CV) queda como
+  alternativa si el propietario prefiere un solo precio.
 
 ## 10. Riesgos técnicos y comerciales
 

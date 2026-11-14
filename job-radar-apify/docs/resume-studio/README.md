@@ -25,9 +25,21 @@ Marcas en todos los documentos: **[V]** verificado · **[P]** propuesto · **[?]
 pantallas en escritorio y móvil, recorrido automático, datos ficticios y la
 vacante real `mockups/sample-job-2026-11-14.json`.
 
+## Revisión 2 (2026-11-14)
+
+A pedido del propietario: diseño minimalista y con estilo de agente; sin
+onboarding; «Analizar mi perfil» lleva directo a subir el CV; la
+autorización son tres casillas con el texto legal completo detrás de cada
+enlace; el chat es un agente que trabaja a la vista; y la descarga es una
+pantalla de pase (1 o 3 meses) como la referencia, con la vacante arriba.
+Ver doc 03 §0, doc 04 §0 y doc 06 §9.3. Donde los documentos de abajo
+contradigan esta revisión, manda la revisión.
+
 ## Resumen para decidir
 
-- **Precio recomendado:** COP 9.900 IVA incluido, pago único por CV (30 días
+- **Precio (revisión 2):** pase de 1 mes COP 14.900 o 3 meses COP 9.900/mes
+  (COP 29.700 en un pago), sin renovación automática; margen 64–82 % (doc 06
+  §9.3). Antes: COP 9.900 IVA incluido, pago único por CV (30 días
   de re-ediciones). Margen bruto 63–79 % con 10 CV gratis por cada pago;
   baja a 17–33 % si son 100 gratis por pago (doc 06 §9.1), de ahí los topes
   de IA por sesión.

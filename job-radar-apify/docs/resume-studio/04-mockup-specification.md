@@ -9,6 +9,27 @@
 | Mockups de alta fidelidad + prototipo navegable | [P] `mockups/resume-studio-prototype.html` (copia local del artifact) |
 | Vacante real usada en el ejemplo | [V] ver §3 |
 
+## 0. Revisión 2 (2026-11-14) — mapa de las 12 pantallas a 5 vistas [P]
+
+El propietario pidió un diseño mucho más minimalista y «agéntico», sin el
+onboarding y con el pago como en la referencia. El prototipo publicado es
+ahora esta versión.
+
+| Vista | Cubre las pantallas | Notas |
+|---|---|---|
+| Vacante | S1 | Botón de IA con borde degradado animado; «Aplicar» igual que hoy |
+| Tu CV | S3, S4 | Tres casillas con enlace a panel legal; zona de carga; «crear desde cero» como enlace |
+| Agente | S5–S11 | Pasos del agente, preguntas con respuestas rápidas, tarjeta de compatibilidad, propuestas con diff, «De 57 a 83 sin inventar nada»; CV en vivo con Antes/Después, plantilla, deshacer |
+| Descarga (pase) | S12 | Banner de la vacante; planes 1 y 3 meses; ventajas; «Desbloquear»; Wompi simulado |
+| Listo | S12 | Descargar PDF/DOCX, aplicar, versiones, exportar o borrar datos |
+| — | S2 (onboarding) | **Eliminado**: los datos salen de la vacante |
+
+Lenguaje visual: fondo blanco, una sola cosa importante por vista, bordes
+finos en vez de sombras duras, tinta y verde de la marca, Space Grotesk en
+titulares, un orbe con degradado verde-dorado como señal del agente
+(gira cuando trabaja), texto que aparece al escribirse, transiciones cortas
+que respetan `prefers-reduced-motion`.
+
 ## 1. Sistema visual aplicado [V]
 
 | Token | Valor | Uso en el Resume Studio |
