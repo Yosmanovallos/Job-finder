@@ -52,6 +52,12 @@
    actualizarán en la fase de implementación, si se aprueba. Este ADR es la
    excepción documentada para el trabajo de diseño.
 
+6. **Nada llega a producción hasta que el plan esté al 100 %** (decisión del
+   propietario, 2026-11-14). Ninguna fase R0–R4 se mergea a `main` por
+   separado, ni siquiera apagada por bandera. Todo se integra en una rama
+   aparte y entra a producción en un solo merge aprobado
+   (`docs/resume-studio/10-implementation-roadmap.md`).
+
 ## Consecuencias
 
 - Los agentes pueden leer el historial del CV Generator para auditarlo, pero
