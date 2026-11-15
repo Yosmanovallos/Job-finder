@@ -7,9 +7,9 @@ autor_tipo: Organization
 publicada:
 actualizada:
 etiquetas: remoto, ofertas-falsas, contratos
-revision_propietario: pendiente
-revisado_por:
-fecha_revision:
+revision_propietario: aprobada
+revisado_por: Equipo de BuscoTrabajo
+fecha_revision: 2026-11-14
 ---
 Trabajar desde casa en Colombia puede significar tres cosas distintas, y elegir mal cambia tus derechos. Hay tres figuras con nombres parecidos: el trabajo remoto, el teletrabajo y el trabajo en casa. Cada una tiene reglas propias sobre quién paga el internet, si puedes volver a la oficina y qué pasa con el auxilio de transporte. Esta guía las explica con el texto oficial de cada norma[^ley2121][^ley1221][^ley2088] y cierra con consejos prácticos para encontrar vacantes remotas que sí existan.
 
