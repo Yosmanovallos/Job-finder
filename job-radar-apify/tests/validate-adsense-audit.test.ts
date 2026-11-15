@@ -76,6 +76,7 @@ function seen(entry: PageFact, overrides: Partial<BrowserFact> = {}): BrowserFac
     historyLength: 1,
     hasReportLink: entry.kind.startsWith("vacante-"),
     hydratedWords: entry.rawWords,
+    hydratedOnlyWords: [],
     pageErrors: 0,
     error: null,
     ...overrides
@@ -327,6 +328,8 @@ test("ADS-001 CLI arguments", () => {
   assert.equal(parseArgs(["--live", "--max-urls", "30"]).maxUrls, 30);
   assert.throws(() => parseArgs(["--live", "--base-url", "http://127.0.0.1:1"]), /no ambos/);
   assert.throws(() => parseArgs(["--write"]), /desconocido/);
+  assert.throws(() => parseArgs(["--live", "--browser"]), /no se admite con --live/);
+  assert.equal(parseArgs(["--base-url", "http://127.0.0.1:1", "--browser"]).browser, true);
   assert.throws(() => parseArgs(["--max-urls"]), /necesita un valor/);
 });
 

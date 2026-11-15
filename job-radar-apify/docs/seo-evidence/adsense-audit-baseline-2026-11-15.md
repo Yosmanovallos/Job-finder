@@ -11,10 +11,16 @@ fusionados** aquí.
 - Informe: [`adsense-audit-baseline.json`](adsense-audit-baseline.json). Solo
   indicadores: estados, evidencia en una línea, rutas sintéticas y conteos.
   No incluye HTML, texto de páginas ni datos personales.
-- Reproducir: `npm run adsense:audit` (requiere Docker y Chromium de
-  Playwright). La suite compara los 50 estados con ese JSON y falla si alguno
-  cambia. Para actualizar la línea base cuando se fusione una fase, copia el
-  informe nuevo que imprime la suite.
+- Reproducir (requiere Docker y Chromium de Playwright):
+  - `npm run adsense:audit` ejecuta el auditor. **Hoy sale con código 1 a
+    propósito**, porque hay reglas medibles que no cumplen.
+  - `npm run test:adsense-audit` es el gate de F0. Compara los 50 estados con
+    ese JSON y falla si alguno cambia o si falta el archivo.
+- **La línea base la genera el propio auditor.** Fija los estados para
+  detectar regresiones, pero no prueba nada de forma independiente. La
+  justificación independiente es la tabla regla por regla de abajo. Cuando
+  se fusione una fase, copia el informe nuevo que imprime la suite y explica
+  aquí cada estado que cambie.
 
 ## Resultado
 
@@ -25,8 +31,8 @@ fusionados** aquí.
 
 Hay 36 reglas medibles por código y 15 de ellas no cumplen: AV-1, AV-2, AV-4,
 CX-1, CX-2, CX-3, CX-4, CX-6, SP-1, SP-2, SP-6, SP-11, SP-12, PP-5 y TX-1.
-Por eso `npm run adsense:audit -- --base-url …` sale con código 1. Es lo
-esperado hasta F2–F5. La suite aislada pasa porque comprueba que el auditor
+Por eso `npm run adsense:audit` sale con código 1. Es lo esperado hasta
+F2–F5. `npm run test:adsense-audit` pasa porque comprueba que el auditor
 **reproduce esta matriz**. Ese es el gate de F0 ajustado por F1.
 
 | Métrica (design.md) | Valor | Umbral del gate |
@@ -36,7 +42,7 @@ esperado hasta F2–F5. La suite aislada pasa porque comprueba que el auditor
 | `copied_indexable_share` | 0,667 (2 de 3 vacantes indexables de la muestra sintética) | según D1 |
 | `ads_on_ineligible_routes` | 0 | 0 |
 | `raw_html_words` mínimo en páginas de texto | 109 (`/legal/uso-aceptable`) | ≥ 150 |
-| `ssr_hydration_parity` (palabras) | 93,6 % | 100 % |
+| `ssr_hydration_parity` (palabras) | 99,6 % | 100 % |
 | `broken_internal_links` | 0 de 150 comprobados | 0 |
 | `duplicate_policy_pages` | 0 | 0 |
 
@@ -85,9 +91,10 @@ Estado: C = CUMPLE · P = PARCIAL · N = NO CUMPLE · M = MANUAL.
 
 | ID | Propuesta | Auditor | Hallazgo |
 |---|:-:|:-:|---|
-| TX-1 | ⚠️ (F1 lo dio por hecho) | N | **`/fuentes` llega incompleta sin JavaScript:** 130 palabras en el HTML inicial frente a 189 después de hidratar. Además, cuatro páginas completas quedan bajo el umbral de 150 palabras de `design.md`: `/legal/uso-aceptable` (109), `/como-funciona` (113), `/fuentes` (130) y `/legal/cookies` (139) |
-| SP-1 | ✅ «falta prueba» | P | La prueba existe y la paridad es del 93,6 % de las palabras. Hay texto que solo está en el HTML del servidor. Entre las palabras que faltan después de hidratar están las de la miga de pan («inicio», «empleos») y los títulos de vacantes del bloque «Más empleos» y de la lista del hub de Bogotá: 77 %, la peor página. También difiere la redacción en `/como-funciona`, `/opiniones`, `/dashboard` y la portada. La lista de palabras de cada página está en `indicadores.navegador[].palabrasAusentes`. Ninguna página baja del 75 %, pero el umbral es el 100 %. Hay que revisarlo antes de F6 |
+| TX-1 | ⚠️ (F1 lo dio por hecho) | N | **`/fuentes` llega incompleta sin JavaScript.** Tiene 130 palabras en el HTML inicial frente a 226 después de hidratar. El texto que solo aparece tras hidratar es un párrafo real («diez pestañas abiertas, cada una con su propio buscador…») y los nombres de las fuentes. Además, cuatro páginas completas quedan bajo el umbral de 150 palabras de `design.md`: `/legal/uso-aceptable` (109), `/como-funciona` (113), `/fuentes` (130) y `/legal/cookies` (139) |
+| SP-1 | ✅ «falta prueba» | P | La prueba existe y la paridad es del 99,6 % de las palabras. Las diferencias son de redacción: `/opiniones` 94 % («puedes escribir desde esta…» solo en el servidor) y las vacantes 97–98 % (la etiqueta «Ubicación» y la fecha absoluta «noviembre», que React muestra como fecha relativa). La lista de cada página está en `indicadores.navegador[].palabrasAusentes`. El umbral es el 100 % |
 | PP-5 | ✅ | N | `/empresas` lleva el marcador (≥ 10 vacantes), pero su contenido es solo una lista de empresas: 83 palabras en el sintético, que tiene 16 empresas. En producción muestra 48 empresas y probablemente supere 150 palabras. Hay que medirlo con `--live` y decidir si un directorio de enlaces debe llevar anuncios (PP-3/PP-5) |
+| — (ADS-020) | — | — | **`/opiniones` muestra un apartado vacío en el HTML inicial.** Dice «Todavía no hay opiniones publicadas», y la versión hidratada dice algo parecido. El escenario «sección vacía» de ADS-020 pide no mostrarlo. F1 lo mantuvo como diseño («la invitación a opinar»). La página no lleva anuncios (PP-2 cumple), pero un revisor lo ve. Lo anota AV-3 (MANUAL) |
 
 ### Dependen del propietario o de Google: MANUAL
 
@@ -123,18 +130,18 @@ SP-9, SP-14, SP-15, PP-6, PG-3, PG-4, PG-6 (`ads.txt` coincide con la meta
 
 ## Modo `--live`
 
-`npm run adsense:audit -- --live [--max-urls 40] [--delay-ms 1000] [--browser]`
+`npm run adsense:audit -- --live [--max-urls 40] [--delay-ms 1000]`
 
 - Solo GET contra `https://buscotrabajo.co`.
 - 40 URLs por defecto, con un tope duro de 120.
 - Una pausa de 1 s o más entre peticiones.
 - User-Agent genérico `Mozilla/5.0 (compatible; site-audit/1.0)`.
 - El informe se guarda en el directorio temporal.
-- `--browser` también carga en Chromium las páginas de la muestra, con sus
-  recursos del mismo origen. Las peticiones a Google se abortan siempre.
 
 Se probó el perfil contra el servidor local (descubrimiento por sitemap,
 presupuesto, pausa y solo GET) en `tests/validate-adsense-audit.ts`: 8 GET en
-unos 7 s. El User-Agent y el rechazo de métodos distintos de GET, de hosts
+unos 7 s. `--browser` no se admite con `--live`, porque las peticiones de la
+SPA no tendrían pausa ni contarían en el límite. En el navegador solo salen
+GET y HEAD al origen auditado. El User-Agent y el rechazo de métodos distintos de GET, de hosts
 ajenos, de pausas menores de 1 s y de más de 120 URLs se prueban sin red en
 `tests/validate-adsense-audit.test.ts`.

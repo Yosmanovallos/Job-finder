@@ -2,18 +2,21 @@
 //
 //   npm run adsense:audit
 //       Synthetic build + disposable PostgreSQL (scripts/run-isolated-tests.ts,
-//       suite `adsense-audit`). Never touches production. Exits ≠ 0 while the
-//       audited build does not reproduce the committed baseline matrix.
+//       suite `adsense-audit`). Never touches production. Exits ≠ 0 when any
+//       measurable rule is not CUMPLE — today, by design, until F2–F5 land.
+//       The gate that the auditor reproduces the committed baseline is a
+//       separate suite: `npm run test:adsense-audit`.
 //
 //   npm run adsense:audit -- --base-url http://127.0.0.1:3000 [--browser]
 //       Against a server you started locally (loopback only).
 //
-//   npm run adsense:audit -- --live [--max-urls 40] [--delay-ms 1000] [--browser]
+//   npm run adsense:audit -- --live [--max-urls 40] [--delay-ms 1000]
 //       Against https://buscotrabajo.co: GET only, at most --max-urls requests
 //       (default 40, hard cap 120), ≥ 1 s between requests, generic User-Agent.
-//       REQUIRES the owner's explicit approval before each run.
-//       --browser additionally loads the sampled pages in Chromium (their
-//       same-origin assets too); Google requests are always aborted.
+//       REQUIRES the owner's explicit approval before each run. --browser is
+//       refused with --live: the SPA's own requests would be neither paced nor
+//       counted. In the browser only GET/HEAD to the audited origin go out;
+//       Google requests are always aborted.
 //
 // Common flags: --attest <file.json> (owner decisions and MANUAL
 // confirmations, see AuditAttestations), --expect <baseline.json> (exit 0
@@ -96,6 +99,9 @@ export function parseArgs(argv: string[]): CliOptions {
     }
   }
   if (options.live && options.baseUrl) throw new Error("[adsense-audit] usa --live o --base-url, no ambos");
+  // In a browser the SPA fetches its own assets and APIs: they would be
+  // neither paced nor counted against --max-urls. Not allowed on production.
+  if (options.live && options.browser) throw new Error("[adsense-audit] --browser no se admite con --live (peticiones sin límite ni pausa)");
   return options;
 }
 

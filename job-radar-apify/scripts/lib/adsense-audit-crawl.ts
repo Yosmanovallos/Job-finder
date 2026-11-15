@@ -333,6 +333,7 @@ interface ProbeResult {
   history: number;
   report: boolean;
   words: number;
+  extraWords: string[];
 }
 
 /**
@@ -343,21 +344,33 @@ interface ProbeResult {
  */
 const BROWSER_PROBE = String.raw`function (segments) {
   var squash = function (value) { return value.replace(/\s+/g, "").toLowerCase(); };
+  // Text nodes joined with spaces: textContent glues adjacent elements
+  // ("fuentesFuentes"), which would merge words.
+  var textOf = function (node) {
+    var walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT);
+    var parts = [];
+    while (walker.nextNode()) {
+      var parent = walker.currentNode.parentNode;
+      if (parent && /^(SCRIPT|STYLE|NOSCRIPT)$/.test(parent.nodeName)) continue;
+      parts.push(walker.currentNode.nodeValue);
+    }
+    return parts.join(" ");
+  };
   var app = document.querySelector("#app") || document.body;
-  var all = squash(app.textContent || "");
+  var all = squash(textOf(app));
   var wanted = segments.map(squash);
   var missing = segments.filter(function (segment, index) { return all.indexOf(wanted[index]) < 0; });
   // Word level: distinct words of the server text absent from the hydrated text.
   var tokens = function (value) { return value.toLowerCase().match(/[\p{L}\p{N}]{3,}/gu) || []; };
   var present = {};
-  tokens(app.textContent || "").forEach(function (word) { present[word] = true; });
+  tokens(textOf(app)).forEach(function (word) { present[word] = true; });
   var serverWords = {};
   segments.forEach(function (segment) { tokens(segment).forEach(function (word) { serverWords[word] = true; }); });
   var serverList = Object.keys(serverWords);
   var missingWords = serverList.filter(function (word) { return !present[word]; });
   var hidden = [];
   app.querySelectorAll("p, li, h1, h2, h3, h4, dd, dt, td").forEach(function (element) {
-    var raw = (element.textContent || "").replace(/\s+/g, " ").trim();
+    var raw = textOf(element).replace(/\s+/g, " ").trim();
     if (raw.split(" ").length < 4 || wanted.indexOf(squash(raw)) < 0) return;
     if (element.closest("details")) return; // accordions are allowed by the policy
     var style = getComputedStyle(element);
@@ -381,8 +394,10 @@ const BROWSER_PROBE = String.raw`function (segments) {
   var report = Array.prototype.some.call(document.querySelectorAll("a"), function (link) { return /reportar esta vacante/i.test(link.textContent || ""); });
   var clone = app.cloneNode(true);
   clone.querySelectorAll("header, footer, nav, script, style, button, svg").forEach(function (node) { node.remove(); });
-  var words = (clone.textContent || "").split(/\s+/).filter(function (word) { return /[\p{L}\p{N}]/u.test(word); }).length;
-  return { missing: missing, serverWords: serverList.length, missingWords: missingWords, hidden: hidden, footer: footer, overlay: overlay, history: history.length, report: report, words: words };
+  var words = textOf(clone).split(/\s+/).filter(function (word) { return /[\p{L}\p{N}]/u.test(word); }).length;
+  // Reverse direction (TX-1): words the hydrated content adds to the server text.
+  var extraWords = Object.keys(tokens(textOf(clone)).reduce(function (set, word) { if (!serverWords[word]) set[word] = true; return set; }, {}));
+  return { missing: missing, serverWords: serverList.length, missingWords: missingWords, hidden: hidden, footer: footer, overlay: overlay, history: history.length, report: report, words: words, extraWords: extraWords };
 }`;
 
 /**
@@ -403,7 +418,9 @@ export async function observeInBrowser(facts: SiteFacts, maxPages = BROWSER_KIND
       await context.route("**/*", (route) => {
         const url = new URL(route.request().url());
         if (/googlesyndication\.com$|doubleclick\.net$/.test(url.hostname) && /adsbygoogle/.test(url.pathname + url.search)) adsRequested = true;
-        return url.origin === origin ? route.continue() : route.abort();
+        // Read-only: only GET/HEAD to the audited origin ever leaves the browser.
+        const method = route.request().method();
+        return url.origin === origin && (method === "GET" || method === "HEAD") ? route.continue() : route.abort();
       });
       const tab = await context.newPage();
       let pageErrors = 0;
@@ -443,6 +460,7 @@ export async function observeInBrowser(facts: SiteFacts, maxPages = BROWSER_KIND
           historyLength: result.history,
           hasReportLink: result.report,
           hydratedWords: result.words,
+          hydratedOnlyWords: result.extraWords,
           pageErrors,
           error: null
         });
@@ -461,6 +479,7 @@ export async function observeInBrowser(facts: SiteFacts, maxPages = BROWSER_KIND
           historyLength: 0,
           hasReportLink: false,
           hydratedWords: 0,
+          hydratedOnlyWords: [],
           pageErrors: pageErrors + 1,
           error: (error instanceof Error ? error.message : "error").split(/\r?\n/)[0].slice(0, 160)
         });

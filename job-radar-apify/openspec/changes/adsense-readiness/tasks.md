@@ -35,39 +35,44 @@ anterior. **No se pulsa «Solicitar revisión» antes de F6.**
       `scripts/lib/adsense-audit-rules.ts`; CUMPLE / PARCIAL / NO CUMPLE /
       MANUAL con evidencia, umbral, valor y `pendiente_manual`. Informe JSON
       en el directorio temporal + resumen legible. Sale ≠ 0 si una regla
-      medible no cumple; con `--expect <json>`, si la matriz cambia;
-      `--attest <json>` registra decisiones (D1…) y confirmaciones MANUAL
+      medible no cumple (hoy sale 1, a propósito); con `--expect <json>`, si
+      la matriz cambia; `--attest <json>` registra decisiones (D1…) y
+      confirmaciones MANUAL
 - [x] Modo `--live` (solo GET a `https://buscotrabajo.co`, 40 URLs por
       defecto y tope de 120, pausa ≥ 1 s, User-Agent genérico). **No
       ejecutado: requiere aprobación del propietario.** Probado su perfil
       contra el servidor local (8 GET en ~7 s) y sin red (método, host,
-      pausa, tope, User-Agent)
+      pausa, tope, User-Agent). `--browser` se rechaza con `--live`; en el
+      navegador solo salen GET/HEAD al origen auditado
 - [x] Medir: vacantes indexables por procedencia → `copied_indexable_share`
       (muestra del sitemap en `--live`; sintético: 0,667)
 - [ ] Medir: clics de Google a vacantes de terceros (28 días) → insumo de D1.
       MANUAL: es dato de Search Console; el auditor no lo inventa
 - [x] Prueba de paridad HTML inicial ↔ DOM hidratado en Chromium (SP-1 por
-      palabras y por bloque; SP-5 texto oculto en escritorio **y** móvil,
+      palabras, 99,6 %, y por bloque; SP-5 texto oculto en escritorio **y** móvil,
       acordeones `<details>` permitidos). Anuncios observados por petición
       real a `adsbygoogle.js` (abortada) tras disparar el cargador diferido
 - [x] Métricas `original_pages` / `original_words` desde
       `sitemap-pages.xml` (familias propias: institucionales, legales,
       `/guias/*`, `/informes/*`, `/herramientas/*`): 10 / 2.291
 - [x] Línea base en `docs/seo-evidence/adsense-audit-baseline.json` (solo
-      indicadores) y `adsense-audit-baseline-2026-11-15.md` (diferencias
-      regla por regla con la propuesta)
+      indicadores; la genera el auditor, es un candado de regresión) y
+      `adsense-audit-baseline-2026-11-15.md` (justificación regla por regla
+      frente a la propuesta)
 - **Gate (ajustado por F1):** el auditor reproduce la matriz de la línea
   base — 21 CUMPLE · 1 PARCIAL · 14 NO CUMPLE · 14 MANUAL — con 0
-  diferencias (`npm run adsense:audit` en verde). F1 movió PP-1…PP-4, AV-5,
+  diferencias (`npm run test:adsense-audit` en verde; `npm run
+  adsense:audit` sale 1 hasta F2–F5). F1 movió PP-1…PP-4, AV-5,
   CX-5, CX-9, SP-17, SP-19 y PG-5 a CUMPLE; AV-1, AV-2, AV-4, CX-1…CX-4,
   CX-6, SP-2, SP-6, SP-11 y SP-12 siguen en NO CUMPLE porque F2 (#138),
   F3 (#137) y F4 (#139) no están fusionados; 14 reglas que la propuesta
   daba por ✅/⚠️ dependen del propietario o de Google (MANUAL)
 - **Hallazgos nuevos:** TX-1 NO CUMPLE (`/fuentes` 130 palabras sin JS
-  frente a 189 hidratada; 4 páginas < 150), SP-1 PARCIAL (93,6 % de
-  palabras; miga de pan y «Más empleos» solo en el HTML del servidor),
-  PP-5 NO CUMPLE en sintético (`/empresas` con anuncios y solo una lista de
-  enlaces; medir con `--live`)
+  frente a 226 hidratada, falta un párrafo; 4 páginas < 150), SP-1 PARCIAL
+  (99,6 % de palabras; diferencias de redacción en `/opiniones` y en las
+  vacantes), PP-5 NO CUMPLE en sintético (`/empresas` con anuncios y solo
+  una lista de enlaces; medir con `--live`), `/opiniones` muestra
+  «Todavía no hay opiniones publicadas» en el HTML inicial (ADS-020)
 - Al fusionar cada fase, regenerar la línea base con el informe de la suite
 
 ## F1 — Confianza, higiene y elegibilidad de anuncios

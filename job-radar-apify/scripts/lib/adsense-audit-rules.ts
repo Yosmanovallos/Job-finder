@@ -100,6 +100,8 @@ export interface BrowserFact {
   hasReportLink: boolean;
   /** Words of the hydrated #app without menu, footer and buttons (TX-1 completeness). */
   hydratedWords: number;
+  /** Distinct words the hydrated content has and the server text lacks. */
+  hydratedOnlyWords: string[];
   pageErrors: number;
   /** First line of the navigation error, when the page could not be observed. */
   error: string | null;
@@ -1063,7 +1065,7 @@ export const RULES: RuleDef[] = [
       return {
         estado: incomplete.length > 0 ? "NO CUMPLE" : short.length > 0 ? "PARCIAL" : "CUMPLE",
         evidencia:
-          `${sample.length} páginas de texto; ${incomplete.length === 0 ? "todas entregan su texto en el HTML inicial" : `incompletas sin JavaScript: ${list(incomplete.map((page) => page.path))}`}` +
+          `${sample.length} páginas de texto; ${incomplete.length === 0 ? "todas entregan su texto en el HTML inicial" : `incompletas sin JavaScript: ${list(incomplete.map((page) => `${page.path} (solo tras hidratar: ${(ctx.browser(page.kind)?.hydratedOnlyWords ?? []).slice(0, 8).join(" ")})`))}`}` +
           `${facts.browser ? "" : " (completitud sin medir: sin navegador)"}; por debajo de ${THRESHOLDS.rawWords} palabras: ${list(short.map((page) => `${page.path} (${page.rawWords})`))}` +
           `${ratio.length ? `; palabras inicial/hidratado: ${list(ratio, 11)}` : ""}`,
         umbral: `HTML inicial ≥ 80 % del texto hidratado y raw_html_words ≥ ${THRESHOLDS.rawWords} en cada página de texto (design.md)`,

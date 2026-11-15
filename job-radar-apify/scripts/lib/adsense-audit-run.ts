@@ -41,7 +41,7 @@ export interface AuditReport {
   /** Indicators only — no HTML, no page text, no personal data. */
   indicadores: {
     paginas: { tipo: string; ruta: string; estado: number; robots: string; anuncios: boolean; palabras: number; jsonld: string[] }[];
-    navegador: { ruta: string; anunciosPedidos: boolean; bloques: number; ausentes: number; ocultos: number; capa: number; palabrasHidratadas: number; palabrasServidor: number; palabrasAusentes: string[]; errores: number; error: string | null }[] | null;
+    navegador: { ruta: string; anunciosPedidos: boolean; bloques: number; ausentes: number; ocultos: number; capa: number; palabrasHidratadas: number; palabrasServidor: number; palabrasAusentes: string[]; palabrasSoloHidratadas: string[]; errores: number; error: string | null }[] | null;
     paginasOriginales: { ruta: string; palabras: number }[];
     muestraVacantes: { ruta: string; fuente: string | null; indexable: boolean }[];
     enlacesRotos: SiteFacts["brokenLinks"];
@@ -90,6 +90,7 @@ export async function runAudit(options: AuditOptions): Promise<{ report: AuditRe
         palabrasHidratadas: entry.hydratedWords,
         palabrasServidor: entry.serverWords,
         palabrasAusentes: entry.missingWords.slice(0, 40),
+        palabrasSoloHidratadas: entry.hydratedOnlyWords.slice(0, 40),
         errores: entry.pageErrors,
         error: entry.error
       })) ?? null,
