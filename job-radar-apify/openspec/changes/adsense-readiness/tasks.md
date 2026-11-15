@@ -116,13 +116,20 @@ anterior. **No se pulsa «Solicitar revisión» antes de F6.**
       del título en común, desempate por el hash del id), mismo número de
       enlaces — ADS-037
 - [x] `test:seo` en verde
-- [ ] Drift en 2 vacantes de cada procedencia. **Pendiente.** ADS-031 solo
-      prueba que `renderJobPageHtml()` reproduce la composición anterior
-      (`tests/fixtures/job-page-golden/generate.ts`), no la ruta real con
-      base de datos. Falta: 449c981 y esta rama contra la misma BD
-      desechable, 2 vacantes oficiales y 2 de terceros, comparar title,
-      meta, canonical, robots, JSON-LD, `__SSR_JOB__` y H1 (cambio esperado:
-      solo el orden de «Más empleos»); y `/seo drift compare` en producción
+- [x] Drift local de la ruta real (2026-11-14, `npm run drift:adsense-f2`,
+      `tests/drift-adsense-f2.ts`): 449c981 y esta rama, uno tras otro,
+      contra la misma BD desechable con un hub sintético de Bogotá
+      (16 vacantes, 2 de «Portal oficial»). URLs: 2 vacantes oficiales,
+      2 de terceros (LinkedIn, Computrabajo), `/empleos/bogota`,
+      `sitemap-jobs.xml` y `sitemap-jobs-recent.xml`. Idénticos: status,
+      title, meta description, canonical, robots, H1, JSON-LD (los 4 con
+      JobPosting), `__SSR_JOB__`, marcador de anuncios (sí en las 2
+      oficiales, no en las 2 de terceros), el cuerpo de `#app` fuera de
+      «Más empleos», `__SSR_JOB_LINKS__` fuera de `related`, el hub y los
+      dos sitemaps. **Única diferencia:** la lista de «Más empleos» de las
+      4 vacantes, con 6 enlaces en ambas versiones. Ejemplo: «Mesero» ahora
+      abre con «Mesero de Eventos» y sigue con la rotación anterior
+- [ ] `/seo drift compare` de 2 vacantes de cada procedencia en producción,
       tras desplegar
 - [x] CX-5 sin perder variedad: en un hub sintético de 60 vacantes con
       títulos repetidos, 37 listas distintas por rotación → 38 por cercanía;
@@ -131,7 +138,8 @@ anterior. **No se pulsa «Solicitar revisión» antes de F6.**
       completo; quedan en «Abierto» del ADR 0016 (no afecta al gate con D1(a))
 - **Gate:** CX-4, CX-9, SP-11, SP-12, PP-4 en CUMPLE con D1(a) — probado
   por ADS-030…039 y `test:seo`; D1(b) implementada y apagada, con dos
-  consumidores abiertos en el ADR. Falta el drift de la ruta real
+  consumidores abiertos en el ADR. Drift local de la ruta real hecho;
+  falta el de producción tras desplegar
 
 ## F3 — Guías
 
