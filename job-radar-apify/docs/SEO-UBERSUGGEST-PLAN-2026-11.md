@@ -330,11 +330,35 @@ sitio (5.000 páginas en Business).
 
 ## 6. Decisiones del propietario
 
-1. Crear el proyecto y el Rank Tracking (A1 y A2) con la lista del anexo A.
-2. Aprobar la auditoría mensual (A3), que es un rastreo automatizado de
-   producción.
-3. Instalar o no el conector MCP (A5).
-4. Aprobar la lista de 12 guías de K1 para F3.
+Aprobadas el 2026-11-15 en el chat:
+
+1. ✅ **Proyecto y Rank Tracking creados** (A1 y A2) en la cuenta Individual:
+   - **Proyecto «BuscoTrabajo»** (`buscotrabajo.co`), con mercados
+     Español / Colombia y Español / Venezuela.
+   - **Competidores:** co.computrabajo.com, elempleo.com, magneto365.com,
+     co.indeed.com y opcionempleo.com.co. Se quitó linkedin.com, que venía
+     sugerido.
+   - **Sitemaps:** `sitemap-categories.xml` y `sitemap-pages.xml`, para que las
+     1.000 páginas de la auditoría vayan a hubs y páginas propias y no a
+     vacantes. Se quitó `sitemap.xml`.
+   - **Temas para IA:** los 5 sugeridos, más «Empleos sin experiencia» y
+     «Trabajo remoto en Venezuela». Ubersuggest generó 10 prompts para la
+     Visibilidad en IA (A4).
+   - **Rank Tracking:** 100 de 125 palabras, las del anexo A (78 ES-CO y
+     22 ES-VE), importadas por CSV. Se descartaron las 50 que proponía la
+     herramienta («maquilladora cerca de mi», «empleos en new york», …).
+     Actualización semanal; la primera posición aparece tras la siguiente
+     actualización.
+   - **Auditoría:** crear el proyecto **lanzó automáticamente una auditoría**
+     (≤1.000 páginas, ~10 min) el 2026-11-15. Es la auditoría inicial de A3.
+     Las siguientes son mensuales.
+2. ✅ **Auditoría mensual (A3):** aprobada dentro de «todo lo que contiene».
+3. 🔄 **Conector MCP oficial (A5):** aprobado. Conectarlo requiere que el
+   propietario inicie sesión (OAuth) desde la tarjeta del conector «Ubersuggest»
+   en Claude.
+4. ✅ **Lista de 12 guías de K1 para F3:** aprobada. Es la entrada del paso
+   «Lista de 12 temas … aprobada por el propietario» de
+   `openspec/changes/adsense-readiness/tasks.md`.
 
 ## Anexo A — Lista propuesta para el Rank Tracking
 
