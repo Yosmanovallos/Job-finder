@@ -88,15 +88,34 @@ anterior. **No se pulsa «Solicitar revisión» antes de F6.**
 
 ## F3 — Guías
 
-- [ ] Pruebas que fallan primero: ADS-040…ADS-049 (rutas, JSON-LD, autor,
-      fuentes obligatorias, sin párrafos repetidos, 404 con el interruptor)
-- [ ] `/guias` y `/guias/:slug` renderizadas en el servidor
+> Infraestructura en `codex/adsense-guides` (2026-11-14), apagada
+> (`GUIDES_ENABLED = false` en `src/config.ts`). Sin guías firmadas,
+> `/guias*` es un 404 real y no aparece en el sitemap ni en el menú.
+
+- [x] Pruebas que fallan primero: `tests/validate-guides.test.ts` (ADS-040:
+      rutas, JSON-LD `Article`, autor, fechas, fuentes obligatorias, sin
+      párrafos repetidos, ≥ 800 palabras, revisión del propietario, 404 y
+      sitemap con el interruptor), en la suite `unit`
+- [x] `/guias` y `/guias/:slug` renderizadas en el servidor
+      (`src/server/routes/guides.ts`): texto completo en el HTML inicial,
+      Markdown con `Accept: text/markdown`, `/api/guias` para la navegación
+      del cliente, marcador de anuncios solo en la guía publicada (el índice
+      es navegación, PP-3)
+- [x] Contenido en `content/guias/*.md` con validador
+      (`src/lib/guides.ts`, formato en `content/guias/README.md`)
+- [x] `sitemap-guides.xml` en el índice del sitemap solo con guías publicadas
+- [x] «Guías» en menú y pie detrás de `GUIDES_ENABLED`; «Guías
+      relacionadas» (máx. 3, mapeo estático de etiquetas, sin consultas) en
+      hubs y vacantes
 - [ ] Lista de 12 temas desde el estudio de palabras clave (#121), aprobada
-      por el propietario
+      por el propietario (`f3-temas-propuestos.md`)
+- [ ] Autor del `Article` y firmante de cada guía (D2, D3)
 - [ ] 12 guías: borrador → verificación de cada fuente → dato propio del
       corpus con fecha de corte → revisión y firma (D3)
-- [ ] «Guías» en menú y pie; enlaces desde hubs y vacantes
-- [ ] Sitemap, `llms.txt` y catálogo actualizados
+- [ ] Encender `GUIDES_ENABLED` en el mismo cambio que la primera guía
+      firmada (una prueba lo exige)
+- [ ] `llms.txt` y catálogo con `/guias` cuando esté encendido (no antes:
+      anunciaría un 404)
 - [ ] Calendario: 2 guías por semana después de la primera docena
 - **Gate:** CX-1, CX-3, AV-4 en CUMPLE; `original_pages` ≥ 20
 

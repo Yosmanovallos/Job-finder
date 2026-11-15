@@ -22,3 +22,9 @@ export const PAYWALL_ENABLED = false;
 export function formatCOP(amount: number): string {
   return `$${amount.toLocaleString("es-CO")}`;
 }
+
+// /guias editorial layer (openspec adsense-readiness F3, ADS-040). Shared by
+// the server routes, the sitemap and the Header/Footer links, so the menu
+// never points at a 404. Even when true, only guides the owner approved are
+// served; with none approved /guias stays a real 404. Rollback: set false.
+export const GUIDES_ENABLED = false;
