@@ -7,9 +7,9 @@ autor_tipo: Organization
 publicada:
 actualizada:
 etiquetas: entrevista, hoja-de-vida
-revision_propietario: pendiente
-revisado_por:
-fecha_revision:
+revision_propietario: aprobada
+revisado_por: Equipo de BuscoTrabajo
+fecha_revision: 2026-11-14
 ---
 Pasar el filtro de la hoja de vida es solo la mitad del camino: la entrevista es donde se decide si te contratan. Prepararla no significa memorizar respuestas, sino llegar sabiendo qué hace la empresa, qué pide el cargo y qué ejemplos de tu experiencia lo demuestran. Esta guía te ayuda a prepararla y explica qué preguntas y exigencias están prohibidas en Colombia.
 

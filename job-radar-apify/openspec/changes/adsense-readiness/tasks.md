@@ -123,7 +123,8 @@ anterior. **No se pulsa «Solicitar revisión» antes de F6.**
   - [x] Borradores 6–12 (tipos de contrato, prestaciones, periodo de
         prueba, liquidación, ofertas falsas, hoja de vida, entrevista),
         2026-11-14; revisión en `f3-revision-guias-6-12.md`
-  - [ ] Firma del propietario de las guías 6–12
+  - [x] Firma del propietario de las guías 6–12 (2026-11-14). Las 12
+        están aprobadas y sin publicar
 - [ ] Encender `GUIDES_ENABLED` en el mismo cambio que la primera guía
       firmada (una prueba lo exige)
 - [ ] Al encender: `test:seo` y `test:baseline` con la bandera activa y una

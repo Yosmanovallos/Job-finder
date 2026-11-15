@@ -7,9 +7,9 @@ autor_tipo: Organization
 publicada:
 actualizada:
 etiquetas: ofertas-falsas, buscar-empleo
-revision_propietario: pendiente
-revisado_por:
-fecha_revision:
+revision_propietario: aprobada
+revisado_por: Equipo de BuscoTrabajo
+fecha_revision: 2026-11-14
 ---
 Quien busca trabajo con urgencia es el blanco perfecto para una estafa: está dispuesto a moverse rápido, a compartir sus datos y, a veces, a pagar por una oportunidad. Una oferta falsa puede costarte dinero, exponer tus documentos o hacerte perder semanas. Esta guía reúne señales de alerta concretas, lo que la norma prohíbe a quienes intermedian empleo y qué hacer si ya caíste.
 

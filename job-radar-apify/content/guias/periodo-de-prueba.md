@@ -7,9 +7,9 @@ autor_tipo: Organization
 publicada:
 actualizada:
 etiquetas: contratos, sin-experiencia
-revision_propietario: pendiente
-revisado_por:
-fecha_revision:
+revision_propietario: aprobada
+revisado_por: Equipo de BuscoTrabajo
+fecha_revision: 2026-11-14
 ---
 Muchos empleos nuevos empiezan con un periodo de prueba. Es la etapa en la que la empresa evalúa si eres la persona indicada y tú evalúas si el trabajo te conviene. También es una etapa llena de mitos: que dura tres meses, que en ese tiempo no hay prestaciones, que se puede repetir cada vez que te renuevan el contrato. Esta guía separa lo que dice el Código Sustantivo del Trabajo de lo que se repite por costumbre.[^cst]
 

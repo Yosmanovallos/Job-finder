@@ -7,9 +7,9 @@ autor_tipo: Organization
 publicada:
 actualizada:
 etiquetas: contratos, prestaciones, entrevista
-revision_propietario: pendiente
-revisado_por:
-fecha_revision:
+revision_propietario: aprobada
+revisado_por: Equipo de BuscoTrabajo
+fecha_revision: 2026-11-14
 ---
 Cuando una empresa te hace una oferta, lo primero que conviene preguntar no es el salario sino el tipo de contrato. De eso dependen tu estabilidad, cómo y cuándo puede terminar la relación, qué te deben pagar al final y si tienes prestaciones sociales. Esta guía explica los tipos de contrato que reconoce la legislación colombiana, con los cambios de la reforma laboral de 2025,[^ley2466] y cómo distinguir un contrato de trabajo de un contrato de prestación de servicios.
 

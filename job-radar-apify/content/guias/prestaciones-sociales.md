@@ -7,9 +7,9 @@ autor_tipo: Organization
 publicada:
 actualizada:
 etiquetas: prestaciones, contratos
-revision_propietario: pendiente
-revisado_por:
-fecha_revision:
+revision_propietario: aprobada
+revisado_por: Equipo de BuscoTrabajo
+fecha_revision: 2026-11-14
 ---
 Además del salario, un contrato de trabajo en Colombia te da derecho a pagos que no aparecen en el anuncio de la vacante pero que suman mucho al año: la prima de servicios, las cesantías con sus intereses y las vacaciones. Conocerlos te permite comparar dos ofertas con el mismo salario y detectar si una empresa está pagando menos de lo que debe. Esta guía explica cada uno con la norma a la mano.
 

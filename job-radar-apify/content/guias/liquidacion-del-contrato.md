@@ -7,9 +7,9 @@ autor_tipo: Organization
 publicada:
 actualizada:
 etiquetas: prestaciones, contratos
-revision_propietario: pendiente
-revisado_por:
-fecha_revision:
+revision_propietario: aprobada
+revisado_por: Equipo de BuscoTrabajo
+fecha_revision: 2026-11-14
 ---
 Cuando un contrato de trabajo termina, por renuncia, por despido o porque se cumplió el plazo, el empleador debe pagarte lo que te debe hasta ese día. A ese pago se le llama liquidación. Es un momento en el que mucha gente firma sin revisar, porque quiere cerrar la etapa o empezar pronto en otro empleo. Esta guía explica qué conceptos debe incluir, cuáles dependen de cómo terminó el contrato y qué hacer si el pago se demora.
 

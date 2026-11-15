@@ -7,9 +7,9 @@ autor_tipo: Organization
 publicada:
 actualizada:
 etiquetas: hoja-de-vida, sin-experiencia
-revision_propietario: pendiente
-revisado_por:
-fecha_revision:
+revision_propietario: aprobada
+revisado_por: Equipo de BuscoTrabajo
+fecha_revision: 2026-11-14
 ---
 La hoja de vida es lo primero que ve un reclutador y, a menudo, lo único que ve antes de decidir si te llama. No necesita diseños llamativos; necesita que en pocos segundos quede claro qué sabes hacer, qué has hecho y cómo contactarte. Esta guía explica qué incluir, cómo adaptarla a cada vacante y qué información no tienes por qué entregar.
 
