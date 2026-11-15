@@ -29,6 +29,7 @@ import { liveJobSql } from "../lib/job-freshness.js";
 import { findExpiredUrlHashes } from "./expired-job-repository.js";
 import { StaleWhileRevalidateCache } from "../lib/stale-while-revalidate-cache.js";
 import { clipVarchar } from "../lib/varchar.js";
+import type { MarketRow } from "../lib/market-report.js";
 import { RECENT_SITEMAP_WINDOW_HOURS, type RecentReadyJob } from "../lib/recent-jobs.js";
 import { copySpecificCityMismatchSql } from "../lib/official-copy-location.js";
 import { trustedEmploymentType } from "../lib/employment-type-trust.js";
@@ -1417,6 +1418,54 @@ async function queryHomeJobCounts(country: string, cities: string[]): Promise<Ho
         isLocked: Boolean(row.is_locked)
       }))
   };
+}
+
+/** Read-only query client: the pool, or a client inside BEGIN READ ONLY. */
+export interface MarketRowsClient {
+  query(text: string, values?: unknown[]): Promise<{ rows: unknown[] }>;
+}
+
+/**
+ * The live canonical vacancies of one country (remote rows with no country
+ * included, as on the dashboard), only the columns the monthly report
+ * aggregates — no URL, id or description. Same canonical projection and
+ * country scope as queryHomeJobCounts(), so the report total equals the
+ * home's and the dashboard's.
+ *
+ * Only scripts/build-market-report.ts calls this, once per run inside a READ
+ * ONLY transaction with a statement_timeout. No request path calls it
+ * (adsense-readiness F4; Supabase Disk IO incident, 2026-11-03).
+ */
+export async function queryMarketRows(client: MarketRowsClient, country: "CO" | "VE"): Promise<MarketRow[]> {
+  const sql = createSqlParts();
+  const scope = buildJobWhere({ country }, sql);
+  const result = await client.query(
+    `WITH canonical AS MATERIALIZED (
+       SELECT DISTINCT ON (${VACANCY_IDENTITY_KEYS})
+              title, company, location, source, sources, remote_type, published_at, country,
+              salary_min, salary_max, salary_currency
+       FROM ${vacancyIdentitySourceSql(`is_active = TRUE AND ${liveJobSql()}`)} jobs
+       ORDER BY ${VACANCY_IDENTITY_KEYS}, published_at DESC, id DESC
+     )
+     SELECT title, company, location, source, sources, remote_type, published_at, country,
+            salary_min, salary_max, salary_currency
+     FROM canonical
+     WHERE ${scope.join(" AND ")}`,
+    sql.values
+  );
+  return (result.rows as Array<Record<string, unknown>>).map((row) => ({
+    title: String(row.title ?? ""),
+    company: (row.company as string | null) ?? null,
+    location: (row.location as string | null) ?? null,
+    source: String(row.source ?? ""),
+    sources: Array.isArray(row.sources) ? (row.sources as unknown[]).filter((item): item is string => typeof item === "string") : [],
+    remoteType: (row.remote_type as string | null) ?? null,
+    publishedAt: new Date(row.published_at as string).toISOString(),
+    country: (row.country as string | null) ?? null,
+    salaryMin: row.salary_min === null || row.salary_min === undefined ? null : Number(row.salary_min),
+    salaryMax: row.salary_max === null || row.salary_max === undefined ? null : Number(row.salary_max),
+    salaryCurrency: (row.salary_currency as string | null) ?? null
+  }));
 }
 
 export interface CompanyGroup {

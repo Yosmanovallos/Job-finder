@@ -45,6 +45,7 @@ const Pricing = lazy(() => import("./sections/Pricing.js"));
 const Legal = lazy(() => import("./sections/Legal.js"));
 const Account = lazy(() => import("./sections/Account.js"));
 const PublicInfoPage = lazy(() => import("./sections/PublicInfoPage.js"));
+const MarketReportPage = lazy(() => import("./sections/MarketReportPage.js"));
 const Opiniones = lazy(() => import("./sections/Opiniones.js"));
 
 function Landing() {
@@ -145,6 +146,8 @@ function AppRoutes() {
       <Route path="/docs" element={<PublicInfoPage />} />
       <Route path="/about" element={<PublicInfoPage />} />
       <Route path="/metodologia" element={<PublicInfoPage />} />
+      <Route path="/informes" element={<MarketReportPage />} />
+      <Route path="/informes/:slug" element={<MarketReportPage />} />
       <Route path="/contact" element={<PublicInfoPage />} />
       <Route path="/privacy" element={<PublicInfoPage />} />
       <Route

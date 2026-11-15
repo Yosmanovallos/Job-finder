@@ -1,14 +1,18 @@
 // Own data (openspec/changes/adsense-readiness F4): the monthly labour-market
 // report and the computed comparisons on hubs and on the home page.
 //
-// Every figure here is computed from the live, deduplicated corpus with the
-// same filters the dashboard and the hubs apply (applyJobFilters, the role
-// matcher, classifyModality). Nothing is typed by hand: the copy is a
-// template over the numbers, and a figure without enough coverage is
-// rendered as «sin datos suficientes». No LLM is involved.
+// Every figure comes from a frozen snapshot of the live, deduplicated corpus,
+// aggregated with the same filters the dashboard and the hubs apply
+// (applyJobFilters, the role matcher, classifyModality). The snapshot is made
+// by scripts/build-market-report.ts in a READ ONLY transaction and committed
+// to data/market-reports/; the server reads those files at startup and never
+// queries the database for them. Nothing is typed by hand: the copy is a
+// template over the numbers. A group under MARKET_MIN_CELL vacancies is
+// suppressed (aggregates only, nothing that singles out a job or employer),
+// and a figure without enough coverage reads «sin datos suficientes».
+// No LLM is involved.
 //
-// Pure module (no DB, no fs): src/db/job-repository.ts loads the rows and
-// caches the snapshot; server.ts renders it. Shared by server and client.
+// Pure module (no DB, no fs): shared by server, script and client.
 
 import type { PublicContent } from "./agent-readiness.js";
 import { applyJobFilters, CITY_OPTIONS, roleTitleMatcher } from "./job-filters.js";
@@ -21,9 +25,12 @@ import { DEFAULT_ROLES_200 } from "../queue/scheduler.js";
 import type { Job } from "../sources/types.js";
 
 export const MARKET_REPORT_INDEX_PATH = "/informes";
+/** Always the newest edition (302); each edition lives at its own month URL. */
 export const MARKET_REPORT_PATH = "/informes/empleo-colombia";
 const EDITION_PATH = /^\/informes\/empleo-colombia-(\d{4})-(\d{2})$/;
 
+/** Smallest group the snapshot publishes: fewer vacancies than this is «menos de 10». */
+export const MARKET_MIN_CELL = 10;
 /** Minimum vacancies with a published salary (in one currency) before any salary figure is shown. */
 export const MARKET_MIN_SALARY_JOBS = 30;
 /** Same as the hub inventory guard (MIN_LISTING_JOBS_FOR_ADS / intentRobots). */
@@ -34,7 +41,7 @@ const TOP_COMPANIES = 10;
 const TOP_SOURCES = 8;
 const DAY_MS = 86_400_000;
 
-/** One canonical live vacancy, only the columns the report reads. */
+/** One canonical live vacancy, only the columns the report reads. Never stored. */
 export interface MarketRow {
   title: string;
   company: string | null;
@@ -52,8 +59,10 @@ export interface MarketRow {
 export interface MarketCount {
   label: string;
   count: number;
-  path: string;
 }
+
+/** A count, or null when the group has fewer than MARKET_MIN_CELL vacancies. */
+export type CellCount = number | null;
 
 export interface MarketSnapshot {
   version: 1;
@@ -62,24 +71,32 @@ export interface MarketSnapshot {
   cutoff: string;
   /** YYYY-MM of the cutoff in Bogotá time. */
   period: string;
+  minCell: number;
+  /** How every figure was computed, frozen with the data. */
+  methodology: string[];
   total: number;
-  last7Days: number;
-  /** Every city hub of the country, biggest first. */
+  last7Days: CellCount;
+  /** City hubs with at least minCell vacancies, biggest first. A city hub absent here has fewer. */
   cities: MarketCount[];
+  /** How many city hubs the snapshot measured (present or suppressed). */
+  cityHubs: number;
   /** Vacancies whose location matches none of the city hubs. */
-  withoutCity: number;
-  /** Every tracked role with at least one vacancy, biggest first. A role absent here has 0. */
+  withoutCity: CellCount;
+  /** Tracked roles with at least minCell vacancies, biggest first. A role absent here has fewer. */
   roles: MarketCount[];
+  /** How many tracked roles the snapshot measured. */
+  roleHubs: number;
   /** Vacancies whose title matches none of the tracked roles. */
-  withoutRole: number;
-  modalities: Record<JobModality, number>;
+  withoutRole: CellCount;
+  modalities: Record<JobModality, CellCount>;
   /** Vacancies whose primary or merged source is the employer's own careers site. */
-  official: number;
-  sources: Array<{ label: string; count: number }>;
-  companies: Array<{ label: string; count: number }>;
+  official: CellCount;
+  sources: MarketCount[];
+  /** Employers with at least minCell vacancies (top TOP_COMPANIES). */
+  companies: MarketCount[];
   companyCount: number;
   /** Vacancies with any published salary, in any currency. */
-  salaryJobs: number;
+  salaryJobs: CellCount;
   /** Null below MARKET_MIN_SALARY_JOBS in the main currency. */
   salary: { currency: string; jobs: number; p25: number; median: number; p75: number } | null;
 }
@@ -89,8 +106,8 @@ export interface MarketComparison {
   previousCutoff: string;
   totalDelta: number;
   totalPct: number | null;
-  officialShareDelta: number;
-  remoteShareDelta: number;
+  officialShareDelta: number | null;
+  remoteShareDelta: number | null;
   cities: Array<{ label: string; delta: number; current: number; previous: number }>;
 }
 
@@ -102,6 +119,15 @@ const MODALITY_WORDS: Record<JobModality, string> = {
   freelance: "proyectos freelance",
   unknown: "sin modalidad declarada"
 };
+
+export function marketMethodology(countryName: string): string[] {
+  return [
+    `Se cuentan las vacantes activas en el momento del corte: publicadas en los últimos 30 días, sin plazo vencido y sin cierre confirmado por la fuente. Cada vacante cuenta una sola vez aunque aparezca en varios portales (misma URL normalizada o mismo cargo, empresa y ubicación). Las vacantes remotas sin país se cuentan en ${countryName}, igual que en el buscador.`,
+    "La ciudad sale del texto de ubicación, con el mismo filtro que usan las páginas de cada ciudad; el cargo, de las palabras del título, con el mismo criterio que las páginas de cada cargo; la modalidad, de lo que declara la fuente o, si no lo declara, del título y la ubicación. Una vacante es del portal oficial cuando su fuente principal o una de sus fuentes fusionadas es el portal de empleo del propio empleador.",
+    `Solo se publican agregados: un grupo (ciudad, cargo, empresa, fuente o modalidad) con menos de ${MARKET_MIN_CELL} vacantes aparece como «menos de ${MARKET_MIN_CELL}». El salario típico exige al menos ${MARKET_MIN_SALARY_JOBS} vacantes con salario publicado en una misma moneda; es la mediana del punto medio de cada rango.`,
+    "Todo se calcula por código, en una transacción de solo lectura, sin redacción manual de cifras ni modelos de lenguaje. La edición queda congelada en el repositorio con su fecha de corte y esta metodología."
+  ];
+}
 
 const yieldToEventLoop = () => new Promise<void>((resolve) => setImmediate(resolve));
 
@@ -133,8 +159,7 @@ function quantile(sorted: number[], q: number): number {
   const position = (sorted.length - 1) * q;
   const low = Math.floor(position);
   const high = Math.ceil(position);
-  const value = sorted[low]! + (sorted[high]! - sorted[low]!) * (position - low);
-  return Math.round(value);
+  return Math.round(sorted[low]! + (sorted[high]! - sorted[low]!) * (position - low));
 }
 
 function positive(value: unknown): number | null {
@@ -142,14 +167,22 @@ function positive(value: unknown): number | null {
   return Number.isFinite(number) && number > 0 ? number : null;
 }
 
+/** Labels compare without case or accents ("Asesor comercial" = "Asesor Comercial"). */
+const labelKey = (label: string) => label.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
+const findLabel = <T extends { label: string }>(list: readonly T[], label: string) => list.find((item) => labelKey(item.label) === labelKey(label));
+const hasLabel = (list: readonly string[], label: string) => list.some((item) => labelKey(item) === labelKey(label));
+
+const cell = (count: number): CellCount => (count >= MARKET_MIN_CELL ? count : null);
+const byCount = (a: MarketCount, b: MarketCount) => b.count - a.count || a.label.localeCompare(b.label, "es");
+
 export function marketCityLabels(country: "CO" | "VE"): string[] {
   return country === "CO" ? [...CITY_OPTIONS] : [...getCountryConfig("VE").cities];
 }
 
 /**
- * Aggregates the canonical rows of one country. Yields to the event loop
- * between cities and roles, so a 40k-row snapshot never blocks requests for
- * long (the role pass is 200 matchers over the distinct titles).
+ * Aggregates the canonical rows of one country into a publishable snapshot.
+ * Yields to the event loop between cities and roles (200 matchers over the
+ * distinct titles), so even a 40k-row run never blocks for long.
  */
 export async function buildMarketSnapshot(
   rows: readonly MarketRow[],
@@ -159,19 +192,17 @@ export async function buildMarketSnapshot(
   const jobs = rows.map(toJob);
   const cutoffMs = cutoff.getTime();
 
+  const cityLabels = marketCityLabels(country);
   const cities: MarketCount[] = [];
-  const placed = new Set<number>();
-  const indexOf = new Map<Job, number>(jobs.map((job, index) => [job, index]));
-  for (const label of marketCityLabels(country)) {
-    const category: ResolvedCategory = { kind: "ciudad", label, country };
-    const matched = applyJobFilters(jobs, cityHubFilters(category));
-    for (const job of matched) placed.add(indexOf.get(job)!);
-    cities.push({ label, count: matched.length, path: buildCategoryPath(category) });
+  const placed = new Set<Job>();
+  for (const label of cityLabels) {
+    const matched = applyJobFilters(jobs, cityHubFilters({ kind: "ciudad", label, country }));
+    for (const job of matched) placed.add(job);
+    if (matched.length >= MARKET_MIN_CELL) cities.push({ label, count: matched.length });
     await yieldToEventLoop();
   }
-  cities.sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, "es"));
+  cities.sort(byCount);
 
-  // Roles: the hubs' own matcher over distinct titles, weighted by count.
   const titleCounts = new Map<string, number>();
   for (const row of rows) titleCounts.set(row.title, (titleCounts.get(row.title) || 0) + 1);
   const titles = [...titleCounts.entries()];
@@ -186,14 +217,14 @@ export async function buildMarketSnapshot(
         matchedTitle.add(title);
       }
     }
-    if (count > 0) roles.push({ label, count, path: buildCategoryPath({ kind: "rol", label, country }) });
+    if (count >= MARKET_MIN_CELL) roles.push({ label, count });
     await yieldToEventLoop();
   }
-  roles.sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, "es"));
+  roles.sort(byCount);
   let withoutRole = 0;
   for (const [title, weight] of titles) if (!matchedTitle.has(title)) withoutRole += weight;
 
-  const modalities = Object.fromEntries(MODALITIES.map((modality) => [modality, 0])) as Record<JobModality, number>;
+  const modalityCounts = Object.fromEntries(MODALITIES.map((modality) => [modality, 0])) as Record<JobModality, number>;
   const sources = new Map<string, number>();
   const companies = new Map<string, { names: Map<string, number>; count: number }>();
   const salaryByCurrency = new Map<string, number[]>();
@@ -201,7 +232,7 @@ export async function buildMarketSnapshot(
   let last7Days = 0;
   let salaryJobs = 0;
   for (const row of rows) {
-    modalities[classifyModality({ source: row.source, remoteType: row.remoteType, title: row.title, location: row.location })] += 1;
+    modalityCounts[classifyModality({ source: row.source, remoteType: row.remoteType, title: row.title, location: row.location })] += 1;
     if (row.source === OFFICIAL_SOURCE || row.sources.includes(OFFICIAL_SOURCE)) official += 1;
     if (row.source) sources.set(row.source, (sources.get(row.source) || 0) + 1);
     if (row.company && !isPlaceholderEmployer(row.company)) {
@@ -226,15 +257,9 @@ export async function buildMarketSnapshot(
 
   const [mainCurrency] = [...salaryByCurrency.entries()].sort(([a, x], [b, y]) => y.length - x.length || a.localeCompare(b));
   let salary: MarketSnapshot["salary"] = null;
-  if (mainCurrency && mainCurrency[1].length >= MARKET_MIN_SALARY_JOBS) {
+  if (mainCurrency && mainCurrency[1].length >= Math.max(MARKET_MIN_SALARY_JOBS, MARKET_MIN_CELL)) {
     const sorted = [...mainCurrency[1]].sort((a, b) => a - b);
-    salary = {
-      currency: mainCurrency[0],
-      jobs: sorted.length,
-      p25: quantile(sorted, 0.25),
-      median: quantile(sorted, 0.5),
-      p75: quantile(sorted, 0.75)
-    };
+    salary = { currency: mainCurrency[0], jobs: sorted.length, p25: quantile(sorted, 0.25), median: quantile(sorted, 0.5), p75: quantile(sorted, 0.75) };
   }
 
   const displayName = (names: Map<string, number>) =>
@@ -245,74 +270,79 @@ export async function buildMarketSnapshot(
     country,
     cutoff: cutoff.toISOString(),
     period: bogotaPeriod(cutoff),
+    minCell: MARKET_MIN_CELL,
+    methodology: marketMethodology(getCountryConfig(country).name),
     total: rows.length,
-    last7Days,
+    last7Days: cell(last7Days),
     cities,
-    withoutCity: rows.length - placed.size,
+    cityHubs: cityLabels.length,
+    withoutCity: cell(rows.length - placed.size),
     roles,
-    withoutRole,
-    modalities,
-    official,
+    roleHubs: DEFAULT_ROLES_200.length,
+    withoutRole: cell(withoutRole),
+    modalities: Object.fromEntries(MODALITIES.map((modality) => [modality, cell(modalityCounts[modality])])) as Record<JobModality, CellCount>,
+    official: cell(official),
     sources: [...sources.entries()]
       .map(([label, count]) => ({ label, count }))
-      .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))
+      .filter((source) => source.count >= MARKET_MIN_CELL)
+      .sort(byCount)
       .slice(0, TOP_SOURCES),
     companies: [...companies.values()]
       .map((entry) => ({ label: displayName(entry.names), count: entry.count }))
-      .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, "es"))
+      .filter((company) => company.count >= MARKET_MIN_CELL)
+      .sort(byCount)
       .slice(0, TOP_COMPANIES),
     companyCount: companies.size,
-    salaryJobs,
+    salaryJobs: cell(salaryJobs),
     salary
   };
 }
 
-/** Shape check for a frozen edition read from disk (data/market-reports). */
+/** Shape check for an edition read from disk (data/market-reports). */
 export function isMarketSnapshot(value: unknown): value is MarketSnapshot {
   if (!value || typeof value !== "object") return false;
   const v = value as Record<string, unknown>;
-  const isCount = (item: unknown) =>
-    !!item && typeof item === "object" && typeof (item as MarketCount).label === "string" && Number.isInteger((item as MarketCount).count);
+  const isCell = (item: unknown) => item === null || (Number.isInteger(item) && (item as number) >= MARKET_MIN_CELL);
+  const isCountList = (list: unknown) =>
+    Array.isArray(list) &&
+    list.every((item) => !!item && typeof item === "object" && typeof (item as MarketCount).label === "string" &&
+      Number.isInteger((item as MarketCount).count) && (item as MarketCount).count >= MARKET_MIN_CELL);
   return (
     v.version === 1 &&
     (v.country === "CO" || v.country === "VE") &&
     typeof v.cutoff === "string" && Number.isFinite(Date.parse(v.cutoff)) &&
-    typeof v.period === "string" && /^\d{4}-\d{2}$/.test(v.period) &&
-    Number.isInteger(v.total) && Number.isInteger(v.last7Days) && Number.isInteger(v.official) &&
-    Number.isInteger(v.withoutCity) && Number.isInteger(v.withoutRole) &&
-    Number.isInteger(v.companyCount) && Number.isInteger(v.salaryJobs) &&
-    Array.isArray(v.cities) && v.cities.every(isCount) &&
-    Array.isArray(v.roles) && v.roles.every(isCount) &&
-    Array.isArray(v.companies) && v.companies.every(isCount) &&
-    Array.isArray(v.sources) && v.sources.every(isCount) &&
+    typeof v.period === "string" && /^\d{4}-(0[1-9]|1[0-2])$/.test(v.period) &&
+    v.minCell === MARKET_MIN_CELL &&
+    Array.isArray(v.methodology) && v.methodology.length > 0 && v.methodology.every((item) => typeof item === "string") &&
+    Number.isInteger(v.total) && (v.total as number) >= 0 &&
+    Number.isInteger(v.cityHubs) && Number.isInteger(v.roleHubs) && Number.isInteger(v.companyCount) &&
+    [v.last7Days, v.withoutCity, v.withoutRole, v.official, v.salaryJobs].every(isCell) &&
+    isCountList(v.cities) && isCountList(v.roles) && isCountList(v.companies) && isCountList(v.sources) &&
     !!v.modalities && typeof v.modalities === "object" &&
-    MODALITIES.every((modality) => Number.isInteger((v.modalities as Record<string, unknown>)[modality])) &&
-    (v.salary === null || (typeof v.salary === "object" && Number.isFinite((v.salary as { median: number }).median)))
+    MODALITIES.every((modality) => isCell((v.modalities as Record<string, unknown>)[modality])) &&
+    (v.salary === null || (!!v.salary && typeof v.salary === "object" && Number.isFinite((v.salary as { median: number }).median)))
   );
 }
 
 const share = (part: number, whole: number) => (whole > 0 ? (part / whole) * 100 : 0);
+const shareOf = (part: CellCount, whole: number) => (part === null ? null : share(part, whole));
 
 export function compareMarketSnapshots(current: MarketSnapshot, previous: MarketSnapshot | null): MarketComparison | null {
   if (!previous || previous.country !== current.country) return null;
   if (previous.period >= current.period) return null;
   const previousCities = new Map(previous.cities.map((city) => [city.label, city.count]));
+  const delta = (a: number | null, b: number | null) => (a === null || b === null ? null : a - b);
   return {
     previousPeriod: previous.period,
     previousCutoff: previous.cutoff,
     totalDelta: current.total - previous.total,
     totalPct: previous.total > 0 ? ((current.total - previous.total) / previous.total) * 100 : null,
-    officialShareDelta: share(current.official, current.total) - share(previous.official, previous.total),
-    remoteShareDelta: share(current.modalities.remoto, current.total) - share(previous.modalities.remoto, previous.total),
+    officialShareDelta: delta(shareOf(current.official, current.total), shareOf(previous.official, previous.total)),
+    remoteShareDelta: delta(shareOf(current.modalities.remoto, current.total), shareOf(previous.modalities.remoto, previous.total)),
     cities: current.cities
-      .filter((city) => previousCities.has(city.label) && (city.count > 0 || previousCities.get(city.label)! > 0))
+      .filter((city) => previousCities.has(city.label))
       .slice(0, 8)
-      .map((city) => ({
-        label: city.label,
-        current: city.count,
-        previous: previousCities.get(city.label)!,
-        delta: city.count - previousCities.get(city.label)!
-      }))
+      .map((city) => ({ label: city.label, current: city.count, previous: previousCities.get(city.label)!, delta: city.count - previousCities.get(city.label)! }))
   };
 }
 
@@ -322,12 +352,17 @@ const integer = (value: number) => value.toLocaleString("es-CO");
 const percent = (value: number) => `${(Math.round(value * 10) / 10).toLocaleString("es-CO", { maximumFractionDigits: 1 })} %`;
 const pct = (part: number, whole: number) => percent(share(part, whole));
 const signed = (value: number) => (value > 0 ? `+${integer(value)}` : value < 0 ? `−${integer(-value)}` : "0");
-const signedPoints = (value: number) => {
+const signedPoints = (value: number | null) => {
+  if (value === null) return "sin datos suficientes";
   const rounded = Math.round(value * 10) / 10;
   const text = Math.abs(rounded).toLocaleString("es-CO", { maximumFractionDigits: 1 });
   return rounded > 0 ? `+${text} puntos` : rounded < 0 ? `−${text} puntos` : "sin cambio";
 };
 const vacancies = (count: number) => (count === 1 ? "1 vacante" : `${integer(count)} vacantes`);
+const SMALL = `menos de ${MARKET_MIN_CELL}`;
+/** «N vacantes (12,3 %)», or «menos de MIN_CELL vacantes» for a suppressed cell. */
+const cellText = (count: CellCount, total: number) =>
+  count === null ? `${SMALL} vacantes` : `${vacancies(count)} (${pct(count, total)})`;
 
 export function formatMarketDate(iso: string): string {
   return new Date(iso).toLocaleDateString("es-CO", { day: "numeric", month: "long", year: "numeric", timeZone: "America/Bogota" });
@@ -362,69 +397,72 @@ export function marketEditionPath(period: string): string {
 
 // ---- report page ------------------------------------------------------
 
-export interface MarketReportEdition {
-  pathname: string;
-  /** True for a frozen month (data/market-reports), false for the live edition. */
-  frozen: boolean;
-  /** Frozen editions available, newest first (YYYY-MM). */
-  editions?: string[];
-}
-
+/**
+ * The page of one edition. `previous` is the edition of an earlier month
+ * (the newest one before it), or null: then the variation reads «sin datos
+ * suficientes». `editions` lists every edition, newest first.
+ */
 export function buildMarketReportContent(
   snapshot: MarketSnapshot,
   previous: MarketSnapshot | null,
-  edition: MarketReportEdition
+  editions: string[] = []
 ): PublicContent {
   const countryName = getCountryConfig(snapshot.country).name;
   const month = marketPeriodLabel(snapshot.period);
   const cutoffDate = formatMarketDate(snapshot.cutoff);
   const total = snapshot.total;
-  const placedCities = snapshot.cities.filter((city) => city.count > 0);
-  const [firstCity, secondCity, thirdCity] = placedCities;
+  const [firstCity, secondCity, thirdCity] = snapshot.cities;
   const topRoles = snapshot.roles.slice(0, TOP_ROLES);
   const comparison = compareMarketSnapshots(snapshot, previous);
-  const known = total - snapshot.modalities.unknown;
+  const pathname = marketEditionPath(snapshot.period);
+  const declared = MODALITIES.filter((modality) => modality !== "unknown")
+    .map((modality) => snapshot.modalities[modality])
+    .reduce<number>((sum, value) => sum + (value ?? 0), 0);
 
   const cityParagraphs = firstCity
     ? [
         `${firstCity.label} concentra ${vacancies(firstCity.count)}, el ${pct(firstCity.count, total)} del total del país en este corte.` +
           (secondCity ? ` Le sigue ${secondCity.label} con ${vacancies(secondCity.count)} (${pct(secondCity.count, total)})` : "") +
           (thirdCity ? ` y ${thirdCity.label} con ${vacancies(thirdCity.count)} (${pct(thirdCity.count, total)}).` : secondCity ? "." : ""),
-        `${vacancies(snapshot.withoutCity)} (${pct(snapshot.withoutCity, total)}) no mencionan ninguna de las ${snapshot.cities.length} ciudades que seguimos: son de otros municipios, de todo el país o no dicen dónde.`
+        `De las ${snapshot.cityHubs} ciudades que seguimos, ${snapshot.cities.length} tienen al menos ${MARKET_MIN_CELL} vacantes. ${cellText(snapshot.withoutCity, total)} no mencionan ninguna de ellas: son de otros municipios, de todo el país o no dicen dónde.`
       ]
-    : ["Sin datos suficientes: ninguna vacante del corte menciona una de las ciudades que seguimos."];
+    : ["Sin datos suficientes: ninguna de las ciudades que seguimos alcanza el mínimo de vacantes para publicarse."];
 
   const roleParagraphs = topRoles.length > 0
     ? [
         `El cargo con más vacantes es ${topRoles[0]!.label} (${vacancies(topRoles[0]!.count)}, ${pct(topRoles[0]!.count, total)} del total).` +
           (topRoles[1] ? ` Después vienen ${topRoles.slice(1, 4).map((role) => `${role.label} (${integer(role.count)})`).join(", ")}.` : ""),
-        `Una vacante puede contar en más de un cargo si su título encaja en varios, y ${vacancies(snapshot.withoutRole)} (${pct(snapshot.withoutRole, total)}) no encajan en ninguno de los ${DEFAULT_ROLES_200.length} cargos que seguimos.`
+        `Una vacante puede contar en más de un cargo si su título encaja en varios. ${cellText(snapshot.withoutRole, total)} no encajan en ninguno de los ${snapshot.roleHubs} cargos que seguimos.`
       ]
-    : ["Sin datos suficientes: ningún título del corte coincide con los cargos que seguimos."];
+    : ["Sin datos suficientes: ningún cargo de los que seguimos alcanza el mínimo de vacantes para publicarse."];
 
   const modalityParagraphs = [
-    `${MODALITIES.filter((modality) => modality !== "unknown" && snapshot.modalities[modality] > 0)
-      .map((modality) => `${vacancies(snapshot.modalities[modality])} ${MODALITY_WORDS[modality]} (${pct(snapshot.modalities[modality], total)})`)
-      .join(", ") || "Ninguna vacante declara modalidad"}.`,
-    `${vacancies(snapshot.modalities.unknown)} (${pct(snapshot.modalities.unknown, total)}) no dicen si son presenciales, híbridas o remotas; entre las ${integer(known)} que sí lo dicen, el ${pct(snapshot.modalities.remoto, known)} son remotas.`
+    `${MODALITIES.filter((modality) => modality !== "unknown").map((modality) => `${MODALITY_WORDS[modality]}: ${cellText(snapshot.modalities[modality], total)}`).join("; ")}.`.replace(/^./, (letter) => letter.toUpperCase()),
+    `${cellText(snapshot.modalities.unknown, total)} no dicen si son presenciales, híbridas o remotas.` +
+      (snapshot.modalities.remoto !== null && declared > 0
+        ? ` Entre las ${integer(declared)} que sí lo dicen, el ${pct(snapshot.modalities.remoto, declared)} son remotas.`
+        : "")
   ];
 
   const sourceParagraphs = [
-    `${vacancies(snapshot.official)} (${pct(snapshot.official, total)}) vienen del portal de empleo del propio empleador, la fuente más directa: la publica la empresa para que se difunda. El resto proviene de portales de empleo de terceros, siempre con enlace a la publicación original.`,
-    `Fuente principal de cada vacante: ${snapshot.sources.map((source) => `${source.label} ${integer(source.count)} (${pct(source.count, total)})`).join(", ")}.`
+    `${cellText(snapshot.official, total)} vienen del portal de empleo del propio empleador, la fuente más directa: la publica la empresa para que se difunda. El resto proviene de portales de empleo de terceros, siempre con enlace a la publicación original.`,
+    snapshot.sources.length > 0
+      ? `Fuente principal de cada vacante: ${snapshot.sources.map((source) => `${source.label} ${integer(source.count)} (${pct(source.count, total)})`).join(", ")}.`
+      : "Sin datos suficientes para repartir por fuente."
   ];
 
-  const companyParagraphs = snapshot.companies.length > 0
-    ? [
-        `${integer(snapshot.companyCount)} empresas identificadas publican vacantes activas. Las que más publican: ${snapshot.companies
-          .map((company) => `${company.label} (${integer(company.count)})`)
-          .join(", ")}.`,
-        `Las diez primeras suman ${vacancies(snapshot.companies.reduce((sum, company) => sum + company.count, 0))}, el ${pct(snapshot.companies.reduce((sum, company) => sum + company.count, 0), total)} del total. Las ofertas de empleador confidencial no cuentan como empresa.`
-      ]
-    : ["Sin datos suficientes: ninguna vacante del corte nombra a su empleador."];
+  const companiesTotal = snapshot.companies.reduce((sum, company) => sum + company.count, 0);
+  const companyParagraphs = [
+    `${integer(snapshot.companyCount)} empresas identificadas publican vacantes activas; las ofertas de empleador confidencial no cuentan como empresa.`,
+    snapshot.companies.length > 0
+      ? `Las que más publican: ${snapshot.companies.map((company) => `${company.label} (${integer(company.count)})`).join(", ")}. Juntas suman ${vacancies(companiesTotal)}, el ${pct(companiesTotal, total)} del total.`
+      : `Sin datos suficientes: ninguna empresa alcanza ${MARKET_MIN_CELL} vacantes activas en este corte.`
+  ];
 
   const salaryParagraphs = [
-    `${vacancies(snapshot.salaryJobs)} de ${integer(total)} (${pct(snapshot.salaryJobs, total)}) publican un salario.`,
+    snapshot.salaryJobs === null
+      ? `${SMALL} vacantes publican un salario.`
+      : `${vacancies(snapshot.salaryJobs)} de ${integer(total)} (${pct(snapshot.salaryJobs, total)}) publican un salario.`,
     snapshot.salary
       ? `Entre las ${integer(snapshot.salary.jobs)} que lo publican en ${snapshot.salary.currency === "COP" ? "pesos colombianos" : snapshot.salary.currency}, el valor central (mediana del punto medio de cada rango) es ${money(snapshot.salary.currency, snapshot.salary.median)}; la mitad de esas ofertas está entre ${money(snapshot.salary.currency, snapshot.salary.p25)} y ${money(snapshot.salary.currency, snapshot.salary.p75)}. Es el valor tal como lo publica la fuente: no siempre dice si es mensual ni si incluye prestaciones.`
       : `Sin datos suficientes para dar un salario típico: hacen falta al menos ${MARKET_MIN_SALARY_JOBS} vacantes con salario publicado en una misma moneda.`
@@ -433,79 +471,65 @@ export function buildMarketReportContent(
   const variationParagraphs = comparison
     ? [
         `Frente al corte del ${formatMarketDate(comparison.previousCutoff)} (${marketPeriodLabel(comparison.previousPeriod)}), las vacantes activas pasaron de ${integer(total - comparison.totalDelta)} a ${integer(total)}: ${signed(comparison.totalDelta)}${comparison.totalPct === null ? "" : ` (${comparison.totalPct >= 0 ? "+" : "−"}${percent(Math.abs(comparison.totalPct))})`}.`,
-        `La cuota del portal oficial del empleador cambió ${signedPoints(comparison.officialShareDelta)} y la de vacantes remotas ${signedPoints(comparison.remoteShareDelta)}.`,
+        `Cuota del portal oficial del empleador: ${signedPoints(comparison.officialShareDelta)}. Cuota de vacantes remotas: ${signedPoints(comparison.remoteShareDelta)}.`,
         ...(comparison.cities.length > 0
           ? [`Por ciudad: ${comparison.cities.map((city) => `${city.label} ${signed(city.delta)} (de ${integer(city.previous)} a ${integer(city.current)})`).join(", ")}.`]
           : [])
       ]
-    : [
-        "Variación respecto al mes anterior: sin datos suficientes. La comparación necesita la edición congelada del mes anterior, y todavía no existe; aparecerá aquí desde la siguiente edición."
-      ];
+    : ["Sin datos suficientes: la comparación necesita la edición de un mes anterior, y todavía no existe. Aparecerá aquí desde la siguiente edición."];
 
-  const editionLinks = [
-    { label: "Todos los informes", href: MARKET_REPORT_INDEX_PATH },
-    ...(edition.frozen ? [{ label: "Edición en curso", href: MARKET_REPORT_PATH }] : []),
-    ...(edition.editions ?? [])
-      .filter((period) => marketEditionPath(period) !== edition.pathname)
-      .slice(0, 6)
-      .map((period) => ({ label: `Edición de ${marketPeriodLabel(period)}`, href: marketEditionPath(period) }))
-  ];
+  const otherEditions = editions.filter((period) => period !== snapshot.period).slice(0, 6);
 
   return {
-    pathname: edition.pathname,
+    pathname,
     title: `Mercado laboral en ${countryName}, ${month}: vacantes por ciudad y cargo | BuscoTrabajo`,
     description: `${vacancies(total)} activas en ${countryName} al ${cutoffDate}: reparto por ciudad, cargo, modalidad y fuente, salarios publicados y metodología. Datos propios de BuscoTrabajo.`,
     heading: `Mercado laboral en ${countryName}: informe de ${month}`,
     introduction: [
-      `Fecha de corte: ${formatMarketDateTime(snapshot.cutoff)} (hora de Colombia). En ese momento había ${vacancies(total)} activas y sin duplicados en ${countryName}, de ${integer(snapshot.companyCount)} empresas identificadas; ${vacancies(snapshot.last7Days)} (${pct(snapshot.last7Days, total)}) se publicaron en los 7 días anteriores.`,
-      edition.frozen
-        ? `Esta es la edición congelada de ${month}: sus cifras no cambian.`
-        : `Esta es la edición en curso de ${month}: se recalcula como mucho cada pocas horas con el corpus vivo, y al cerrar el mes se congela en su propia dirección.`,
-      "Ningún portal individual puede dar estas cifras: salen de cruzar y deduplicar las vacantes de todos los portales que reúne BuscoTrabajo."
+      `Fecha de corte: ${formatMarketDateTime(snapshot.cutoff)} (hora de Colombia). En ese momento había ${vacancies(total)} activas y sin duplicados en ${countryName}, de ${integer(snapshot.companyCount)} empresas identificadas; ${snapshot.last7Days === null ? `${SMALL}` : `${integer(snapshot.last7Days)} (${pct(snapshot.last7Days, total)})`} se publicaron en los 7 días anteriores.`,
+      `Esta edición está congelada: sus cifras no cambian aunque cambie el corpus. Ningún portal individual puede dar estas cifras: salen de cruzar y deduplicar las vacantes de todos los portales que reúne BuscoTrabajo.`
     ],
     sections: [
       {
-        heading: `Vacantes por ciudad`,
+        heading: "Vacantes por ciudad",
         paragraphs: cityParagraphs,
-        links: placedCities.slice(0, 12).map((city) => ({ label: `${city.label}: ${vacancies(city.count)} (${pct(city.count, total)})`, href: city.path }))
+        links: snapshot.cities.slice(0, 12).map((city) => ({
+          label: `${city.label}: ${vacancies(city.count)} (${pct(city.count, total)})`,
+          href: buildCategoryPath({ kind: "ciudad", label: city.label, country: snapshot.country })
+        }))
       },
       {
         heading: "Cargos con más vacantes",
         paragraphs: roleParagraphs,
-        links: topRoles.map((role) => ({ label: `${role.label}: ${vacancies(role.count)}`, href: role.path }))
+        links: topRoles.map((role) => ({ label: `${role.label}: ${vacancies(role.count)}`, href: buildCategoryPath({ kind: "rol", label: role.label, country: snapshot.country }) }))
       },
       { heading: "Modalidad de trabajo", paragraphs: modalityParagraphs },
       { heading: "De dónde vienen las vacantes", paragraphs: sourceParagraphs },
       { heading: "Empresas que más publican", paragraphs: companyParagraphs },
       { heading: "Salarios publicados", paragraphs: salaryParagraphs },
       { heading: "Variación respecto al mes anterior", paragraphs: variationParagraphs },
-      {
-        heading: "Metodología",
-        paragraphs: [
-          `Se cuentan las vacantes activas en el momento del corte: publicadas en los últimos 30 días, sin plazo vencido y sin cierre confirmado por la fuente. Cada vacante cuenta una sola vez aunque aparezca en varios portales (misma URL normalizada o mismo cargo, empresa y ubicación). Las vacantes remotas sin país se cuentan en ${countryName}, igual que en el buscador.`,
-          "La ciudad sale del texto de ubicación, con el mismo filtro que usan las páginas de cada ciudad; el cargo, de las palabras del título, con el mismo criterio que las páginas de cada cargo; la modalidad, de lo que declara la fuente o, si no lo declara, del título y la ubicación. Una vacante es del portal oficial cuando su fuente principal o una de sus fuentes fusionadas es el portal de empleo del propio empleador.",
-          "Todo se calcula por código, sin redacción manual de cifras ni modelos de lenguaje. La explicación completa de cómo se obtienen, deduplican y retiran las vacantes está en la página de metodología."
-        ],
-        links: [{ label: "Metodología de BuscoTrabajo", href: "/metodologia" }]
-      },
+      { heading: "Metodología", paragraphs: snapshot.methodology, links: [{ label: "Metodología de BuscoTrabajo", href: "/metodologia" }] },
       {
         heading: "Límites de estos datos",
         paragraphs: [
           "Es una foto de las vacantes publicadas en internet en los portales que reunimos, no una estadística oficial de empleo ni de desempleo: para eso están el DANE y el Servicio Público de Empleo. Muchas contrataciones no pasan por un portal.",
           "Mide el inventario vivo en la fecha de corte, no cuántas vacantes se publicaron en todo el mes: una oferta que se cerró antes del corte no aparece.",
-          `El salario y la modalidad dependen de lo que publique cada fuente; el ${pct(snapshot.salaryJobs, total)} publica salario y el ${pct(snapshot.modalities.unknown, total)} no declara modalidad. Cuando una cifra no tiene cobertura suficiente se indica «sin datos suficientes» en lugar de estimarla.`
+          `El salario y la modalidad dependen de lo que publique cada fuente${snapshot.salaryJobs === null ? "" : `; el ${pct(snapshot.salaryJobs, total)} publica salario`}${snapshot.modalities.unknown === null ? "" : ` y el ${pct(snapshot.modalities.unknown, total)} no declara modalidad`}. Cuando una cifra no tiene cobertura suficiente se indica «sin datos suficientes» o «${SMALL}» en lugar de estimarla.`
         ]
       },
-      { heading: "Otras ediciones", paragraphs: ["Cada mes cerrado conserva su edición con su propia dirección para comparar en el tiempo."], links: editionLinks }
+      {
+        heading: "Otras ediciones",
+        paragraphs: [otherEditions.length > 0 ? "Cada mes conserva su edición en su propia dirección para comparar en el tiempo." : "Esta es la primera edición; cada mes nuevo tendrá la suya en su propia dirección."],
+        links: [
+          { label: "Todos los informes", href: MARKET_REPORT_INDEX_PATH },
+          ...otherEditions.map((period) => ({ label: `Edición de ${marketPeriodLabel(period)}`, href: marketEditionPath(period) }))
+        ]
+      }
     ]
   };
 }
 
-export function buildMarketReportIndexContent(live: MarketSnapshot | null, editions: string[]): PublicContent {
-  const links = [
-    ...(live ? [{ label: `Edición en curso: ${marketPeriodLabel(live.period)} (${vacancies(live.total)} al ${formatMarketDate(live.cutoff)})`, href: MARKET_REPORT_PATH }] : [{ label: "Edición en curso", href: MARKET_REPORT_PATH }]),
-    ...editions.map((period) => ({ label: `Edición de ${marketPeriodLabel(period)}`, href: marketEditionPath(period) }))
-  ];
+export function buildMarketReportIndexContent(latest: MarketSnapshot | null, editions: string[]): PublicContent {
   return {
     pathname: MARKET_REPORT_INDEX_PATH,
     title: "Informes del mercado laboral en Colombia | BuscoTrabajo",
@@ -516,8 +540,20 @@ export function buildMarketReportIndexContent(live: MarketSnapshot | null, editi
       "Las cifras se calculan por código con el corpus deduplicado, llevan su fecha de corte y dicen qué no miden. Cuando una cifra no tiene cobertura suficiente, el informe lo dice en vez de estimarla."
     ],
     sections: [
-      { heading: "Ediciones", paragraphs: [editions.length > 0 ? `${editions.length === 1 ? "Hay 1 edición cerrada" : `Hay ${editions.length} ediciones cerradas`} además de la edición en curso.` : "La edición en curso es la primera; cada mes cerrado conservará la suya."], links },
-      { heading: "Cómo se calculan", paragraphs: ["Con las mismas reglas de deduplicación, vigencia y filtros que el buscador y las páginas de ciudad y cargo. El detalle está en la sección de metodología de cada informe y en la página de metodología del sitio."], links: [{ label: "Metodología de BuscoTrabajo", href: "/metodologia" }] }
+      {
+        heading: "Ediciones",
+        paragraphs: [
+          latest
+            ? `La edición más reciente es la de ${marketPeriodLabel(latest.period)}, con corte del ${formatMarketDate(latest.cutoff)}: ${vacancies(latest.total)} activas en ${getCountryConfig(latest.country).name}.`
+            : "Todavía no hay ediciones publicadas."
+        ],
+        links: editions.map((period) => ({ label: `Informe de ${marketPeriodLabel(period)}`, href: marketEditionPath(period) }))
+      },
+      {
+        heading: "Cómo se calculan",
+        paragraphs: ["Con las mismas reglas de deduplicación, vigencia y filtros que el buscador y las páginas de ciudad y cargo. Solo se publican agregados de al menos diez vacantes. El detalle está en la sección de metodología de cada informe y en la página de metodología del sitio."],
+        links: [{ label: "Metodología de BuscoTrabajo", href: "/metodologia" }]
+      }
     ]
   };
 }
@@ -530,16 +566,20 @@ export function staticHubRobots(total: number): string | null {
 }
 
 /**
- * The snapshot's count for a static city/role hub (sitemap guard). Undefined
- * when there is no snapshot for that country or the hub isn't one it counts,
- * so an unknown hub keeps today's behaviour (listed).
+ * The snapshot's count for a static city/role hub (sitemap guard). A hub the
+ * snapshot measured but suppressed has fewer than minCell vacancies (0 here,
+ * i.e. below the guard). Undefined when there is no snapshot of that country
+ * or the hub isn't one it measures, so an unknown hub stays listed.
  */
 export function knownStaticHubTotal(snapshot: MarketSnapshot | undefined, category: ResolvedCategory): number | undefined {
   if (!snapshot || snapshot.country !== category.country) return undefined;
-  if (category.kind === "ciudad") return snapshot.cities.find((city) => city.label === category.label)?.count;
+  if (category.kind === "ciudad") {
+    if (!hasLabel(marketCityLabels(snapshot.country), category.label)) return undefined;
+    return findLabel(snapshot.cities, category.label)?.count ?? 0;
+  }
   if (category.kind === "rol") {
-    if (!DEFAULT_ROLES_200.includes(category.label)) return undefined;
-    return snapshot.roles.find((role) => role.label === category.label)?.count ?? 0;
+    if (!hasLabel(DEFAULT_ROLES_200, category.label)) return undefined;
+    return findLabel(snapshot.roles, category.label)?.count ?? 0;
   }
   return undefined;
 }
@@ -548,7 +588,7 @@ type HubJob = Pick<Job, "title" | "company" | "location" | "source"> & { sources
 
 /**
  * One paragraph comparing a hub with the country, from the hub's own total
- * and rows and the last national snapshot. Null without a snapshot of the
+ * and rows and the newest national edition. Null without an edition of the
  * hub's country (never a guess).
  */
 export function buildHubComparison(input: {
@@ -566,28 +606,27 @@ export function buildHubComparison(input: {
       : category.kind === "rol"
         ? `El cargo ${category.label}`
         : category.label;
-  const sentences: string[] = [];
-  sentences.push(
-    `${subject} suma ${vacancies(total)} activas, el equivalente al ${pct(Math.min(total, national.total), national.total)} de las ${integer(national.total)} vacantes de ${countryName} en nuestro último corte (${formatMarketDate(national.cutoff)}).`
-  );
+  const month = marketPeriodLabel(national.period);
+  const sentences: string[] = [
+    `${subject} tiene hoy ${vacancies(total)} activas. En el informe de ${month} (corte del ${formatMarketDate(national.cutoff)}), ${countryName} sumaba ${vacancies(national.total)}${total <= national.total ? `: esta página equivale al ${pct(total, national.total)} de esa cifra` : ""}.`
+  ];
   const ranking = category.kind === "ciudad" ? national.cities : category.kind === "rol" ? national.roles : [];
-  const rank = ranking.findIndex((entry) => entry.label === category.label);
+  const rank = ranking.findIndex((entry) => labelKey(entry.label) === labelKey(category.label));
   if (rank >= 0) {
-    const of = ranking.filter((entry) => entry.count > 0).length;
     sentences.push(
       category.kind === "ciudad"
-        ? `Ocupa el puesto ${rank + 1} entre las ${of} ciudades con vacantes que seguimos.`
-        : `Es el número ${rank + 1} entre los ${of} cargos con vacantes que seguimos.`
+        ? `En ese corte ocupaba el puesto ${rank + 1} entre las ${ranking.length} ciudades con al menos ${MARKET_MIN_CELL} vacantes.`
+        : `En ese corte era el número ${rank + 1} entre los ${ranking.length} cargos con al menos ${MARKET_MIN_CELL} vacantes.`
     );
   }
   if (jobs.length > 0) {
     const sample = jobs.length;
     const remote = jobs.filter((job) => classifyModality({ source: job.source, remoteType: job.remoteType, title: job.title, location: job.location }) === "remoto").length;
     const official = jobs.filter((job) => job.source === OFFICIAL_SOURCE || (job.sources ?? []).includes(OFFICIAL_SOURCE)).length;
-    const scope = sample < total ? `en las ${integer(sample)} más recientes` : `en ${sample === 1 ? "la vacante" : `las ${integer(sample)} vacantes`} de esta página`;
-    sentences.push(
-      `${scope.charAt(0).toUpperCase()}${scope.slice(1)}, el ${pct(remote, sample)} es remoto (${pct(national.modalities.remoto, national.total)} en todo el país) y el ${pct(official, sample)} viene del portal oficial del empleador (${pct(national.official, national.total)} en el país).`
-    );
+    const scope = sample < total ? `En las ${integer(sample)} vacantes más recientes de esta página` : `En ${sample === 1 ? "la vacante" : `las ${integer(sample)} vacantes`} de esta página`;
+    const nationalRemote = national.modalities.remoto === null ? "" : ` (${pct(national.modalities.remoto, national.total)} en el país)`;
+    const nationalOfficial = national.official === null ? "" : ` (${pct(national.official, national.total)} en el país)`;
+    sentences.push(`${scope}, el ${pct(remote, sample)} es remoto${nationalRemote} y el ${pct(official, sample)} viene del portal oficial del empleador${nationalOfficial}.`);
     const companies = new Map<string, { label: string; count: number }>();
     for (const job of jobs) {
       if (!job.company || isPlaceholderEmployer(job.company)) continue;
@@ -631,13 +670,35 @@ export function homeShareLabel(count: number | null | undefined, totalJobs: numb
   return `${pct(count, totalJobs)} del país`;
 }
 
+/** What the home shows from the newest edition: role counts and where they come from. */
+export interface HomeMarketFigures {
+  period: string;
+  cutoff: string;
+  roleCounts: Record<string, number>;
+}
+
+export function buildHomeMarketFigures(snapshot: MarketSnapshot | undefined, roles: readonly string[]): HomeMarketFigures | null {
+  if (!snapshot) return null;
+  const roleCounts: Record<string, number> = {};
+  for (const role of roles) {
+    const entry = findLabel(snapshot.roles, role);
+    if (entry) roleCounts[role] = entry.count;
+  }
+  return { period: snapshot.period, cutoff: snapshot.cutoff, roleCounts };
+}
+
+export function homeRolesContext(figures: HomeMarketFigures | null | undefined): string | null {
+  if (!figures) return null;
+  return `Cifras del informe del mercado laboral de ${marketPeriodLabel(figures.period)} (corte del ${formatMarketDate(figures.cutoff)}). Los cargos sin cifra tenían menos de ${MARKET_MIN_CELL} vacantes en ese corte.`;
+}
+
 // ---- routes -----------------------------------------------------------
 
-export type MarketReportRoute = { kind: "index" } | { kind: "live" } | { kind: "edition"; period: string };
+export type MarketReportRoute = { kind: "index" } | { kind: "latest" } | { kind: "edition"; period: string };
 
 export function parseMarketReportPath(pathname: string): MarketReportRoute | null {
   if (pathname === MARKET_REPORT_INDEX_PATH) return { kind: "index" };
-  if (pathname === MARKET_REPORT_PATH) return { kind: "live" };
+  if (pathname === MARKET_REPORT_PATH) return { kind: "latest" };
   const match = EDITION_PATH.exec(pathname);
   if (!match) return null;
   const month = Number(match[2]);
@@ -650,8 +711,17 @@ export function marketReportsEnabled(env: Record<string, string | undefined> = p
   return !(value === "false" || value === "0" || value === "off");
 }
 
-/** sitemap-pages.xml entries of the reports (none with the switch off). */
+/**
+ * sitemap-pages.xml entries of the reports: the index and every edition, only
+ * once at least one edition exists (an empty index is thin), none with the
+ * switch off.
+ */
 export function marketReportSitemapEntries(enabled: boolean, editions: string[]): string[] {
-  if (!enabled) return [];
-  return [MARKET_REPORT_INDEX_PATH, MARKET_REPORT_PATH, ...editions.map(marketEditionPath)];
+  if (!enabled || editions.length === 0) return [];
+  return [MARKET_REPORT_INDEX_PATH, ...editions.map(marketEditionPath)];
+}
+
+/** The newest edition strictly before `period`, from a newest-first list. */
+export function previousEdition<T extends { period: string }>(editions: readonly T[], period: string): T | null {
+  return editions.find((edition) => edition.period < period) ?? null;
 }
