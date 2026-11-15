@@ -360,6 +360,59 @@ Aprobadas el 2026-11-15 en el chat:
    «Lista de 12 temas … aprobada por el propietario» de
    `openspec/changes/adsense-readiness/tasks.md`.
 
+## 7. Primera auditoría del sitio (2026-11-15 11:07)
+
+La auditoría inicial que lanzó la creación del proyecto. Datos leídos en
+`/es/analyze/site-audit`:
+
+- **Puntuación on-page: 80 («Alta»).**
+- **Páginas:** 1.000 rastreadas (el tope del plan). 999 válidas,
+  1 redirección, 0 rotas, 0 bloqueadas y 0 con código 4XX.
+- **Rastreo:** ~0,5 páginas por segundo durante ~35 minutos. Aunque el
+  proyecto tiene los sitemaps de hubs y páginas, el rastreador sigue los
+  enlaces y **casi todo lo rastreado son vacantes**.
+
+**Lo que pasa limpio:**
+
+- sitemap y SSL;
+- sin meta descripciones duplicadas ni ausentes;
+- sin `noindex` inesperado;
+- ninguna página lenta, H1 en todas y compresión activa;
+- sin enlaces rotos y sin redirecciones temporales.
+
+**571 problemas, en 6 tipos:**
+
+| Problema | Páginas | De qué se trata | ¿Actuar? |
+|---|---:|---|---|
+| Pocas palabras | 114 | 102 son vacantes (93–197 palabras en el HTML del servidor). Las otras 12 son páginas propias: `/como-funciona` (31 palabras), `/preguntas`, `/legal/*` (cookies, privacidad, términos, uso aceptable), `/fuentes`, `/opiniones`, `/empresas`, `/ve/empresas`, `/dashboard` (132) y `/ve/dashboard`. | **Sí.** Las páginas propias son el mismo hallazgo de `adsense-readiness` (HTML crudo de 6–39 palabras en `/legal/*`, `/como-funciona` y `/preguntas`). Lo corrigen F1b y F2; tras su despliegue, **volver a auditar** para comprobarlo. Las vacantes cortas son el caso de `job-page-differentiation`. |
+| `<title>` duplicados | 21 | La misma vacante publicada en varias ciudades. Por ejemplo, «Gestor(a) comercial - colocación de productos financieros» en Medellín, Bucaramanga, Zipaquirá, Ibagué y Manizales tiene 5 URL distintas con el mismo título. Causa en el código: `buildJobTitleTag` (`src/lib/job-seo.ts:423`) **quita la ciudad cuando `{título} en {ciudad}` supera `JOB_TITLE_TAG_MAX`**. Unos pocos casos («Conductor en Bogotá – ACTIVOS S.A.S») son la misma vacante dos veces. | **Sí, pero en un cambio propio.** Si el título es largo, conservar la ciudad (recortar la empresa y la marca antes que la ciudad, o aceptar algo más de longitud). Respeta la regla del roadmap de no quitar nunca la ciudad del título. Los duplicados exactos van a dedupe. |
+| URL «mal formateada» | 197 | El UUID en `/empleos/{uuid}/{slug}`, además de `/about`, `/contact`, `/docs` y `/dashboard` | **No.** El UUID es la identidad estable de la vacante (ver el bug de churn de URL en `SEO-PLAN.md` §9). `/about`, `/contact`, `/docs` y `/privacy` son superficies del contrato de agentes (`agent-readiness.ts`) y están protegidas. |
+| URL muy largas | 180 | Los slugs de vacantes largos | **No**, por el mismo motivo. Como mucho, recortar el slug en vacantes nuevas, nunca en las existentes. |
+| `<title>` muy largo | 53 | Vacantes con título de fuente largo. El código nunca corta el título del cargo. | No. Es decisión de diseño. |
+| `<title>` muy corto | 6 | `/about`, `/contact`, `/privacy`, `/legal/uso-aceptable` y 2 vacantes («Consultor rpa», «HRBP en Bogota») | Bajo. Solo `/legal/uso-aceptable` puede alargarse sin tocar el contrato de agentes. |
+
+**Velocidad (datos de visitantes reales de 28 días, escritorio):**
+
+- tiempo de carga 2,23 s («genial»);
+- interactividad 84 ms («genial»);
+- **estabilidad visual (CLS) 0,17: «precisa de mejoras»**. El umbral es ≤ 0,1.
+
+Es dato de campo, distinto del 100 de laboratorio de PageSpeed del
+2026-11-08. Vale una revisión propia del CLS en escritorio (anuncios, imágenes
+y bloques que llegan tarde) siguiendo el runbook de rendimiento.
+
+**Acciones nuevas que salen de la auditoría**, para añadir al roadmap:
+
+1. **Código:** conservar la ciudad en el `<title>` de las vacantes con título
+   largo (21 duplicados; esfuerzo S–M, cambio propio y `seo-drift`).
+2. **Código:** investigar el CLS de 0,17 en escritorio (esfuerzo M).
+3. **Verificación:** volver a auditar después de desplegar `adsense-readiness`
+   F1b y F2. Las 12 páginas propias deberían salir de «pocas palabras».
+4. **Proceso:** si el plan lo permite, limitar o excluir `/empleos/{uuid}`
+   de la auditoría mensual. Así las 1.000 páginas cubren hubs, intención,
+   empresas y guías. Si no se puede, auditar esas plantillas por URL
+   exacta.
+
 ## Anexo A — Lista propuesta para el Rank Tracking
 
 Son 100 palabras: 78 de Colombia y 22 de Venezuela. Quedan 25 de margen.
