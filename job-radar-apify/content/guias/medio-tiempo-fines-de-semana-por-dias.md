@@ -15,7 +15,7 @@ Trabajar medio tiempo, solo los fines de semana o algunos días al mes es la opc
 
 ## Cuántas vacantes hay hoy
 
-Al corte de esta guía, la página de [trabajo de medio tiempo](/empleos/medio-tiempo) de BuscoTrabajo listaba 39 vacantes activas en Colombia, y la de [trabajo los fines de semana](/empleos/fines-de-semana) listaba 33.[^bt-medio][^bt-finde] Son pocas frente al total del país, en parte porque muchas empresas no dicen en el título que el horario es parcial. Por eso conviene leer la descripción de cada vacante y preguntar por el horario en la entrevista, aunque el anuncio no lo mencione.
+Al corte de esta guía, la página de [trabajo de medio tiempo](/empleos/medio-tiempo) de BuscoTrabajo listaba 39 vacantes activas en Colombia, y la de [trabajo los fines de semana](/empleos/fines-de-semana) listaba 33.[^bt-medio][^bt-finde] Son pocas frente al total del país, y esas páginas solo reúnen las vacantes que el buscador logra identificar con ese horario. Por eso conviene leer la descripción de cada vacante y preguntar por el horario en la entrevista, aunque el anuncio no lo mencione.
 
 ## Un contrato de pocas horas sigue siendo un contrato de trabajo
 
@@ -27,7 +27,7 @@ El mismo decreto aclara que el paso de tiempo completo a tiempo parcial, o al re
 
 La jornada ordinaria máxima se ha ido reduciendo. La Ley 2101 de 2021 fijó una reducción gradual: una hora menos a los dos años de su entrada en vigencia, otra a los tres años y luego dos horas por año hasta llegar a 42 horas semanales, sin bajar el salario.[^ley2101] La reforma laboral de 2025 mantuvo ese límite de 42 horas a la semana y de ocho horas al día, sin perjuicio de esa aplicación gradual.[^ley2466]
 
-Esas 42 horas pueden repartirse en cinco o seis días a la semana, siempre con un día de descanso.[^ley2466] Si se pacta una jornada flexible, cada día puede tener entre cuatro horas continuas y nueve horas, sin recargo por trabajo suplementario mientras no se supere el promedio semanal.[^ley2466] Las horas extra, diurnas o nocturnas, no pueden pasar de dos al día ni de doce a la semana.[^ley2466]
+Esas 42 horas pueden repartirse en cinco o seis días a la semana, siempre con un día de descanso.[^ley2466] Si se pacta una jornada flexible, cada día puede tener entre cuatro horas continuas y nueve horas, sin recargo por trabajo suplementario mientras no se supere el promedio semanal.[^ley2466] Las horas extra, diurnas o nocturnas, no pueden pasar de dos al día ni de doce a la semana; la misma norma exceptúa de ese límite al sector de seguridad y al sector salud, que tienen reglas propias.[^ley2466]
 
 Para quienes trabajan medio tiempo, esto importa por una razón: si te contratan por pocas horas y luego te piden quedarte más, esas horas adicionales por encima de tu jornada pactada deben quedar registradas y pagadas. La reforma obliga al empleador a llevar un registro del trabajo suplementario y a entregarte una relación de tus horas extra si la pides.[^ley2466]
 

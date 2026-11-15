@@ -38,7 +38,7 @@ La APE también atiende a las empresas, que pueden registrarse y publicar vacant
 
 Este es el punto más importante de la guía. Las actividades básicas de gestión y colocación se prestan siempre de forma gratuita para el trabajador, según el artículo 2.2.6.1.2.4 del Decreto 1072 de 2015.[^d1072] La APE lo repite en su portal: todos sus servicios son gratuitos.[^ape]
 
-La norma va más allá. A todos los prestadores del Servicio Público de Empleo les está prohibido cobrar por los servicios que deben prestar gratis, y también ofrecer condiciones de empleo falsas o engañosas.[^d1072] Las agencias privadas con ánimo de lucro pueden cobrar, pero al empleador que usa sus servicios, no a quien busca trabajo.[^ley1636] Y quien se dedique a colocar personal sin autorización del Ministerio del Trabajo puede recibir multas.[^ley1636]
+La norma va más allá. A todos los prestadores del Servicio Público de Empleo les está prohibido cobrar por los servicios que deben prestar gratis, y también ofrecer condiciones de empleo falsas o engañosas.[^d1072] Las agencias privadas con ánimo de lucro pueden cobrar al empleador que usa sus servicios[^ley1636], pero los servicios básicos siguen siendo gratuitos para quien busca trabajo.[^d1072] Y quien se dedique a colocar personal sin autorización del Ministerio del Trabajo puede recibir multas.[^ley1636]
 
 Si alguien te pide dinero por inscribirte, por «asegurarte» una vacante o por una entrevista, desconfía. El Servicio Público de Empleo lo recuerda en su página principal: no cobra por vacantes.[^spe]
 

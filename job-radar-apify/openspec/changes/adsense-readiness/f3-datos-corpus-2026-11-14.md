@@ -34,8 +34,32 @@ Notas:
   cargos equivalentes («aprendiz» y «practicante» devuelven lo mismo). Por
   eso las guías dicen «una búsqueda de aprendiz devolvía», no «vacantes que
   mencionan aprendiz en su texto».
-- El hub `/empleos/remoto` mostraba 710 en ese momento: cuenta otra cosa
-  (vacantes aptas para la página), así que la guía de remoto usa la API y no
-  cita esa cifra.
+- Los hubs por intención (`/empleos/remoto`, `/sin-experiencia`,
+  `/medio-tiempo`, `/fines-de-semana`, `/temporada` y sus versiones por
+  ciudad) cuentan solo las vacantes aptas para Google: `intentFilters()` en
+  `src/lib/intent-pages.ts` añade `googleReady: true`, y `server.ts` muestra
+  ese `total` como «N vacantes encontradas». Por eso `/empleos/remoto`
+  mostraba 710 mientras la API daba 2.771 remotas en total. La guía de
+  remoto cita las dos cifras y explica la diferencia.
 - Las cifras cambian a diario. Al publicar o actualizar una guía se vuelve a
   medir y se cambia la fecha de corte de la fuente.
+
+## Cómo se verificaron las fuentes (para las guías 6–12)
+
+- `www.secretariasenado.gov.co` rechaza la conexión desde este entorno
+  (ECONNREFUSED, también con `curl`). Se usa el Gestor Normativo de Función
+  Pública, que publica el texto vigente con notas de modificación.
+- La herramienta de lectura web falla con el certificado TLS de
+  `funcionpublica.gov.co`; `curl` sí funciona. Se descarga
+  `norma.php?i=<id>` y se convierte a texto (UTF-8, con respaldo latin1).
+- Identificadores `norma.php?i=` usados: Código Sustantivo del Trabajo
+  199983 · Ley 2466 de 2025 260676 · Ley 2121 de 2021 167966 · Ley 1221 de
+  2008 31431 · Ley 2088 de 2021 162970 · Ley 2191 de 2022 177586 · Ley 2101
+  de 2021 166506 · Ley 1780 de 2016 69573 · Ley 1636 de 2013 53493 · Ley
+  2043 de 2020 137051 · Ley 2039 de 2020 137230 · Decreto 1072 de 2015 72173.
+- El texto del CST en Función Pública no siempre incorpora la reforma de
+  2025 (por ejemplo, el art. 46). Para artículos reformados se cita la Ley
+  2466 de 2025.
+- La API pública limita el ritmo: ante un 429 hay que esperar lo que dice
+  `Retry-After` (unos 50 s) y dejar varios segundos entre consultas. Las
+  páginas de hub no consumen esa cuota.

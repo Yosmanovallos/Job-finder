@@ -109,6 +109,18 @@ test("ADS-040 a guide without the owner's approval does not publish", () => {
   assert.equal(publishedGuides([pending]).length, 0);
 });
 
+test("ADS-040 an approved guide waits for its real go-live date", () => {
+  const signed = parseGuide("guia-de-prueba.md", fixtureSource().replace("publicada: 2026-11-20", "publicada:").replace("actualizada: 2026-11-21", "actualizada:"));
+  assert.deepEqual(errorsOf(signed), [[]], "approved without a date is valid");
+  assert.equal(publishedGuides([signed]).length, 0, "but not published until the release sets publicada");
+});
+
+test("ADS-040 sources are numbered in order of first citation", () => {
+  const html = renderGuidePageHtml(indexHtml, guide());
+  assert.match(html, /<li id="fuente-1"><a href="https:\/\/www\.secretariasenado/);
+  assert.match(html, /<li id="fuente-2"><a href="https:\/\/buscotrabajo\.co/);
+});
+
 test("ADS-040 the owner-review fields are mandatory", () => {
   for (const key of ["revision_propietario", "revisado_por", "fecha_revision"]) {
     const [errors] = errorsOf(guide({ omit: [key] }));

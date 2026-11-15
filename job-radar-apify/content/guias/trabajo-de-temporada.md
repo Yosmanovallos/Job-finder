@@ -15,7 +15,7 @@ Entre noviembre y enero muchas empresas contratan personal extra: almacenes, cen
 
 ## Cuántas vacantes de temporada hay hoy
 
-Al corte de esta guía, la página de [trabajo por temporada](/empleos/temporada) de BuscoTrabajo listaba 279 vacantes activas en Colombia.[^bt-temporada] La cifra cambia rápido en estas semanas, porque las empresas abren y cierran convocatorias según sus picos de venta. Si te interesa este tipo de trabajo, revisa la página con frecuencia y postúlate pronto.
+Al corte de esta guía, la página de [trabajo por temporada](/empleos/temporada) de BuscoTrabajo listaba 279 vacantes activas en Colombia.[^bt-temporada] Es una cifra del día: las vacantes de temporada se abren y se cierran en pocas semanas. Si te interesa este tipo de trabajo, revisa la página con frecuencia y postúlate pronto.
 
 ## Qué contrato te pueden ofrecer
 

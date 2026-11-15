@@ -15,9 +15,9 @@ Trabajar desde casa en Colombia puede significar tres cosas distintas, y elegir 
 
 ## Cuántas vacantes remotas hay hoy
 
-Al corte de esta guía, BuscoTrabajo tenía 2.771 vacantes activas en Colombia clasificadas como remotas, de un total de 33.437 vacantes activas en el país.[^bt-remoto][^bt-total] Es decir, cerca de una de cada doce. De esas vacantes remotas, 795 se habían publicado en los últimos siete días, lo que muestra que la oferta se renueva rápido y conviene revisarla seguido.[^bt-remoto-7d]
+Al corte de esta guía, BuscoTrabajo tenía 2.771 vacantes activas en Colombia clasificadas como remotas, de un total de 33.437 vacantes activas en el país.[^bt-remoto][^bt-total] Es decir, cerca de una de cada doce. La página de [empleos remotos](/empleos/remoto) muestra una cifra menor, 710 al mismo corte, porque solo lista las vacantes con datos suficientes para tener su propia página pública.[^bt-remoto-hub] De las vacantes remotas, 795 se habían publicado en los últimos siete días, lo que muestra que la oferta se renueva rápido y conviene revisarla seguido.[^bt-remoto-7d]
 
-Aunque el trabajo sea remoto, muchas empresas siguen indicando una ciudad. Al filtrar las vacantes remotas por ubicación, 772 mencionaban Bogotá, 120 Medellín y 41 Cali.[^bt-remoto-bogota][^bt-remoto-medellin][^bt-remoto-cali] Eso suele significar que la empresa tiene sede en esa ciudad o que pide vivir allí por si hay reuniones presenciales ocasionales. Vale la pena leer la vacante completa antes de descartarla por la ciudad.
+Aunque el trabajo sea remoto, muchas empresas siguen indicando una ciudad. Al filtrar las vacantes remotas por ubicación, 772 mencionaban Bogotá, 120 Medellín y 41 Cali.[^bt-remoto-bogota][^bt-remoto-medellin][^bt-remoto-cali] La vacante no siempre explica por qué menciona una ciudad: puede ser la sede de la empresa o un requisito de residencia. Vale la pena leerla completa y, si no lo dice, preguntarlo antes de descartarla.
 
 ## Trabajo remoto, teletrabajo y trabajo en casa no son lo mismo
 
@@ -69,11 +69,11 @@ Ese derecho tiene ley propia. La Ley 2191 de 2022 define la desconexión laboral
 
 Las ofertas remotas atraen a mucha gente, y por eso también atraen estafas. Estas prácticas reducen el riesgo y te ahorran tiempo:
 
-1. **Filtra por modalidad, no por palabras sueltas.** En BuscoTrabajo puedes usar el filtro «Remoto» del buscador o entrar directo a la página de [empleos remotos](/empleos/remoto). Buscar solo «desde casa» trae muchas ofertas de venta por catálogo que no son empleos.
+1. **Filtra por modalidad, no por palabras sueltas.** En BuscoTrabajo puedes usar el filtro «Remoto» del buscador o entrar directo a la página de [empleos remotos](/empleos/remoto). Una frase como «desde casa» en un anuncio no dice si hay contrato de trabajo; la modalidad y la descripción sí.
 2. **Revisa quién publica.** Prefiere vacantes publicadas en el portal oficial de la empresa o en portales conocidos, y desconfía de anuncios sin nombre de empresa.
 3. **Pregunta la figura de contratación.** Trabajo remoto, teletrabajo o prestación de servicios no son lo mismo. Solo los dos primeros son contratos de trabajo con prestaciones sociales.
 4. **Nunca pagues por un empleo.** Ninguna empresa seria cobra por entrevistas, cursos obligatorios o «kits de inicio». Si te piden dinero, repórtalo.
-5. **Verifica que la ciudad no sea un requisito oculto.** Muchas vacantes remotas piden vivir en una ciudad concreta por si hay reuniones presenciales.
+5. **Verifica que la ciudad no sea un requisito oculto.** Si una vacante remota menciona una ciudad, pregunta si debes vivir allí.
 
 En el trabajo remoto, la ley dice que no hay exclusividad: puedes ejercer otras labores, salvo que acuerdes una cláusula de exclusividad, por ejemplo cuando hay asuntos confidenciales.[^ley2121] Si te ofrecen un contrato con esa cláusula, léela con calma antes de firmar.
 
@@ -99,6 +99,7 @@ El trabajo remoto es una de las formas de empleo con más oferta en BuscoTrabajo
 [^bt-remoto-bogota]: [BuscoTrabajo, API pública: vacantes remotas con ubicación en Bogotá](https://buscotrabajo.co/api/v1/jobs?country=CO&modality=remoto&cities=Bogot%C3%A1&limit=1) — total de la respuesta, corte 2026-11-14
 [^bt-remoto-medellin]: [BuscoTrabajo, API pública: vacantes remotas con ubicación en Medellín](https://buscotrabajo.co/api/v1/jobs?country=CO&modality=remoto&cities=Medell%C3%ADn&limit=1) — total de la respuesta, corte 2026-11-14
 [^bt-remoto-cali]: [BuscoTrabajo, API pública: vacantes remotas con ubicación en Cali](https://buscotrabajo.co/api/v1/jobs?country=CO&modality=remoto&cities=Cali&limit=1) — total de la respuesta, corte 2026-11-14
+[^bt-remoto-hub]: [BuscoTrabajo: trabajos remotos en Colombia](https://buscotrabajo.co/empleos/remoto) — total de vacantes de la página, corte 2026-11-14
 [^ley2121]: [Ley 2121 de 2021, trabajo remoto (arts. 3, 4, 7, 10, 15, 16, 17, 20 y 25)](https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=167966) — Gestor Normativo de Función Pública, consultado el 2026-11-14
 [^ley1221]: [Ley 1221 de 2008, teletrabajo (arts. 2, 6 y 6A)](https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=31431) — Gestor Normativo de Función Pública, texto con las modificaciones de la Ley 2466 de 2025, consultado el 2026-11-14
 [^ley2466]: [Ley 2466 de 2025, reforma laboral (arts. 52 y 53)](https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=260676) — Gestor Normativo de Función Pública, consultado el 2026-11-14

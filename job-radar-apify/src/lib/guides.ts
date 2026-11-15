@@ -308,7 +308,6 @@ export function validateGuide(guide: Guide): string[] {
   if (meta.revision_propietario === "aprobada") {
     if (!meta.revisado_por.trim()) errors.push("guía aprobada sin 'revisado_por'");
     if (!DATE_RE.test(meta.fecha_revision)) errors.push("guía aprobada sin 'fecha_revision' AAAA-MM-DD");
-    if (!DATE_RE.test(meta.publicada)) errors.push("guía aprobada sin fecha 'publicada' AAAA-MM-DD");
   }
   if (meta.publicada && !DATE_RE.test(meta.publicada)) errors.push("'publicada' debe ser AAAA-MM-DD");
   if (meta.actualizada && !DATE_RE.test(meta.actualizada)) errors.push("'actualizada' debe ser AAAA-MM-DD");
@@ -374,11 +373,15 @@ export function validateGuides(guides: Guide[]): GuideValidation[] {
   return results;
 }
 
-/** Only valid, owner-approved guides are published. */
+/**
+ * Only valid, owner-approved guides with a real go-live date are published.
+ * An approved guide with an empty `publicada` waits for the release commit
+ * that sets the actual deploy date — never a backdated one.
+ */
 export function publishedGuides(guides: Guide[]): Guide[] {
   const validation = validateGuides(guides);
   return guides
-    .filter((guide, index) => validation[index]!.errors.length === 0 && isOwnerApproved(guide.meta))
+    .filter((guide, index) => validation[index]!.errors.length === 0 && isOwnerApproved(guide.meta) && DATE_RE.test(guide.meta.publicada))
     .sort((a, b) => (a.meta.publicada < b.meta.publicada ? 1 : a.meta.publicada > b.meta.publicada ? -1 : a.meta.slug.localeCompare(b.meta.slug)));
 }
 
@@ -423,9 +426,23 @@ function renderInline(text: string, sourceNumber: Map<string, number>): string {
   return out.join("");
 }
 
+/** Sources in order of first citation in the text (then any uncited ones). */
+function orderedSources(guide: Guide): GuideSource[] {
+  const byId = new Map(guide.sources.map((source) => [source.id, source]));
+  const order: GuideSource[] = [];
+  for (const unit of textUnits(guide)) {
+    for (const ref of refsIn(unit)) {
+      const source = byId.get(ref);
+      if (source && !order.includes(source)) order.push(source);
+    }
+  }
+  for (const source of guide.sources) if (!order.includes(source)) order.push(source);
+  return order;
+}
+
 function sourceNumbers(guide: Guide): Map<string, number> {
   const numbers = new Map<string, number>();
-  guide.sources.forEach((source, index) => numbers.set(source.id, index + 1));
+  orderedSources(guide).forEach((source, index) => numbers.set(source.id, index + 1));
   return numbers;
 }
 
@@ -443,7 +460,7 @@ export function renderGuideBodyHtml(guide: Guide): string {
     if (!("items" in block)) return `<${block.type}>${renderInline(block.text, numbers)}</${block.type}>`;
     return `<${block.type}>${block.items.map((item) => `<li>${renderInline(item, numbers)}</li>`).join("")}</${block.type}>`;
   }).join("\n");
-  const sources = guide.sources.map((source, index) => {
+  const sources = orderedSources(guide).map((source, index) => {
     const note = source.note ? ` — ${escapeHtml(source.note)}` : "";
     return `<li id="fuente-${index + 1}"><a href="${escapeHtml(source.url)}" rel="noopener" target="_blank">${escapeHtml(source.label)}</a>${note}</li>`;
   }).join("");
