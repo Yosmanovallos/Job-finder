@@ -1537,16 +1537,35 @@ export function buildCategoryItemList(meta: CategoryMeta, jobs: SeoJob[]): objec
 // `guardedCities` and `indexPaths` (ADR 0014): the guarded city hubs that pass
 // the guard right now, and the /empleos index pages. Both absent = the
 // sitemap of before seo-empleos-coverage.
+// Same inventory guard as intent pages and guarded city hubs (intentRobots).
+const STATIC_HUB_MIN_INDEXABLE_JOBS = 10;
+
 export function buildCategoriesSitemapXml(
-  options: { intents?: ResolvedCategory[]; guardedCities?: ResolvedCategory[]; indexPaths?: string[] } = {}
+  options: {
+    intents?: ResolvedCategory[];
+    guardedCities?: ResolvedCategory[];
+    indexPaths?: string[];
+    /**
+     * adsense-readiness F4 (SP-2): a static city/role hub whose known total
+     * is below the inventory guard is noindex, so it leaves the sitemap too.
+     * Undefined (no snapshot yet) keeps the hub listed, as before.
+     */
+    knownTotal?: (category: ResolvedCategory) => number | undefined;
+  } = {}
 ): string {
   const veCities = getCountryConfig("VE").cities;
   const coCities = options.intents ? CITY_OPTIONS.filter((label) => label !== "Remoto") : CITY_OPTIONS;
-  const categories: ResolvedCategory[] = [
+  const staticHubs: ResolvedCategory[] = [
     ...coCities.map((label) => ({ kind: "ciudad" as const, label, country: "CO" })),
     ...veCities.map((label) => ({ kind: "ciudad" as const, label, country: "VE" })),
     ...DEFAULT_ROLES_200.map((label) => ({ kind: "rol" as const, label, country: "CO" })),
-    ...DEFAULT_ROLES_200.map((label) => ({ kind: "rol" as const, label, country: "VE" })),
+    ...DEFAULT_ROLES_200.map((label) => ({ kind: "rol" as const, label, country: "VE" }))
+  ];
+  const categories: ResolvedCategory[] = [
+    ...staticHubs.filter((hub) => {
+      const known = options.knownTotal?.(hub);
+      return known === undefined || known >= STATIC_HUB_MIN_INDEXABLE_JOBS;
+    }),
     ...(options.intents ?? []),
     ...(options.guardedCities ?? [])
   ];
