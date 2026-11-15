@@ -136,6 +136,13 @@ test("ADS-040 a figure or a norm without an official source fails", () => {
   assert.deepEqual(figureOnCorpus, [], "a corpus figure with its cut-off date is its own source");
 });
 
+test("ADS-040 a list inherits the source of the sentence that introduces it with ':'", () => {
+  const [inherited] = errorsOf(guide({ extraBody: "El calendario es este:[^cst]\n\n- desde 2025, un 80 %;\n- desde 2026, un 90 %." }));
+  assert.deepEqual(inherited, []);
+  const [notIntroduced] = errorsOf(guide({ extraBody: "El calendario es este.[^cst]\n\n- desde 2025, un 80 %;\n- desde 2026, un 90 %." }));
+  assert.ok(notIntroduced!.some((error) => error.startsWith("cifra sin fuente oficial")), "a list after a sentence ending in '.' cites on its own");
+});
+
 test("ADS-040 official sources are Colombian state domains and SENA, over https", () => {
   assert.ok(isOfficialSourceUrl("https://www.mintrabajo.gov.co/x"));
   assert.ok(isOfficialSourceUrl("https://www.dane.gov.co/x"));

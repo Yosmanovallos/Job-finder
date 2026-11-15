@@ -107,11 +107,19 @@ anterior. **No se pulsa «Solicitar revisión» antes de F6.**
 - [x] «Guías» en menú y pie detrás de `GUIDES_ENABLED`; «Guías
       relacionadas» (máx. 3, mapeo estático de etiquetas, sin consultas) en
       hubs y vacantes
-- [ ] Lista de 12 temas desde el estudio de palabras clave (#121), aprobada
-      por el propietario (`f3-temas-propuestos.md`)
-- [ ] Autor del `Article` y firmante de cada guía (D2, D3)
+- [x] Lista de 12 temas desde el estudio de palabras clave (#121), aprobada
+      por el propietario el 2026-11-14 (`f3-temas-propuestos.md`)
+- [x] Autor y firmante: «Equipo de BuscoTrabajo» (Organization), decidido
+      por el propietario el 2026-11-14 (D3)
 - [ ] 12 guías: borrador → verificación de cada fuente → dato propio del
       corpus con fecha de corte → revisión y firma (D3)
+  - [x] Borradores 1–5 (remoto, sin experiencia, APE del SENA, medio tiempo
+        y fines de semana, temporada), normas leídas en el Gestor Normativo
+        de Función Pública y en los portales oficiales; datos en
+        `f3-datos-corpus-2026-11-14.md`. `secretariasenado.gov.co` no
+        respondió desde este entorno, por eso se cita Función Pública
+  - [ ] Firma del propietario de las guías 1–5
+  - [ ] Borradores 6–12
 - [ ] Encender `GUIDES_ENABLED` en el mismo cambio que la primera guía
       firmada (una prueba lo exige)
 - [ ] Al encender: `test:seo` y `test:baseline` con la bandera activa y una

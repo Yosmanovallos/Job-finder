@@ -250,6 +250,28 @@ function textUnits(guide: Guide): string[] {
   return units;
 }
 
+/**
+ * Units for the source rule: a list item also carries the citations of the
+ * paragraph that introduces the list when that paragraph ends with ":" —
+ * "Lo fija así:[^ley]" followed by the list it announces.
+ */
+function citationUnits(guide: Guide): Array<{ text: string; inherited: string[] }> {
+  const units: Array<{ text: string; inherited: string[] }> = [];
+  let lead: string[] = [];
+  for (const block of guide.blocks) {
+    if (block.type === "p") {
+      units.push({ text: block.text, inherited: [] });
+      lead = /:\s*(\[\^[a-z0-9-]+\]\s*)*$/i.test(block.text.trim()) ? refsIn(block.text) : [];
+    } else if (block.type === "ul" || block.type === "ol") {
+      units.push(...block.items.map((text) => ({ text, inherited: lead })));
+      lead = [];
+    } else {
+      lead = [];
+    }
+  }
+  return units;
+}
+
 function refsIn(text: string): string[] {
   return [...text.matchAll(FOOTNOTE_REF_RE)].map((match) => match[1]!.toLowerCase());
 }
@@ -301,10 +323,11 @@ export function validateGuide(guide: Guide): string[] {
     byId.set(source.id, source);
   }
   const cited = new Set<string>();
-  for (const unit of textUnits(guide)) {
-    const refs = refsIn(unit);
-    refs.forEach((ref) => cited.add(ref));
-    for (const ref of refs) if (!byId.has(ref)) errors.push(`cita [^${ref}] sin fuente definida`);
+  for (const { text: unit, inherited } of citationUnits(guide)) {
+    const own = refsIn(unit);
+    own.forEach((ref) => cited.add(ref));
+    for (const ref of own) if (!byId.has(ref)) errors.push(`cita [^${ref}] sin fuente definida`);
+    const refs = [...own, ...inherited];
     const plain = inlineToText(unit);
     const cites = refs.map((ref) => byId.get(ref)).filter((source): source is GuideSource => Boolean(source));
     const official = cites.some((source) => source.official);
