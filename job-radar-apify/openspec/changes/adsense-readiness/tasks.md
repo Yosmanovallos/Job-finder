@@ -118,7 +118,8 @@ anterior. **No se pulsa «Solicitar revisión» antes de F6.**
         de Función Pública y en los portales oficiales; datos en
         `f3-datos-corpus-2026-11-14.md`. `secretariasenado.gov.co` no
         respondió desde este entorno, por eso se cita Función Pública
-  - [ ] Firma del propietario de las guías 1–5 (aprobada: trabajo-remoto-colombia, 2026-11-14)
+  - [x] Firma del propietario de las guías 1–5 (2026-11-14). Aprobadas y
+        sin publicar: `publicada` se fija en el commit de salida
   - [ ] Borradores 6–12
 - [ ] Encender `GUIDES_ENABLED` en el mismo cambio que la primera guía
       firmada (una prueba lo exige)

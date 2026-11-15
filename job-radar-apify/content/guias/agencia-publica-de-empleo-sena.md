@@ -7,9 +7,9 @@ autor_tipo: Organization
 publicada:
 actualizada:
 etiquetas: servicio-publico-de-empleo, sin-experiencia, buscar-empleo
-revision_propietario: pendiente
-revisado_por:
-fecha_revision:
+revision_propietario: aprobada
+revisado_por: Equipo de BuscoTrabajo
+fecha_revision: 2026-11-14
 ---
 Muchas personas buscan empleo solo en portales privados y no saben que el Estado colombiano tiene una red pública para conectar a quienes buscan trabajo con las empresas que necesitan personal. Una de las entidades de esa red es la Agencia Pública de Empleo del SENA. Esta guía explica qué es, qué servicios ofrece, por qué no debes pagar por ellos y cómo combinarla con otros buscadores, como BuscoTrabajo, para no perder oportunidades.
 

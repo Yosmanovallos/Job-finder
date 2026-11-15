@@ -7,9 +7,9 @@ autor_tipo: Organization
 publicada:
 actualizada:
 etiquetas: contratos, prestaciones, sin-experiencia
-revision_propietario: pendiente
-revisado_por:
-fecha_revision:
+revision_propietario: aprobada
+revisado_por: Equipo de BuscoTrabajo
+fecha_revision: 2026-11-14
 ---
 Entre noviembre y enero muchas empresas contratan personal extra: almacenes, centros de distribución, supermercados, restaurantes y empresas de mensajería necesitan más manos para la temporada de fin de año. Es una buena puerta de entrada para quien busca su primer empleo o un ingreso adicional, pero también es una época en la que abundan los contratos cortos mal explicados. Esta guía resume qué tipo de contrato te pueden ofrecer, qué te deben pagar al final y qué revisar antes de firmar.
 

@@ -7,9 +7,9 @@ autor_tipo: Organization
 publicada:
 actualizada:
 etiquetas: contratos, prestaciones, buscar-empleo
-revision_propietario: pendiente
-revisado_por:
-fecha_revision:
+revision_propietario: aprobada
+revisado_por: Equipo de BuscoTrabajo
+fecha_revision: 2026-11-14
 ---
 Trabajar medio tiempo, solo los fines de semana o algunos días al mes es la opción de muchas personas que estudian, cuidan a alguien o buscan un ingreso extra. También es el tipo de trabajo donde más se confunden los derechos: hay quien cree que por trabajar pocas horas no tiene prima, ni recargos, ni seguridad social. Esta guía explica qué dicen las normas vigentes y cómo buscar estas vacantes.
 

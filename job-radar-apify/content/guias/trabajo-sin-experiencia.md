@@ -7,9 +7,9 @@ autor_tipo: Organization
 publicada:
 actualizada:
 etiquetas: sin-experiencia, hoja-de-vida, servicio-publico-de-empleo
-revision_propietario: pendiente
-revisado_por:
-fecha_revision:
+revision_propietario: aprobada
+revisado_por: Equipo de BuscoTrabajo
+fecha_revision: 2026-11-14
 ---
 Conseguir el primer empleo tiene una trampa conocida: casi todas las vacantes piden experiencia, y la experiencia solo se obtiene trabajando. La buena noticia es que en Colombia hay normas que reconocen como experiencia actividades que muchas personas no ponen en su hoja de vida, y que existen vacantes pensadas para quien empieza. Esta guía reúne las dos cosas: lo que dice la norma y cómo buscar de forma práctica.
 
