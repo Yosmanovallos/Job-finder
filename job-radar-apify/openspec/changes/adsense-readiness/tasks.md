@@ -125,8 +125,27 @@ anterior. **No se pulsa «Solicitar revisión» antes de F6.**
         2026-11-14; revisión en `f3-revision-guias-6-12.md`
   - [x] Firma del propietario de las guías 6–12 (2026-11-14). Las 12
         están aprobadas y sin publicar
-- [ ] Encender `GUIDES_ENABLED` en el mismo cambio que la primera guía
-      firmada (una prueba lo exige)
+- [x] Publicación escalonada (decisión del propietario 2026-11-14): cada
+      guía aparece sola en su fecha `publicada` (hora de Colombia); 4 el día
+      del encendido y luego 2 por semana (`scripts/schedule-guides.ts`)
+- [x] `scripts/check-guide-figures.ts`: vuelve a medir las cifras del corpus
+      de cada guía (páginas públicas y API pública con pausas)
+- [x] `llms.txt` lista `/guias` solo con el interruptor encendido
+- [x] Prueba HTTP `tests/validate-guides-http.ts` en `test:seo`, para los dos
+      estados del interruptor. Verificado en local con el interruptor
+      encendido y fechas de prueba (sin commit de ese estado)
+- [ ] **Día del encendido** (después de mergear #136 y #137):
+  1. `npx tsx scripts/check-guide-figures.ts` y actualizar en cada guía las
+     cifras que cambiaron y su `corte`. Con la cuota de la API agotada,
+     esperar al día siguiente
+  2. `npx tsx scripts/schedule-guides.ts --start <fecha real> --write`
+  3. `GUIDES_ENABLED = true` en `src/config.ts`
+  4. `tsc`, `build`, `test:unit`, `test:job-render`, `test:agent-readiness`,
+     `test:seo`, `test:baseline`
+  5. Desplegar; comprobar en producción `/guias`, una guía, el sitemap y un
+     hub; `/seo drift compare` de un hub y una vacante (bloque nuevo
+     «Guías relacionadas»)
+  6. Enviar `sitemap-guides.xml` en Search Console (acción del propietario)
 - [ ] Al encender: `test:seo` y `test:baseline` con la bandera activa y una
       guía de prueba, para cubrir la inyección en hubs y vacantes de
       `server.ts`, el índice del sitemap y que la ruta del payload coincida
