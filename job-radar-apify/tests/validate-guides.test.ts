@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import {
   GUIDE_TAGS,
   GuideParseError,
+  colombiaToday,
   MIN_USEFUL_WORDS,
   guideTagsForHub,
   guideTagsForJob,
@@ -30,6 +31,8 @@ import {
 } from "../src/server/routes/guides.js";
 import { GUIDES_CONTENT_DIR, getPublishedGuides, loadGuidesFrom } from "../src/server/guides-store.js";
 import { GUIDES_ENABLED } from "../src/config.js";
+import { buildLlmsTxt } from "../src/lib/agent-readiness.js";
+import { FIRST_DAY_COUNT, PER_WEEK, RELEASE_ORDER, releaseDates } from "../scripts/schedule-guides.js";
 
 // openspec/changes/adsense-readiness — F3, requirement ADS-040 (CX-1, CX-3,
 // AV-4, SP-11). Offline: fixtures are built here, never in content/guias.
@@ -316,10 +319,32 @@ test("ADS-040 every guide in content/guias parses and passes validation", () => 
 
 test("ADS-040 the switch never exposes an empty /guias: menu and footer follow GUIDES_ENABLED", () => {
   if (GUIDES_ENABLED) {
-    assert.ok(publishedGuides(loadGuidesFrom(GUIDES_CONTENT_DIR)).length > 0, "GUIDES_ENABLED needs at least one owner-approved guide");
+    assert.ok(getPublishedGuides(true, colombiaToday()).length > 0, "GUIDES_ENABLED needs at least one owner-approved guide live today");
   }
   const header = fs.readFileSync(path.join(root, "src/sections/Header.tsx"), "utf-8");
   const footer = fs.readFileSync(path.join(root, "src/sections/Footer.tsx"), "utf-8");
   assert.match(header, /GUIDES_ENABLED \? \[\{ label: "Guías", to: "\/guias" \}\]/);
   assert.match(footer, /GUIDES_ENABLED\s*\?\s*\[\{ label: "Guías", href: "\/guias"/);
+});
+
+test("ADS-040 a guide scheduled for a later day stays hidden until that day (Colombia time)", () => {
+  const scheduled = guide();
+  assert.equal(publishedGuides([scheduled], "2026-11-19").length, 0, "the day before publicada");
+  assert.equal(publishedGuides([scheduled], "2026-11-20").length, 1, "on publicada");
+  assert.equal(colombiaToday(new Date("2026-11-21T03:00:00Z")), "2026-11-20", "10 p. m. in Bogotá is still the 20th");
+});
+
+test("ADS-040 staggered release: four on day one, then two a week, covering all twelve guides", () => {
+  const dates = releaseDates("2026-11-20", RELEASE_ORDER.length);
+  assert.equal(RELEASE_ORDER.length, 12);
+  assert.equal(new Set(RELEASE_ORDER).size, 12);
+  for (const slug of RELEASE_ORDER) assert.ok(fs.existsSync(path.join(GUIDES_CONTENT_DIR, `${slug}.md`)), slug);
+  assert.equal(dates.filter((date) => date === "2026-11-20").length, FIRST_DAY_COUNT);
+  assert.equal(dates.filter((date) => date === "2026-11-27").length, PER_WEEK);
+  assert.equal(dates.at(-1), "2026-12-18");
+});
+
+test("ADS-040 llms.txt lists /guias only while the section is switched on", () => {
+  assert.doesNotMatch(buildLlmsTxt(false), /\/guias/);
+  assert.match(buildLlmsTxt(true), /\[Guías\]\(https:\/\/buscotrabajo\.co\/guias\)/);
 });

@@ -111,7 +111,7 @@ const suites: Record<string, string[]> = {
   observability: ["validate-run-observability.ts"],
   pagination: ["validate-job-pagination.ts", "validate-search-narrowing.ts"],
   modality: ["validate-job-modality.test.ts", "validate-job-modality.ts"],
-  seo: ["validate-seo-job-pages.ts", "validate-job-page-blocks.ts", "validate-intent-pages.ts"],
+  seo: ["validate-seo-job-pages.ts", "validate-job-page-blocks.ts", "validate-intent-pages.ts", "validate-guides-http.ts"],
   "intent-bench": ["bench-intent-pages.ts"],
   "intent-drift": ["drift-intent-pages.ts"],
   "job-page-blocks": ["validate-job-page-blocks.ts", "validate-job-page-blocks.test.ts"],

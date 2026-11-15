@@ -373,15 +373,24 @@ export function validateGuides(guides: Guide[]): GuideValidation[] {
   return results;
 }
 
+/** Today's date (AAAA-MM-DD) in Colombia, the calendar the release schedule uses. */
+export function colombiaToday(now: Date = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Bogota", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
+}
+
 /**
- * Only valid, owner-approved guides with a real go-live date are published.
+ * Only valid, owner-approved guides with a real go-live date are published,
+ * and, when `today` is given, only from that date on.
  * An approved guide with an empty `publicada` waits for the release commit
  * that sets the actual deploy date — never a backdated one.
  */
-export function publishedGuides(guides: Guide[]): Guide[] {
+export function publishedGuides(guides: Guide[], today?: string): Guide[] {
   const validation = validateGuides(guides);
   return guides
     .filter((guide, index) => validation[index]!.errors.length === 0 && isOwnerApproved(guide.meta) && DATE_RE.test(guide.meta.publicada))
+    // Staggered release (owner decision 2026-11-14): a guide scheduled for a
+    // later date stays out of every route, sitemap and link until that day.
+    .filter((guide) => !today || guide.meta.publicada <= today)
     .sort((a, b) => (a.meta.publicada < b.meta.publicada ? 1 : a.meta.publicada > b.meta.publicada ? -1 : a.meta.slug.localeCompare(b.meta.slug)));
 }
 
