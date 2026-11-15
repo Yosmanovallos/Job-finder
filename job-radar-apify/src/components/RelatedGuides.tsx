@@ -1,5 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
-import { readSsrGuideLinks } from "../lib/guides.js";
+import { GUIDES_ENABLED } from "../config.js";
+import { readSsrGuideLinks } from "../lib/guide-links.js";
 
 declare global {
   interface Window {
@@ -13,7 +14,7 @@ declare global {
 // payload and nothing renders. Empty while /guias is switched off.
 export default function RelatedGuides({ className = "" }: { className?: string }) {
   const { pathname } = useLocation();
-  const links = readSsrGuideLinks(window.__SSR_GUIDE_LINKS__, pathname);
+  const links = GUIDES_ENABLED ? readSsrGuideLinks(window.__SSR_GUIDE_LINKS__, pathname) : [];
   if (links.length === 0) return null;
   return (
     <nav data-related-guides aria-label="Guías relacionadas" className={className}>

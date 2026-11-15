@@ -6,6 +6,7 @@ import type http from "node:http";
 import { fileURLToPath } from "node:url";
 import {
   GUIDE_TAGS,
+  GuideParseError,
   MIN_USEFUL_WORDS,
   guideTagsForHub,
   guideTagsForJob,
@@ -125,10 +126,14 @@ test("ADS-040 a figure or a norm without an official source fails", () => {
   ];
   for (const extra of cases) {
     const [errors] = errorsOf(guide({ extraBody: extra }));
-    assert.ok(errors!.some((error) => error.startsWith("cifra o norma sin fuente oficial")), `${extra}: ${errors!.join("; ")}`);
+    assert.ok(errors!.some((error) => /^(cifra|norma) sin fuente oficial/.test(error)), `${extra}: ${errors!.join("; ")}`);
   }
   const [backed] = errorsOf(guide({ extraBody: "El periodo de prueba se pacta por escrito según el artículo citado.[^cst]" }));
   assert.deepEqual(backed, []);
+  const [normOnCorpus] = errorsOf(guide({ extraBody: "El artículo sobre jornada lo confirma.[^bt]" }));
+  assert.ok(normOnCorpus!.some((error) => error.startsWith("norma sin fuente oficial")), "a norm cannot rest on our own corpus");
+  const [figureOnCorpus] = errorsOf(guide({ extraBody: "Hoy hay 300 vacantes de ese cargo.[^bt]" }));
+  assert.deepEqual(figureOnCorpus, [], "a corpus figure with its cut-off date is its own source");
 });
 
 test("ADS-040 official sources are Colombian state domains and SENA, over https", () => {
@@ -172,7 +177,7 @@ test("ADS-040 no paragraph over 40 words repeats across guides", () => {
 
 test("ADS-040 raw HTML, images and h1 in the body are rejected", () => {
   for (const extra of ["<script>alert(1)</script>", "![x](https://example.com/x.png)", "# Otro título"]) {
-    assert.throws(() => guide({ extraBody: extra }), undefined, extra);
+    assert.throws(() => guide({ extraBody: extra }), GuideParseError, extra);
   }
 });
 

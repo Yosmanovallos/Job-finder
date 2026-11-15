@@ -13,8 +13,10 @@
 
 export const MIN_USEFUL_WORDS = 800;
 export const MAX_SHARED_PARAGRAPH_WORDS = 40;
-export const MAX_RELATED_GUIDES = 3;
-export const GUIDES_BASE_PATH = "/guias";
+import { GUIDES_BASE_PATH, MAX_RELATED_GUIDES, SLUG_RE, guidePath, type GuideSummary } from "./guide-links.js";
+
+export { GUIDES_BASE_PATH, MAX_RELATED_GUIDES, guidePath, isGuideSummaryList, readSsrGuideLinks } from "./guide-links.js";
+export type { GuideSummary, SsrGuideLinks } from "./guide-links.js";
 
 /** Official sources a figure or norm may rest on (Colombian state + SENA). */
 export function isOfficialSourceUrl(url: string): boolean {
@@ -99,7 +101,6 @@ const REQUIRED_KEYS = [
 ] as const;
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const FOOTNOTE_DEF_RE = /^\[\^([a-z0-9-]+)\]:\s*\[([^\]]+)\]\((https:\/\/[^)\s]+)\)\s*(.*)$/i;
 const FOOTNOTE_REF_RE = /\[\^([a-z0-9-]+)\]/gi;
 // A figure (any digit, %, $) or a legal norm needs an official source.
@@ -305,13 +306,14 @@ export function validateGuide(guide: Guide): string[] {
     refs.forEach((ref) => cited.add(ref));
     for (const ref of refs) if (!byId.has(ref)) errors.push(`cita [^${ref}] sin fuente definida`);
     const plain = inlineToText(unit);
-    const needsSource = FIGURE_RE.test(plain) || NORM_RE.test(plain);
-    if (!needsSource) continue;
-    const backed = refs.some((ref) => {
-      const source = byId.get(ref);
-      return Boolean(source && (source.official || (source.corpus && source.cutoff)));
-    });
-    if (!backed) errors.push(`cifra o norma sin fuente oficial enlazada: «${plain.slice(0, 90)}…»`);
+    const cites = refs.map((ref) => byId.get(ref)).filter((source): source is GuideSource => Boolean(source));
+    const official = cites.some((source) => source.official);
+    // A norm always needs the official text; our own corpus can only back a figure.
+    if (NORM_RE.test(plain) && !official) {
+      errors.push(`norma sin fuente oficial enlazada: «${plain.slice(0, 90)}…»`);
+    } else if (FIGURE_RE.test(plain) && !official && !cites.some((source) => source.corpus && source.cutoff)) {
+      errors.push(`cifra sin fuente oficial enlazada: «${plain.slice(0, 90)}…»`);
+    }
   }
   for (const source of guide.sources) {
     if (!cited.has(source.id)) errors.push(`fuente [^${source.id}] definida pero no citada`);
@@ -425,18 +427,7 @@ export function renderGuideBodyHtml(guide: Guide): string {
   return `${body}\n<section aria-labelledby="guia-fuentes"><h2 id="guia-fuentes">Fuentes</h2><ol>${sources}</ol></section>`;
 }
 
-export function guidePath(slug: string): string {
-  return `${GUIDES_BASE_PATH}/${slug}`;
-}
 
-export interface GuideSummary {
-  slug: string;
-  path: string;
-  title: string;
-  description: string;
-  datePublished: string;
-  dateModified: string;
-}
 
 export interface GuidePayload extends GuideSummary {
   author: string;
@@ -478,13 +469,6 @@ export function isGuidePayload(value: unknown): value is GuidePayload {
     typeof v.author === "string" && typeof v.datePublished === "string" && Array.isArray(v.sources);
 }
 
-export function isGuideSummaryList(value: unknown): value is GuideSummary[] {
-  return Array.isArray(value) && value.every((item) => {
-    if (!item || typeof item !== "object") return false;
-    const v = item as Record<string, unknown>;
-    return typeof v.slug === "string" && SLUG_RE.test(v.slug) && typeof v.title === "string" && typeof v.path === "string" && v.path === guidePath(v.slug);
-  });
-}
 
 export function guideArticleJsonLd(guide: Guide, origin: string): Record<string, unknown> {
   const url = `${origin}${guidePath(guide.meta.slug)}`;
@@ -577,15 +561,4 @@ export function guideTagsForJob(job: { modality?: string | null; remote?: boolea
     : [GUIDE_TAGS.scams, GUIDE_TAGS.interview, GUIDE_TAGS.resume];
 }
 
-export interface SsrGuideLinks {
-  path: string;
-  links: GuideSummary[];
-}
 
-/** Validates window.__SSR_GUIDE_LINKS__: only for this exact page, at most three /guias links. */
-export function readSsrGuideLinks(value: unknown, pathname: string): GuideSummary[] {
-  if (!value || typeof value !== "object") return [];
-  const v = value as Record<string, unknown>;
-  if (v.path !== pathname || !isGuideSummaryList(v.links)) return [];
-  return v.links.slice(0, MAX_RELATED_GUIDES);
-}

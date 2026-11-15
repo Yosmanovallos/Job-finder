@@ -114,6 +114,10 @@ anterior. **No se pulsa «Solicitar revisión» antes de F6.**
       corpus con fecha de corte → revisión y firma (D3)
 - [ ] Encender `GUIDES_ENABLED` en el mismo cambio que la primera guía
       firmada (una prueba lo exige)
+- [ ] Al encender: `test:seo` y `test:baseline` con la bandera activa y una
+      guía de prueba, para cubrir la inyección en hubs y vacantes de
+      `server.ts`, el índice del sitemap y que la ruta del payload coincida
+      con `location.pathname` en vacantes con slug o tildes
 - [ ] `llms.txt` y catálogo con `/guias` cuando esté encendido (no antes:
       anunciaría un 404)
 - [ ] Calendario: 2 guías por semana después de la primera docena

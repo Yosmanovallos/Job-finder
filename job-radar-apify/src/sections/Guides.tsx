@@ -58,7 +58,6 @@ function useGuidesData<T>(read: () => T | null, url: string, accept: (value: unk
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
   return state;
 }
