@@ -114,6 +114,7 @@ const suites: Record<string, string[]> = {
   modality: ["validate-job-modality.test.ts", "validate-job-modality.ts"],
   seo: ["validate-seo-job-pages.ts", "validate-job-page-blocks.ts", "validate-intent-pages.ts", "validate-market-report.ts"],
   "intent-bench": ["bench-intent-pages.ts"],
+  "home-cold": ["bench-home-cold.ts"],
   "intent-drift": ["drift-intent-pages.ts"],
   "job-page-blocks": ["validate-job-page-blocks.ts", "validate-job-page-blocks.test.ts"],
   companies: ["validate-company-identity.test.ts", "validate-companies-search.ts"],
