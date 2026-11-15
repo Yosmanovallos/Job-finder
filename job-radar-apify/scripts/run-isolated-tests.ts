@@ -45,6 +45,7 @@ const suites: Record<string, string[]> = {
     "validate-public-api-limits.test.ts",
     "validate-page-meta.test.ts",
     "validate-adsense-readiness.test.ts",
+    "validate-adsense-audit.test.ts",
     "validate-source-closure.test.ts",
     "validate-job-freshness.test.ts",
     "validate-company-identity.test.ts",
@@ -119,6 +120,7 @@ const suites: Record<string, string[]> = {
   "saved-jobs": ["validate-saved-jobs.ts"],
   "site-feedback": ["validate-site-feedback.test.ts", "validate-site-feedback.ts"],
   baseline: ["validate-public-baseline.ts"],
+  "adsense-audit": ["validate-adsense-audit.ts"],
   "agent-readiness": ["validate-agent-readiness.test.ts", "validate-agent-readiness.ts"],
   "job-seo": [
     "validate-google-readiness.test.ts",
@@ -130,7 +132,7 @@ const selection = process.argv[2] || "unit";
 const offline = selection === "unit" || selection === "job-render";
 if (!Object.hasOwn(suites, selection) || process.argv.slice(3).some((arg) => arg !== "--dry-run")) {
   throw new Error(
-    "[P0] Suite inválida. Usa unit, integration, intent-bench, intent-drift, job-render, sitemap, observability, pagination, modality, seo, companies, home, baseline, agent-readiness, job-seo, job-page-blocks, source-closure, job-freshness o direct; --dry-run es opcional."
+    "[P0] Suite inválida. Usa unit, integration, intent-bench, intent-drift, job-render, sitemap, observability, pagination, modality, seo, companies, home, baseline, agent-readiness, job-seo, job-page-blocks, source-closure, job-freshness, adsense-audit o direct; --dry-run es opcional."
   );
 }
 
@@ -209,7 +211,8 @@ async function executeSuite(file: string, env: NodeJS.ProcessEnv, cwd: string): 
       }
     }
   };
-  const timer = setTimeout(kill, 120000);
+  // The AdSense audit loads ~20 pages in Chromium plus a paced live profile.
+  const timer = setTimeout(kill, file === "validate-adsense-audit.ts" ? 300000 : 120000);
   const interrupt = () => kill();
   process.once("SIGINT", interrupt);
   process.once("SIGTERM", interrupt);
@@ -266,7 +269,7 @@ async function main(): Promise<void> {
   const results: { suite: string; status: string; durationMs: number }[] = [];
   console.log(`[P0] Entorno temporal: ${directory}`);
   try {
-    if (selection === "baseline" || selection === "job-render") {
+    if (selection === "baseline" || selection === "job-render" || selection === "adsense-audit") {
       const buildOptions = {
         root,
         envDir: false,

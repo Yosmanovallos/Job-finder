@@ -20,6 +20,7 @@
     "test:integration": "tsx scripts/run-isolated-tests.ts integration",
     "test:sitemap": "tsx scripts/run-isolated-tests.ts sitemap",
     "test:baseline": "tsx scripts/run-isolated-tests.ts baseline",
+    "adsense:audit": "tsx scripts/adsense-audit.ts",
     "test:agent-readiness": "tsx scripts/run-isolated-tests.ts agent-readiness",
     "test:job-seo": "tsx scripts/run-isolated-tests.ts job-seo",
     "jobs:classify-readiness": "tsx scripts/classify-job-readiness.ts",

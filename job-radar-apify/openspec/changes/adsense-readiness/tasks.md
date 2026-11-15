@@ -19,14 +19,56 @@ anterior. **No se pulsa «Solicitar revisión» antes de F6.**
 > `validate-adsense-readiness.test.ts`. El auditor sigue siendo requisito
 > del gate F6.
 
-- [ ] Pruebas que fallan primero: una por regla de la matriz (ADS-001…)
-- [ ] `scripts/adsense-audit.ts` + `npm run adsense:audit` (build sintético)
-- [ ] Modo `--live` (solo GET, con límite y pausa; requiere aprobación)
-- [ ] Medir: vacantes indexables por procedencia (oficial / terceros)
-- [ ] Medir: clics de Google a vacantes de terceros (28 días) → insumo de D1
-- [ ] Prueba de paridad HTML inicial ↔ DOM hidratado (SP-1, SP-5)
-- [ ] Guardar la línea base en `docs/seo-evidence/` (solo indicadores)
-- **Gate:** el auditor reproduce los 26 ✅ / 15 ⚠️ / 9 ❌ de `proposal.md`
+### Hecho (2026-11-15), rama `claude/adsense-f0-audit-5fec2b`
+
+- [x] Pruebas ADS-001 en `tests/validate-adsense-audit.test.ts` (suite
+      `unit`, 17 pruebas): las 50 reglas una vez cada una (AV 5, CX 10, SP 19,
+      MA 1, PP 6, PG 7, TX 2) y el recuento 26 ✅ / 15 ⚠️ / 9 ❌ de la
+      propuesta; «todo cumple» da 50 entradas y código 0; `/login` con
+      marcador hace fallar PP-1, la nombra y da código 1; MANUAL sin atestar
+      nunca pasa; el fetcher solo hace GET, en el sitio auditado, con
+      presupuesto y pausa
+- [x] `scripts/adsense-audit.ts` + `npm run adsense:audit`: build sintético
+      (`envDir: false`) y Postgres desechable vía `run-isolated-tests.ts`
+      (suite `adsense-audit`, semilla `tests/fixtures/adsense-audit.sql`:
+      vacante oficial, dos de terceros y una vencida). Reglas en
+      `scripts/lib/adsense-audit-rules.ts`; CUMPLE / PARCIAL / NO CUMPLE /
+      MANUAL con evidencia, umbral, valor y `pendiente_manual`. Informe JSON
+      en el directorio temporal + resumen legible. Sale ≠ 0 si una regla
+      medible no cumple; con `--expect <json>`, si la matriz cambia;
+      `--attest <json>` registra decisiones (D1…) y confirmaciones MANUAL
+- [x] Modo `--live` (solo GET a `https://buscotrabajo.co`, 40 URLs por
+      defecto y tope de 120, pausa ≥ 1 s, User-Agent genérico). **No
+      ejecutado: requiere aprobación del propietario.** Probado su perfil
+      contra el servidor local (8 GET en ~7 s) y sin red (método, host,
+      pausa, tope, User-Agent)
+- [x] Medir: vacantes indexables por procedencia → `copied_indexable_share`
+      (muestra del sitemap en `--live`; sintético: 0,667)
+- [ ] Medir: clics de Google a vacantes de terceros (28 días) → insumo de D1.
+      MANUAL: es dato de Search Console; el auditor no lo inventa
+- [x] Prueba de paridad HTML inicial ↔ DOM hidratado en Chromium (SP-1 por
+      palabras y por bloque; SP-5 texto oculto en escritorio **y** móvil,
+      acordeones `<details>` permitidos). Anuncios observados por petición
+      real a `adsbygoogle.js` (abortada) tras disparar el cargador diferido
+- [x] Métricas `original_pages` / `original_words` desde
+      `sitemap-pages.xml` (familias propias: institucionales, legales,
+      `/guias/*`, `/informes/*`, `/herramientas/*`): 10 / 2.291
+- [x] Línea base en `docs/seo-evidence/adsense-audit-baseline.json` (solo
+      indicadores) y `adsense-audit-baseline-2026-11-15.md` (diferencias
+      regla por regla con la propuesta)
+- **Gate (ajustado por F1):** el auditor reproduce la matriz de la línea
+  base — 21 CUMPLE · 1 PARCIAL · 14 NO CUMPLE · 14 MANUAL — con 0
+  diferencias (`npm run adsense:audit` en verde). F1 movió PP-1…PP-4, AV-5,
+  CX-5, CX-9, SP-17, SP-19 y PG-5 a CUMPLE; AV-1, AV-2, AV-4, CX-1…CX-4,
+  CX-6, SP-2, SP-6, SP-11 y SP-12 siguen en NO CUMPLE porque F2 (#138),
+  F3 (#137) y F4 (#139) no están fusionados; 14 reglas que la propuesta
+  daba por ✅/⚠️ dependen del propietario o de Google (MANUAL)
+- **Hallazgos nuevos:** TX-1 NO CUMPLE (`/fuentes` 130 palabras sin JS
+  frente a 189 hidratada; 4 páginas < 150), SP-1 PARCIAL (93,6 % de
+  palabras; miga de pan y «Más empleos» solo en el HTML del servidor),
+  PP-5 NO CUMPLE en sintético (`/empresas` con anuncios y solo una lista de
+  enlaces; medir con `--live`)
+- Al fusionar cada fase, regenerar la línea base con el informe de la suite
 
 ## F1 — Confianza, higiene y elegibilidad de anuncios
 

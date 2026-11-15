@@ -1,0 +1,1583 @@
+{
+  "generado": "2026-11-15T14:21:56.368Z",
+  "modo": "sintetico",
+  "base": "http://127.0.0.1:63706",
+  "resumen": {
+    "total": 50,
+    "porEstado": {
+      "CUMPLE": 21,
+      "PARCIAL": 1,
+      "NO CUMPLE": 14,
+      "MANUAL": 14
+    },
+    "medibles": 36,
+    "mediblesQueNoCumplen": [
+      "AV-1",
+      "AV-2",
+      "AV-4",
+      "CX-1",
+      "CX-2",
+      "CX-3",
+      "CX-4",
+      "CX-6",
+      "SP-1",
+      "SP-2",
+      "SP-6",
+      "SP-11",
+      "SP-12",
+      "PP-5",
+      "TX-1"
+    ],
+    "metricas": {
+      "original_pages": 10,
+      "original_words": 2291,
+      "copied_indexable_share": 0.667,
+      "ads_on_ineligible_routes": 0,
+      "ssr_hydration_parity": 0.936,
+      "broken_internal_links": 0,
+      "duplicate_policy_pages": 0,
+      "raw_html_words_min_text_pages": 109,
+      "requests": 164
+    }
+  },
+  "reglas": [
+    {
+      "id": "AV-1",
+      "grupo": "A",
+      "regla": "Valor único sustancial",
+      "tipo": "codigo",
+      "fase": "F2–F5",
+      "propuesta": "❌",
+      "estado": "NO CUMPLE",
+      "evidencia": "original_pages 10 < 40, original_words 2291 < 30000, hubs sin análisis propio (F4, PR #139 sin fusionar): /empleos/bogota, D1 sin decidir",
+      "umbral": "original_pages ≥ 40, original_words ≥ 30000, hubs con análisis propio, D1 aplicada",
+      "valor": "10 páginas / 2291 palabras",
+      "pendiente_manual": null
+    },
+    {
+      "id": "AV-2",
+      "grupo": "A",
+      "regla": "Presencia constante en la Web",
+      "tipo": "mixta",
+      "fase": "F3, F4",
+      "propuesta": "⚠️",
+      "estado": "NO CUMPLE",
+      "evidencia": "secciones permanentes indexables: ninguna; /guias (F3, PR #137 sin fusionar) /informes (F4, PR #139 sin fusionar) no responden 200 indexable",
+      "umbral": "/guias y /informes en 200 e indexables",
+      "valor": 0,
+      "pendiente_manual": "14 días de la capa nueva en producción y tendencia de 404 en Search Console (F6)"
+    },
+    {
+      "id": "AV-3",
+      "grupo": "A",
+      "regla": "Interés genuino de los usuarios",
+      "tipo": "manual",
+      "fase": "F1, F6",
+      "propuesta": "⚠️",
+      "estado": "MANUAL",
+      "evidencia": "/opiniones muestra «Todavía no hay opiniones publicadas»",
+      "umbral": null,
+      "valor": null,
+      "pendiente_manual": "Sesiones y fuentes de tráfico en GA4 (28 días) y opiniones publicadas reales"
+    },
+    {
+      "id": "AV-4",
+      "grupo": "A",
+      "regla": "Información, herramientas o servicios auténticos de alta calidad",
+      "tipo": "codigo",
+      "fase": "F3, F5",
+      "propuesta": "⚠️",
+      "estado": "NO CUMPLE",
+      "evidencia": "0 guías indexables (F3, PR #137 sin fusionar), 0 herramientas (F5, según D6)",
+      "umbral": "≥ 12 guías y ≥ 1 herramienta",
+      "valor": "0 guías / 0 herramientas",
+      "pendiente_manual": null
+    },
+    {
+      "id": "AV-5",
+      "grupo": "A",
+      "regla": "Selección y mantenimiento estructural continuos",
+      "tipo": "codigo",
+      "fase": "F1, F4",
+      "propuesta": "⚠️",
+      "estado": "CUMPLE",
+      "evidencia": "/metodologia: 549 palabras en el HTML inicial, temas dedupl|duplicad, vigen|venc|sigue abierta, 30 días, fuente; enlazada desde /about: sí; en el pie: sí",
+      "umbral": "≥ 150 palabras; deduplicación, vigencia, retención de 30 días y fuentes; enlazada",
+      "valor": 549,
+      "pendiente_manual": null
+    },
+    {
+      "id": "CX-1",
+      "grupo": "B",
+      "regla": "Suficiente contenido original",
+      "tipo": "codigo",
+      "fase": "F3",
+      "propuesta": "❌",
+      "estado": "NO CUMPLE",
+      "evidencia": "original_pages 10, original_words 2291 (institucionales y legales; guías F3 e informes F4 sin fusionar)",
+      "umbral": "original_pages ≥ 40 y original_words ≥ 30000 (PARCIAL desde 20 páginas)",
+      "valor": "10 / 2291",
+      "pendiente_manual": null
+    },
+    {
+      "id": "CX-2",
+      "grupo": "B",
+      "regla": "Valor sustancial frente a sitios similares",
+      "tipo": "codigo",
+      "fase": "F2, F4",
+      "propuesta": "❌",
+      "estado": "NO CUMPLE",
+      "evidencia": "hubs sin análisis propio (F4, PR #139 sin fusionar): /empleos/bogota; D1 sin decidir",
+      "umbral": "análisis propio en cada hub indexable y D1 aplicada",
+      "valor": null,
+      "pendiente_manual": null
+    },
+    {
+      "id": "CX-3",
+      "grupo": "B",
+      "regla": "Contenido nuevo y original con regularidad",
+      "tipo": "mixta",
+      "fase": "F3, F4",
+      "propuesta": "❌",
+      "estado": "NO CUMPLE",
+      "evidencia": "0 guías publicadas; informe mensual: no (F4 sin fusionar)",
+      "umbral": "≥ 12 guías e informe mensual publicado",
+      "valor": 0,
+      "pendiente_manual": "Ritmo de 2 guías por semana sostenido (fechas de publicación de las últimas 14 días)"
+    },
+    {
+      "id": "CX-4",
+      "grupo": "B",
+      "regla": "Sin contenido copiado (tal cual, con sinónimos, o solo insertado)",
+      "tipo": "mixta",
+      "fase": "F2",
+      "propuesta": "❌",
+      "estado": "NO CUMPLE",
+      "evidencia": "D1 sin decidir; F2 (PR #138) sin fusionar. 67 % de la muestra de vacantes indexables viene de portales de terceros. Tratamiento actual: fuente nombrada, enlace al original, sin anuncios",
+      "umbral": "D1 decidida y tratamiento de la opción elegida en todas las vacantes de terceros",
+      "valor": "67 % de la muestra de vacantes indexables viene de portales de terceros",
+      "pendiente_manual": "Decisión D1 del propietario (registrar en el archivo de atestaciones)"
+    },
+    {
+      "id": "CX-5",
+      "grupo": "B",
+      "regla": "Sin duplicados internos ni texto largo repetido",
+      "tipo": "codigo",
+      "fase": "F1, F2",
+      "propuesta": "⚠️",
+      "estado": "CUMPLE",
+      "evidencia": "duplicate_policy_pages 0 (/privacy no contradice a /legal/privacidad); bloque «Más empleos» distinto entre vacantes hermanas (6 y 6 enlaces, 0 en común)",
+      "umbral": "duplicate_policy_pages = 0 y «Más empleos» distinto entre vacantes hermanas",
+      "valor": 0,
+      "pendiente_manual": null
+    },
+    {
+      "id": "CX-6",
+      "grupo": "B",
+      "regla": "Páginas similares: ampliar o agrupar",
+      "tipo": "codigo",
+      "fase": "F4",
+      "propuesta": "⚠️",
+      "estado": "NO CUMPLE",
+      "evidencia": "hubs sin análisis propio (F4, PR #139 sin fusionar): /empleos/bogota; /empleos/santa-marta: robots «(ninguno)», en sitemap de categorías",
+      "umbral": "hubs indexables con análisis propio; hubs < 10 vacantes con noindex y fuera del sitemap",
+      "valor": null,
+      "pendiente_manual": null
+    },
+    {
+      "id": "CX-7",
+      "grupo": "B",
+      "regla": "Navegación alineada, legible, funcional y precisa",
+      "tipo": "codigo",
+      "fase": "F1",
+      "propuesta": "✅",
+      "estado": "CUMPLE",
+      "evidencia": "pie presente en 20/22 páginas; faltan: ninguna; enlaces del pie rotos: 0",
+      "umbral": "pie con contacto, acerca de, metodología y legales en todas las páginas; 0 rotos",
+      "valor": 0,
+      "pendiente_manual": null
+    },
+    {
+      "id": "CX-8",
+      "grupo": "B",
+      "regla": "Contenido organizado por temática",
+      "tipo": "codigo",
+      "fase": "—",
+      "propuesta": "✅",
+      "estado": "CUMPLE",
+      "evidencia": "ciudad, cargo y empresas: /empleos/bogota 200, /empleos/ingeniero-civil 200, /empresas 200",
+      "umbral": "hub de ciudad, de cargo y directorio de empresas en 200",
+      "valor": null,
+      "pendiente_manual": null
+    },
+    {
+      "id": "CX-9",
+      "grupo": "B",
+      "regla": "El sitio cumple lo que promete; sin enlaces a páginas inexistentes",
+      "tipo": "mixta",
+      "fase": "F2",
+      "propuesta": "⚠️",
+      "estado": "CUMPLE",
+      "evidencia": "vacante vencida 410 noindex sin anuncios; URL inexistente 404; 150 enlaces internos comprobados, 0 rotos",
+      "umbral": "vencida 404/410 noindex sin anuncios; inexistente 404; broken_internal_links = 0",
+      "valor": 0,
+      "pendiente_manual": "Soft 404 y «No se ha encontrado (404)» en el informe de páginas de Search Console"
+    },
+    {
+      "id": "CX-10",
+      "grupo": "B",
+      "regla": "Se ve bien en los navegadores",
+      "tipo": "manual",
+      "fase": "F6",
+      "propuesta": "✅",
+      "estado": "MANUAL",
+      "evidencia": "Chromium escritorio: 22/22 páginas sin errores de JavaScript",
+      "umbral": null,
+      "valor": null,
+      "pendiente_manual": "Revisión en Chromium, Firefox y WebKit, escritorio y móvil (F6)"
+    },
+    {
+      "id": "SP-1",
+      "grupo": "C",
+      "regla": "Encubrimiento",
+      "tipo": "codigo",
+      "fase": "F0",
+      "propuesta": "✅",
+      "estado": "PARCIAL",
+      "evidencia": "ssr_hydration_parity (palabras) 93.6 % en 18 páginas; por bloque exacto 68.2 %; páginas por debajo del 100 %: /empleos/bogota 77 % (102 105 108 111), /dashboard 81 % (vacantes analista uno portal), /como-funciona 83 % (escribes escribe buscamos vez), /empleos/a0000000-0000-4000-8000-000000000002… 85 % (102 105 108 111), /opiniones 87 % (cuéntanos todavía puedes escribir), / 88 % (busco jobs getonboard remoteok), /empleos/a0000000-0000-4000-8000-000000000001… 89 % (inicio empleos analista ubicación), /empleos/santa-marta 91 % (empleos inicio trabajos contratan) (+10)",
+      "umbral": "100 % de las palabras del HTML inicial presentes en el DOM hidratado (PARCIAL ≥ 75 % por página)",
+      "valor": 93.6,
+      "pendiente_manual": null
+    },
+    {
+      "id": "SP-2",
+      "grupo": "C",
+      "regla": "Páginas puerta",
+      "tipo": "codigo",
+      "fase": "F4",
+      "propuesta": "⚠️",
+      "estado": "NO CUMPLE",
+      "evidencia": "/empleos/santa-marta: robots «(ninguno)», en sitemap de categorías; hubs sin análisis propio (F4, PR #139 sin fusionar): /empleos/bogota",
+      "umbral": "hubs < 10 con noindex y fuera del sitemap; hubs indexables con análisis propio",
+      "valor": null,
+      "pendiente_manual": null
+    },
+    {
+      "id": "SP-3",
+      "grupo": "C",
+      "regla": "Dominio caducado",
+      "tipo": "manual",
+      "fase": "—",
+      "propuesta": "✅",
+      "estado": "MANUAL",
+      "evidencia": "no se puede medir por código",
+      "umbral": null,
+      "valor": null,
+      "pendiente_manual": "El propietario confirma que el dominio no se compró para aprovechar la reputación de un sitio anterior"
+    },
+    {
+      "id": "SP-4",
+      "grupo": "C",
+      "regla": "Contenido pirateado",
+      "tipo": "manual",
+      "fase": "—",
+      "propuesta": "✅",
+      "estado": "MANUAL",
+      "evidencia": "no se puede medir por código",
+      "umbral": null,
+      "valor": null,
+      "pendiente_manual": "Search Console → Problemas de seguridad: ninguno"
+    },
+    {
+      "id": "SP-5",
+      "grupo": "C",
+      "regla": "Texto y enlaces ocultos",
+      "tipo": "codigo",
+      "fase": "F0",
+      "propuesta": "✅",
+      "estado": "CUMPLE",
+      "evidencia": "22 páginas sin texto del servidor oculto por estilos (se admiten acordeones <details> y bloques que solo una de las dos anchuras, escritorio o móvil, oculta)",
+      "umbral": "0 bloques ocultos con display:none, visibility:hidden, tamaño 0 o fuera de pantalla",
+      "valor": 0,
+      "pendiente_manual": null
+    },
+    {
+      "id": "SP-6",
+      "grupo": "C",
+      "regla": "Exceso de palabras clave",
+      "tipo": "codigo",
+      "fase": "F4",
+      "propuesta": "⚠️",
+      "estado": "NO CUMPLE",
+      "evidencia": "listas que solo enumeran enlaces (≥ 8 enlaces, < 20 % de texto propio): /: 1, /ve: 1 — F4 (PR #139) sin fusionar",
+      "umbral": "0 listas de solo enlaces en la portada (criterio propio)",
+      "valor": 2,
+      "pendiente_manual": null
+    },
+    {
+      "id": "SP-7",
+      "grupo": "C",
+      "regla": "Spam de enlaces",
+      "tipo": "manual",
+      "fase": "—",
+      "propuesta": "✅",
+      "estado": "MANUAL",
+      "evidencia": "no se puede medir por código",
+      "umbral": null,
+      "valor": null,
+      "pendiente_manual": "El propietario confirma que no compra, vende ni intercambia enlaces"
+    },
+    {
+      "id": "SP-8",
+      "grupo": "C",
+      "regla": "Tráfico automatizado hacia Google",
+      "tipo": "manual",
+      "fase": "—",
+      "propuesta": "✅",
+      "estado": "MANUAL",
+      "evidencia": "no se puede medir por código",
+      "umbral": null,
+      "valor": null,
+      "pendiente_manual": "El propietario confirma que ningún proceso consulta la Búsqueda de Google de forma automatizada"
+    },
+    {
+      "id": "SP-9",
+      "grupo": "C",
+      "regla": "Prácticas maliciosas",
+      "tipo": "codigo",
+      "fase": "—",
+      "propuesta": "✅",
+      "estado": "CUMPLE",
+      "evidencia": "descargas forzadas: ninguna; entradas de historial añadidas al cargar: ninguna",
+      "umbral": "0 descargas forzadas y ≤ 2 entradas de historial tras cargar",
+      "valor": 0,
+      "pendiente_manual": null
+    },
+    {
+      "id": "SP-10",
+      "grupo": "C",
+      "regla": "Funciones engañosas",
+      "tipo": "manual",
+      "fase": "—",
+      "propuesta": "✅",
+      "estado": "MANUAL",
+      "evidencia": "no se puede medir por código",
+      "umbral": null,
+      "valor": null,
+      "pendiente_manual": "Revisión humana: el buscador y los botones hacen lo que dicen"
+    },
+    {
+      "id": "SP-11",
+      "grupo": "C",
+      "regla": "Abuso de contenido a gran escala",
+      "tipo": "mixta",
+      "fase": "F2",
+      "propuesta": "❌",
+      "estado": "NO CUMPLE",
+      "evidencia": "D1 sin decidir; F2 (PR #138) sin fusionar. 67 % de la muestra de vacantes indexables viene de portales de terceros. Tratamiento actual: fuente nombrada, enlace al original, sin anuncios",
+      "umbral": "D1 decidida y tratamiento de la opción elegida en todas las vacantes de terceros",
+      "valor": "67 % de la muestra de vacantes indexables viene de portales de terceros",
+      "pendiente_manual": "Decisión D1 del propietario (registrar en el archivo de atestaciones)"
+    },
+    {
+      "id": "SP-12",
+      "grupo": "C",
+      "regla": "Raspado de datos",
+      "tipo": "mixta",
+      "fase": "F2",
+      "propuesta": "❌",
+      "estado": "NO CUMPLE",
+      "evidencia": "D1 sin decidir; F2 (PR #138) sin fusionar. 67 % de la muestra de vacantes indexables viene de portales de terceros. Tratamiento actual: fuente nombrada, enlace al original, sin anuncios",
+      "umbral": "D1 decidida y tratamiento de la opción elegida en todas las vacantes de terceros",
+      "valor": "67 % de la muestra de vacantes indexables viene de portales de terceros",
+      "pendiente_manual": "Decisión D1 del propietario (registrar en el archivo de atestaciones)"
+    },
+    {
+      "id": "SP-13",
+      "grupo": "C",
+      "regla": "Reputación de sitios",
+      "tipo": "manual",
+      "fase": "—",
+      "propuesta": "✅",
+      "estado": "MANUAL",
+      "evidencia": "no se puede medir por código",
+      "umbral": null,
+      "valor": null,
+      "pendiente_manual": "El propietario confirma que no aloja contenido de terceros para posicionarlo"
+    },
+    {
+      "id": "SP-14",
+      "grupo": "C",
+      "regla": "Redirecciones engañosas",
+      "tipo": "codigo",
+      "fase": "—",
+      "propuesta": "✅",
+      "estado": "CUMPLE",
+      "evidencia": "32 respuestas sin meta refresh, redirecciones por script ni 3xx a otro dominio",
+      "umbral": "solo 301/308 al mismo dominio",
+      "valor": 0,
+      "pendiente_manual": null
+    },
+    {
+      "id": "SP-15",
+      "grupo": "C",
+      "regla": "Afiliación sin valor",
+      "tipo": "codigo",
+      "fase": "—",
+      "propuesta": "✅",
+      "estado": "CUMPLE",
+      "evidencia": "ningún enlace externo de la muestra lleva parámetros de afiliado",
+      "umbral": "0 enlaces con aff/affiliate/partner/tag/ref",
+      "valor": 0,
+      "pendiente_manual": null
+    },
+    {
+      "id": "SP-16",
+      "grupo": "C",
+      "regla": "Spam generado por usuarios",
+      "tipo": "manual",
+      "fase": "—",
+      "propuesta": "✅",
+      "estado": "MANUAL",
+      "evidencia": "no se puede medir por código",
+      "umbral": null,
+      "valor": null,
+      "pendiente_manual": "Moderación previa de opiniones: `npm run test:site-feedback` y revisión de lo publicado en /opiniones"
+    },
+    {
+      "id": "SP-17",
+      "grupo": "C",
+      "regla": "Retiradas legales y de información personal",
+      "tipo": "codigo",
+      "fase": "F1",
+      "propuesta": "⚠️",
+      "estado": "CUMPLE",
+      "evidencia": "/contact explica en el HTML inicial cómo retirar una vacante o reportar una oferta",
+      "umbral": "procedimiento público de retiro en /contact",
+      "valor": null,
+      "pendiente_manual": null
+    },
+    {
+      "id": "SP-18",
+      "grupo": "C",
+      "regla": "Elusión de políticas",
+      "tipo": "manual",
+      "fase": "—",
+      "propuesta": "✅",
+      "estado": "MANUAL",
+      "evidencia": "no se puede medir por código",
+      "umbral": null,
+      "valor": null,
+      "pendiente_manual": "El propietario confirma que no hay otros sitios o cuentas usados para eludir políticas"
+    },
+    {
+      "id": "SP-19",
+      "grupo": "C",
+      "regla": "Estafa y fraude",
+      "tipo": "codigo",
+      "fase": "F1",
+      "propuesta": "⚠️",
+      "estado": "CUMPLE",
+      "evidencia": "«Reportar esta vacante» visible en 2 vacantes (oficial y terceros)",
+      "umbral": "enlace «Reportar esta vacante» en cada vacante",
+      "valor": null,
+      "pendiente_manual": null
+    },
+    {
+      "id": "MA-1",
+      "grupo": "D",
+      "regla": "Sin acción manual activa",
+      "tipo": "manual",
+      "fase": "F6",
+      "propuesta": "✅",
+      "estado": "MANUAL",
+      "evidencia": "no se puede medir por código",
+      "umbral": null,
+      "valor": null,
+      "pendiente_manual": "Search Console → Acciones manuales: «No se han detectado problemas»"
+    },
+    {
+      "id": "PP-1",
+      "grupo": "E",
+      "regla": "Sin anuncios en pantallas sin contenido o de poco valor",
+      "tipo": "codigo",
+      "fase": "F1",
+      "propuesta": "❌",
+      "estado": "CUMPLE",
+      "evidencia": "5 rutas de pantallas sin contenido (login, cuenta, 404, vencida) sin anuncios (marcador bt-ads, bloques <ins> y petición real a adsbygoogle.js en el navegador): /esta-pagina-no-existe, /login, /reset-password, /cuenta, /empleos/a0000000-0000-4000-8000-000000000004/analista-de-operaciones-sintetico-vencida-bogota-colombia",
+      "umbral": "0 rutas con anuncios",
+      "valor": 0,
+      "pendiente_manual": null
+    },
+    {
+      "id": "PP-2",
+      "grupo": "E",
+      "regla": "Sin anuncios en pantallas en construcción",
+      "tipo": "codigo",
+      "fase": "F1",
+      "propuesta": "⚠️",
+      "estado": "CUMPLE",
+      "evidencia": "2 rutas de estados vacíos (opiniones, hub < 10) sin anuncios (marcador bt-ads, bloques <ins> y petición real a adsbygoogle.js en el navegador): /opiniones, /empleos/santa-marta",
+      "umbral": "0 rutas con anuncios",
+      "valor": 0,
+      "pendiente_manual": null
+    },
+    {
+      "id": "PP-3",
+      "grupo": "E",
+      "regla": "Sin anuncios en pantallas de navegación o alertas",
+      "tipo": "codigo",
+      "fase": "F1",
+      "propuesta": "⚠️",
+      "estado": "CUMPLE",
+      "evidencia": "2 rutas de buscador y navegación sin anuncios (marcador bt-ads, bloques <ins> y petición real a adsbygoogle.js en el navegador): /dashboard, /dashboard?q=analista&ciudad=bogota",
+      "umbral": "0 rutas con anuncios",
+      "valor": 0,
+      "pendiente_manual": null
+    },
+    {
+      "id": "PP-4",
+      "grupo": "E",
+      "regla": "Sin anuncios junto a contenido replicado",
+      "tipo": "codigo",
+      "fase": "F1, F2",
+      "propuesta": "❌",
+      "estado": "CUMPLE",
+      "evidencia": "2 rutas de vacantes de terceros sin anuncios (marcador bt-ads, bloques <ins> y petición real a adsbygoogle.js en el navegador): /empleos/a0000000-0000-4000-8000-000000000002/analista-de-operaciones-sintetico-terceros-uno-bogota-colombia, /empleos/a0000000-0000-4000-8000-000000000003/analista-de-operaciones-sintetico-terceros-dos-bogota-colombia; control positivo: la vacante oficial sí lleva el marcador",
+      "umbral": "0 rutas con anuncios",
+      "valor": 0,
+      "pendiente_manual": null
+    },
+    {
+      "id": "PP-5",
+      "grupo": "E",
+      "regla": "Más contenido que anuncios",
+      "tipo": "codigo",
+      "fase": "F1",
+      "propuesta": "✅",
+      "estado": "NO CUMPLE",
+      "evidencia": "6 páginas elegibles; bloques manuales <ins>: 0; elegibles con < 150 palabras: /empresas (83)",
+      "umbral": "0 bloques manuales; toda página con anuncios ≥ 150 palabras propias",
+      "valor": 1,
+      "pendiente_manual": null
+    },
+    {
+      "id": "PP-6",
+      "grupo": "E",
+      "regla": "Idioma admitido",
+      "tipo": "codigo",
+      "fase": "—",
+      "propuesta": "✅",
+      "estado": "CUMPLE",
+      "evidencia": "27 páginas con <html lang=\"es…\">",
+      "umbral": "lang es en todas las páginas",
+      "valor": null,
+      "pendiente_manual": null
+    },
+    {
+      "id": "PG-1",
+      "grupo": "F",
+      "regla": "Sin clics ni impresiones no válidos",
+      "tipo": "manual",
+      "fase": "—",
+      "propuesta": "✅",
+      "estado": "MANUAL",
+      "evidencia": "no se puede medir por código",
+      "umbral": null,
+      "valor": null,
+      "pendiente_manual": "Conducta del propietario: no abrir ni pulsar anuncios propios"
+    },
+    {
+      "id": "PG-2",
+      "grupo": "F",
+      "regla": "Fuentes de tráfico permitidas",
+      "tipo": "manual",
+      "fase": "—",
+      "propuesta": "✅",
+      "estado": "MANUAL",
+      "evidencia": "no se puede medir por código",
+      "umbral": null,
+      "valor": null,
+      "pendiente_manual": "GA4 → Adquisición: orgánico, directo y redes; sin tráfico comprado"
+    },
+    {
+      "id": "PG-3",
+      "grupo": "F",
+      "regla": "Comportamiento del sitio (sin emergentes que estorben)",
+      "tipo": "codigo",
+      "fase": "—",
+      "propuesta": "✅",
+      "estado": "CUMPLE",
+      "evidencia": "22 páginas sin capas fijas que tapen más del 30 % de la pantalla",
+      "umbral": "0 capas fijas > 30 % del viewport al cargar",
+      "valor": 0,
+      "pendiente_manual": null
+    },
+    {
+      "id": "PG-4",
+      "grupo": "F",
+      "regla": "Navegación no engañosa",
+      "tipo": "codigo",
+      "fase": "—",
+      "propuesta": "✅",
+      "estado": "CUMPLE",
+      "evidencia": "el enlace de salida nombra el portal de destino en 2 vacantes",
+      "umbral": "el enlace a la fuente dice a qué portal lleva",
+      "valor": null,
+      "pendiente_manual": null
+    },
+    {
+      "id": "PG-5",
+      "grupo": "F",
+      "regla": "Privacidad: aviso de cookies y consentimiento donde se exige",
+      "tipo": "mixta",
+      "fase": "F1",
+      "propuesta": "⚠️",
+      "estado": "CUMPLE",
+      "evidencia": "una sola historia de privacidad: Google, publicidad, cookies y cómo desactivar la personalización; /privacy coherente",
+      "umbral": "política coherente que declara Google, cookies publicitarias y exclusión",
+      "valor": null,
+      "pendiente_manual": "D5: mensaje de consentimiento (CMP) para EEE/Reino Unido/Suiza activo en AdSense → Privacidad y mensajes"
+    },
+    {
+      "id": "PG-6",
+      "grupo": "F",
+      "regla": "Propiedad del sitio y ads.txt",
+      "tipo": "codigo",
+      "fase": "—",
+      "propuesta": "✅",
+      "estado": "CUMPLE",
+      "evidencia": "ads.txt: línea google.com presente; meta google-adsense-account: pub-2247075733653451; coinciden: sí",
+      "umbral": "ads.txt con google.com, <pub>, DIRECT igual a la meta de verificación",
+      "valor": "pub-2247075733653451",
+      "pendiente_manual": null
+    },
+    {
+      "id": "PG-7",
+      "grupo": "F",
+      "regla": "Titular mayor de 18 años",
+      "tipo": "manual",
+      "fase": "—",
+      "propuesta": "✅",
+      "estado": "MANUAL",
+      "evidencia": "no se puede medir por código",
+      "umbral": null,
+      "valor": null,
+      "pendiente_manual": "Dato del titular de la cuenta de AdSense"
+    },
+    {
+      "id": "TX-1",
+      "grupo": "G",
+      "regla": "El texto está en el HTML inicial",
+      "tipo": "codigo",
+      "fase": "F1",
+      "propuesta": "⚠️",
+      "estado": "NO CUMPLE",
+      "evidencia": "11 páginas de texto; incompletas sin JavaScript: /fuentes; por debajo de 150 palabras: /legal/uso-aceptable (109), /legal/cookies (139), /como-funciona (113), /fuentes (130); palabras inicial/hidratado: /legal/terminos 177/170, /legal/privacidad 241/229, /legal/uso-aceptable 109/101, /legal/cookies 139/133, /privacy 267/271, /about 233/238, /contact 357/358, /metodologia 549/539, /preguntas 243/252, /como-funciona 113/112, /fuentes 130/189",
+      "umbral": "HTML inicial ≥ 80 % del texto hidratado y raw_html_words ≥ 150 en cada página de texto (design.md)",
+      "valor": 109,
+      "pendiente_manual": null
+    },
+    {
+      "id": "TX-2",
+      "grupo": "G",
+      "regla": "El rastreador de AdSense puede entrar",
+      "tipo": "codigo",
+      "fase": "—",
+      "propuesta": "✅",
+      "estado": "CUMPLE",
+      "evidencia": "robots.txt no bloquea el sitio a Mediapartners-Google, Googlebot ni AdsBot-Google",
+      "umbral": "sin Disallow: / para los rastreadores de Google",
+      "valor": null,
+      "pendiente_manual": null
+    }
+  ],
+  "indicadores": {
+    "paginas": [
+      {
+        "tipo": "home-co",
+        "ruta": "/",
+        "estado": 200,
+        "robots": "",
+        "anuncios": true,
+        "palabras": 864,
+        "jsonld": [
+          "Organization",
+          "WebSite"
+        ]
+      },
+      {
+        "tipo": "home-ve",
+        "ruta": "/ve",
+        "estado": 200,
+        "robots": "",
+        "anuncios": true,
+        "palabras": 779,
+        "jsonld": [
+          "Organization",
+          "WebSite"
+        ]
+      },
+      {
+        "tipo": "empleos",
+        "ruta": "/empleos",
+        "estado": 200,
+        "robots": "",
+        "anuncios": true,
+        "palabras": 477,
+        "jsonld": [
+          "Organization",
+          "WebSite",
+          "BreadcrumbList",
+          "ItemList"
+        ]
+      },
+      {
+        "tipo": "hub-grande",
+        "ruta": "/empleos/bogota",
+        "estado": 200,
+        "robots": "",
+        "anuncios": true,
+        "palabras": 636,
+        "jsonld": [
+          "Organization",
+          "WebSite",
+          "BreadcrumbList",
+          "ItemList"
+        ]
+      },
+      {
+        "tipo": "hub-cargo",
+        "ruta": "/empleos/ingeniero-civil",
+        "estado": 200,
+        "robots": "noindex",
+        "anuncios": false,
+        "palabras": 59,
+        "jsonld": [
+          "Organization",
+          "WebSite",
+          "BreadcrumbList",
+          "ItemList"
+        ]
+      },
+      {
+        "tipo": "empresas",
+        "ruta": "/empresas",
+        "estado": 200,
+        "robots": "",
+        "anuncios": true,
+        "palabras": 83,
+        "jsonld": [
+          "Organization",
+          "WebSite",
+          "ItemList"
+        ]
+      },
+      {
+        "tipo": "no-existe",
+        "ruta": "/esta-pagina-no-existe",
+        "estado": 404,
+        "robots": "noindex",
+        "anuncios": false,
+        "palabras": 11,
+        "jsonld": []
+      },
+      {
+        "tipo": "legal-terminos",
+        "ruta": "/legal/terminos",
+        "estado": 200,
+        "robots": "",
+        "anuncios": false,
+        "palabras": 177,
+        "jsonld": [
+          "Organization",
+          "WebSite"
+        ]
+      },
+      {
+        "tipo": "legal-privacidad",
+        "ruta": "/legal/privacidad",
+        "estado": 200,
+        "robots": "",
+        "anuncios": false,
+        "palabras": 241,
+        "jsonld": [
+          "Organization",
+          "WebSite"
+        ]
+      },
+      {
+        "tipo": "legal-uso-aceptable",
+        "ruta": "/legal/uso-aceptable",
+        "estado": 200,
+        "robots": "",
+        "anuncios": false,
+        "palabras": 109,
+        "jsonld": [
+          "Organization",
+          "WebSite"
+        ]
+      },
+      {
+        "tipo": "legal-cookies",
+        "ruta": "/legal/cookies",
+        "estado": 200,
+        "robots": "",
+        "anuncios": false,
+        "palabras": 139,
+        "jsonld": [
+          "Organization",
+          "WebSite"
+        ]
+      },
+      {
+        "tipo": "privacy",
+        "ruta": "/privacy",
+        "estado": 200,
+        "robots": "",
+        "anuncios": false,
+        "palabras": 267,
+        "jsonld": [
+          "Organization",
+          "WebSite"
+        ]
+      },
+      {
+        "tipo": "about",
+        "ruta": "/about",
+        "estado": 200,
+        "robots": "",
+        "anuncios": false,
+        "palabras": 233,
+        "jsonld": [
+          "Organization",
+          "WebSite"
+        ]
+      },
+      {
+        "tipo": "contact",
+        "ruta": "/contact",
+        "estado": 200,
+        "robots": "",
+        "anuncios": false,
+        "palabras": 357,
+        "jsonld": [
+          "Organization",
+          "WebSite"
+        ]
+      },
+      {
+        "tipo": "metodologia",
+        "ruta": "/metodologia",
+        "estado": 200,
+        "robots": "",
+        "anuncios": false,
+        "palabras": 549,
+        "jsonld": [
+          "Organization",
+          "WebSite"
+        ]
+      },
+      {
+        "tipo": "preguntas",
+        "ruta": "/preguntas",
+        "estado": 200,
+        "robots": "",
+        "anuncios": false,
+        "palabras": 243,
+        "jsonld": [
+          "Organization",
+          "WebSite"
+        ]
+      },
+      {
+        "tipo": "como-funciona",
+        "ruta": "/como-funciona",
+        "estado": 200,
+        "robots": "",
+        "anuncios": false,
+        "palabras": 113,
+        "jsonld": [
+          "Organization",
+          "WebSite"
+        ]
+      },
+      {
+        "tipo": "fuentes",
+        "ruta": "/fuentes",
+        "estado": 200,
+        "robots": "",
+        "anuncios": false,
+        "palabras": 130,
+        "jsonld": [
+          "Organization",
+          "WebSite"
+        ]
+      },
+      {
+        "tipo": "opiniones",
+        "ruta": "/opiniones",
+        "estado": 200,
+        "robots": "",
+        "anuncios": false,
+        "palabras": 142,
+        "jsonld": [
+          "Organization",
+          "WebSite"
+        ]
+      },
+      {
+        "tipo": "login",
+        "ruta": "/login",
+        "estado": 200,
+        "robots": "noindex,follow",
+        "anuncios": false,
+        "palabras": 0,
+        "jsonld": [
+          "Organization",
+          "WebSite"
+        ]
+      },
+      {
+        "tipo": "reset-password",
+        "ruta": "/reset-password",
+        "estado": 200,
+        "robots": "noindex,follow",
+        "anuncios": false,
+        "palabras": 0,
+        "jsonld": [
+          "Organization",
+          "WebSite"
+        ]
+      },
+      {
+        "tipo": "cuenta",
+        "ruta": "/cuenta",
+        "estado": 200,
+        "robots": "noindex,follow",
+        "anuncios": false,
+        "palabras": 0,
+        "jsonld": [
+          "Organization",
+          "WebSite"
+        ]
+      },
+      {
+        "tipo": "dashboard",
+        "ruta": "/dashboard",
+        "estado": 200,
+        "robots": "",
+        "anuncios": false,
+        "palabras": 243,
+        "jsonld": [
+          "Organization",
+          "WebSite"
+        ]
+      },
+      {
+        "tipo": "dashboard-filtrado",
+        "ruta": "/dashboard?q=analista&ciudad=bogota",
+        "estado": 200,
+        "robots": "",
+        "anuncios": false,
+        "palabras": 243,
+        "jsonld": [
+          "Organization",
+          "WebSite"
+        ]
+      },
+      {
+        "tipo": "guias",
+        "ruta": "/guias",
+        "estado": 404,
+        "robots": "noindex",
+        "anuncios": false,
+        "palabras": 11,
+        "jsonld": []
+      },
+      {
+        "tipo": "informes",
+        "ruta": "/informes",
+        "estado": 404,
+        "robots": "noindex",
+        "anuncios": false,
+        "palabras": 11,
+        "jsonld": []
+      },
+      {
+        "tipo": "herramientas",
+        "ruta": "/herramientas",
+        "estado": 404,
+        "robots": "noindex",
+        "anuncios": false,
+        "palabras": 11,
+        "jsonld": []
+      },
+      {
+        "tipo": "vacante-oficial",
+        "ruta": "/empleos/a0000000-0000-4000-8000-000000000001/analista-de-operaciones-sintetico-oficial-medellin-colombia",
+        "estado": 200,
+        "robots": "",
+        "anuncios": true,
+        "palabras": 217,
+        "jsonld": [
+          "Organization",
+          "WebSite",
+          "BreadcrumbList",
+          "JobPosting"
+        ]
+      },
+      {
+        "tipo": "vacante-terceros",
+        "ruta": "/empleos/a0000000-0000-4000-8000-000000000002/analista-de-operaciones-sintetico-terceros-uno-bogota-colombia",
+        "estado": 200,
+        "robots": "",
+        "anuncios": false,
+        "palabras": 274,
+        "jsonld": [
+          "Organization",
+          "WebSite",
+          "BreadcrumbList",
+          "JobPosting"
+        ]
+      },
+      {
+        "tipo": "vacante-terceros-hermana",
+        "ruta": "/empleos/a0000000-0000-4000-8000-000000000003/analista-de-operaciones-sintetico-terceros-dos-bogota-colombia",
+        "estado": 200,
+        "robots": "",
+        "anuncios": false,
+        "palabras": 276,
+        "jsonld": [
+          "Organization",
+          "WebSite",
+          "BreadcrumbList",
+          "JobPosting"
+        ]
+      },
+      {
+        "tipo": "vacante-vencida",
+        "ruta": "/empleos/a0000000-0000-4000-8000-000000000004/analista-de-operaciones-sintetico-vencida-bogota-colombia",
+        "estado": 410,
+        "robots": "noindex",
+        "anuncios": false,
+        "palabras": 13,
+        "jsonld": []
+      },
+      {
+        "tipo": "hub-pequeno",
+        "ruta": "/empleos/santa-marta",
+        "estado": 200,
+        "robots": "",
+        "anuncios": false,
+        "palabras": 295,
+        "jsonld": [
+          "Organization",
+          "WebSite",
+          "BreadcrumbList",
+          "ItemList"
+        ]
+      }
+    ],
+    "navegador": [
+      {
+        "ruta": "/",
+        "anunciosPedidos": true,
+        "bloques": 74,
+        "ausentes": 1,
+        "ocultos": 0,
+        "capa": 0.007,
+        "palabrasHidratadas": 560,
+        "palabrasServidor": 253,
+        "palabrasAusentes": [
+          "busco",
+          "jobs",
+          "getonboard",
+          "remoteok",
+          "remotive",
+          "workana",
+          "weremoto",
+          "días",
+          "ahora",
+          "uno",
+          "hace",
+          "armenia",
+          "ibague",
+          "popayan",
+          "asesor",
+          "marta",
+          "mira",
+          "minuto",
+          "escribes",
+          "escribe",
+          "quitamos",
+          "aquí",
+          "reales",
+          "encuéntrala",
+          "agente",
+          "puedes",
+          "desarrolladores",
+          "inicio",
+          "guardadas",
+          "califícanos"
+        ],
+        "errores": 0,
+        "error": null
+      },
+      {
+        "ruta": "/empleos/bogota",
+        "anunciosPedidos": true,
+        "bloques": 62,
+        "ausentes": 43,
+        "ocultos": 0,
+        "capa": 0.007,
+        "palabrasHidratadas": 594,
+        "palabrasServidor": 69,
+        "palabrasAusentes": [
+          "102",
+          "105",
+          "108",
+          "111",
+          "114",
+          "117",
+          "120",
+          "empleos",
+          "muestra",
+          "inicio",
+          "trabajos",
+          "contratan",
+          "empresa",
+          "analista",
+          "uno",
+          "marta"
+        ],
+        "errores": 0,
+        "error": null
+      },
+      {
+        "ruta": "/esta-pagina-no-existe",
+        "anunciosPedidos": false,
+        "bloques": 0,
+        "ausentes": 0,
+        "ocultos": 0,
+        "capa": 0,
+        "palabrasHidratadas": 7,
+        "palabrasServidor": 0,
+        "palabrasAusentes": [],
+        "errores": 0,
+        "error": null
+      },
+      {
+        "ruta": "/legal/terminos",
+        "anunciosPedidos": false,
+        "bloques": 7,
+        "ausentes": 0,
+        "ocultos": 0,
+        "capa": 0.007,
+        "palabrasHidratadas": 170,
+        "palabrasServidor": 111,
+        "palabrasAusentes": [
+          "última",
+          "disponibilidad",
+          "datos"
+        ],
+        "errores": 0,
+        "error": null
+      },
+      {
+        "ruta": "/legal/privacidad",
+        "anunciosPedidos": false,
+        "bloques": 10,
+        "ausentes": 0,
+        "ocultos": 0,
+        "capa": 0.007,
+        "palabrasHidratadas": 229,
+        "palabrasServidor": 115,
+        "palabrasAusentes": [
+          "última",
+          "hoy"
+        ],
+        "errores": 0,
+        "error": null
+      },
+      {
+        "ruta": "/legal/uso-aceptable",
+        "anunciosPedidos": false,
+        "bloques": 9,
+        "ausentes": 0,
+        "ocultos": 0,
+        "capa": 0.007,
+        "palabrasHidratadas": 101,
+        "palabrasServidor": 63,
+        "palabrasAusentes": [
+          "última",
+          "qué",
+          "hacer",
+          "permitido",
+          "extraer"
+        ],
+        "errores": 0,
+        "error": null
+      },
+      {
+        "ruta": "/legal/cookies",
+        "anunciosPedidos": false,
+        "bloques": 6,
+        "ausentes": 0,
+        "ocultos": 0,
+        "capa": 0.007,
+        "palabrasHidratadas": 133,
+        "palabrasServidor": 75,
+        "palabrasAusentes": [
+          "última"
+        ],
+        "errores": 0,
+        "error": null
+      },
+      {
+        "ruta": "/privacy",
+        "anunciosPedidos": false,
+        "bloques": 8,
+        "ausentes": 0,
+        "ocultos": 0,
+        "capa": 0.007,
+        "palabrasHidratadas": 271,
+        "palabrasServidor": 142,
+        "palabrasAusentes": [
+          "puedes"
+        ],
+        "errores": 0,
+        "error": null
+      },
+      {
+        "ruta": "/about",
+        "anunciosPedidos": false,
+        "bloques": 8,
+        "ausentes": 0,
+        "ocultos": 0,
+        "capa": 0.007,
+        "palabrasHidratadas": 238,
+        "palabrasServidor": 142,
+        "palabrasAusentes": [
+          "qué"
+        ],
+        "errores": 0,
+        "error": null
+      },
+      {
+        "ruta": "/contact",
+        "anunciosPedidos": false,
+        "bloques": 12,
+        "ausentes": 0,
+        "ocultos": 0,
+        "capa": 0.007,
+        "palabrasHidratadas": 358,
+        "palabrasServidor": 170,
+        "palabrasAusentes": [
+          "qué",
+          "puedes",
+          "retirar",
+          "agentes"
+        ],
+        "errores": 0,
+        "error": null
+      },
+      {
+        "ruta": "/metodologia",
+        "anunciosPedidos": false,
+        "bloques": 23,
+        "ausentes": 0,
+        "ocultos": 0,
+        "capa": 0.007,
+        "palabrasHidratadas": 539,
+        "palabrasServidor": 222,
+        "palabrasAusentes": [
+          "hay",
+          "duplicados",
+          "prioridad",
+          "qué",
+          "hacemos"
+        ],
+        "errores": 0,
+        "error": null
+      },
+      {
+        "ruta": "/preguntas",
+        "anunciosPedidos": false,
+        "bloques": 14,
+        "ausentes": 0,
+        "ocultos": 0,
+        "capa": 0.007,
+        "palabrasHidratadas": 252,
+        "palabrasServidor": 136,
+        "palabrasAusentes": [
+          "preguntas"
+        ],
+        "errores": 0,
+        "error": null
+      },
+      {
+        "ruta": "/como-funciona",
+        "anunciosPedidos": false,
+        "bloques": 5,
+        "ausentes": 4,
+        "ocultos": 0,
+        "capa": 0.007,
+        "palabrasHidratadas": 112,
+        "palabrasServidor": 65,
+        "palabrasAusentes": [
+          "escribes",
+          "escribe",
+          "buscamos",
+          "vez",
+          "cruzamos",
+          "filtramos",
+          "sirve",
+          "duplicados",
+          "resultados",
+          "aplicar",
+          "ordenados"
+        ],
+        "errores": 0,
+        "error": null
+      },
+      {
+        "ruta": "/fuentes",
+        "anunciosPedidos": false,
+        "bloques": 9,
+        "ausentes": 0,
+        "ocultos": 0,
+        "capa": 0.007,
+        "palabrasHidratadas": 189,
+        "palabrasServidor": 72,
+        "palabrasAusentes": [
+          "qué"
+        ],
+        "errores": 0,
+        "error": null
+      },
+      {
+        "ruta": "/opiniones",
+        "anunciosPedidos": false,
+        "bloques": 8,
+        "ausentes": 7,
+        "ocultos": 0,
+        "capa": 0,
+        "palabrasHidratadas": 183,
+        "palabrasServidor": 70,
+        "palabrasAusentes": [
+          "cuéntanos",
+          "todavía",
+          "puedes",
+          "escribir",
+          "desde",
+          "esta",
+          "página",
+          "tus",
+          "navegación"
+        ],
+        "errores": 0,
+        "error": null
+      },
+      {
+        "ruta": "/login",
+        "anunciosPedidos": false,
+        "bloques": 0,
+        "ausentes": 0,
+        "ocultos": 0,
+        "capa": 0,
+        "palabrasHidratadas": 35,
+        "palabrasServidor": 0,
+        "palabrasAusentes": [],
+        "errores": 0,
+        "error": null
+      },
+      {
+        "ruta": "/cuenta",
+        "anunciosPedidos": false,
+        "bloques": 0,
+        "ausentes": 0,
+        "ocultos": 0,
+        "capa": 0,
+        "palabrasHidratadas": 44,
+        "palabrasServidor": 0,
+        "palabrasAusentes": [],
+        "errores": 0,
+        "error": null
+      },
+      {
+        "ruta": "/dashboard",
+        "anunciosPedidos": false,
+        "bloques": 25,
+        "ausentes": 24,
+        "ocultos": 0,
+        "capa": 0.007,
+        "palabrasHidratadas": 210,
+        "palabrasServidor": 26,
+        "palabrasAusentes": [
+          "vacantes",
+          "analista",
+          "uno",
+          "portal",
+          "remoto"
+        ],
+        "errores": 0,
+        "error": null
+      },
+      {
+        "ruta": "/empleos/a0000000-0000-4000-8000-000000000001/analista-de-operaciones-sintetico-oficial-medellin-colombia",
+        "anunciosPedidos": true,
+        "bloques": 12,
+        "ausentes": 8,
+        "ocultos": 0,
+        "capa": 0.007,
+        "palabrasHidratadas": 207,
+        "palabrasServidor": 102,
+        "palabrasAusentes": [
+          "inicio",
+          "empleos",
+          "analista",
+          "ubicación",
+          "noviembre",
+          "fuente",
+          "ver",
+          "aplicar",
+          "descripción",
+          "requisito",
+          "todos"
+        ],
+        "errores": 0,
+        "error": null
+      },
+      {
+        "ruta": "/empleos/a0000000-0000-4000-8000-000000000002/analista-de-operaciones-sintetico-terceros-uno-bogota-colombia",
+        "anunciosPedidos": false,
+        "bloques": 19,
+        "ausentes": 13,
+        "ocultos": 0,
+        "capa": 0.007,
+        "palabrasHidratadas": 243,
+        "palabrasServidor": 109,
+        "palabrasAusentes": [
+          "102",
+          "105",
+          "108",
+          "111",
+          "114",
+          "inicio",
+          "analista",
+          "uno",
+          "ubicación",
+          "noviembre",
+          "ver",
+          "aplicar",
+          "descripción",
+          "requisito",
+          "vacantes",
+          "más"
+        ],
+        "errores": 0,
+        "error": null
+      },
+      {
+        "ruta": "/empleos/a0000000-0000-4000-8000-000000000004/analista-de-operaciones-sintetico-vencida-bogota-colombia",
+        "anunciosPedidos": false,
+        "bloques": 0,
+        "ausentes": 0,
+        "ocultos": 0,
+        "capa": 0,
+        "palabrasHidratadas": 11,
+        "palabrasServidor": 0,
+        "palabrasAusentes": [],
+        "errores": 0,
+        "error": null
+      },
+      {
+        "ruta": "/empleos/santa-marta",
+        "anunciosPedidos": false,
+        "bloques": 22,
+        "ausentes": 6,
+        "ocultos": 0,
+        "capa": 0.007,
+        "palabrasHidratadas": 254,
+        "palabrasServidor": 68,
+        "palabrasAusentes": [
+          "empleos",
+          "inicio",
+          "trabajos",
+          "contratan",
+          "empresa",
+          "asesor"
+        ],
+        "errores": 0,
+        "error": null
+      }
+    ],
+    "paginasOriginales": [
+      {
+        "ruta": "/como-funciona",
+        "palabras": 113
+      },
+      {
+        "ruta": "/fuentes",
+        "palabras": 130
+      },
+      {
+        "ruta": "/preguntas",
+        "palabras": 243
+      },
+      {
+        "ruta": "/about",
+        "palabras": 233
+      },
+      {
+        "ruta": "/metodologia",
+        "palabras": 549
+      },
+      {
+        "ruta": "/contact",
+        "palabras": 357
+      },
+      {
+        "ruta": "/legal/terminos",
+        "palabras": 177
+      },
+      {
+        "ruta": "/legal/privacidad",
+        "palabras": 241
+      },
+      {
+        "ruta": "/legal/uso-aceptable",
+        "palabras": 109
+      },
+      {
+        "ruta": "/legal/cookies",
+        "palabras": 139
+      }
+    ],
+    "muestraVacantes": [
+      {
+        "ruta": "/empleos/a0000000-0000-4000-8000-000000000001/analista-de-operaciones-sintetico-oficial-medellin-colombia",
+        "fuente": "Portal oficial",
+        "indexable": true
+      },
+      {
+        "ruta": "/empleos/a0000000-0000-4000-8000-000000000002/analista-de-operaciones-sintetico-terceros-uno-bogota-colombia",
+        "fuente": "LinkedIn",
+        "indexable": true
+      },
+      {
+        "ruta": "/empleos/a0000000-0000-4000-8000-000000000003/analista-de-operaciones-sintetico-terceros-dos-bogota-colombia",
+        "fuente": "LinkedIn",
+        "indexable": true
+      }
+    ],
+    "enlacesRotos": [],
+    "enlacesComprobados": 150,
+    "peticiones": 164,
+    "metodos": [
+      "GET"
+    ]
+  },
+  "diferencias": []
+}
