@@ -108,7 +108,7 @@ const suites: Record<string, string[]> = {
   sitemap: ["validate-sitemap-streaming.ts"],
   observability: ["validate-run-observability.ts"],
   pagination: ["validate-job-pagination.ts", "validate-search-narrowing.ts"],
-  modality: ["validate-job-modality.test.ts", "validate-job-modality.ts"],
+  modality: ["validate-job-modality.test.ts", "validate-job-modality.ts", "validate-backfill-false-remote.ts"],
   seo: ["validate-seo-job-pages.ts", "validate-job-page-blocks.ts", "validate-intent-pages.ts"],
   "intent-bench": ["bench-intent-pages.ts"],
   "intent-drift": ["drift-intent-pages.ts"],
