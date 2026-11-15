@@ -34,7 +34,8 @@ Con `THIRD_PARTY_JOB_EXCERPT_ENABLED=true`, toda vacante cuya fuente no sea
    oferta original, reputación, portal del empleador, otras vacantes de la
    empresa, «Más empleos en <ciudad>») y no carga anuncios.
 3. Queda fuera del corpus de Google. Todos los consumidores del veredicto
-   compartido deben estar de acuerdo, y en el código ya lo están:
+   compartido deben estar de acuerdo. En el código lo están todos menos
+   las dos filas marcadas «sin cambio», que quedan en «Abierto»:
 
    | Consumidor | Con la bandera encendida | Dónde |
    |---|---|---|
@@ -46,6 +47,7 @@ Con `THIRD_PARTY_JOB_EXCERPT_ENABLED=true`, toda vacante cuya fuente no sea
    | IndexNow | la URL no se envía | `scripts/indexnow-submit.ts` |
    | Hidratación (`__SSR_JOB__`) | mismo extracto que el HTML del servidor (SP-1) | `renderJobPageHtml()` |
    | `/api/jobs/:id` | **sin cambio**: texto completo | ver «Abierto» |
+   | API pública de agentes (REST, MCP, A2A, WebMCP) | **sin cambio**: hasta 8.000 caracteres | `src/lib/public-jobs-api.ts`, ver «Abierto» |
 
 4. Las vacantes de «Portal oficial» no cambian: página completa, JobPosting
    y anuncios según `seo_ready`.
@@ -67,7 +69,7 @@ y lleva `noindex`».
 1. Medir (F0) cuántos clics de Google llegan hoy a vacantes de terceros
    (Search Console, 28 días). Es el tráfico que se pierde.
 2. Aceptar este ADR y aplicar la enmienda al contrato.
-3. Decidir el punto abierto de `/api/jobs/:id`.
+3. Decidir los dos puntos abiertos (`/api/jobs/:id` y la API de agentes).
 4. Encender en el entorno de Render y verificar con `/seo drift compare`
    en dos vacantes de cada procedencia.
 
@@ -81,6 +83,12 @@ salido del índice vuelven a entrar en el siguiente rastreo del sitemap.
   las sesiones iniciadas para el detalle de la vacante. Recortarlo cambiaría
   lo que ve quien busca empleo en el dashboard, que no es una página
   indexable. Propuesta: dejarlo completo. Confirmarlo al aceptar el ADR.
+- La API pública de agentes (`/api/public/jobs`, MCP, A2A, WebMCP;
+  contrato protegido de `docs/AGENT-READINESS-RUNBOOK.md`) devuelve la
+  descripción de terceros acotada a 8.000 caracteres. Si D1(b) se enciende
+  para reducir la superficie copiada, la API debería aplicar el mismo
+  extracto, con OpenAPI, `llms.txt` y digests actualizados en el mismo
+  cambio. No está implementado: decidirlo al aceptar el ADR.
 
 ## Alternativas descartadas
 

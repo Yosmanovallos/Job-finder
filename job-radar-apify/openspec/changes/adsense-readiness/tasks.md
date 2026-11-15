@@ -115,13 +115,23 @@ anterior. **No se pulsa «Solicitar revisión» antes de F6.**
 - [x] «Más empleos en <ciudad>» ordenado por cercanía de cargo (palabras
       del título en común, desempate por el hash del id), mismo número de
       enlaces — ADS-037
-- [x] `test:seo` en verde. Drift: con las mismas entradas el HTML de las
-      dos vacantes dorada es idéntico (ADS-031); en producción solo cambia
-      el orden de «Más empleos». `/seo drift compare` de 2 vacantes de cada
-      procedencia queda para después del despliegue (la herramienta no
-      lee loopback)
+- [x] `test:seo` en verde
+- [ ] Drift en 2 vacantes de cada procedencia. **Pendiente.** ADS-031 solo
+      prueba que `renderJobPageHtml()` reproduce la composición anterior
+      (`tests/fixtures/job-page-golden/generate.ts`), no la ruta real con
+      base de datos. Falta: 449c981 y esta rama contra la misma BD
+      desechable, 2 vacantes oficiales y 2 de terceros, comparar title,
+      meta, canonical, robots, JSON-LD, `__SSR_JOB__` y H1 (cambio esperado:
+      solo el orden de «Más empleos»); y `/seo drift compare` en producción
+      tras desplegar
+- [x] CX-5 sin perder variedad: en un hub sintético de 60 vacantes con
+      títulos repetidos, 37 listas distintas por rotación → 38 por cercanía;
+      hermanas con el mismo título siguen con listas distintas (ADS-037)
+- [ ] D1(b): API pública de agentes y `/api/jobs/:id` siguen con el texto
+      completo; quedan en «Abierto» del ADR 0016 (no afecta al gate con D1(a))
 - **Gate:** CX-4, CX-9, SP-11, SP-12, PP-4 en CUMPLE con D1(a) — probado
-  por ADS-030…039 y `test:seo`; D1(b) lista y apagada
+  por ADS-030…039 y `test:seo`; D1(b) implementada y apagada, con dos
+  consumidores abiertos en el ADR. Falta el drift de la ruta real
 
 ## F3 — Guías
 

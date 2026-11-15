@@ -1,8 +1,11 @@
 /**
  * Golden job pages (openspec adsense-readiness F2). The .html files next to
- * this one were rendered by the job route's composition at 449c981, before
- * F2: with THIRD_PARTY_JOB_EXCERPT_ENABLED off, renderJobPageHtml() must
- * still produce them byte for byte (line endings normalized to LF).
+ * this one were written by generate.ts, which repeats the composition the
+ * /empleos/:id route used at 449c981 (before F2), with the root index.html
+ * as shell. With THIRD_PARTY_JOB_EXCERPT_ENABLED off, renderJobPageHtml()
+ * must still produce them byte for byte (line endings normalized to LF).
+ * If the shell changes on purpose, regenerate from a pre-change checkout:
+ *   npx tsx tests/fixtures/job-page-golden/generate.ts "$PWD"
  * Synthetic data only.
  */
 import type { SeoJob } from "../../../src/lib/job-seo.js";

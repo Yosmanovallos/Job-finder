@@ -199,6 +199,18 @@ test("ADS-037 CX-5: the number of linked jobs is unchanged", () => {
   assert.ok(spread.size > 1, "no shared token: hash tie-break, not one list for all");
 });
 
+test("ADS-037 CX-5: proximity does not make sibling lists more alike", () => {
+  const groups: Array<[string, number]> = [["Auxiliar de bodega", 5], ["Asesor comercial", 4], ["Mesero", 3], ["Analista de datos", 3], ["Conductor", 3], ["Cajero", 3], ["Auxiliar contable", 3], ["Desarrollador backend", 2], ["Enfermera jefe", 2], ["Vendedor tienda", 2]];
+  const titles = groups.flatMap(([title, n]) => Array.from({ length: n }, () => title));
+  for (let i = 0; titles.length < 60; i++) titles.push(`Cargo único ${i} operario`);
+  const hub = titles.map((title, i) => ({ ...candidate(i, title), jobId: `${(0x10000000 + i * 7919).toString(16)}-0000-4000-8000-000000000000` }));
+  const lists = (ranked: boolean) => new Set(hub.map((job) => pickRelatedJobs(job.jobId, hub, RELATED_JOBS_LIMIT, ranked ? job.title : undefined).map((l) => l.path).join()));
+  assert.ok(lists(true).size >= lists(false).size, `${lists(true).size} distinct lists with proximity vs ${lists(false).size} by rotation`);
+  const siblings = hub.filter((job) => job.title === "Auxiliar de bodega");
+  const siblingLists = new Set(siblings.map((job) => pickRelatedJobs(job.jobId, hub, RELATED_JOBS_LIMIT, job.title).map((l) => l.path).join()));
+  assert.equal(siblingLists.size, siblings.length, "same-title siblings still get different lists");
+});
+
 test("ADS-038 the job route renders through renderJobPageHtml and filters stale listing rows", () => {
   const server = fs.readFileSync(path.join(here, "..", "src", "server.ts"), "utf-8");
   assert.ok(/renderJobPageHtml\(/.test(server), "job route uses the shared composition");
