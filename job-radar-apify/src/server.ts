@@ -3416,7 +3416,15 @@ async function handleMarketReportRoute(
     return true;
   }
   if (wantsMarkdown(req.headers.accept)) {
-    await sendBody(req, res, 200, { "Content-Type": "text/markdown; charset=utf-8", Vary: "Accept", Link: DISCOVERY_LINKS }, renderContentMarkdown(content));
+    // Same as "/" and PUBLIC_PAGES: the edge ignores Vary: Accept, so the
+    // Markdown variant must never be cached under the HTML URL.
+    await sendBody(
+      req,
+      res,
+      200,
+      { "Content-Type": "text/markdown; charset=utf-8", "Cache-Control": "private, no-store", Vary: "Accept", Link: DISCOVERY_LINKS },
+      renderContentMarkdown(content)
+    );
     return true;
   }
   let html: string;

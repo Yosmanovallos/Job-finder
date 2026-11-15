@@ -149,8 +149,10 @@ async function run(): Promise<void> {
     check(!/<meta[^>]*name="robots"[^>]*noindex/.test(html), "El informe es indexable.", "El informe lleva noindex.");
 
     const markdown = await fetch(`${BASE_URL}${editionPath}`, { headers: { Accept: "text/markdown" } });
-    check((markdown.headers.get("content-type") || "").startsWith("text/markdown") && /Vary/i.test([...markdown.headers.keys()].join(" ")),
-      "Negociación Markdown con Vary.", "Sin negociación Markdown.");
+    check((markdown.headers.get("content-type") || "").startsWith("text/markdown") && /Accept/.test(markdown.headers.get("vary") || ""),
+      "Negociación Markdown con Vary: Accept.", "Sin negociación Markdown.");
+    check(markdown.headers.get("cache-control") === "private, no-store",
+      "La variante Markdown nunca entra en el caché del borde.", `Markdown con Cache-Control ${markdown.headers.get("cache-control")}.`);
     const api = await fetch(`${BASE_URL}/api${editionPath}`);
     check(api.status === 200, "/api/informes sirve el mismo contenido en JSON.", `/api/informes respondió ${api.status}.`);
 

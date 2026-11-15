@@ -7,6 +7,9 @@
 // The base is a plain export of the commit to compare, built, at
 // <os tmpdir>/job-radar-bench-base/job-radar-apify (node_modules may be a
 // junction to this checkout's). `npx tsx scripts/run-isolated-tests.ts home-cold`.
+// Cleanup: remove the junction FIRST (`cmd /c rmdir <base>\node_modules`);
+// `rm -rf` on the base tree can follow it and delete this checkout's
+// node_modules.
 import "./require-isolated-database.js";
 import { spawn, type ChildProcess } from "node:child_process";
 import { randomBytes } from "node:crypto";

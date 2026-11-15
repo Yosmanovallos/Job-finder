@@ -154,12 +154,18 @@ ninguna página.
       `/` +2,6 KB y del hub +1,3 KB sin comprimir; JS inicial gzip
       137,6 → 138,9 KB. Sin regresión: no hay consultas nuevas, cachés ni
       precalentado nuevos; el caché y el precalentado del dashboard no cambian
-- [ ] **Propietario:** generar la primera edición contra producción y hacer
-      commit del JSON (sin él, los hubs no muestran comparación, la portada
-      no muestra cifras de cargos y `/informes` sigue en `noindex`):
-      `npx tsx scripts/build-market-report.ts --dry-run`, revisar, y luego
-      `--write`. Hacerlo cerca del cierre de cada mes: volver a correrlo en
-      el mismo mes reescribe esa edición
+- [ ] **Propietario, requisito antes de desplegar a `main`:** generar la
+      primera edición de **ambos países** contra producción y hacer commit
+      de los JSON. Sin ellos: los hubs no muestran comparación (CX-6), la
+      portada no muestra cifras de cargos, el pie enlaza un `/informes`
+      vacío (señal de sección en construcción, PP-2) y los hubs pequeños
+      quedan `noindex` pero todavía en `sitemap-categories.xml` («URL
+      enviada marcada como noindex» en Search Console). Comandos:
+      `npx tsx scripts/build-market-report.ts --dry-run --country CO`,
+      revisar, `--write --country CO`; lo mismo con `--country VE`. Hacerlo
+      cerca del cierre de cada mes: volver a correrlo en el mismo mes
+      reescribe esa edición. Si pasan más de 45 días sin edición nueva, el
+      sitemap vuelve a listar todos los hubs (vuelve el mismo aviso)
 - [ ] Después del despliegue: `/seo drift compare` de un hub y de `/`, y
       la comprobación en producción del runbook (URL única, `MISS`)
 - [ ] Posible seguimiento (no en esta fase): automatizar la edición

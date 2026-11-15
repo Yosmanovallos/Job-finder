@@ -40,6 +40,15 @@ const read = (file: string) => fs.readFileSync(path.join(root, file), "utf-8");
 const CUTOFF = new Date("2026-11-14T15:00:00.000Z");
 const DAY = 86_400_000;
 
+/** Body of server.ts's handleMarketReportRoute, up to the next top-level declaration. */
+function reportHandler(server: string): string {
+  const start = server.indexOf("async function handleMarketReportRoute");
+  assert.ok(start > 0, "handleMarketReportRoute exists");
+  const rest = server.slice(start + 10);
+  const end = rest.search(/\n(?:async function|function|const|server\.listen)\b/);
+  return server.slice(start, start + 10 + (end > 0 ? end : rest.length));
+}
+
 const CITY_LOCATIONS = ["Bogotá, D.C.", "Medellín, Antioquia", "Cali", "Barranquilla", "Cartagena", "Bucaramanga", "Pereira", "Manizales"];
 const TITLES = [
   "Asesor comercial",
@@ -287,17 +296,15 @@ test("ADS-058 report routes, switch, sitemap and no ad marker", () => {
   assert.match(server, /marketReportSitemapEntries\(/);
   assert.match(read("src/sections/Footer.tsx"), /\/informes/);
   assert.match(read("src/App.tsx"), /path="\/informes/);
-  const start = server.indexOf("// F4 market report routes");
-  const end = server.indexOf("// end F4 market report routes");
-  assert.ok(start > 0 && end > start, "report routes are delimited");
-  assert.doesNotMatch(server.slice(start, end), /markAdEligible/);
+  assert.ok(server.indexOf("// F4 market report routes") > 0, "report routes are delimited");
+  assert.doesNotMatch(reportHandler(server), /markAdEligible/);
 });
 
 test("ADS-059 nothing on the request path queries the database for the report", async () => {
   const server = read("src/server.ts");
-  const start = server.indexOf("// F4 market report routes");
-  const end = server.indexOf("// end F4 market report routes");
-  assert.doesNotMatch(server.slice(start, end), /pool\.|getJobsPage|getIntentPage|queryMarketRows/);
+  const handler = reportHandler(server);
+  assert.match(handler, /getMarketEditions\("CO"\)/, "the handler reads the in-memory editions");
+  assert.doesNotMatch(handler, /pool\.|getJobsPage|getIntentPage|queryMarketRows|await get[A-Z]/);
   assert.doesNotMatch(server, /queryMarketRows/, "only the script reads the rows");
   assert.match(server, /buildHubComparison\(\{[^}]*national:\s*latestMarketSnapshot\(/);
   assert.doesNotMatch(read("src/server/market-reports.ts"), /from "\.\.\/db\//);

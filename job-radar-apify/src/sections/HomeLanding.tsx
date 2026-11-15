@@ -540,7 +540,7 @@ function Explore({ country, data }: { country: string; data: HomeData }) {
           ))}
         </div>
       </div>
-      {country === "CO" ? (
+      {country === "CO" && data.market ? (
         <p className={`${T.small} md:text-base mt-6 md:mt-8 text-[#3d413e]`}>
           ¿Cómo se reparte el empleo por ciudad, cargo y modalidad?{" "}
           <Link to={MARKET_REPORT_INDEX_PATH} className="font-semibold text-primary underline underline-offset-4">Informe mensual del mercado laboral</Link>
