@@ -19,6 +19,7 @@ import { queryRecentSeoReadyJobs } from "../src/db/job-repository.js";
 import { buildJobUrl, isPubliclyDescribable } from "../src/lib/job-seo.js";
 import { buildIndexNowPayload, submitIndexNow, INDEXNOW_KEY_LOCATION } from "../src/lib/indexnow.js";
 import { RECENT_SITEMAP_WINDOW_HOURS } from "../src/lib/recent-jobs.js";
+import { isExcludedFromGoogleIndex } from "../src/lib/third-party-excerpt.js";
 
 dotenv.config();
 
@@ -36,7 +37,10 @@ function parseArgs(argv: string[]): { execute: boolean; hours: number } {
 async function main() {
   const { execute, hours } = parseArgs(process.argv.slice(2));
   const jobs = await queryRecentSeoReadyJobs(hours);
-  const payload = buildIndexNowPayload(jobs.filter(isPubliclyDescribable).map((job) => buildJobUrl(job)));
+  // D1(b) (adsense-readiness F2, off by default): excerpted third-party copies are noindex.
+  const payload = buildIndexNowPayload(
+    jobs.filter((job) => isPubliclyDescribable(job) && !isExcludedFromGoogleIndex(job)).map((job) => buildJobUrl(job))
+  );
   const result = await submitIndexNow(payload, { execute, fetch: execute ? fetch : undefined });
   console.log(
     JSON.stringify({

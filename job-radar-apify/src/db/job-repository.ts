@@ -436,6 +436,8 @@ export interface CanonicalSitemapJob {
   isLocked: boolean;
   /** Real content-change time; NULL for legacy rows (then <lastmod> is omitted). */
   contentUpdatedAt: string | Date | null;
+  /** Provenance for D1(b) (adsense-readiness F2): a third-party copy may be left out. */
+  source: string | null;
 }
 
 export interface SitemapStreamOptions {
@@ -463,6 +465,7 @@ interface SitemapJobRow {
   published_at: string | Date;
   is_locked: boolean;
   content_updated_at: string | Date | null;
+  source: string | null;
 }
 
 /**
@@ -503,11 +506,11 @@ export async function streamCanonicalSitemapJobs(options: SitemapStreamOptions):
     ]);
     await client.query(
       `DECLARE sitemap_jobs_cursor NO SCROLL CURSOR FOR
-       SELECT id, title, company, location, url, published_at, content_updated_at,
+       SELECT id, title, company, location, url, published_at, content_updated_at, source,
               (published_at > NOW() - INTERVAL '48 hours') AS is_locked
        FROM (
          SELECT DISTINCT ON (lower(trim(title)), lower(trim(COALESCE(company, 'confidencial'))), lower(trim(COALESCE(location, CASE country WHEN 'VE' THEN 'venezuela' ELSE 'colombia' END))))
-                id, title, company, location, url, published_at, content_updated_at,
+                id, title, company, location, url, published_at, content_updated_at, source,
                 seo_ready, is_active, valid_through
          FROM jobs
          WHERE is_active = TRUE AND ${liveJobSql()}
@@ -544,7 +547,8 @@ export async function streamCanonicalSitemapJobs(options: SitemapStreamOptions):
           url: row.url ? resolveOutboundUrl(row.url) : row.url,
           publishedAt: row.published_at,
           isLocked: row.is_locked,
-          contentUpdatedAt: row.content_updated_at
+          contentUpdatedAt: row.content_updated_at,
+          source: row.source
         });
         count += 1;
       }
@@ -602,11 +606,11 @@ export async function queryRecentSeoReadyJobs(
     await client.query("BEGIN READ ONLY");
     await client.query("SELECT set_config('statement_timeout', $1, true)", [`${statementTimeoutMs}ms`]);
     const result = await client.query<RecentReadyRow>(
-      `SELECT id, title, company, location, url, country, published_at, content_updated_at,
+      `SELECT id, title, company, location, url, country, published_at, content_updated_at, source,
               (published_at > NOW() - INTERVAL '48 hours') AS is_locked
        FROM (
          SELECT DISTINCT ON (lower(trim(title)), lower(trim(COALESCE(company, 'confidencial'))), lower(trim(COALESCE(location, CASE country WHEN 'VE' THEN 'venezuela' ELSE 'colombia' END))))
-                id, title, company, location, url, country, published_at, content_updated_at,
+                id, title, company, location, url, country, published_at, content_updated_at, source,
                 seo_ready, is_active, valid_through
          FROM jobs
          WHERE is_active = TRUE AND ${liveJobSql()} AND published_at >= NOW() - ($1::int * INTERVAL '1 hour')
@@ -627,7 +631,8 @@ export async function queryRecentSeoReadyJobs(
       country: row.country,
       publishedAt: row.published_at,
       isLocked: row.is_locked,
-      contentUpdatedAt: row.content_updated_at
+      contentUpdatedAt: row.content_updated_at,
+      source: row.source
     }));
     // Same public view as the sitemap and hubs (anonymous visitor).
     return maskLockedFields(jobs, "free");
