@@ -419,7 +419,12 @@ function realCompany(job: SeoJob): string | null {
   return company && !isPlaceholderEmployer(company) ? company : null;
 }
 
-/** `{title} en {city} – {company} | BuscoTrabajo`, dropping parts to fit; the job title is never cut. */
+/**
+ * `{title} en {city} – {company} | BuscoTrabajo`, dropping the brand and then
+ * the company to fit. The job title is never cut and the city is never
+ * dropped: when `{title} en {city}` alone is longer than the limit it is
+ * returned as is (a few characters over, like a long source title already is).
+ */
 export function buildJobTitleTag(job: SeoJob): string {
   const title = collapseSpaces(job.title);
   const city = titleCity(job);
@@ -427,15 +432,15 @@ export function buildJobTitleTag(job: SeoJob): string {
   const where = city ? `${title} en ${city}` : title;
   // The brand goes first: Google already shows the site name beside the
   // result, while the city and the employer are what the searcher scans for.
+  // The city goes last of all: the same vacancy is often posted in several
+  // cities, and without it those pages share one <title> (Ubersuggest audit
+  // 2026-11-15: 21 duplicates). Roadmap §2.1: never drop the city.
   const candidates = [
     company ? `${where} – ${company}${BRAND_SUFFIX}` : null,
     company ? `${where} – ${company}` : null,
-    `${where}${BRAND_SUFFIX}`,
-    where,
-    `${title}${BRAND_SUFFIX}`,
-    title
+    `${where}${BRAND_SUFFIX}`
   ].filter((candidate): candidate is string => Boolean(candidate));
-  return candidates.find((candidate) => codePoints(candidate) <= JOB_TITLE_TAG_MAX) ?? title;
+  return candidates.find((candidate) => codePoints(candidate) <= JOB_TITLE_TAG_MAX) ?? where;
 }
 
 /** Title, company and location, then employment type and the first real source sentence when they exist. */
