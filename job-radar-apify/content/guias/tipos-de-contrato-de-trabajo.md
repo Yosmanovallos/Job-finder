@@ -1,6 +1,7 @@
 ---
 slug: tipos-de-contrato-de-trabajo
 titulo: Tipos de contrato de trabajo en Colombia: cuál te están ofreciendo
+titulo_seo: Tipos de contrato de trabajo en Colombia
 descripcion: Contrato indefinido, a término fijo, por obra o labor, ocasional y de aprendizaje: qué dice cada uno y en qué se diferencian de la prestación de servicios.
 autor: Equipo de BuscoTrabajo
 autor_tipo: Organization

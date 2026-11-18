@@ -1,6 +1,7 @@
 ---
 slug: trabajo-sin-experiencia
 titulo: Trabajo sin experiencia en Colombia: cómo conseguir tu primer empleo
+titulo_seo: Trabajo sin experiencia: tu primer empleo
 descripcion: Qué cuenta como experiencia según la ley, cómo usar prácticas y contratos de aprendizaje, y dónde buscar vacantes que no piden experiencia en Colombia.
 autor: Equipo de BuscoTrabajo
 autor_tipo: Organization

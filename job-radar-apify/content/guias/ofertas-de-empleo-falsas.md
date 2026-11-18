@@ -1,6 +1,7 @@
 ---
 slug: ofertas-de-empleo-falsas
 titulo: Ofertas de empleo falsas: señales para reconocerlas y cómo protegerte
+titulo_seo: Ofertas de empleo falsas: cómo reconocerlas
 descripcion: Las señales más claras de una oferta de trabajo falsa en Colombia, qué prohíbe la norma a quienes intermedian empleo y qué hacer si ya diste dinero o datos.
 autor: Equipo de BuscoTrabajo
 autor_tipo: Organization

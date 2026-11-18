@@ -20,6 +20,7 @@ import {
   validateGuides,
   type Guide
 } from "../src/lib/guides.js";
+import { SEO_TITLE_MAX, guideSeoTitle, guideUrlsChangedSince } from "../src/lib/guides.js";
 import { isMarkedAdEligible } from "../src/lib/ad-eligibility.js";
 import {
   buildGuidesSitemapXml,
@@ -347,4 +348,61 @@ test("ADS-040 staggered release: four on day one, then two a week, covering all 
 test("ADS-040 llms.txt lists /guias only while the section is switched on", () => {
   assert.doesNotMatch(buildLlmsTxt(false), /\/guias/);
   assert.match(buildLlmsTxt(true), /\[Guías\]\(https:\/\/buscotrabajo\.co\/guias\)/);
+});
+
+// SEO polish before the switch-on (2026-11-18): breadcrumbs, ItemList,
+// titles that fit in a results page, IndexNow for guides.
+const jsonLd = (html: string) => [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map((m) => JSON.parse(m[1]!));
+
+test("ADS-040 guide page carries a BreadcrumbList Inicio > Guías > guía", () => {
+  const ld = jsonLd(renderGuidePageHtml(indexHtml, guide()));
+  const crumbs = ld.find((item) => item["@type"] === "BreadcrumbList");
+  assert.ok(crumbs, "BreadcrumbList JSON-LD");
+  assert.deepEqual(crumbs.itemListElement.map((item: { name: string }) => item.name), ["Inicio", "Guías", "Guía de prueba sobre el periodo de prueba"]);
+  assert.deepEqual(crumbs.itemListElement.map((item: { position: number }) => item.position), [1, 2, 3]);
+  assert.equal(crumbs.itemListElement[2].item, "https://buscotrabajo.co/guias/guia-de-prueba");
+});
+
+test("ADS-040 the index carries an ItemList of the published guides and a BreadcrumbList", () => {
+  const guides = [guide({ slug: "guia-a", seed: "aa" }), guide({ slug: "guia-b", seed: "bb" })];
+  const ld = jsonLd(renderGuidesIndexHtml(indexHtml, guides));
+  const list = ld.find((item) => item["@type"] === "ItemList");
+  assert.ok(list, "ItemList JSON-LD");
+  assert.equal(list.numberOfItems, 2);
+  assert.deepEqual(list.itemListElement.map((item: { url: string }) => item.url), ["https://buscotrabajo.co/guias/guia-a", "https://buscotrabajo.co/guias/guia-b"]);
+  const crumbs = ld.find((item) => item["@type"] === "BreadcrumbList");
+  assert.deepEqual(crumbs.itemListElement.map((item: { name: string }) => item.name), ["Inicio", "Guías"]);
+});
+
+test("ADS-040 <title> fits in 60 characters; the H1 keeps the full title", () => {
+  const short = guide();
+  assert.equal(guideSeoTitle(short.meta), "Guía de prueba sobre el periodo de prueba | BuscoTrabajo");
+  const longTitle = "Periodo de prueba en Colombia: duración, reglas y qué pasa si te despiden";
+  const long = parseGuide("guia-de-prueba.md", fixtureSource().replace(/^titulo: .*$/m, `titulo: ${longTitle}`));
+  assert.ok(validateGuides([long])[0]!.errors.some((error) => error.includes("titulo_seo")), "a long title without titulo_seo fails");
+  const fixed = parseGuide("guia-de-prueba.md", fixtureSource().replace(/^titulo: .*$/m, `titulo: ${longTitle}
+titulo_seo: Periodo de prueba en Colombia: duración`));
+  assert.deepEqual(validateGuides([fixed])[0]!.errors, []);
+  const html = renderGuidePageHtml(indexHtml, fixed);
+  assert.match(html, /<title>Periodo de prueba en Colombia: duración \| BuscoTrabajo<\/title>/);
+  assert.match(appHtml(html), new RegExp(`<h1>${longTitle}</h1>`));
+  const tooLong = parseGuide("guia-de-prueba.md", fixtureSource().replace(/^titulo: .*$/m, `titulo: ${longTitle}
+titulo_seo: ${longTitle}`));
+  assert.ok(validateGuides([tooLong])[0]!.errors.some((error) => error.includes("'titulo_seo'")));
+});
+
+test("ADS-040 every real guide's <title> fits in the results page", () => {
+  for (const real of loadGuidesFrom(GUIDES_CONTENT_DIR)) {
+    const title = guideSeoTitle(real.meta);
+    assert.ok(title.length <= SEO_TITLE_MAX, `${real.meta.slug}: ${title.length} caracteres`);
+  }
+});
+
+test("ADS-040 IndexNow gets the guides that went live or changed in the window, plus the index", () => {
+  const live = guide({ slug: "guia-a", seed: "aa" }); // publicada 2026-11-20, actualizada 2026-11-21
+  assert.deepEqual(guideUrlsChangedSince([live], "2026-11-21", "https://buscotrabajo.co"), ["https://buscotrabajo.co/guias", "https://buscotrabajo.co/guias/guia-a"]);
+  assert.deepEqual(guideUrlsChangedSince([live], "2026-11-22", "https://buscotrabajo.co"), []);
+  assert.deepEqual(guideUrlsChangedSince([], "2026-11-01", "https://buscotrabajo.co"), []);
+  const script = fs.readFileSync(path.join(root, "scripts", "indexnow-submit.ts"), "utf-8");
+  assert.match(script, /getPublishedGuides\(\)/, "the script reads the live guides (empty while the switch is off)");
 });

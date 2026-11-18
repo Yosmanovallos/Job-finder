@@ -1,6 +1,7 @@
 ---
 slug: prestaciones-sociales
 titulo: Prestaciones sociales en Colombia: prima, cesantías, intereses y vacaciones
+titulo_seo: Prestaciones sociales: prima y cesantías
 descripcion: Qué son la prima de servicios, las cesantías, sus intereses y las vacaciones, cuándo se pagan y cómo verificar que tu empleador las esté pagando bien.
 autor: Equipo de BuscoTrabajo
 autor_tipo: Organization

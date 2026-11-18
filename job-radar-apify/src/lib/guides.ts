@@ -60,6 +60,8 @@ export type GuideBlock =
 export interface GuideFrontmatter {
   slug: string;
   titulo: string;
+  /** Optional shorter <title> for search results; the H1 stays `titulo`. */
+  titulo_seo: string;
   descripcion: string;
   autor: string;
   autor_tipo: string;
@@ -124,6 +126,7 @@ export function parseGuide(file: string, source: string): Guide {
   const meta: GuideFrontmatter = {
     slug: raw.slug ?? "",
     titulo: raw.titulo ?? "",
+    titulo_seo: raw.titulo_seo ?? "",
     descripcion: raw.descripcion ?? "",
     autor: raw.autor ?? "",
     autor_tipo: raw.autor_tipo ?? "",
@@ -286,6 +289,17 @@ export function normalizeParagraph(text: string): string {
     .trim();
 }
 
+/** Google shows about 60 characters of a <title> before cutting it. */
+export const SEO_TITLE_MAX = 60;
+export const GUIDE_TITLE_SUFFIX = " | BuscoTrabajo";
+
+/** `<title>` of a guide: `titulo_seo` (or `titulo`) plus the brand when it still fits. */
+export function guideSeoTitle(meta: Pick<GuideFrontmatter, "titulo" | "titulo_seo">): string {
+  const base = meta.titulo_seo || meta.titulo;
+  const branded = `${base}${GUIDE_TITLE_SUFFIX}`;
+  return branded.length <= SEO_TITLE_MAX ? branded : base;
+}
+
 export function isOwnerApproved(meta: GuideFrontmatter): boolean {
   return meta.revision_propietario === "aprobada" && meta.revisado_por.trim().length > 0 && DATE_RE.test(meta.fecha_revision);
 }
@@ -300,6 +314,12 @@ export function validateGuide(guide: Guide): string[] {
   if (!SLUG_RE.test(meta.slug)) errors.push(`slug no válido: '${meta.slug}'`);
   if (`${meta.slug}.md` !== guide.file.split(/[\\/]/).pop()) errors.push(`el archivo debe llamarse ${meta.slug}.md`);
   if (meta.titulo.length < 10 || meta.titulo.length > 110) errors.push("'titulo' debe tener entre 10 y 110 caracteres");
+  if (meta.titulo_seo && (meta.titulo_seo.length < 20 || meta.titulo_seo.length > SEO_TITLE_MAX)) {
+    errors.push(`'titulo_seo' debe tener entre 20 y ${SEO_TITLE_MAX} caracteres`);
+  }
+  if (guideSeoTitle(meta).length > SEO_TITLE_MAX) {
+    errors.push(`el título de la pestaña supera ${SEO_TITLE_MAX} caracteres y Google lo cortaría: añade 'titulo_seo'`);
+  }
   if (meta.descripcion.length < 50 || meta.descripcion.length > 170) errors.push("'descripcion' debe tener entre 50 y 170 caracteres");
   if (!meta.autor.trim()) errors.push("falta 'autor'");
   if (meta.autor_tipo !== "Person" && meta.autor_tipo !== "Organization") errors.push("'autor_tipo' debe ser Person u Organization");
@@ -479,6 +499,8 @@ export function renderGuideBodyHtml(guide: Guide): string {
 
 
 export interface GuidePayload extends GuideSummary {
+  /** The page <title> (guideSeoTitle), so the client matches the server. */
+  seoTitle?: string;
   author: string;
   authorType: "Person" | "Organization";
   reviewedBy: string;
@@ -502,6 +524,7 @@ export function guideSummary(guide: Guide): GuideSummary {
 export function guidePayload(guide: Guide): GuidePayload {
   return {
     ...guideSummary(guide),
+    seoTitle: guideSeoTitle(guide.meta),
     author: guide.meta.autor,
     authorType: guide.meta.autor_tipo === "Person" ? "Person" : "Organization",
     reviewedBy: guide.meta.revisado_por,
@@ -538,6 +561,46 @@ export function guideArticleJsonLd(guide: Guide, origin: string): Record<string,
     citation: guide.sources.map((source) => ({ "@type": "CreativeWork", name: source.label, url: source.url })),
     wordCount: usefulWordCount(guide)
   };
+}
+
+/** Inicio › Guías › <guía>, matching the page's own "Guías" link. */
+export function guideBreadcrumbJsonLd(guide: Guide | null, origin: string): Record<string, unknown> {
+  const items: Array<{ name: string; url: string }> = [
+    { name: "Inicio", url: `${origin}/` },
+    { name: "Guías", url: `${origin}${GUIDES_BASE_PATH}` }
+  ];
+  if (guide) items.push({ name: guide.meta.titulo, url: `${origin}${guidePath(guide.meta.slug)}` });
+  return {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: items.map((item, index) => ({ "@type": "ListItem", position: index + 1, name: item.name, item: item.url }))
+  };
+}
+
+/** The /guias index as an ItemList, in the order the page shows. */
+export function guidesItemListJsonLd(guides: Guide[], origin: string): Record<string, unknown> {
+  return {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    name: GUIDES_INDEX_HEADING,
+    numberOfItems: guides.length,
+    itemListElement: guides.map((guide, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      url: `${origin}${guidePath(guide.meta.slug)}`,
+      name: guide.meta.titulo
+    }))
+  };
+}
+
+/**
+ * Guide URLs that went live or were updated on or after `sinceDay`
+ * (YYYY-MM-DD, Colombia), for IndexNow. The index is added when any is.
+ */
+export function guideUrlsChangedSince(guides: Guide[], sinceDay: string, origin: string): string[] {
+  const changed = guides.filter((guide) => guide.meta.publicada >= sinceDay || (guide.meta.actualizada || "") >= sinceDay);
+  if (changed.length === 0) return [];
+  return [`${origin}${GUIDES_BASE_PATH}`, ...changed.map((guide) => `${origin}${guidePath(guide.meta.slug)}`)];
 }
 
 export function renderGuideMarkdown(guide: Guide): string {

@@ -1,6 +1,7 @@
 ---
 slug: trabajo-de-temporada
 titulo: Trabajo de temporada de fin de año: contratos, pagos y qué exigir
+titulo_seo: Trabajo de temporada: contratos y pagos
 descripcion: Qué contratos se usan para la temporada de diciembre en Colombia, qué te deben pagar al terminar y cómo funcionan las empresas de servicios temporales.
 autor: Equipo de BuscoTrabajo
 autor_tipo: Organization

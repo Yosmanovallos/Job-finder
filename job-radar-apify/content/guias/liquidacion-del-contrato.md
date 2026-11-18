@@ -1,6 +1,7 @@
 ---
 slug: liquidacion-del-contrato
 titulo: Liquidación del contrato de trabajo: qué incluye y cómo revisarla
+titulo_seo: Liquidación del contrato: qué incluye
 descripcion: Qué conceptos debe traer tu liquidación al terminar un contrato en Colombia, cuándo hay indemnización y qué hacer si no te pagan a tiempo.
 autor: Equipo de BuscoTrabajo
 autor_tipo: Organization

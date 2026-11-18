@@ -1,6 +1,7 @@
 ---
 slug: periodo-de-prueba
 titulo: Periodo de prueba en Colombia: duración, reglas y qué pasa si te despiden
+titulo_seo: Periodo de prueba en Colombia: duración
 descripcion: Cuánto puede durar el periodo de prueba, cuándo es válido, qué derechos tienes durante esos días y qué cambia si el contrato es a término fijo.
 autor: Equipo de BuscoTrabajo
 autor_tipo: Organization

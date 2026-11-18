@@ -18,7 +18,10 @@ import {
   GUIDES_INDEX_TITLE,
   formatSpanishDate,
   guideArticleJsonLd,
+  guideBreadcrumbJsonLd,
   guidePath,
+  guideSeoTitle,
+  guidesItemListJsonLd,
   guidePayload,
   guideSummary,
   renderGuideBodyHtml,
@@ -65,7 +68,7 @@ function appendToHead(html: string, snippet: string): string {
 
 export function renderGuidePageHtml(indexHtml: string, guide: Guide): string {
   const { meta } = guide;
-  const content: PublicContent = { pathname: guidePath(meta.slug), title: `${meta.titulo} | BuscoTrabajo`, description: meta.descripcion, heading: meta.titulo, introduction: [], sections: [] };
+  const content: PublicContent = { pathname: guidePath(meta.slug), title: guideSeoTitle(meta), description: meta.descripcion, heading: meta.titulo, introduction: [], sections: [] };
   const modified = meta.actualizada || meta.publicada;
   const byline = `<p data-guide-byline>Por ${escapeHtml(meta.autor)} · Publicada el <time datetime="${meta.publicada}">${formatSpanishDate(meta.publicada)}</time>` +
     ` · Actualizada el <time datetime="${modified}">${formatSpanishDate(modified)}</time>` +
@@ -76,6 +79,7 @@ export function renderGuidePageHtml(indexHtml: string, guide: Guide): string {
   html = html.replace(/<meta[^>]*property=["']og:type["'][^>]*>/, () => `<meta property="og:type" content="article" />`);
   html = appendToHead(html,
     `  <script type="application/ld+json">${escapeJsonForScriptTag(guideArticleJsonLd(guide, SITE_ORIGIN))}</script>\n` +
+    `  <script type="application/ld+json">${escapeJsonForScriptTag(guideBreadcrumbJsonLd(guide, SITE_ORIGIN))}</script>\n` +
     `  <script>window.__SSR_GUIDE__=${escapeJsonForScriptTag(guidePayload(guide))};</script>\n`);
   // Original, reviewed publisher content: the one place in /guias with ads.
   return markAdEligible(html);
@@ -91,7 +95,10 @@ export function renderGuidesIndexHtml(indexHtml: string, guides: Guide[]): strin
   const appHtml = `<article data-guides-index><h1>${escapeHtml(GUIDES_INDEX_HEADING)}</h1>\n<p>${escapeHtml(GUIDES_INDEX_INTRO)}</p>\n<ul>${items}</ul></article>`;
   const html = withApp(indexHtml, content, appHtml);
   // A list of links is a navigation screen (PP-3): no ad marker here.
-  return appendToHead(html, `  <script>window.__SSR_GUIDES__=${escapeJsonForScriptTag(guides.map(guideSummary))};</script>\n`);
+  return appendToHead(html,
+    `  <script type="application/ld+json">${escapeJsonForScriptTag(guidesItemListJsonLd(guides, SITE_ORIGIN))}</script>\n` +
+    `  <script type="application/ld+json">${escapeJsonForScriptTag(guideBreadcrumbJsonLd(null, SITE_ORIGIN))}</script>\n` +
+    `  <script>window.__SSR_GUIDES__=${escapeJsonForScriptTag(guides.map(guideSummary))};</script>\n`);
 }
 
 export function buildGuidesSitemapXml(guides: Guide[]): string {

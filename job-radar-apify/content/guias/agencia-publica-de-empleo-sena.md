@@ -1,6 +1,7 @@
 ---
 slug: agencia-publica-de-empleo-sena
 titulo: Agencia Pública de Empleo del SENA: qué ofrece y cómo usarla gratis
+titulo_seo: Agencia Pública de Empleo SENA: cómo usarla
 descripcion: Qué es la Agencia Pública de Empleo del SENA, qué servicios presta sin costo, cómo registrarte en el Servicio Público de Empleo y cómo detectar cobros indebidos.
 autor: Equipo de BuscoTrabajo
 autor_tipo: Organization

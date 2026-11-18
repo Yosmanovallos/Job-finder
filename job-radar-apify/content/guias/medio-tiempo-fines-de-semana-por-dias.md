@@ -1,6 +1,7 @@
 ---
 slug: medio-tiempo-fines-de-semana-por-dias
 titulo: Medio tiempo, fines de semana y trabajo por días: tus derechos en Colombia
+titulo_seo: Medio tiempo y fines de semana: tus derechos
 descripcion: Jornada máxima, recargos nocturnos y dominicales, prima y seguridad social para quien trabaja medio tiempo, por días o los fines de semana en Colombia.
 autor: Equipo de BuscoTrabajo
 autor_tipo: Organization

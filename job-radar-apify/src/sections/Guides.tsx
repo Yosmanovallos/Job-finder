@@ -123,7 +123,7 @@ export function GuidePage() {
     isGuidePayload,
     slug
   );
-  usePageMeta({ title: data ? `${data.title} | BuscoTrabajo` : "Guías | BuscoTrabajo", description: data?.description ?? GUIDES_INDEX_DESCRIPTION });
+  usePageMeta({ title: data ? data.seoTitle ?? `${data.title} | BuscoTrabajo` :"Guías | BuscoTrabajo", description: data?.description ?? GUIDES_INDEX_DESCRIPTION });
   if (missing) return <NotAvailable />;
   if (!data) return <div className="min-h-[60vh] bg-white" aria-busy="true" />;
   return (

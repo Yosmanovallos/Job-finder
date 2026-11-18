@@ -1,6 +1,7 @@
 ---
 slug: como-hacer-una-hoja-de-vida
 titulo: Cómo hacer una hoja de vida en Colombia que pase el primer filtro
+titulo_seo: Cómo hacer una hoja de vida en Colombia
 descripcion: Qué incluir y qué dejar por fuera de tu hoja de vida, cómo adaptarla a cada vacante y qué datos no te pueden exigir al postularte en Colombia.
 autor: Equipo de BuscoTrabajo
 autor_tipo: Organization

@@ -13,6 +13,7 @@ esta carpeta: una guía inválida rompe la prueba.
 ---
 slug: periodo-de-prueba
 titulo: Periodo de prueba en Colombia: duración, reglas y qué pasa si te despiden
+titulo_seo: Periodo de prueba en Colombia: duración   (opcional; ver abajo)
 descripcion: (entre 50 y 170 caracteres)
 autor: (nombre de la persona u organización que firma)
 autor_tipo: Person | Organization
@@ -25,6 +26,9 @@ fecha_revision: AAAA-MM-DD
 ---
 ```
 
+- `titulo` es el H1 de la página. El `<title>` es `titulo_seo` (o `titulo`) + «| BuscoTrabajo» si cabe en 60 caracteres;
+  si no, `titulo_seo` solo. El validador rechaza un `<title>` de más de 60 caracteres: en ese caso se añade
+  `titulo_seo` (20–60 caracteres) con la palabra clave principal al inicio.
 - `revision_propietario: aprobada` solo la escribe el propietario (o se
   escribe por instrucción explícita suya, guía por guía). Nunca se
   rellena por adelantado.

@@ -1,6 +1,7 @@
 ---
 slug: entrevista-de-trabajo
 titulo: Entrevista de trabajo: cómo prepararla y qué no te pueden preguntar
+titulo_seo: Entrevista de trabajo: cómo prepararla
 descripcion: Cómo preparar una entrevista de trabajo en Colombia, qué preguntas hacer al final y qué preguntas y exigencias están prohibidas para el empleador.
 autor: Equipo de BuscoTrabajo
 autor_tipo: Organization

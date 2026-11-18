@@ -134,6 +134,12 @@ anterior. **No se pulsa «Solicitar revisión» antes de F6.**
 - [x] Prueba HTTP `tests/validate-guides-http.ts` en `test:seo`, para los dos
       estados del interruptor. Verificado en local con el interruptor
       encendido y fechas de prueba (sin commit de ese estado)
+- [x] SEO antes del encendido (2026-11-18): `BreadcrumbList` (Inicio › Guías ›
+      guía) en cada guía e `ItemList` + `BreadcrumbList` en `/guias`; `<title>`
+      de 60 caracteres o menos con `titulo_seo` (el H1 conserva `titulo`; el
+      validador rechaza títulos más largos); `indexnow:submit` añade las guías
+      publicadas o actualizadas en la ventana y `/guias` (vacío con el interruptor
+      apagado). Sin imagen social propia por guía: se usa la general del sitio
 - [ ] **Día del encendido** (después de mergear #136 y #137):
   1. `npx tsx scripts/check-guide-figures.ts` y actualizar en cada guía las
      cifras que cambiaron y su `corte`. Con la cuota de la API agotada,

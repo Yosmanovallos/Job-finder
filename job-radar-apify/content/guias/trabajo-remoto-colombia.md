@@ -1,6 +1,7 @@
 ---
 slug: trabajo-remoto-colombia
 titulo: Trabajo remoto en Colombia: cómo encontrarlo y qué derechos tienes
+titulo_seo: Trabajo remoto en Colombia: leyes y vacantes
 descripcion: Diferencias entre trabajo remoto, teletrabajo y trabajo en casa, qué debe pagar el empleador y cómo buscar vacantes remotas reales en Colombia.
 autor: Equipo de BuscoTrabajo
 autor_tipo: Organization
