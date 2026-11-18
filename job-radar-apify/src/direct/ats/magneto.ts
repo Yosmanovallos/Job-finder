@@ -116,8 +116,10 @@ export async function listMagneto(ref: string, http: HttpGet, options: ListOptio
       locationTexts: cities,
       countryCodes: row.countryIds?.length ? row.countryIds.map((id) => (id === COLOMBIA_ID ? "CO" : `MAGNETO-${id}`)) : [],
       structuredCity: cities.length === 1 ? cities[0] : null,
-      // isRemote:false does not mean on-site (the modality is per company, not per row).
-      workplace: row.isRemote === true ? "remote" : null,
+      // isRemote is never evidence: false does not mean on-site, and true is
+      // Magneto's "Remoto / híbrido en: {ciudad}" checkbox — remote OR hybrid,
+      // also ticked on on-site postings (see sources/magneto-catalog.ts).
+      workplace: null,
       descriptionText: null,
       department: null,
       employmentType: text(row.contractOrder?.name),
