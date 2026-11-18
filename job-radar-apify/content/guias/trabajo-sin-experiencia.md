@@ -5,8 +5,8 @@ titulo_seo: Trabajo sin experiencia: tu primer empleo
 descripcion: Qué cuenta como experiencia según la ley, cómo usar prácticas y contratos de aprendizaje, y dónde buscar vacantes que no piden experiencia en Colombia.
 autor: Equipo de BuscoTrabajo
 autor_tipo: Organization
-publicada:
-actualizada:
+publicada: 2026-11-18
+actualizada: 2026-11-18
 etiquetas: sin-experiencia, hoja-de-vida, servicio-publico-de-empleo
 revision_propietario: aprobada
 revisado_por: Equipo de BuscoTrabajo
@@ -16,7 +16,7 @@ Conseguir el primer empleo tiene una trampa conocida: casi todas las vacantes pi
 
 ## Cuántas vacantes sin experiencia hay hoy
 
-Al corte de esta guía, la página de [trabajo sin experiencia](/empleos/sin-experiencia) de BuscoTrabajo listaba 277 vacantes activas en Colombia.[^bt-sinexp] Por ciudades, la de Bogotá listaba 71, la de Medellín 36 y la de Cali 22.[^bt-sinexp-bogota][^bt-sinexp-medellin][^bt-sinexp-cali]
+Al corte de esta guía, la página de [trabajo sin experiencia](/empleos/sin-experiencia) de BuscoTrabajo listaba 294 vacantes activas en Colombia.[^bt-sinexp] Por ciudades, la de Bogotá listaba 77, la de Medellín 38 y la de Cali 21.[^bt-sinexp-bogota][^bt-sinexp-medellin][^bt-sinexp-cali]
 
 Son menos de las que uno quisiera, y eso tiene una lectura práctica: además de buscar la etiqueta «sin experiencia», conviene postularse a cargos de entrada que piden poca experiencia, y presentar bien la que ya tienes aunque no venga de un empleo formal. Las secciones siguientes explican cómo.
 
@@ -81,10 +81,10 @@ Una advertencia: las ofertas para personas sin experiencia también atraen estaf
 
 Que no tengas un empleo formal previo no significa que no tengas experiencia. Las prácticas, monitorías, judicaturas, contratos de aprendizaje y otras actividades certificadas pueden contar, y la norma obliga a reconocer varias de ellas. Pide tus certificados, preséntalos bien en la hoja de vida y busca en varias fuentes a la vez. Puedes empezar por las [vacantes sin experiencia de hoy](/empleos/sin-experiencia).
 
-[^bt-sinexp]: [BuscoTrabajo: trabajo sin experiencia en Colombia](https://buscotrabajo.co/empleos/sin-experiencia) — total de vacantes de la página, corte 2026-11-14
-[^bt-sinexp-bogota]: [BuscoTrabajo: trabajo sin experiencia en Bogotá](https://buscotrabajo.co/empleos/bogota/sin-experiencia) — total de vacantes de la página, corte 2026-11-14
-[^bt-sinexp-medellin]: [BuscoTrabajo: trabajo sin experiencia en Medellín](https://buscotrabajo.co/empleos/medellin/sin-experiencia) — total de vacantes de la página, corte 2026-11-14
-[^bt-sinexp-cali]: [BuscoTrabajo: trabajo sin experiencia en Cali](https://buscotrabajo.co/empleos/cali/sin-experiencia) — total de vacantes de la página, corte 2026-11-14
+[^bt-sinexp]: [BuscoTrabajo: trabajo sin experiencia en Colombia](https://buscotrabajo.co/empleos/sin-experiencia) — total de vacantes de la página, corte 2026-11-18
+[^bt-sinexp-bogota]: [BuscoTrabajo: trabajo sin experiencia en Bogotá](https://buscotrabajo.co/empleos/bogota/sin-experiencia) — total de vacantes de la página, corte 2026-11-18
+[^bt-sinexp-medellin]: [BuscoTrabajo: trabajo sin experiencia en Medellín](https://buscotrabajo.co/empleos/medellin/sin-experiencia) — total de vacantes de la página, corte 2026-11-18
+[^bt-sinexp-cali]: [BuscoTrabajo: trabajo sin experiencia en Cali](https://buscotrabajo.co/empleos/cali/sin-experiencia) — total de vacantes de la página, corte 2026-11-18
 [^ley2039]: [Ley 2039 de 2020, inserción laboral de jóvenes (art. 2, modificado por la Ley 2221 de 2022)](https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=137230) — Gestor Normativo de Función Pública, consultado el 2026-11-14
 [^ley2043]: [Ley 2043 de 2020, prácticas laborales como experiencia profesional (arts. 1, 3 y 6)](https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=137051) — Gestor Normativo de Función Pública, consultado el 2026-11-14
 [^ley2466]: [Ley 2466 de 2025, reforma laboral (art. 21, que modifica el art. 81 del Código Sustantivo del Trabajo)](https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=260676) — Gestor Normativo de Función Pública, consultado el 2026-11-14

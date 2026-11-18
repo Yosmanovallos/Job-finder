@@ -5,8 +5,8 @@ titulo_seo: Agencia Pública de Empleo SENA: cómo usarla
 descripcion: Qué es la Agencia Pública de Empleo del SENA, qué servicios presta sin costo, cómo registrarte en el Servicio Público de Empleo y cómo detectar cobros indebidos.
 autor: Equipo de BuscoTrabajo
 autor_tipo: Organization
-publicada:
-actualizada:
+publicada: 2026-11-18
+actualizada: 2026-11-18
 etiquetas: servicio-publico-de-empleo, sin-experiencia, buscar-empleo
 revision_propietario: aprobada
 revisado_por: Equipo de BuscoTrabajo
@@ -64,7 +64,7 @@ Si perdiste tu empleo, pregunta en tu Caja de Compensación Familiar o en la APE
 
 ## Cuántas vacantes de aprendiz hay hoy
 
-El SENA es también la entidad de los contratos de aprendizaje, y muchas personas llegan a la APE buscando su etapa práctica. Al corte de esta guía, una búsqueda de «aprendiz» en BuscoTrabajo devolvía 655 vacantes activas en Colombia, de las cuales 253 indicaban Bogotá como ubicación.[^bt-aprendiz][^bt-aprendiz-bogota] El buscador agrupa cargos equivalentes, por eso una búsqueda de «practicante» da el mismo resultado.[^bt-practicante]
+El SENA es también la entidad de los contratos de aprendizaje, y muchas personas llegan a la APE buscando su etapa práctica. Al corte de esta guía, una búsqueda de «aprendiz» en BuscoTrabajo devolvía 661 vacantes activas en Colombia, de las cuales 273 indicaban Bogotá como ubicación.[^bt-aprendiz][^bt-aprendiz-bogota] El buscador agrupa cargos equivalentes, por eso una búsqueda de «practicante» da el mismo resultado.[^bt-practicante]
 
 Esas cifras sirven para dimensionar la oferta: hay cientos de vacantes abiertas para quien está en formación, pero se concentran en pocas ciudades. Si vives fuera de Bogotá, conviene revisar también la oferta de la APE en tu departamento.
 
@@ -86,6 +86,6 @@ La Agencia Pública de Empleo del SENA es parte de la red oficial del Servicio P
 [^ley1780]: [Ley 1780 de 2016, empleo y emprendimiento juvenil (art. 17)](https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=69573) — Gestor Normativo de Función Pública, consultado el 2026-11-14
 [^ape]: [Agencia Pública de Empleo del SENA](https://agenciapublicadeempleo.sena.edu.co/) — portal oficial, consultado el 2026-11-14
 [^spe]: [Unidad Administrativa Especial del Servicio Público de Empleo](https://www.serviciodeempleo.gov.co/) — portal oficial, consultado el 2026-11-14
-[^bt-aprendiz]: [BuscoTrabajo, API pública: búsqueda «aprendiz» en Colombia](https://buscotrabajo.co/api/v1/jobs?country=CO&search=aprendiz&limit=1) — total de la respuesta, corte 2026-11-14
-[^bt-aprendiz-bogota]: [BuscoTrabajo, API pública: búsqueda «aprendiz» con ubicación en Bogotá](https://buscotrabajo.co/api/v1/jobs?country=CO&search=aprendiz&cities=Bogot%C3%A1&limit=1) — total de la respuesta, corte 2026-11-14
-[^bt-practicante]: [BuscoTrabajo, API pública: búsqueda «practicante» en Colombia](https://buscotrabajo.co/api/v1/jobs?country=CO&search=practicante&limit=1) — total de la respuesta, corte 2026-11-14
+[^bt-aprendiz]: [BuscoTrabajo, API pública: búsqueda «aprendiz» en Colombia](https://buscotrabajo.co/api/v1/jobs?country=CO&search=aprendiz&limit=1) — total de la respuesta, corte 2026-11-18
+[^bt-aprendiz-bogota]: [BuscoTrabajo, API pública: búsqueda «aprendiz» con ubicación en Bogotá](https://buscotrabajo.co/api/v1/jobs?country=CO&search=aprendiz&cities=Bogot%C3%A1&limit=1) — total de la respuesta, corte 2026-11-18
+[^bt-practicante]: [BuscoTrabajo, API pública: búsqueda «practicante» en Colombia](https://buscotrabajo.co/api/v1/jobs?country=CO&search=practicante&limit=1) — total de la respuesta, corte 2026-11-18

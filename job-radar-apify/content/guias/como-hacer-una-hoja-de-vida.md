@@ -5,8 +5,8 @@ titulo_seo: Cómo hacer una hoja de vida en Colombia
 descripcion: Qué incluir y qué dejar por fuera de tu hoja de vida, cómo adaptarla a cada vacante y qué datos no te pueden exigir al postularte en Colombia.
 autor: Equipo de BuscoTrabajo
 autor_tipo: Organization
-publicada:
-actualizada:
+publicada: 2026-12-16
+actualizada: 2026-12-16
 etiquetas: hoja-de-vida, sin-experiencia
 revision_propietario: aprobada
 revisado_por: Equipo de BuscoTrabajo
@@ -16,7 +16,7 @@ La hoja de vida es lo primero que ve un reclutador y, a menudo, lo único que ve
 
 ## Cuántas personas compiten por los mismos cargos
 
-Al corte de esta guía, la página de [auxiliar administrativo](/empleos/auxiliar-administrativo) de BuscoTrabajo listaba 1.445 vacantes activas en Colombia, la de [auxiliar de enfermería](/empleos/auxiliar-de-enfermeria) 723 y la de [trabajo sin experiencia](/empleos/sin-experiencia) 277.[^bt-auxiliar][^bt-enfermeria][^bt-sinexp] Son cargos con mucha oferta, y en ellos una hoja de vida clara y adaptada a cada vacante te ayuda a destacar en la primera revisión.
+Al corte de esta guía, la página de [auxiliar administrativo](/empleos/auxiliar-administrativo) de BuscoTrabajo listaba 1.427 vacantes activas en Colombia, la de [auxiliar de enfermería](/empleos/auxiliar-de-enfermeria) 714 y la de [trabajo sin experiencia](/empleos/sin-experiencia) 294.[^bt-auxiliar][^bt-enfermeria][^bt-sinexp] Son cargos con mucha oferta, y en ellos una hoja de vida clara y adaptada a cada vacante te ayuda a destacar en la primera revisión.
 
 ## Qué debe incluir
 
@@ -78,9 +78,9 @@ Guarda en una carpeta digital tus certificados de estudio, de cursos, de prácti
 
 Una buena hoja de vida es corta, clara y adaptada a cada vacante. Incluye contacto, perfil, experiencia, formación y habilidades; cuenta tus prácticas y monitorías como experiencia si se relacionan con lo que estudiaste, y deja por fuera los datos sensibles. Con ella lista, empieza a postularte en cargos como [auxiliar administrativo](/empleos/auxiliar-administrativo) o en las [vacantes sin experiencia](/empleos/sin-experiencia).
 
-[^bt-auxiliar]: [BuscoTrabajo: trabajo de auxiliar administrativo en Colombia](https://buscotrabajo.co/empleos/auxiliar-administrativo) — total de vacantes de la página, corte 2026-11-14
-[^bt-enfermeria]: [BuscoTrabajo: trabajo de auxiliar de enfermería en Colombia](https://buscotrabajo.co/empleos/auxiliar-de-enfermeria) — total de vacantes de la página, corte 2026-11-14
-[^bt-sinexp]: [BuscoTrabajo: trabajo sin experiencia en Colombia](https://buscotrabajo.co/empleos/sin-experiencia) — total de vacantes de la página, corte 2026-11-14
+[^bt-auxiliar]: [BuscoTrabajo: trabajo de auxiliar administrativo en Colombia](https://buscotrabajo.co/empleos/auxiliar-administrativo) — total de vacantes de la página, corte 2026-11-18
+[^bt-enfermeria]: [BuscoTrabajo: trabajo de auxiliar de enfermería en Colombia](https://buscotrabajo.co/empleos/auxiliar-de-enfermeria) — total de vacantes de la página, corte 2026-11-18
+[^bt-sinexp]: [BuscoTrabajo: trabajo sin experiencia en Colombia](https://buscotrabajo.co/empleos/sin-experiencia) — total de vacantes de la página, corte 2026-11-18
 [^ley2039]: [Ley 2039 de 2020 (art. 2)](https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=137230) — Gestor Normativo de Función Pública, consultado el 2026-11-14
 [^ley190]: [Ley 190 de 1995 (art. 1)](https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=321) — Gestor Normativo de Función Pública, consultado el 2026-11-14
 [^ley1581]: [Ley 1581 de 2012, protección de datos personales (arts. 5 y 6)](https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=49981) — Gestor Normativo de Función Pública, consultado el 2026-11-14

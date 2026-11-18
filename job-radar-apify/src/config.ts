@@ -27,4 +27,4 @@ export function formatCOP(amount: number): string {
 // the server routes, the sitemap and the Header/Footer links, so the menu
 // never points at a 404. Even when true, only guides the owner approved are
 // served; with none approved /guias stays a real 404. Rollback: set false.
-export const GUIDES_ENABLED = false;
+export const GUIDES_ENABLED = true;

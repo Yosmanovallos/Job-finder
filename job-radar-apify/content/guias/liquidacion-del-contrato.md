@@ -5,8 +5,8 @@ titulo_seo: Liquidación del contrato: qué incluye
 descripcion: Qué conceptos debe traer tu liquidación al terminar un contrato en Colombia, cuándo hay indemnización y qué hacer si no te pagan a tiempo.
 autor: Equipo de BuscoTrabajo
 autor_tipo: Organization
-publicada:
-actualizada:
+publicada: 2026-12-09
+actualizada: 2026-12-09
 etiquetas: prestaciones, contratos
 revision_propietario: aprobada
 revisado_por: Equipo de BuscoTrabajo
@@ -16,7 +16,7 @@ Cuando un contrato de trabajo termina, por renuncia, por despido o porque se cum
 
 ## Por qué importa ahora
 
-Muchas personas firman contratos cortos en la temporada de fin de año y los terminan en enero. Al corte de esta guía, la página de [trabajo por temporada](/empleos/temporada) de BuscoTrabajo listaba 279 vacantes activas en Colombia, y el país sumaba 33.437 vacantes activas en total.[^bt-temporada][^bt-total] Cada uno de esos contratos, al terminar, debería cerrarse con una liquidación como la que se describe aquí.
+Muchas personas firman contratos cortos en la temporada de fin de año y los terminan en enero. Al corte de esta guía, la página de [trabajo por temporada](/empleos/temporada) de BuscoTrabajo listaba 296 vacantes activas en Colombia, y el país sumaba 33.511 vacantes activas en total.[^bt-temporada][^bt-total] Cada uno de esos contratos, al terminar, debería cerrarse con una liquidación como la que se describe aquí.
 
 ## Lo que siempre debe incluir
 
@@ -85,8 +85,8 @@ Si no llegas a un acuerdo con el empleador, puedes acudir a un inspector de trab
 
 La liquidación cierra la relación laboral y debe incluir salario pendiente, prima, cesantías con sus intereses y vacaciones, en proporción al tiempo trabajado. Si te despidieron sin justa causa, además te corresponde una indemnización, y si el pago se demora, el empleador se expone a una indemnización por mora.[^cst] Revísala con calma, pide tu certificado laboral y, si vas a buscar un nuevo empleo, empieza por las [vacantes sin experiencia](/empleos/sin-experiencia) o las de [temporada](/empleos/temporada).
 
-[^bt-temporada]: [BuscoTrabajo: trabajo por temporada en Colombia](https://buscotrabajo.co/empleos/temporada) — total de vacantes de la página, corte 2026-11-14
-[^bt-total]: [BuscoTrabajo, API pública: vacantes activas en Colombia](https://buscotrabajo.co/api/v1/jobs?country=CO&limit=1) — total de la respuesta, corte 2026-11-14
+[^bt-temporada]: [BuscoTrabajo: trabajo por temporada en Colombia](https://buscotrabajo.co/empleos/temporada) — total de vacantes de la página, corte 2026-11-18
+[^bt-total]: [BuscoTrabajo, API pública: vacantes activas en Colombia](https://buscotrabajo.co/api/v1/jobs?country=CO&limit=1) — total de la respuesta, corte 2026-11-18
 [^cst]: [Código Sustantivo del Trabajo (arts. 57, 64, 65, 186, 189, 249 y 306)](https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=199983) — Gestor Normativo de Función Pública, consultado el 2026-11-14
 [^ley50]: [Ley 50 de 1990 (art. 99, régimen de cesantías con fondos)](https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=281) — Gestor Normativo de Función Pública, consultado el 2026-11-14
 [^d1072]: [Decreto 1072 de 2015 (arts. 2.2.1.3.4 y 2.2.1.3.5, intereses de cesantías)](https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=72173) — Gestor Normativo de Función Pública, consultado el 2026-11-14

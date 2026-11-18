@@ -5,8 +5,8 @@ titulo_seo: Tipos de contrato de trabajo en Colombia
 descripcion: Contrato indefinido, a término fijo, por obra o labor, ocasional y de aprendizaje: qué dice cada uno y en qué se diferencian de la prestación de servicios.
 autor: Equipo de BuscoTrabajo
 autor_tipo: Organization
-publicada:
-actualizada:
+publicada: 2026-12-02
+actualizada: 2026-12-02
 etiquetas: contratos, prestaciones, entrevista
 revision_propietario: aprobada
 revisado_por: Equipo de BuscoTrabajo
@@ -50,7 +50,7 @@ Es el de corta duración, no mayor de un mes, y referido a labores distintas de 
 
 Es un contrato laboral especial y a término fijo, de hasta tres años, en el que una persona se forma en una entidad autorizada mientras una empresa patrocinadora le da los medios para aprender el oficio y le paga un apoyo de sostenimiento mensual.[^ley2466] Ese apoyo tiene mínimos fijados en la ley según la fase de formación, y el tiempo de práctica certificado cuenta como experiencia laboral.[^ley2466]
 
-Al corte de esta guía, una búsqueda de «aprendiz» en BuscoTrabajo devolvía 655 vacantes activas en Colombia, de un total de 33.437 vacantes activas en el país.[^bt-aprendiz][^bt-total] Son una puerta de entrada frecuente para quien estudia en el SENA o en una institución técnica.
+Al corte de esta guía, una búsqueda de «aprendiz» en BuscoTrabajo devolvía 661 vacantes activas en Colombia, de un total de 33.511 vacantes activas en el país.[^bt-aprendiz][^bt-total] Son una puerta de entrada frecuente para quien estudia en el SENA o en una institución técnica.
 
 ## Puedes tener más de un contrato
 
@@ -75,5 +75,5 @@ En Colombia, la regla general es el contrato indefinido; el término fijo, la ob
 
 [^cst]: [Código Sustantivo del Trabajo (arts. 6, 22, 23, 24, 26 y 46)](https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=199983) — Gestor Normativo de Función Pública, consultado el 2026-11-14
 [^ley2466]: [Ley 2466 de 2025, reforma laboral (arts. 5, 6, 16 y 21)](https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=260676) — Gestor Normativo de Función Pública, consultado el 2026-11-14
-[^bt-aprendiz]: [BuscoTrabajo, API pública: búsqueda «aprendiz» en Colombia](https://buscotrabajo.co/api/v1/jobs?country=CO&search=aprendiz&limit=1) — total de la respuesta, corte 2026-11-14
-[^bt-total]: [BuscoTrabajo, API pública: vacantes activas en Colombia](https://buscotrabajo.co/api/v1/jobs?country=CO&limit=1) — total de la respuesta, corte 2026-11-14
+[^bt-aprendiz]: [BuscoTrabajo, API pública: búsqueda «aprendiz» en Colombia](https://buscotrabajo.co/api/v1/jobs?country=CO&search=aprendiz&limit=1) — total de la respuesta, corte 2026-11-18
+[^bt-total]: [BuscoTrabajo, API pública: vacantes activas en Colombia](https://buscotrabajo.co/api/v1/jobs?country=CO&limit=1) — total de la respuesta, corte 2026-11-18

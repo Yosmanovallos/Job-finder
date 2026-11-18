@@ -5,8 +5,8 @@ titulo_seo: Entrevista de trabajo: cómo prepararla
 descripcion: Cómo preparar una entrevista de trabajo en Colombia, qué preguntas hacer al final y qué preguntas y exigencias están prohibidas para el empleador.
 autor: Equipo de BuscoTrabajo
 autor_tipo: Organization
-publicada:
-actualizada:
+publicada: 2026-12-16
+actualizada: 2026-12-16
 etiquetas: entrevista, hoja-de-vida
 revision_propietario: aprobada
 revisado_por: Equipo de BuscoTrabajo
@@ -16,7 +16,7 @@ Pasar el filtro de la hoja de vida es solo la mitad del camino: la entrevista es
 
 ## Dónde se concentra la oferta
 
-Al corte de esta guía, la página de [asesor comercial](/empleos/asesor-comercial) de BuscoTrabajo listaba 5.106 vacantes activas en Colombia, la de [ejecutivo de ventas](/empleos/ejecutivo-de-ventas) 2.457 y la de [auxiliar administrativo](/empleos/auxiliar-administrativo) 1.445.[^bt-asesor][^bt-ejecutivo][^bt-auxiliar] Si te postulas a cargos comerciales, prepárate para entrevistas en las que te pedirán ejemplos de ventas, metas y trato con clientes; si es un cargo administrativo, te preguntarán por organización, herramientas de oficina y manejo de documentos.
+Al corte de esta guía, la página de [asesor comercial](/empleos/asesor-comercial) de BuscoTrabajo listaba 5.084 vacantes activas en Colombia, la de [ejecutivo de ventas](/empleos/ejecutivo-de-ventas) 2.414 y la de [auxiliar administrativo](/empleos/auxiliar-administrativo) 1.427.[^bt-asesor][^bt-ejecutivo][^bt-auxiliar] Si te postulas a cargos comerciales, prepárate para entrevistas en las que te pedirán ejemplos de ventas, metas y trato con clientes; si es un cargo administrativo, te preguntarán por organización, herramientas de oficina y manejo de documentos.
 
 ## Antes de la entrevista
 
@@ -87,9 +87,9 @@ Desconfía de una «entrevista» que ocurre solo por chat, sin videollamada ni l
 
 Una buena entrevista se prepara: investiga la empresa, conecta cada requisito del cargo con un ejemplo tuyo y lleva tus propias preguntas sobre el contrato y el horario. Recuerda que hay preguntas y exigencias prohibidas, como las de planes reproductivos o la prueba de embarazo como requisito. Cuando estés listo, revisa las vacantes de [asesor comercial](/empleos/asesor-comercial) o de [auxiliar administrativo](/empleos/auxiliar-administrativo).
 
-[^bt-asesor]: [BuscoTrabajo: trabajo de asesor comercial en Colombia](https://buscotrabajo.co/empleos/asesor-comercial) — total de vacantes de la página, corte 2026-11-14
-[^bt-ejecutivo]: [BuscoTrabajo: trabajo de ejecutivo de ventas en Colombia](https://buscotrabajo.co/empleos/ejecutivo-de-ventas) — total de vacantes de la página, corte 2026-11-14
-[^bt-auxiliar]: [BuscoTrabajo: trabajo de auxiliar administrativo en Colombia](https://buscotrabajo.co/empleos/auxiliar-administrativo) — total de vacantes de la página, corte 2026-11-14
+[^bt-asesor]: [BuscoTrabajo: trabajo de asesor comercial en Colombia](https://buscotrabajo.co/empleos/asesor-comercial) — total de vacantes de la página, corte 2026-11-18
+[^bt-ejecutivo]: [BuscoTrabajo: trabajo de ejecutivo de ventas en Colombia](https://buscotrabajo.co/empleos/ejecutivo-de-ventas) — total de vacantes de la página, corte 2026-11-18
+[^bt-auxiliar]: [BuscoTrabajo: trabajo de auxiliar administrativo en Colombia](https://buscotrabajo.co/empleos/auxiliar-administrativo) — total de vacantes de la página, corte 2026-11-18
 [^d1072]: [Decreto 1072 de 2015 (arts. 2.2.6.1.2.4, 2.2.6.1.2.17 y 2.2.6.1.2.26)](https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=72173) — Gestor Normativo de Función Pública, consultado el 2026-11-14
 [^cst]: [Código Sustantivo del Trabajo (art. 241A, adicionado por la Ley 2114 de 2021)](https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=199983) — Gestor Normativo de Función Pública, consultado el 2026-11-14
 [^ley2466]: [Ley 2466 de 2025, reforma laboral (art. 18)](https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=260676) — Gestor Normativo de Función Pública, consultado el 2026-11-14

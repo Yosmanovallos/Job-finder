@@ -5,8 +5,8 @@ titulo_seo: Trabajo de temporada: contratos y pagos
 descripcion: Qué contratos se usan para la temporada de diciembre en Colombia, qué te deben pagar al terminar y cómo funcionan las empresas de servicios temporales.
 autor: Equipo de BuscoTrabajo
 autor_tipo: Organization
-publicada:
-actualizada:
+publicada: 2026-11-18
+actualizada: 2026-11-18
 etiquetas: contratos, prestaciones, sin-experiencia
 revision_propietario: aprobada
 revisado_por: Equipo de BuscoTrabajo
@@ -16,7 +16,7 @@ Entre noviembre y enero muchas empresas contratan personal extra: almacenes, cen
 
 ## Cuántas vacantes de temporada hay hoy
 
-Al corte de esta guía, la página de [trabajo por temporada](/empleos/temporada) de BuscoTrabajo listaba 279 vacantes activas en Colombia.[^bt-temporada] Es una cifra del día: las vacantes de temporada se abren y se cierran en pocas semanas. Si te interesa este tipo de trabajo, revisa la página con frecuencia y postúlate pronto.
+Al corte de esta guía, la página de [trabajo por temporada](/empleos/temporada) de BuscoTrabajo listaba 296 vacantes activas en Colombia.[^bt-temporada] Es una cifra del día: las vacantes de temporada se abren y se cierran en pocas semanas. Si te interesa este tipo de trabajo, revisa la página con frecuencia y postúlate pronto.
 
 ## Qué contrato te pueden ofrecer
 
@@ -81,7 +81,7 @@ Si el empleador termina el contrato antes de la fecha pactada y sin justa causa,
 
 La temporada de fin de año abre muchas vacantes cortas y es una buena oportunidad para ganar experiencia. Un contrato de pocas semanas sigue siendo un contrato de trabajo: debe estar por escrito, te da derecho a prestaciones proporcionales y, si es con una temporal, tiene límites claros. Revisa las [vacantes de temporada de hoy](/empleos/temporada) y, si es tu primer empleo, también las de [trabajo sin experiencia](/empleos/sin-experiencia).
 
-[^bt-temporada]: [BuscoTrabajo: trabajo por temporada en Colombia](https://buscotrabajo.co/empleos/temporada) — total de vacantes de la página, corte 2026-11-14
+[^bt-temporada]: [BuscoTrabajo: trabajo por temporada en Colombia](https://buscotrabajo.co/empleos/temporada) — total de vacantes de la página, corte 2026-11-18
 [^ley2466]: [Ley 2466 de 2025, reforma laboral (arts. 5, 6 y 45)](https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=260676) — Gestor Normativo de Función Pública, consultado el 2026-11-14
 [^cst]: [Código Sustantivo del Trabajo (arts. 6, 64, 65, 77, 78, 186, 249 y 306)](https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=199983) — Gestor Normativo de Función Pública, consultado el 2026-11-14
 [^d1072]: [Decreto 1072 de 2015, empresas de servicios temporales (arts. 2.2.6.5.5 y 2.2.6.5.6)](https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=72173) — Gestor Normativo de Función Pública, consultado el 2026-11-14

@@ -5,8 +5,8 @@ titulo_seo: Medio tiempo y fines de semana: tus derechos
 descripcion: Jornada máxima, recargos nocturnos y dominicales, prima y seguridad social para quien trabaja medio tiempo, por días o los fines de semana en Colombia.
 autor: Equipo de BuscoTrabajo
 autor_tipo: Organization
-publicada:
-actualizada:
+publicada: 2026-11-25
+actualizada: 2026-11-25
 etiquetas: contratos, prestaciones, buscar-empleo
 revision_propietario: aprobada
 revisado_por: Equipo de BuscoTrabajo
@@ -16,7 +16,7 @@ Trabajar medio tiempo, solo los fines de semana o algunos días al mes es la opc
 
 ## Cuántas vacantes hay hoy
 
-Al corte de esta guía, la página de [trabajo de medio tiempo](/empleos/medio-tiempo) de BuscoTrabajo listaba 39 vacantes activas en Colombia, y la de [trabajo los fines de semana](/empleos/fines-de-semana) listaba 33.[^bt-medio][^bt-finde] Son pocas frente al total del país, y esas páginas solo reúnen las vacantes que el buscador logra identificar con ese horario. Por eso conviene leer la descripción de cada vacante y preguntar por el horario en la entrevista, aunque el anuncio no lo mencione.
+Al corte de esta guía, la página de [trabajo de medio tiempo](/empleos/medio-tiempo) de BuscoTrabajo listaba 40 vacantes activas en Colombia, y la de [trabajo los fines de semana](/empleos/fines-de-semana) listaba 35.[^bt-medio][^bt-finde] Son pocas frente al total del país, y esas páginas solo reúnen las vacantes que el buscador logra identificar con ese horario. Por eso conviene leer la descripción de cada vacante y preguntar por el horario en la entrevista, aunque el anuncio no lo mencione.
 
 ## Un contrato de pocas horas sigue siendo un contrato de trabajo
 
@@ -79,8 +79,8 @@ La afiliación a pensiones, riesgos laborales y subsidio familiar es responsabil
 
 Trabajar pocas horas no reduce tus derechos, solo los hace proporcionales. Tienes jornada máxima, recargos por trabajo nocturno y en domingos o festivos, prima, cesantías y vacaciones en proporción al tiempo trabajado, y una forma especial de cotizar a seguridad social si trabajas pocos días al mes. Pide todo por escrito y revisa a diario las [vacantes de medio tiempo](/empleos/medio-tiempo) y de [fines de semana](/empleos/fines-de-semana).
 
-[^bt-medio]: [BuscoTrabajo: trabajo de medio tiempo en Colombia](https://buscotrabajo.co/empleos/medio-tiempo) — total de vacantes de la página, corte 2026-11-14
-[^bt-finde]: [BuscoTrabajo: trabajo los fines de semana en Colombia](https://buscotrabajo.co/empleos/fines-de-semana) — total de vacantes de la página, corte 2026-11-14
+[^bt-medio]: [BuscoTrabajo: trabajo de medio tiempo en Colombia](https://buscotrabajo.co/empleos/medio-tiempo) — total de vacantes de la página, corte 2026-11-18
+[^bt-finde]: [BuscoTrabajo: trabajo los fines de semana en Colombia](https://buscotrabajo.co/empleos/fines-de-semana) — total de vacantes de la página, corte 2026-11-18
 [^d1072]: [Decreto 1072 de 2015, trabajadores dependientes que laboran por periodos inferiores a un mes (arts. 2.2.1.6.4.2, 2.2.1.6.4.3, 2.2.1.6.4.5, 2.2.1.6.4.6, 2.2.1.6.4.12 y 2.2.1.6.4.16)](https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=72173) — Gestor Normativo de Función Pública, consultado el 2026-11-14
 [^ley2101]: [Ley 2101 de 2021, reducción de la jornada laboral (arts. 1 a 3)](https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=166506) — Gestor Normativo de Función Pública, consultado el 2026-11-14
 [^ley2466]: [Ley 2466 de 2025, reforma laboral (arts. 6, 10, 11, 12, 13 y 14)](https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=260676) — Gestor Normativo de Función Pública, consultado el 2026-11-14

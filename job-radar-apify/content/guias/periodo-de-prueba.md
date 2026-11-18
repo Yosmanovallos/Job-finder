@@ -5,8 +5,8 @@ titulo_seo: Periodo de prueba en Colombia: duración
 descripcion: Cuánto puede durar el periodo de prueba, cuándo es válido, qué derechos tienes durante esos días y qué cambia si el contrato es a término fijo.
 autor: Equipo de BuscoTrabajo
 autor_tipo: Organization
-publicada:
-actualizada:
+publicada: 2026-12-09
+actualizada: 2026-12-09
 etiquetas: contratos, sin-experiencia
 revision_propietario: aprobada
 revisado_por: Equipo de BuscoTrabajo
@@ -16,7 +16,7 @@ Muchos empleos nuevos empiezan con un periodo de prueba. Es la etapa en la que l
 
 ## Por qué te conviene conocerlo
 
-Cada vacante que aceptas abre un nuevo periodo de prueba. Al corte de esta guía, las páginas de ciudad de BuscoTrabajo listaban 12.043 vacantes activas en [Bogotá](/empleos/bogota), 3.608 en [Medellín](/empleos/medellin) y 2.134 en [Cali](/empleos/cali), y la de [trabajo sin experiencia](/empleos/sin-experiencia) listaba 277 en todo el país.[^bt-bogota][^bt-medellin][^bt-cali][^bt-sinexp] Quien consigue uno de esos empleos, sobre todo si es el primero, pasa por esta etapa en sus primeras semanas.
+Cada vacante que aceptas abre un nuevo periodo de prueba. Al corte de esta guía, las páginas de ciudad de BuscoTrabajo listaban 12.081 vacantes activas en [Bogotá](/empleos/bogota), 3.631 en [Medellín](/empleos/medellin) y 2.192 en [Cali](/empleos/cali), y la de [trabajo sin experiencia](/empleos/sin-experiencia) listaba 294 en todo el país.[^bt-bogota][^bt-medellin][^bt-cali][^bt-sinexp] Quien consigue uno de esos empleos, sobre todo si es el primero, pasa por esta etapa en sus primeras semanas.
 
 ## Qué es
 
@@ -74,7 +74,7 @@ El periodo de prueba debe constar por escrito, no puede durar más de dos meses,
 
 [^cst]: [Código Sustantivo del Trabajo (arts. 76, 77, 78, 79, 80 y 239)](https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=199983) — Gestor Normativo de Función Pública, consultado el 2026-11-14
 [^ley2466]: [Ley 2466 de 2025, reforma laboral (art. 16, que modifica el art. 23 del Código Sustantivo del Trabajo)](https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=260676) — Gestor Normativo de Función Pública, consultado el 2026-11-14
-[^bt-bogota]: [BuscoTrabajo: empleos en Bogotá](https://buscotrabajo.co/empleos/bogota) — total de vacantes de la página, corte 2026-11-14
-[^bt-medellin]: [BuscoTrabajo: empleos en Medellín](https://buscotrabajo.co/empleos/medellin) — total de vacantes de la página, corte 2026-11-14
-[^bt-cali]: [BuscoTrabajo: empleos en Cali](https://buscotrabajo.co/empleos/cali) — total de vacantes de la página, corte 2026-11-14
-[^bt-sinexp]: [BuscoTrabajo: trabajo sin experiencia en Colombia](https://buscotrabajo.co/empleos/sin-experiencia) — total de vacantes de la página, corte 2026-11-14
+[^bt-bogota]: [BuscoTrabajo: empleos en Bogotá](https://buscotrabajo.co/empleos/bogota) — total de vacantes de la página, corte 2026-11-18
+[^bt-medellin]: [BuscoTrabajo: empleos en Medellín](https://buscotrabajo.co/empleos/medellin) — total de vacantes de la página, corte 2026-11-18
+[^bt-cali]: [BuscoTrabajo: empleos en Cali](https://buscotrabajo.co/empleos/cali) — total de vacantes de la página, corte 2026-11-18
+[^bt-sinexp]: [BuscoTrabajo: trabajo sin experiencia en Colombia](https://buscotrabajo.co/empleos/sin-experiencia) — total de vacantes de la página, corte 2026-11-18

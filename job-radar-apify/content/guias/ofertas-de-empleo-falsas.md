@@ -5,8 +5,8 @@ titulo_seo: Ofertas de empleo falsas: cómo reconocerlas
 descripcion: Las señales más claras de una oferta de trabajo falsa en Colombia, qué prohíbe la norma a quienes intermedian empleo y qué hacer si ya diste dinero o datos.
 autor: Equipo de BuscoTrabajo
 autor_tipo: Organization
-publicada:
-actualizada:
+publicada: 2026-11-25
+actualizada: 2026-11-25
 etiquetas: ofertas-falsas, buscar-empleo
 revision_propietario: aprobada
 revisado_por: Equipo de BuscoTrabajo
@@ -18,7 +18,7 @@ Quien busca trabajo con urgencia es el blanco perfecto para una estafa: está di
 
 Una buena primera pista es el origen de la oferta. Una vacante publicada en el sitio de empleo de la propia empresa es más fácil de verificar que un anuncio suelto en una red social o un mensaje que te llega sin haberte postulado.
 
-Al corte de esta guía, 1.123 de las 33.437 vacantes activas en Colombia que reunía BuscoTrabajo venían del portal oficial del empleador; el resto venía de portales de empleo de terceros.[^bt-oficial][^bt-total] Eso no hace falsas a las demás, pero sí indica dónde verificar: si la vacante está en un portal de terceros, busca si la empresa existe y si publica lo mismo en su propio sitio.
+Al corte de esta guía, 1.089 de las 33.511 vacantes activas en Colombia que reunía BuscoTrabajo venían del portal oficial del empleador; el resto venía de portales de empleo de terceros.[^bt-oficial][^bt-total] Eso no hace falsas a las demás, pero sí indica dónde verificar: si la vacante está en un portal de terceros, busca si la empresa existe y si publica lo mismo en su propio sitio.
 
 ## Lo que la norma prohíbe a quienes intermedian empleo
 
@@ -76,8 +76,8 @@ En la práctica:
 
 Una oferta real no te cobra por postularte, identifica a la empresa, te explica el contrato y no te pide claves ni datos bancarios antes de contratarte. Quien intermedia empleo necesita autorización y no puede cobrarte por los servicios básicos. Verifica el origen de cada vacante y, ante la duda, no pagues ni compartas datos. Puedes buscar con más tranquilidad en vacantes que enlazan a su fuente original, como las de [empleos remotos](/empleos/remoto) o [sin experiencia](/empleos/sin-experiencia).
 
-[^bt-oficial]: [BuscoTrabajo, API pública: vacantes del portal oficial del empleador en Colombia](https://buscotrabajo.co/api/v1/jobs?country=CO&sources=Portal%20oficial&limit=1) — total de la respuesta, corte 2026-11-14
-[^bt-total]: [BuscoTrabajo, API pública: vacantes activas en Colombia](https://buscotrabajo.co/api/v1/jobs?country=CO&limit=1) — total de la respuesta, corte 2026-11-14
+[^bt-oficial]: [BuscoTrabajo, API pública: vacantes del portal oficial del empleador en Colombia](https://buscotrabajo.co/api/v1/jobs?country=CO&sources=Portal%20oficial&limit=1) — total de la respuesta, corte 2026-11-18
+[^bt-total]: [BuscoTrabajo, API pública: vacantes activas en Colombia](https://buscotrabajo.co/api/v1/jobs?country=CO&limit=1) — total de la respuesta, corte 2026-11-18
 [^ley1636]: [Ley 1636 de 2013 (arts. 32, 37 y 38)](https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=53493) — Gestor Normativo de Función Pública, consultado el 2026-11-14
 [^d1072]: [Decreto 1072 de 2015 (arts. 2.2.6.1.2.4, 2.2.6.1.2.17 y 2.2.6.1.2.26)](https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=72173) — Gestor Normativo de Función Pública, consultado el 2026-11-14
 [^spe]: [Unidad Administrativa Especial del Servicio Público de Empleo](https://www.serviciodeempleo.gov.co/) — portal oficial, consultado el 2026-11-14

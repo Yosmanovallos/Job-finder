@@ -5,8 +5,8 @@ titulo_seo: Prestaciones sociales: prima y cesantías
 descripcion: Qué son la prima de servicios, las cesantías, sus intereses y las vacaciones, cuándo se pagan y cómo verificar que tu empleador las esté pagando bien.
 autor: Equipo de BuscoTrabajo
 autor_tipo: Organization
-publicada:
-actualizada:
+publicada: 2026-12-02
+actualizada: 2026-12-02
 etiquetas: prestaciones, contratos
 revision_propietario: aprobada
 revisado_por: Equipo de BuscoTrabajo
@@ -22,7 +22,7 @@ También aplican a contratos cortos. Desde la reforma laboral de 2025, en los co
 
 ## Cargos con más oferta y por qué te conviene saberlo
 
-Al corte de esta guía, la página de [asesor comercial](/empleos/asesor-comercial) de BuscoTrabajo listaba 5.106 vacantes activas en Colombia, la de [auxiliar administrativo](/empleos/auxiliar-administrativo) 1.445 y la de [auxiliar de enfermería](/empleos/auxiliar-de-enfermeria) 723.[^bt-asesor][^bt-auxiliar][^bt-enfermeria] Son cargos donde muchas ofertas se parecen en salario; la diferencia real entre una y otra suele estar en el tipo de contrato y en que se paguen completas las prestaciones.
+Al corte de esta guía, la página de [asesor comercial](/empleos/asesor-comercial) de BuscoTrabajo listaba 5.084 vacantes activas en Colombia, la de [auxiliar administrativo](/empleos/auxiliar-administrativo) 1.427 y la de [auxiliar de enfermería](/empleos/auxiliar-de-enfermeria) 714.[^bt-asesor][^bt-auxiliar][^bt-enfermeria] Son cargos donde muchas ofertas se parecen en salario; la diferencia real entre una y otra suele estar en el tipo de contrato y en que se paguen completas las prestaciones.
 
 ## La prima de servicios
 
@@ -76,6 +76,6 @@ La prima, las cesantías con sus intereses y las vacaciones son parte de tu remu
 [^ley50]: [Ley 50 de 1990 (art. 99, régimen de cesantías con fondos)](https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=281) — Gestor Normativo de Función Pública, consultado el 2026-11-14
 [^d1072]: [Decreto 1072 de 2015 (art. 2.2.1.3.4, intereses de cesantías)](https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=72173) — Gestor Normativo de Función Pública, consultado el 2026-11-14
 [^salario]: [Concepto 062131 de 2026 de Función Pública, que transcribe el art. 1 del Decreto 1469 de 2025](https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=276596) — Gestor Normativo de Función Pública, consultado el 2026-11-14
-[^bt-asesor]: [BuscoTrabajo: trabajo de asesor comercial en Colombia](https://buscotrabajo.co/empleos/asesor-comercial) — total de vacantes de la página, corte 2026-11-14
-[^bt-auxiliar]: [BuscoTrabajo: trabajo de auxiliar administrativo en Colombia](https://buscotrabajo.co/empleos/auxiliar-administrativo) — total de vacantes de la página, corte 2026-11-14
-[^bt-enfermeria]: [BuscoTrabajo: trabajo de auxiliar de enfermería en Colombia](https://buscotrabajo.co/empleos/auxiliar-de-enfermeria) — total de vacantes de la página, corte 2026-11-14
+[^bt-asesor]: [BuscoTrabajo: trabajo de asesor comercial en Colombia](https://buscotrabajo.co/empleos/asesor-comercial) — total de vacantes de la página, corte 2026-11-18
+[^bt-auxiliar]: [BuscoTrabajo: trabajo de auxiliar administrativo en Colombia](https://buscotrabajo.co/empleos/auxiliar-administrativo) — total de vacantes de la página, corte 2026-11-18
+[^bt-enfermeria]: [BuscoTrabajo: trabajo de auxiliar de enfermería en Colombia](https://buscotrabajo.co/empleos/auxiliar-de-enfermeria) — total de vacantes de la página, corte 2026-11-18

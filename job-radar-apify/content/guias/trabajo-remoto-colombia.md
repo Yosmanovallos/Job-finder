@@ -5,8 +5,8 @@ titulo_seo: Trabajo remoto en Colombia: leyes y vacantes
 descripcion: Diferencias entre trabajo remoto, teletrabajo y trabajo en casa, qué debe pagar el empleador y cómo buscar vacantes remotas reales en Colombia.
 autor: Equipo de BuscoTrabajo
 autor_tipo: Organization
-publicada:
-actualizada:
+publicada: 2026-11-18
+actualizada: 2026-11-18
 etiquetas: remoto, ofertas-falsas, contratos
 revision_propietario: aprobada
 revisado_por: Equipo de BuscoTrabajo
@@ -16,9 +16,9 @@ Trabajar desde casa en Colombia puede significar tres cosas distintas, y elegir 
 
 ## Cuántas vacantes remotas hay hoy
 
-Al corte de esta guía, BuscoTrabajo tenía 2.771 vacantes activas en Colombia clasificadas como remotas, de un total de 33.437 vacantes activas en el país.[^bt-remoto][^bt-total] Es decir, cerca de una de cada doce. La página de [empleos remotos](/empleos/remoto) muestra una cifra menor, 710 al mismo corte, porque solo lista las vacantes con datos suficientes para tener su propia página pública.[^bt-remoto-hub] De las vacantes remotas, 795 se habían publicado en los últimos siete días, lo que muestra que la oferta se renueva rápido y conviene revisarla seguido.[^bt-remoto-7d]
+Al corte de esta guía, BuscoTrabajo tenía 1.802 vacantes activas en Colombia clasificadas como remotas, de un total de 33.511 vacantes activas en el país.[^bt-remoto][^bt-total] Es decir, cerca de una de cada diecinueve. La página de [empleos remotos](/empleos/remoto) muestra una cifra menor, 336 al mismo corte, porque solo lista las vacantes con datos suficientes para tener su propia página pública.[^bt-remoto-hub] De las vacantes remotas, 479 se habían publicado en los últimos siete días, lo que muestra que la oferta se renueva rápido y conviene revisarla seguido.[^bt-remoto-7d]
 
-Aunque el trabajo sea remoto, muchas empresas siguen indicando una ciudad. Al filtrar las vacantes remotas por ubicación, 772 mencionaban Bogotá, 120 Medellín y 41 Cali.[^bt-remoto-bogota][^bt-remoto-medellin][^bt-remoto-cali] La vacante no siempre explica por qué menciona una ciudad: puede ser la sede de la empresa o un requisito de residencia. Vale la pena leerla completa y, si no lo dice, preguntarlo antes de descartarla.
+Aunque el trabajo sea remoto, muchas empresas siguen indicando una ciudad. Al filtrar las vacantes remotas por ubicación, 234 mencionaban Bogotá, 46 Medellín y 29 Cali.[^bt-remoto-bogota][^bt-remoto-medellin][^bt-remoto-cali] La vacante no siempre explica por qué menciona una ciudad: puede ser la sede de la empresa o un requisito de residencia. Vale la pena leerla completa y, si no lo dice, preguntarlo antes de descartarla.
 
 ## Trabajo remoto, teletrabajo y trabajo en casa no son lo mismo
 
@@ -94,13 +94,13 @@ Sobre el último punto, el empleador del trabajador remoto está obligado a afil
 
 El trabajo remoto es una de las formas de empleo con más oferta en BuscoTrabajo, y también una de las que más exige leer la letra pequeña. Antes de postularte, identifica si la vacante es trabajo remoto, teletrabajo o trabajo en casa, porque cada figura tiene reglas distintas sobre equipos, auxilios y regreso a la oficina. Usa el filtro de modalidad, desconfía de cualquier cobro y pide por escrito las condiciones. Puedes empezar por las [vacantes remotas de hoy](/empleos/remoto).
 
-[^bt-total]: [BuscoTrabajo, API pública: vacantes activas en Colombia](https://buscotrabajo.co/api/v1/jobs?country=CO&limit=1) — total de la respuesta, corte 2026-11-14
-[^bt-remoto]: [BuscoTrabajo, API pública: vacantes remotas en Colombia](https://buscotrabajo.co/api/v1/jobs?country=CO&modality=remoto&limit=1) — total de la respuesta, corte 2026-11-14
-[^bt-remoto-7d]: [BuscoTrabajo, API pública: vacantes remotas de los últimos 7 días](https://buscotrabajo.co/api/v1/jobs?country=CO&modality=remoto&freshness=7d&limit=1) — total de la respuesta, corte 2026-11-14
-[^bt-remoto-bogota]: [BuscoTrabajo, API pública: vacantes remotas con ubicación en Bogotá](https://buscotrabajo.co/api/v1/jobs?country=CO&modality=remoto&cities=Bogot%C3%A1&limit=1) — total de la respuesta, corte 2026-11-14
-[^bt-remoto-medellin]: [BuscoTrabajo, API pública: vacantes remotas con ubicación en Medellín](https://buscotrabajo.co/api/v1/jobs?country=CO&modality=remoto&cities=Medell%C3%ADn&limit=1) — total de la respuesta, corte 2026-11-14
-[^bt-remoto-cali]: [BuscoTrabajo, API pública: vacantes remotas con ubicación en Cali](https://buscotrabajo.co/api/v1/jobs?country=CO&modality=remoto&cities=Cali&limit=1) — total de la respuesta, corte 2026-11-14
-[^bt-remoto-hub]: [BuscoTrabajo: trabajos remotos en Colombia](https://buscotrabajo.co/empleos/remoto) — total de vacantes de la página, corte 2026-11-14
+[^bt-total]: [BuscoTrabajo, API pública: vacantes activas en Colombia](https://buscotrabajo.co/api/v1/jobs?country=CO&limit=1) — total de la respuesta, corte 2026-11-18
+[^bt-remoto]: [BuscoTrabajo, API pública: vacantes remotas en Colombia](https://buscotrabajo.co/api/v1/jobs?country=CO&modality=remoto&limit=1) — total de la respuesta, corte 2026-11-18
+[^bt-remoto-7d]: [BuscoTrabajo, API pública: vacantes remotas de los últimos 7 días](https://buscotrabajo.co/api/v1/jobs?country=CO&modality=remoto&freshness=7d&limit=1) — total de la respuesta, corte 2026-11-18
+[^bt-remoto-bogota]: [BuscoTrabajo, API pública: vacantes remotas con ubicación en Bogotá](https://buscotrabajo.co/api/v1/jobs?country=CO&modality=remoto&cities=Bogot%C3%A1&limit=1) — total de la respuesta, corte 2026-11-18
+[^bt-remoto-medellin]: [BuscoTrabajo, API pública: vacantes remotas con ubicación en Medellín](https://buscotrabajo.co/api/v1/jobs?country=CO&modality=remoto&cities=Medell%C3%ADn&limit=1) — total de la respuesta, corte 2026-11-18
+[^bt-remoto-cali]: [BuscoTrabajo, API pública: vacantes remotas con ubicación en Cali](https://buscotrabajo.co/api/v1/jobs?country=CO&modality=remoto&cities=Cali&limit=1) — total de la respuesta, corte 2026-11-18
+[^bt-remoto-hub]: [BuscoTrabajo: trabajos remotos en Colombia](https://buscotrabajo.co/empleos/remoto) — total de vacantes de la página, corte 2026-11-18
 [^ley2121]: [Ley 2121 de 2021, trabajo remoto (arts. 3, 4, 7, 10, 15, 16, 17, 20 y 25)](https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=167966) — Gestor Normativo de Función Pública, consultado el 2026-11-14
 [^ley1221]: [Ley 1221 de 2008, teletrabajo (arts. 2, 6 y 6A)](https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=31431) — Gestor Normativo de Función Pública, texto con las modificaciones de la Ley 2466 de 2025, consultado el 2026-11-14
 [^ley2466]: [Ley 2466 de 2025, reforma laboral (arts. 52 y 53)](https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=260676) — Gestor Normativo de Función Pública, consultado el 2026-11-14
