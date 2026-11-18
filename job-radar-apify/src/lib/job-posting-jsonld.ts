@@ -44,6 +44,40 @@ interface JobPostingNode {
   validThrough?: unknown;
 }
 
+const hasText = (value: unknown): boolean =>
+  typeof value === "string" ? value.trim().length > 0 : Array.isArray(value) && value.some(hasText);
+
+/** The posting names a place of work: a city, region, street or postal code (a country alone is not one). */
+function hasPhysicalJobLocation(node: JobPostingNode): boolean {
+  const places: unknown[] = Array.isArray(node.jobLocation) ? node.jobLocation : [node.jobLocation];
+  return places.some((place) => {
+    const address = (place as { address?: unknown } | null | undefined)?.address;
+    if (!address || typeof address !== "object") return false;
+    const { addressLocality, addressRegion, streetAddress, postalCode } = address as Record<string, unknown>;
+    return [addressLocality, addressRegion, streetAddress, postalCode].some(hasText);
+  });
+}
+
+/**
+ * 100% remote, as the posting itself states it: `jobLocationType:
+ * TELECOMMUTE` and NO place of work (schema.org's and Google's shape for a
+ * fully remote job; WeRemoto publishes exactly that).
+ *
+ * TELECOMMUTE next to a real jobLocation is not evidence of remote work.
+ * Confirmed live 2026-11-15, after a user reported on-site jobs labeled
+ * remote: Elempleo stamps TELECOMMUTE on every posting (a nurse and a
+ * construction coordinator in Bogotá among them), and LinkedIn puts it on
+ * hybrid postings too ("Modalidad híbrida en Bogotá", jobLocation Bogotá).
+ * Those rows were stored as fully_remote, shown as "Remoto" and announced
+ * to Google as TELECOMMUTE. With a place of work the modality stays
+ * unstated here; the title/location classifier (job-modality.ts) decides.
+ */
+function statesFullyRemote(node: JobPostingNode): boolean {
+  const locationType = Array.isArray(node.jobLocationType) ? node.jobLocationType : [node.jobLocationType];
+  const telecommute = locationType.some((value: unknown) => typeof value === "string" && value.trim().toUpperCase() === "TELECOMMUTE");
+  return telecommute && !hasPhysicalJobLocation(node);
+}
+
 function findJobPostingNode(html: string): JobPostingNode | null {
   const scripts = html.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi) || [];
   for (const raw of scripts) {
@@ -132,8 +166,8 @@ function buildJobDetail(node: JobPostingNode): Partial<JobDetail> {
   // countries come from applicantLocationRequirements (Country or
   // AdministrativeArea, single or array) and are normalized to ISO-2 — an
   // unrecognized name is dropped, never guessed.
-  const locationType = Array.isArray(node.jobLocationType) ? node.jobLocationType : [node.jobLocationType];
-  if (locationType.some((value: unknown) => typeof value === "string" && value.trim().toUpperCase() === "TELECOMMUTE")) {
+  // Fully remote only as statesFullyRemote() defines it (no place of work).
+  if (statesFullyRemote(node)) {
     detail.remoteType = "fully_remote";
     const requirements = Array.isArray(node.applicantLocationRequirements)
       ? node.applicantLocationRequirements
@@ -184,7 +218,7 @@ function extractLocationLabel(node: JobPostingNode): string | undefined {
   // `jobLocation` at all, `jobLocationType: "TELECOMMUTE"` instead —
   // confirmed live on WeRemoto. "Remoto" matches the pseudo-city convention
   // every other source already uses (see job-filters.ts CITY_OPTIONS).
-  if (node.jobLocationType === "TELECOMMUTE") return "Remoto";
+  if (statesFullyRemote(node)) return "Remoto";
 
   const address = node.jobLocation?.address;
   if (address && typeof address === "object") {

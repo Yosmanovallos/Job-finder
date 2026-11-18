@@ -18,7 +18,7 @@ import {
   renderJobDescriptionHtml,
   type SeoJob
 } from "../src/lib/job-seo.js";
-import { extractJobPostingDetail } from "../src/lib/job-posting-jsonld.js";
+import { extractFullJobPosting, extractJobPostingDetail } from "../src/lib/job-posting-jsonld.js";
 import { buildLocationLabel } from "../src/countries/index.js";
 
 /** The JobPosting properties these tests read. */
@@ -380,4 +380,28 @@ test("JSON-LD parser reads remote modality, eligible countries and expiration on
   assert.equal(onsite.remoteType, undefined);
   assert.equal(onsite.applicantCountries, undefined);
   assert.equal(onsite.validThrough, undefined);
+});
+
+test("JSON-LD parser: TELECOMMUTE next to a place of work is not evidence of remote work", () => {
+  const posting = (extra: Record<string, unknown>) =>
+    `<script type="application/ld+json">${JSON.stringify({ "@type": "JobPosting", title: "Enfermero autorizaciones", description: "<p>Cargo en clínica.</p>", jobLocationType: "TELECOMMUTE", applicantLocationRequirements: { "@type": "Country", name: "Colombia" }, ...extra })}</script>`;
+  // Elempleo (live 2026-11-15): TELECOMMUTE on every posting, with its real city.
+  const elempleo = posting({ jobLocation: { "@type": "Place", address: { "@type": "PostalAddress", addressLocality: "Bogotá D.C.", addressRegion: "Bogotá", addressCountry: "CO" } } });
+  // LinkedIn (live 2026-11-15): same marker on a hybrid posting; Magneto states cities as arrays.
+  const linkedin = posting({ jobLocation: { "@type": "Place", address: { "@type": "PostalAddress", addressCountry: "CO", addressLocality: "Bogotá", addressRegion: null, streetAddress: null } } });
+  const arrays = posting({ jobLocation: [{ "@type": "Place", address: { addressLocality: ["Cartagena"], addressRegion: ["Bolivar"], addressCountry: "CO" } }] });
+  for (const html of [elempleo, linkedin, arrays]) {
+    const detail = extractJobPostingDetail(html)!;
+    assert.equal(detail.remoteType, undefined);
+    assert.equal(detail.applicantCountries, undefined);
+  }
+  assert.equal(extractFullJobPosting(elempleo)?.location, "Bogotá D.C., Bogotá");
+
+  // No place of work (WeRemoto), or only a country: the posting does state 100% remote.
+  for (const extra of [{}, { jobLocation: { "@type": "Place", address: { "@type": "PostalAddress", addressCountry: "CO" } } }]) {
+    const detail = extractJobPostingDetail(posting(extra))!;
+    assert.equal(detail.remoteType, "fully_remote");
+    assert.deepEqual(detail.applicantCountries, ["CO"]);
+  }
+  assert.equal(extractFullJobPosting(posting({}))?.location, "Remoto");
 });
