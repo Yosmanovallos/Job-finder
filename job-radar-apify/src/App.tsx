@@ -144,6 +144,7 @@ function AppRoutes() {
       <Route path="/legal/cookies" element={<Legal type="cookies" />} />
       <Route path="/docs" element={<PublicInfoPage />} />
       <Route path="/about" element={<PublicInfoPage />} />
+      <Route path="/metodologia" element={<PublicInfoPage />} />
       <Route path="/contact" element={<PublicInfoPage />} />
       <Route path="/privacy" element={<PublicInfoPage />} />
       <Route

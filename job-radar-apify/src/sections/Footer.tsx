@@ -29,6 +29,8 @@ const resourceLinks: FooterLink[] = [
   { label: "Empresas", href: "/empresas", icon: <svg {...iconProps} stroke="#9c7518"><path d="M3 21h18M5 21V7l7-4 7 4v14" /></svg> },
   { label: "API y agentes", href: "/docs", icon: <svg {...iconProps} stroke="#9c7518"><path d="M8 9l-4 3 4 3M16 9l4 3-4 3" /></svg> },
   { label: "Acerca de", href: "/about", icon: <svg {...iconProps} stroke="#9c7518"><circle cx="12" cy="12" r="9" /><path d="M12 8h.01M11 12h1v4h1" /></svg> },
+  { label: "Metodología", href: "/metodologia", icon: <svg {...iconProps} stroke="#9c7518"><path d="M4 6h16M4 12h10M4 18h6" /><path d="M17 15l2 2 3-4" /></svg> },
+  { label: "Contacto", href: "/contact", icon: <svg {...iconProps} stroke="#9c7518"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 7l9 6 9-6" /></svg> },
   { label: "Opiniones y ayuda", href: "/opiniones", icon: <svg {...iconProps} stroke="#9c7518"><path d="M21 12a8 8 0 01-11.6 7.1L4 20l1-4.6A8 8 0 1121 12z" /></svg> }
 ];
 

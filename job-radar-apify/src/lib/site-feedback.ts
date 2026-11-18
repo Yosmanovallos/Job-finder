@@ -15,6 +15,9 @@ export const PROBLEM_CATEGORIES = [
   { id: "no-carga", label: "No cargó la página" },
   { id: "busqueda", label: "La búsqueda dio error" },
   { id: "vacante", label: "Una oferta no abre o ya cerró" },
+  // adsense-readiness SP-19: a visible way to flag a scam or a job that
+  // asks for money, reachable from every job page.
+  { id: "sospechosa", label: "Una oferta parece falsa o pide dinero" },
   { id: "lento", label: "Va muy lento" },
   { id: "cuenta", label: "Problema con mi cuenta" },
   { id: "otro", label: "Otra cosa" }
