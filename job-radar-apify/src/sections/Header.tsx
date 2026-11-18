@@ -7,7 +7,7 @@ import { Link, useLocation } from "react-router-dom";
 import ChevronDown from "lucide-react/dist/esm/icons/chevron-down.mjs";
 import Check from "lucide-react/dist/esm/icons/check.mjs";
 import { useAuth } from "../auth/auth-provider.js";
-import { PAYWALL_ENABLED } from "../config.js";
+import { GUIDES_ENABLED, PAYWALL_ENABLED } from "../config.js";
 import { FlagIcon } from "../components/FlagIcon.js";
 import { getEffectiveCountry, setStoredCountry, isVePrefixed } from "../lib/country-context.js";
 
@@ -21,6 +21,7 @@ function getNavLinks(isVenezuela: boolean) {
     { label: "Cómo funciona", to: "/como-funciona" },
     { label: "Empresas", to: isVenezuela ? "/ve/empresas" : "/empresas" },
     ...(PAYWALL_ENABLED ? [{ label: "Precios", to: "/pricing" }] : []),
+    ...(GUIDES_ENABLED ? [{ label: "Guías", to: "/guias" }] : []),
     { label: "Preguntas", to: "/preguntas" }
   ];
 }

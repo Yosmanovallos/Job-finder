@@ -19,7 +19,7 @@ import {
   isCountryScopedUnprefixed,
   isVePrefixed
 } from "./lib/country-context.js";
-import { PAYWALL_ENABLED } from "./config.js";
+import { GUIDES_ENABLED, PAYWALL_ENABLED } from "./config.js";
 import { AuthProvider } from "./auth/auth-provider.js";
 import { SavedJobsProvider } from "./lib/saved-jobs.js";
 import RequireAuth from "./auth/require-auth.js";
@@ -46,6 +46,9 @@ const Legal = lazy(() => import("./sections/Legal.js"));
 const Account = lazy(() => import("./sections/Account.js"));
 const PublicInfoPage = lazy(() => import("./sections/PublicInfoPage.js"));
 const Opiniones = lazy(() => import("./sections/Opiniones.js"));
+// /guias (adsense-readiness F3): only routed while GUIDES_ENABLED is on.
+const GuidesIndex = lazy(() => import("./sections/Guides.js").then((module) => ({ default: module.GuidesIndex })));
+const GuidePage = lazy(() => import("./sections/Guides.js").then((module) => ({ default: module.GuidePage })));
 
 function Landing() {
   // "/" (Colombia, default) vs "/ve" (Venezuela) — same pattern as
@@ -147,6 +150,8 @@ function AppRoutes() {
       <Route path="/metodologia" element={<PublicInfoPage />} />
       <Route path="/contact" element={<PublicInfoPage />} />
       <Route path="/privacy" element={<PublicInfoPage />} />
+      {GUIDES_ENABLED ? <Route path="/guias" element={<GuidesIndex />} /> : null}
+      {GUIDES_ENABLED ? <Route path="/guias/:slug" element={<GuidePage />} /> : null}
       <Route
         path="/cuenta"
         element={

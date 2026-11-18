@@ -96,7 +96,14 @@ export function magnetoRowToJob(row: MagnetoRow): Job | null {
     jobId: String(row.id),
     title: htmlEntities(row.title),
     company: row.confidential ? 'Confidencial' : htmlEntities(row.companyName || 'Confidencial'),
-    location: htmlEntities(row.isRemote ? 'Remoto' : cities.join(', ') || 'Colombia'),
+    // isRemote is not read. On Magneto it is the "Remoto / híbrido en: {ciudad}"
+    // checkbox — remote OR hybrid, never which — and it is ticked on plainly
+    // on-site postings too (confirmed live 2026-11-15: a fibre lineman/driver
+    // in Cartagena). Reading it as "Remoto" hid the real city and labeled
+    // ~360 active jobs remote. The location is the cities Magneto states; the
+    // modality comes from the title, or stays "Sin especificar"
+    // (job-modality.ts).
+    location: htmlEntities(cities.join(', ') || 'Colombia'),
     url: `${ORIGIN}/co/empleos/${row.jobSlug}`,
     dateText: '',
     source: 'Magneto',

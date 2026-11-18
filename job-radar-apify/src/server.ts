@@ -186,6 +186,10 @@ import {
 import { isAdEligibleListing, markAdEligible } from "./lib/ad-eligibility.js";
 import { renderJobPageHtml } from "./lib/job-page-render.js";
 import { isExcludedFromGoogleIndex, thirdPartyExcerptEnabled } from "./lib/third-party-excerpt.js";
+import { getPublishedGuides } from "./server/guides-store.js";
+import { guidesSitemapEntries, handleGuidesRoute, isGuidesRoute, relatedGuidesSnippet } from "./server/routes/guides.js";
+import { guideTagsForHub, guideTagsForJob } from "./lib/guides.js";
+import { classifyModality } from "./lib/job-modality.js";
 import { withServerText } from "./lib/route-server-text.js";
 
 dotenv.config();
@@ -856,6 +860,20 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
   // Curated company/portal favicons, same-origin (see logo-proxy.ts).
   if (isLogoRoute(pathname)) {
     await handleLogoRoute(req, res, { pathname, method });
+    return;
+  }
+
+  // /guias editorial layer (adsense-readiness F3): its own module, no DB,
+  // no job cache. Every /guias path is a real 404 while GUIDES_ENABLED is
+  // off or no guide carries the owner's approval.
+  if (isGuidesRoute(pathname)) {
+    await handleGuidesRoute(req, res, {
+      pathname,
+      method,
+      guides: getPublishedGuides(),
+      loadIndexHtml: async () => (await readStaticFile(path.join(PUBLIC_DIR, "index.html"))).toString("utf8"),
+      sendBody
+    });
     return;
   }
 
@@ -1866,8 +1884,11 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
         ? `<section data-intent-answer aria-label="${escapeHtml(intentAnswer.heading)}">${renderIntentAnswerHtml(intentAnswer)}</section>\n`
         : "";
       const hubIntentLinksHtml = renderHubIntentLinksHtml(hubIntentLinks);
-      const ssrSnippet = `<h1>${escapeHtml(meta.heading)}</h1>\n${intentAnswerHtml}${emptyNotice}${overviewHtml}${newTodayHtml}${statsHtml}${jobsHeading}<nav aria-label="Vacantes"><ul>\n${items}\n</ul></nav>${relatedCitiesHtml}${hubIntentLinksHtml}`;
+      // adsense-readiness F3: 2–3 related guides (static tag mapping, no query).
+      const hubGuides = relatedGuidesSnippet(getPublishedGuides(), guideTagsForHub(category), pathname);
+      const ssrSnippet = `<h1>${escapeHtml(meta.heading)}</h1>\n${intentAnswerHtml}${emptyNotice}${overviewHtml}${newTodayHtml}${statsHtml}${jobsHeading}<nav aria-label="Vacantes"><ul>\n${items}\n</ul></nav>${relatedCitiesHtml}${hubIntentLinksHtml}${hubGuides.html}`;
       indexHtml = indexHtml.replace('<div id="app"></div>', () => `<div id="app">${ssrSnippet}</div>`);
+      if (hubGuides.head) indexHtml = indexHtml.replace("</head>", () => `${hubGuides.head}</head>`);
 
       // Same fix /dashboard already had (Fase 1, §5.4) applied here too —
       // CategoryLanding.tsx previously always re-fetched /api/jobs on
@@ -2123,7 +2144,9 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     const publicJob = session ? null : (await attachReputation([visible]).catch(() => [visible]))[0];
     // Ads only on the employer's own vacancy; a copy from another job
     // board is replicated content (adsense-readiness PP-4).
-    indexHtml = renderJobPageHtml(indexHtml, { job: visible, publicJob, related, companyJobs });
+    // adsense-readiness F3: 2–3 related guides (static tag mapping, no query).
+    const guides = relatedGuidesSnippet(getPublishedGuides(), guideTagsForJob({ modality: classifyModality(visible) }), pathname);
+    indexHtml = renderJobPageHtml(indexHtml, { job: visible, publicJob, related, companyJobs, guides });
 
     await sendBody(req, res, 200, { "Content-Type": "text/html; charset=utf-8" }, indexHtml);
     return;
@@ -2682,7 +2705,8 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       "https://buscotrabajo.co/sitemap-pages.xml",
       "https://buscotrabajo.co/sitemap-jobs.xml",
       "https://buscotrabajo.co/sitemap-jobs-recent.xml",
-      "https://buscotrabajo.co/sitemap-categories.xml"
+      "https://buscotrabajo.co/sitemap-categories.xml",
+      ...guidesSitemapEntries(getPublishedGuides())
     ]);
     await sendBody(req, res, 200, { "Content-Type": "application/xml; charset=utf-8" }, xml);
     return;

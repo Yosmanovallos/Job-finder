@@ -36,6 +36,8 @@ export interface JobPageInput {
   publicJob: SeoJob | null;
   related: RelatedJobLink[];
   companyJobs: CompanyJobsBlock | null;
+  /** adsense-readiness F3: «Guías relacionadas» body block and its head payload. */
+  guides?: { html: string; head: string };
 }
 
 export function renderJobPageHtml(
@@ -56,7 +58,7 @@ export function renderJobPageHtml(
   let html = injectJobPageContent(shell, {
     appHtml:
       `${renderJobBreadcrumbHtml(visible, cityHub)}${buildJobPageBody(publicJob ?? visible)}` +
-      `${companyJobs ? renderCompanyJobsHtml(companyJobs) : ""}${renderRelatedJobsHtml(cityHub, related)}`,
+      `${companyJobs ? renderCompanyJobsHtml(companyJobs) : ""}${renderRelatedJobsHtml(cityHub, related)}${input.guides?.html ?? ""}`,
     links: { jobId: visible.jobId, related, ...(companyJobs ? { company: companyJobs } : {}) },
     breadcrumb: buildJobBreadcrumbList(visible, cityHub),
     payload: publicJob ? buildJobPagePayload(publicJob) : null,
@@ -64,6 +66,7 @@ export function renderJobPageHtml(
     jobPosting
   });
   html = injectJobHeadMeta(html, buildJobMeta(visible));
+  if (input.guides?.head) html = html.replace("</head>", () => `${input.guides!.head}</head>`);
   // Ads only on the employer's own vacancy; a copy from another job
   // board is replicated content (adsense-readiness PP-4).
   if (isAdEligibleJobPage(visible, Boolean(googleReady && jobPosting))) html = markAdEligible(html);

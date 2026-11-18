@@ -143,15 +143,76 @@ anterior. **No se pulsa «Solicitar revisión» antes de F6.**
 
 ## F3 — Guías
 
-- [ ] Pruebas que fallan primero: ADS-040…ADS-049 (rutas, JSON-LD, autor,
-      fuentes obligatorias, sin párrafos repetidos, 404 con el interruptor)
-- [ ] `/guias` y `/guias/:slug` renderizadas en el servidor
-- [ ] Lista de 12 temas desde el estudio de palabras clave (#121), aprobada
-      por el propietario
+> Infraestructura en `codex/adsense-guides` (2026-11-14), apagada
+> (`GUIDES_ENABLED = false` en `src/config.ts`). Sin guías firmadas,
+> `/guias*` es un 404 real y no aparece en el sitemap ni en el menú.
+
+- [x] Pruebas que fallan primero: `tests/validate-guides.test.ts` (ADS-040:
+      rutas, JSON-LD `Article`, autor, fechas, fuentes obligatorias, sin
+      párrafos repetidos, ≥ 800 palabras, revisión del propietario, 404 y
+      sitemap con el interruptor), en la suite `unit`
+- [x] `/guias` y `/guias/:slug` renderizadas en el servidor
+      (`src/server/routes/guides.ts`): texto completo en el HTML inicial,
+      Markdown con `Accept: text/markdown`, `/api/guias` para la navegación
+      del cliente, marcador de anuncios solo en la guía publicada (el índice
+      es navegación, PP-3)
+- [x] Contenido en `content/guias/*.md` con validador
+      (`src/lib/guides.ts`, formato en `content/guias/README.md`)
+- [x] `sitemap-guides.xml` en el índice del sitemap solo con guías publicadas
+- [x] «Guías» en menú y pie detrás de `GUIDES_ENABLED`; «Guías
+      relacionadas» (máx. 3, mapeo estático de etiquetas, sin consultas) en
+      hubs y vacantes
+- [x] Lista de 12 temas desde el estudio de palabras clave (#121), aprobada
+      por el propietario el 2026-11-14 (`f3-temas-propuestos.md`)
+- [x] Autor y firmante: «Equipo de BuscoTrabajo» (Organization), decidido
+      por el propietario el 2026-11-14 (D3)
 - [ ] 12 guías: borrador → verificación de cada fuente → dato propio del
       corpus con fecha de corte → revisión y firma (D3)
-- [ ] «Guías» en menú y pie; enlaces desde hubs y vacantes
-- [ ] Sitemap, `llms.txt` y catálogo actualizados
+  - [x] Borradores 1–5 (remoto, sin experiencia, APE del SENA, medio tiempo
+        y fines de semana, temporada), normas leídas en el Gestor Normativo
+        de Función Pública y en los portales oficiales; datos en
+        `f3-datos-corpus-2026-11-14.md`. `secretariasenado.gov.co` no
+        respondió desde este entorno, por eso se cita Función Pública
+  - [x] Firma del propietario de las guías 1–5 (2026-11-14). Aprobadas y
+        sin publicar: `publicada` se fija en el commit de salida
+  - [x] Borradores 6–12 (tipos de contrato, prestaciones, periodo de
+        prueba, liquidación, ofertas falsas, hoja de vida, entrevista),
+        2026-11-14; revisión en `f3-revision-guias-6-12.md`
+  - [x] Firma del propietario de las guías 6–12 (2026-11-14). Las 12
+        están aprobadas y sin publicar
+- [x] Publicación escalonada (decisión del propietario 2026-11-14): cada
+      guía aparece sola en su fecha `publicada` (hora de Colombia); 4 el día
+      del encendido y luego 2 por semana (`scripts/schedule-guides.ts`)
+- [x] `scripts/check-guide-figures.ts`: vuelve a medir las cifras del corpus
+      de cada guía (páginas públicas y API pública con pausas)
+- [x] `llms.txt` lista `/guias` solo con el interruptor encendido
+- [x] Prueba HTTP `tests/validate-guides-http.ts` en `test:seo`, para los dos
+      estados del interruptor. Verificado en local con el interruptor
+      encendido y fechas de prueba (sin commit de ese estado)
+- [x] SEO antes del encendido (2026-11-18): `BreadcrumbList` (Inicio › Guías ›
+      guía) en cada guía e `ItemList` + `BreadcrumbList` en `/guias`; `<title>`
+      de 60 caracteres o menos con `titulo_seo` (el H1 conserva `titulo`; el
+      validador rechaza títulos más largos); `indexnow:submit` añade las guías
+      publicadas o actualizadas en la ventana y `/guias` (vacío con el interruptor
+      apagado). Sin imagen social propia por guía: se usa la general del sitio
+- [ ] **Día del encendido** (después de mergear #136 y #137):
+  1. `npx tsx scripts/check-guide-figures.ts` y actualizar en cada guía las
+     cifras que cambiaron y su `corte`. Con la cuota de la API agotada,
+     esperar al día siguiente
+  2. `npx tsx scripts/schedule-guides.ts --start <fecha real> --write`
+  3. `GUIDES_ENABLED = true` en `src/config.ts`
+  4. `tsc`, `build`, `test:unit`, `test:job-render`, `test:agent-readiness`,
+     `test:seo`, `test:baseline`
+  5. Desplegar; comprobar en producción `/guias`, una guía, el sitemap y un
+     hub; `/seo drift compare` de un hub y una vacante (bloque nuevo
+     «Guías relacionadas»)
+  6. Enviar `sitemap-guides.xml` en Search Console (acción del propietario)
+- [ ] Al encender: `test:seo` y `test:baseline` con la bandera activa y una
+      guía de prueba, para cubrir la inyección en hubs y vacantes de
+      `server.ts`, el índice del sitemap y que la ruta del payload coincida
+      con `location.pathname` en vacantes con slug o tildes
+- [ ] `llms.txt` y catálogo con `/guias` cuando esté encendido (no antes:
+      anunciaría un 404)
 - [ ] Calendario: 2 guías por semana después de la primera docena
 - **Gate:** CX-1, CX-3, AV-4 en CUMPLE; `original_pages` ≥ 20
 
