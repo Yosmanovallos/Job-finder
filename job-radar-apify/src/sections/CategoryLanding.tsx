@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import RelatedGuides from "../components/RelatedGuides.js";
 import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
 import { CategoryJobRow } from "../components/CategoryJobRow.js";
 import { ContentCta } from "../components/ContentPage.js";
@@ -504,6 +505,7 @@ export default function CategoryLanding() {
               </ul>
             </nav>
           )}
+          <RelatedGuides className="max-w-[1240px] w-full mx-auto px-4 md:px-6 pb-8 md:pb-12" />
           <ContentCta to={dashboardPath} />
         </>
       )}
