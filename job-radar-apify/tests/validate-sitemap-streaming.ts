@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
 import http from "node:http";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
 import { Pool } from "pg";
 import { maskLockedFields } from "../src/db/job-repository.js";
@@ -15,7 +15,19 @@ const baseUrl = `http://127.0.0.1:${port}`;
 const pool = new Pool({ connectionString: process.env.TEST_DATABASE_URL, max: 1 });
 
 function startServer(): ChildProcess {
-  return spawn(process.execPath, ["--max-old-space-size=192", ...process.execArgv, path.join(root, "src/server.ts")], {
+  // Test-only: --expose-gc + the preload make /api/health report memory after
+  // a full GC, so the heap budget below measures retained memory instead of
+  // whenever V8 happened to collect last. Production never loads either.
+  const forceGcPreload = pathToFileURL(path.join(root, "tests/force-gc-memory-usage.mjs")).href;
+  const args = [
+    "--max-old-space-size=192",
+    ...process.execArgv,
+    "--expose-gc",
+    "--import",
+    forceGcPreload,
+    path.join(root, "src/server.ts")
+  ];
+  return spawn(process.execPath, args, {
     cwd: process.cwd(),
     env: { ...process.env, PORT: String(port) },
     shell: false,
@@ -152,6 +164,11 @@ try {
   const hotXml = await hotResponse.text();
   assert.equal(hotXml, coldXml);
   const afterHot = await healthMemory();
+  // Readings are post-GC (see startServer): the 64 MB budget bounds what the
+  // process RETAINS after streaming (mainly the last-good sitemap cache). A
+  // transient buffer released before the reading is bounded instead by the
+  // 192 MB old-space cap (the server would crash) and by the RSS budget, whose
+  // reading keeps the pre-GC RSS when it is higher.
   const peakHeapGrowth = Math.max(afterCold.heapUsed, afterHot.heapUsed) - before.heapUsed;
   const peakRss = Math.max(afterCold.rss, afterHot.rss);
   const renderFreeMemoryBytes = 512 * 1024 * 1024;
