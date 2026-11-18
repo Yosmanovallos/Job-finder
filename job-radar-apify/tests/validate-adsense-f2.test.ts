@@ -233,3 +233,12 @@ test("ADS-039 D1(b) needs its ADR before the flag is turned on", () => {
   }
   assert.match(adr, /no se enciende/i, "the ADR says the flag stays off until it is accepted");
 });
+
+test("ADS-032 job page carries the «Guías relacionadas» block (F3) after the related jobs", () => {
+  const name = goldenCases[0]!.name;
+  const guides = { html: '<nav aria-label="Guías relacionadas" data-related-guides><h2>Guías relacionadas</h2></nav>', head: "  <script>window.__SSR_GUIDE_LINKS__={};</script>" };
+  const html = render(name, OFF, { guides });
+  assert.ok(appHtml(html).includes("data-related-guides"), "guides block in the raw HTML body");
+  assert.ok(html.indexOf("__SSR_GUIDE_LINKS__") > 0 && html.indexOf("__SSR_GUIDE_LINKS__") < html.indexOf("</head>"), "guide payload in <head>");
+  assert.equal(render(name, OFF), golden(name), "without guides the page stays byte-identical to the golden");
+});
