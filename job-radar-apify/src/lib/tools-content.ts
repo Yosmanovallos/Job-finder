@@ -69,7 +69,7 @@ export const LIQUIDATION_EXAMPLE_INPUT = {
   contractType: "fijo",
   startDate: `${LABOR_VALUES_YEAR}-01-01`,
   endDate: `${LABOR_VALUES_YEAR}-06-30`,
-  termination: "renuncia",
+  termination: "vencimiento",
   vacationDaysTaken: 0
 } as const;
 
@@ -89,9 +89,9 @@ function liquidationExampleParagraphs(): string[] {
   const r = liquidationExample();
   const line = (key: string) => r.lines.find((item) => item.key === key)!;
   return [
-    `Una persona gana el salario mínimo (${P(SMMLV)}) con auxilio de transporte, trabajó del 1 de enero al 30 de junio de ${LABOR_VALUES_YEAR} con contrato a término fijo, renunció y no tomó vacaciones. Son ${r.days.total} días, y la base de prima y cesantías es ${P(r.prestacionesBase)} (salario más auxilio).`,
+    `Una persona gana el salario mínimo (${P(SMMLV)}) con auxilio de transporte, trabajó del 1 de enero al 30 de junio de ${LABOR_VALUES_YEAR} con un contrato a término fijo de seis meses que terminó al cumplirse el plazo, y no tomó vacaciones. Son ${r.days.total} días, y la base de prima y cesantías es ${P(r.prestacionesBase)} (salario más auxilio).`,
     `Prima: ${line("prima").formula} = ${P(line("prima").amount)}. Cesantías: ${line("cesantias").formula} = ${P(line("cesantias").amount)}. Intereses: ${line("intereses").formula} = ${P(line("intereses").amount)}. Vacaciones: ${r.days.total} días × 15 ÷ 360 = ${r.vacationDaysPending.toLocaleString("es-CO")} días pendientes; ${line("vacaciones").formula} = ${P(line("vacaciones").amount)}.`,
-    `Total estimado: ${P(r.total)}, más el salario de los días trabajados que aún no te hayan pagado. Como renunció, no hay indemnización.`
+    `Total estimado: ${P(r.total)}, más el salario de los días trabajados que aún no te hayan pagado. Como el contrato terminó por vencimiento del plazo, no hay indemnización.`
   ];
 }
 
@@ -160,7 +160,7 @@ export const LIQUIDATION_TOOL: ToolPage = {
         "Supone un salario fijo y jornada completa. Si recibes comisiones, horas extra o recargos frecuentes, la base de la prima y las cesantías se calcula de otra forma y el resultado puede cambiar.",
         "No suma el salario de los días trabajados que aún no te han pagado, ni descuentos como préstamos o anticipos. Agrégalos tú al revisar la liquidación.",
         "No calcula la indemnización por mora del art. 65 del CST, que aplica cuando el empleador no paga a tiempo los salarios y prestaciones al terminar el contrato.",
-        "La reforma laboral (Ley 2466 de 2025) no cambió los artículos del Código que usa esta calculadora (64, 132, 186, 189, 249 y 306). Sí confirmó que en los contratos a término fijo y por obra o labor se pagan vacaciones y prestaciones en proporción al tiempo trabajado, cualquiera que sea (art. 6)."
+        "La reforma laboral (Ley 2466 de 2025) no modificó ni derogó de forma expresa los artículos del Código que usa esta calculadora (64, 132, 186, 189, 249 y 306). Sí confirmó que en los contratos a término fijo y por obra o labor se pagan vacaciones y prestaciones en proporción al tiempo trabajado, cualquiera que sea (art. 6)."
       ]
     },
     sourcesSection(["minimumWage", "minimumWageTransitory", "transportAllowance", "laborCode", "severanceInterest", "proportionalVacation", "laborReform", "transportInPrestaciones", "days360"])
