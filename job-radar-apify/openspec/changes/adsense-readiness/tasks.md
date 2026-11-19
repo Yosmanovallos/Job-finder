@@ -6,7 +6,7 @@ anterior. **No se pulsa «Solicitar revisión» antes de F6.**
 ## Decisiones previas (propietario)
 
 - [ ] D1 vacantes de terceros: (a) completas sin anuncios / (b) extracto
-- [ ] D2 nombre y rol del responsable para «Acerca de»
+- [x] D2 nombre y rol del responsable para «Acerca de» (2026-11-18: LinkedIn del propietario)
 - [ ] D3 quién revisa y firma las guías
 - [ ] D4 correo con dominio propio
 - [ ] D5 activar el mensaje de consentimiento (CMP) en AdSense
@@ -66,7 +66,9 @@ anterior. **No se pulsa «Solicitar revisión» antes de F6.**
 
 ### F1c — pendiente de datos del propietario
 
-- [ ] «Acerca de» con responsable real: nombre y rol (D2)
+- [x] «Acerca de» con responsable real (D2, propietario 2026-11-18): sección «Quién está
+      detrás de BuscoTrabajo» con nombre, ciudad, perfil profesional y enlace a su LinkedIn,
+      solo con datos de su perfil público. Prueba ADS-021
 - [ ] Correo con dominio propio (D4)
 - [ ] Actualizar `llms.txt`, API Catalog, docs y digests con las rutas reales
 - [ ] lint, typecheck, `test:unit`, `test:integration`, `test:baseline`

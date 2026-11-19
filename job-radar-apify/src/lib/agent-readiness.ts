@@ -121,6 +121,19 @@ export const PUBLIC_PAGES: Record<string, PublicContent> = {
         ]
       },
       {
+        // adsense-readiness F1c (D2, owner 2026-11-18): the real person behind
+        // the site, taken from the owner's own public LinkedIn profile.
+        heading: "Quién está detrás de BuscoTrabajo",
+        paragraphs: [
+          "BuscoTrabajo lo fundó y lo desarrolla Yosman Andres Ovallos Melo, desde Medellín, Colombia. Es ingeniero de calidad de software (QA) con certificación ISTQB, especializado en automatización de pruebas, y también es ingeniero civil.",
+          "Esa experiencia en pruebas de software es la base del servicio: las reglas que se explican en la metodología (vigencia, duplicados, prioridad del portal oficial y retiro de vacantes) las aplica el sistema de forma automática y están cubiertas por pruebas del propio proyecto."
+        ],
+        links: [
+          { label: "Perfil de Yosman Ovallos en LinkedIn", href: "https://www.linkedin.com/in/yosmanovallos/" },
+          { label: "Contacto", href: "/contact" }
+        ]
+      },
+      {
         heading: "Límites y responsabilidad",
         paragraphs: [
           "Las ofertas provienen de terceros y pueden cambiar, cerrar o dejar de estar disponibles. BuscoTrabajo verifica vigencia dentro de su proceso, pero la fuente original es la referencia final para requisitos, salario, ubicación, fechas y formulario de aplicación.",
