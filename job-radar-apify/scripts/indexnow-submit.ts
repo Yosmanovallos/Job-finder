@@ -19,6 +19,7 @@ import { queryRecentSeoReadyJobs } from "../src/db/job-repository.js";
 import { buildJobUrl, isPubliclyDescribable } from "../src/lib/job-seo.js";
 import { buildIndexNowPayload, submitIndexNow, INDEXNOW_KEY_LOCATION } from "../src/lib/indexnow.js";
 import { RECENT_SITEMAP_WINDOW_HOURS } from "../src/lib/recent-jobs.js";
+import { isExcludedFromGoogleIndex } from "../src/lib/third-party-excerpt.js";
 import { SITE_ORIGIN } from "../src/lib/agent-readiness.js";
 import { colombiaToday, guideUrlsChangedSince } from "../src/lib/guides.js";
 import { getPublishedGuides } from "../src/server/guides-store.js";
@@ -43,7 +44,9 @@ async function main() {
   // inside the same window. Empty while GUIDES_ENABLED is off.
   const sinceDay = colombiaToday(new Date(Date.now() - hours * 3_600_000));
   const guideUrls = guideUrlsChangedSince(getPublishedGuides(), sinceDay, SITE_ORIGIN);
-  const payload = buildIndexNowPayload([...guideUrls, ...jobs.filter(isPubliclyDescribable).map((job) => buildJobUrl(job))]);
+  // D1(b) (adsense-readiness F2, off by default): excerpted third-party copies are noindex.
+  const jobUrls = jobs.filter((job) => isPubliclyDescribable(job) && !isExcludedFromGoogleIndex(job)).map((job) => buildJobUrl(job));
+  const payload = buildIndexNowPayload([...guideUrls, ...jobUrls]);
   const result = await submitIndexNow(payload, { execute, fetch: execute ? fetch : undefined });
   console.log(
     JSON.stringify({

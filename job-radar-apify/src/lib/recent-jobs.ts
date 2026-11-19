@@ -31,6 +31,8 @@ export interface RecentReadyJob {
   isLocked: boolean;
   /** Real content-change time; NULL for legacy rows (then <lastmod> is omitted). */
   contentUpdatedAt: string | Date | null;
+  /** Provenance for D1(b) (adsense-readiness F2); absent where it is not needed. */
+  source?: string | null;
 }
 
 export interface NewTodayLink {

@@ -11,6 +11,7 @@
  * render the same links from the same functions.
  */
 import { getCountryConfig } from "../countries/index.js";
+import { jobStaleReason } from "./job-freshness.js";
 import { SITE_URL, buildCategoryPath, buildCategoryUrl, buildJobPath, buildJobUrl, cityHubPlaces, escapeHtml, type ResolvedCategory } from "./job-seo.js";
 
 /** City hubs list their first 60 jobs (server.ts). Sharing it keeps one cache entry per city. */
@@ -72,23 +73,73 @@ export function stableHash(value: string): number {
 }
 
 /**
+ * CX-9 (adsense-readiness F2): the rows of a cached listing page that are
+ * still live by the shared freshness rule. Listing queries already filter
+ * with liveJobSql(), but a stale-while-revalidate entry can outlive a row's
+ * 30-day limit (or its validThrough, when the row carries it) by hours, and
+ * a hub must not link a page that already answers 410. Returns a new array;
+ * the cached one is never mutated. An archived row that is still young can't
+ * be told apart here; the next cache refresh drops it.
+ */
+export function liveListingJobs<T extends { publishedAt?: string | Date | null; validThrough?: string | Date | null }>(
+  jobs: readonly T[],
+  now: Date = new Date()
+): T[] {
+  return jobs.filter((job) => jobStaleReason(job.publishedAt, job.validThrough, now) === null);
+}
+
+// Words that say nothing about the role ("Analista de Datos" ~ "Analista de Cartera" by "analista").
+const ROLE_STOPWORDS = new Set(["de", "del", "la", "las", "el", "los", "en", "y", "e", "o", "u", "para", "con", "por", "a", "al", "sin", "the", "and", "of", "for"]);
+
+function roleTokens(title: string): Set<string> {
+  return new Set(
+    foldCityText(title)
+      .split(/[^a-z0-9]+/)
+      .filter((token) => token.length > 1 && !ROLE_STOPWORDS.has(token))
+  );
+}
+
+/** Jaccard overlap of the role words of two titles, 0..1. */
+function roleProximity(a: Set<string>, b: Set<string>): number {
+  if (a.size === 0 || b.size === 0) return 0;
+  let shared = 0;
+  for (const token of a) if (b.has(token)) shared++;
+  return shared / (a.size + b.size - shared);
+}
+
+/**
  * Up to `limit` other jobs from the hub's own list, starting at an offset
  * derived from this job's id: siblings share link equity instead of every
  * page pointing at the same newest postings. Only public fields.
+ *
+ * With the current job's `title` (CX-5, adsense-readiness F2) the same
+ * candidates are ranked by role proximity first, so a cook's page and an
+ * analyst's page in one city no longer repeat one identical block; ties
+ * keep the id-derived rotation. The number of links never changes.
  */
 export function pickRelatedJobs(
   jobId: string,
   candidates: Array<{ jobId: string; title: string; company?: string | null; location?: string | null; url?: string | null }>,
-  limit = RELATED_JOBS_LIMIT
+  limit = RELATED_JOBS_LIMIT,
+  title?: string
 ): RelatedJobLink[] {
-  const pool = candidates.filter(
+  const eligible = candidates.filter(
     (job) => job.jobId !== jobId && job.title && job.company && job.location && job.url
   );
-  if (pool.length === 0) return [];
-  const start = stableHash(jobId) % pool.length;
+  if (eligible.length === 0) return [];
+  const start = stableHash(jobId) % eligible.length;
+  const rotated = eligible.map((_, i) => eligible[(start + i) % eligible.length]);
+  let pool = rotated;
+  if (title) {
+    const own = roleTokens(title);
+    pool = rotated
+      .map((job, order) => ({ job, order, score: roleProximity(own, roleTokens(job.title)) }))
+      .sort((a, b) => b.score - a.score || a.order - b.order)
+      .map((entry) => entry.job);
+  }
   const picked: RelatedJobLink[] = [];
   for (let i = 0; i < Math.min(limit, pool.length); i++) {
-    const job = pool[(start + i) % pool.length];
+    const job = pool[i];
     picked.push({
       path: buildJobPath({ jobId: job.jobId, title: job.title, location: job.location ?? null }),
       title: job.title,

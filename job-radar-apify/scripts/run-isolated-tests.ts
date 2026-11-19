@@ -46,6 +46,7 @@ const suites: Record<string, string[]> = {
     "validate-page-meta.test.ts",
     "validate-adsense-readiness.test.ts",
     "validate-guides.test.ts",
+    "validate-adsense-f2.test.ts",
     "validate-source-closure.test.ts",
     "validate-job-freshness.test.ts",
     "validate-company-identity.test.ts",
@@ -114,6 +115,7 @@ const suites: Record<string, string[]> = {
   seo: ["validate-seo-job-pages.ts", "validate-job-page-blocks.ts", "validate-intent-pages.ts", "validate-guides-http.ts"],
   "intent-bench": ["bench-intent-pages.ts"],
   "intent-drift": ["drift-intent-pages.ts"],
+  "adsense-drift": ["drift-adsense-f2.ts"],
   "job-page-blocks": ["validate-job-page-blocks.ts", "validate-job-page-blocks.test.ts"],
   companies: ["validate-company-identity.test.ts", "validate-companies-search.ts"],
   home: ["validate-home-stats.ts"],
@@ -131,7 +133,7 @@ const selection = process.argv[2] || "unit";
 const offline = selection === "unit" || selection === "job-render";
 if (!Object.hasOwn(suites, selection) || process.argv.slice(3).some((arg) => arg !== "--dry-run")) {
   throw new Error(
-    "[P0] Suite inválida. Usa unit, integration, intent-bench, intent-drift, job-render, sitemap, observability, pagination, modality, seo, companies, home, baseline, agent-readiness, job-seo, job-page-blocks, source-closure, job-freshness o direct; --dry-run es opcional."
+    "[P0] Suite inválida. Usa unit, integration, intent-bench, intent-drift, adsense-drift, job-render, sitemap, observability, pagination, modality, seo, companies, home, baseline, agent-readiness, job-seo, job-page-blocks, source-closure, job-freshness o direct; --dry-run es opcional."
   );
 }
 

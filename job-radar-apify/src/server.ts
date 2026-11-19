@@ -96,13 +96,6 @@ import {
   escapeHtml,
   escapeJsonForScriptTag,
   isPubliclyDescribable,
-  buildJobMeta,
-  injectJobHeadMeta,
-  injectJobPageContent,
-  buildJobPosting,
-  buildJobPageBody,
-  buildJobPagePayload,
-  isGoogleEligiblePage,
   buildJobPath,
   buildJobSitemapEntry,
   JOBS_SITEMAP_HEADER,
@@ -134,17 +127,15 @@ import {
 } from "./lib/job-seo.js";
 import {
   CITY_HUB_PAGE_LIMIT,
-  buildJobBreadcrumbList,
+  RELATED_JOBS_LIMIT,
   cityHubFilters,
+  liveListingJobs,
   pickRelatedJobs,
-  renderJobBreadcrumbHtml,
-  renderRelatedJobsHtml,
   resolveJobCityHub
 } from "./lib/job-internal-links.js";
 import {
   buildCompanyJobsBlock,
   companyJobsScope,
-  renderCompanyJobsHtml,
   type CompanyJobsScope,
   type CompanyJobsSnapshot
 } from "./lib/job-company-links.js";
@@ -192,7 +183,9 @@ import {
   isBlocked,
   recordSuspiciousEvent
 } from "./lib/security-monitor.js";
-import { isAdEligibleJobPage, isAdEligibleListing, markAdEligible } from "./lib/ad-eligibility.js";
+import { isAdEligibleListing, markAdEligible } from "./lib/ad-eligibility.js";
+import { renderJobPageHtml } from "./lib/job-page-render.js";
+import { isExcludedFromGoogleIndex, thirdPartyExcerptEnabled } from "./lib/third-party-excerpt.js";
 import { getPublishedGuides } from "./server/guides-store.js";
 import { guidesSitemapEntries, handleGuidesRoute, isGuidesRoute, relatedGuidesSnippet } from "./server/routes/guides.js";
 import { guideTagsForHub, guideTagsForJob } from "./lib/guides.js";
@@ -616,7 +609,7 @@ async function loadHomeStats(country: string): Promise<{ body: HomeData; complet
   ]);
   const jobs = counts.status === "fulfilled" ? counts.value : null;
   const companyPage = companies.status === "fulfilled" ? companies.value : null;
-  const latest = jobs ? maskLockedFields(jobs.latestJobs, "free") : [];
+  const latest = jobs ? liveListingJobs(maskLockedFields(jobs.latestJobs, "free")) : [];
   const body: HomeData = {
     totalJobs: jobs?.totalJobs ?? null,
     last7Days: jobs?.last7Days ?? null,
@@ -980,7 +973,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       return;
     }
     const result = await getIntentPage(intentFilters(intent), CITY_HUB_PAGE_LIMIT);
-    const jobs = maskLockedFields(result.jobs, "free").filter(isPubliclyDescribable);
+    const jobs = liveListingJobs(maskLockedFields(result.jobs, "free").filter(isPubliclyDescribable));
     const answer = isLegacyRemoteCopy(intent) ? null : buildIntentAnswer(intent, result.total, jobs);
     const newToday = buildNewTodayBlock(intent, jobs.map(toRecentReadyJob));
     await sendBody(
@@ -1158,7 +1151,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     const companyView = companyPage.view;
     const companyName = companyView.displayName;
     const matched = { jobs: companyPage.jobs, total: companyPage.total };
-    const page = maskLockedFields(matched.jobs, tier);
+    const page = liveListingJobs(maskLockedFields(matched.jobs, tier));
 
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(
@@ -1787,7 +1780,8 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
             offset: 0,
             includeDetails: false
           });
-      const page = maskLockedFields(matched.jobs, "free").filter(isPubliclyDescribable);
+      // CX-9: a cached page never links a row already past the freshness rule.
+      const page = liveListingJobs(maskLockedFields(matched.jobs, "free").filter(isPubliclyDescribable));
       const total = matched.total;
       // Intent pages only: the guard (total = Google-ready rows), the answer
       // block from the rows already loaded, and the sibling country's total
@@ -2105,24 +2099,28 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       return;
     }
 
-    const meta = buildJobMeta(visible);
     // Job SEO V2: USER_VISIBLE and GOOGLE_READY are separate. Every visible
     // job gets the same readable body with the source link in raw HTML; the
     // stored verdict of the shared gate (isGoogleEligiblePage) alone decides
     // robots and JobPosting — the same verdict the sitemap and the Indexing
-    // API read, so the four consumers can never disagree.
-    const googleReady = isGoogleEligiblePage(visible);
-    const jobPosting = googleReady ? buildJobPosting(visible) : null;
+    // API read, so the four consumers can never disagree. renderJobPageHtml()
+    // applies it (and D1(b), off by default: adsense-readiness F2).
     // Link the page back into its city hub (docs/SEO-JOB-LINK-GRAPH-2026-10-29.md).
     // Related jobs come only from the hub's already-cached first page: a cold
     // cache yields none now and warms in the background, never adding a
-    // Postgres round trip to this response.
+    // Postgres round trip to this response. Ranked by role proximity to this
+    // job (CX-5) and never past the freshness rule (CX-9).
     const cityHub = resolveJobCityHub(visible);
     const hubPage = cityHub
       ? peekJobsPage({ filters: cityHubFilters(cityHub), limit: CITY_HUB_PAGE_LIMIT, includeDetails: false })
       : undefined;
     const related = hubPage
-      ? pickRelatedJobs(visible.jobId, maskLockedFields(hubPage.jobs, "free").filter(isPubliclyDescribable))
+      ? pickRelatedJobs(
+          visible.jobId,
+          liveListingJobs(maskLockedFields(hubPage.jobs, "free").filter(isPubliclyDescribable)),
+          RELATED_JOBS_LIMIT,
+          visible.title
+        )
       : [];
     // B1: the employer's other vacancies, peeked like the hub above — never
     // a query this response waits for, never for a placeholder employer.
@@ -2144,23 +2142,11 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     // optional enrichment may fail without making an otherwise healthy
     // vacancy unavailable.
     const publicJob = session ? null : (await attachReputation([visible]).catch(() => [visible]))[0];
-    // adsense-readiness F3: 2–3 related guides (static tag mapping, no query).
-    const jobGuides = relatedGuidesSnippet(getPublishedGuides(), guideTagsForJob({ modality: classifyModality(visible) }), pathname);
-    indexHtml = injectJobPageContent(indexHtml, {
-      appHtml:
-        `${renderJobBreadcrumbHtml(visible, cityHub)}${buildJobPageBody(publicJob ?? visible)}` +
-        `${companyJobs ? renderCompanyJobsHtml(companyJobs) : ""}${renderRelatedJobsHtml(cityHub, related)}${jobGuides.html}`,
-      links: { jobId: visible.jobId, related, ...(companyJobs ? { company: companyJobs } : {}) },
-      breadcrumb: buildJobBreadcrumbList(visible, cityHub),
-      payload: publicJob ? buildJobPagePayload(publicJob) : null,
-      noindex: !googleReady || !jobPosting,
-      jobPosting
-    });
-    indexHtml = injectJobHeadMeta(indexHtml, meta);
-    if (jobGuides.head) indexHtml = indexHtml.replace("</head>", () => `${jobGuides.head}</head>`);
     // Ads only on the employer's own vacancy; a copy from another job
     // board is replicated content (adsense-readiness PP-4).
-    if (isAdEligibleJobPage(visible, Boolean(googleReady && jobPosting))) indexHtml = markAdEligible(indexHtml);
+    // adsense-readiness F3: 2–3 related guides (static tag mapping, no query).
+    const guides = relatedGuidesSnippet(getPublishedGuides(), guideTagsForJob({ modality: classifyModality(visible) }), pathname);
+    indexHtml = renderJobPageHtml(indexHtml, { job: visible, publicJob, related, companyJobs, guides });
 
     await sendBody(req, res, 200, { "Content-Type": "text/html; charset=utf-8" }, indexHtml);
     return;
@@ -2434,7 +2420,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     // Never link a job in the visible SSR list that wouldn't also render
     // for the same anonymous visitor — same filter the sitemap/category
     // branches already apply.
-    const page = maskLockedFields(matched.jobs, "free").filter(isPubliclyDescribable);
+    const page = liveListingJobs(maskLockedFields(matched.jobs, "free").filter(isPubliclyDescribable));
 
     const reputation = companyView.reputation;
     const meta = buildCompanyMeta(companyName, matched.total, requestCountry);
@@ -2794,6 +2780,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     };
     try {
       let wroteEntry = false;
+      const excerptEnabled = thirdPartyExcerptEnabled();
       await streamCanonicalSitemapJobs({
         signal: controller.signal,
         limit: 50_000,
@@ -2807,6 +2794,8 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
           await write(JOBS_SITEMAP_HEADER);
         },
         onJob: async (job) => {
+          // D1(b), off by default: a third-party copy shown as an excerpt is noindex.
+          if (isExcludedFromGoogleIndex(job, excerptEnabled)) return;
           const [visibleJob] = maskLockedFields([job], "free");
           const entry = buildJobSitemapEntry({
             ...visibleJob,
@@ -2864,7 +2853,9 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       res.end("Sitemap temporalmente no disponible.");
       return;
     }
+    const excerptEnabled = thirdPartyExcerptEnabled();
     const entries = recent
+      .filter((job) => !isExcludedFromGoogleIndex(job, excerptEnabled))
       .map((job) => buildJobSitemapEntry(job))
       .filter((entry): entry is string => entry !== null);
     await sendBody(
@@ -3264,7 +3255,7 @@ async function loadEmpleosIndexPayload(country: EmpleosIndexCountry): Promise<Em
   try {
     const firstPage = await getJobsPage({ filters: { country }, limit: 24, offset: 0, includeDetails: true });
     total = firstPage.total;
-    jobs = maskLockedFields(firstPage.jobs, "free")
+    jobs = liveListingJobs(maskLockedFields(firstPage.jobs, "free"))
       .filter(isPubliclyDescribable)
       .slice(0, EMPLEOS_INDEX_JOB_LIMIT)
       .map((job) => toEmpleosIndexJob(job, country));

@@ -1473,6 +1473,9 @@ async function runHttpTests() {
       const html = await archivedRes.text();
       check(archivedRes.status === 410 && html.includes('content="noindex"') && !html.includes('application/ld+json') && !html.includes('outbound_apply'),
         "Archivo sin cola responde 410/noindex sin JobPosting ni postulación.", "Archivo sin cola no respondió honestamente.");
+      // adsense-readiness ADS-035 (CX-9): a gone vacancy carries no ad loader at all.
+      check(!html.includes("adsbygoogle") && !html.includes('name="bt-ads"'),
+        "La vacante vencida (410) no lleva cargador ni marcador de anuncios.", "La vacante vencida (410) trae código de anuncios.");
       const apiRes = await fetch(`${BASE_URL}/api/jobs/${archivedId}`);
       check(apiRes.status === 404, "API no expone archivo privado.", `API archivo: ${apiRes.status}`);
     } finally { await pool.query(`DELETE FROM archived_jobs WHERE job_id = $1`, [archivedId]); }

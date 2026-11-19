@@ -75,16 +75,71 @@ anterior. **No se pulsa «Solicitar revisión» antes de F6.**
 
 ## F2 — Superficie copiada
 
-- [ ] Pruebas que fallan primero: ADS-030…ADS-039
-- [ ] Procedencia oficial / terceros expuesta a la capa de render
-- [ ] Vacante de terceros: sin script de anuncios (ya cubierto por F1) y
-      bloques propios visibles en el HTML inicial
-- [ ] D1(b) implementada detrás de `THIRD_PARTY_JOB_EXCERPT_ENABLED` (apagada)
-- [ ] ADR si se enciende D1(b) (enmienda al contrato JobPosting)
-- [ ] Vacante vencida: 404/410 real, sin enlaces entrantes desde hubs (CX-9)
-- [ ] «Más empleos en <ciudad>» ordenado por cercanía de cargo (CX-5)
-- [ ] `test:seo` y comparación de drift en 2 vacantes de cada procedencia
-- **Gate:** CX-4, CX-9, SP-11, SP-12, PP-4 en CUMPLE según la opción de D1
+> Hecho 2026-11-14 en `claude/adsense-f2-5c9a7f` (PR en borrador contra
+> `codex/adsense-readiness`). D1 = (a), la opción actual.
+
+- [x] Pruebas que fallan primero: `tests/validate-adsense-f2.test.ts`
+      (ADS-030…ADS-039, suite `unit`), escritas antes del código; fallaban
+      por los módulos inexistentes
+- [x] Procedencia: `jobProvenance()` en `src/lib/ad-eligibility.ts`
+      («Portal oficial» → `official`, el resto → `third_party`); la regla
+      de anuncios la usa. La composición de la página de vacante sale de
+      `server.ts` a `src/lib/job-page-render.ts` (`renderJobPageHtml()`),
+      probable sin red
+- [x] Vacante de terceros: sin marcador de anuncios y con los bloques
+      propios en el HTML inicial (miga, ficha, fuente nombrada, enlace al
+      original, reputación, otras vacantes de la empresa, «Más empleos en
+      <ciudad>») — ADS-032. Sin dato, el bloque no se pinta — ADS-033
+- [x] D1(b) detrás de `THIRD_PARTY_JOB_EXCERPT_ENABLED`, **apagada**
+      (`src/lib/third-party-excerpt.ts`): extracto ≤ 300 caracteres (prefijo
+      literal), sin requisitos, sin JobPosting, `noindex,follow`, el mismo
+      extracto en `__SSR_JOB__`, fuera de `sitemap-jobs.xml`,
+      `sitemap-jobs-recent.xml`, `URL_UPDATED` e IndexNow — ADS-034/035.
+      Con la bandera apagada (o con cualquier valor que no sea
+      `true`/`1`/`on`) el HTML de la vacante es byte a byte el de 449c981:
+      ADS-031 contra `tests/fixtures/job-page-golden/` (una vacante de
+      terceros y una oficial, generadas antes del cambio)
+- [x] ADR `docs/adr/0016-third-party-job-excerpt.md` en **borrador**,
+      requisito antes de encender la bandera (enmienda al contrato
+      JobPosting; abierto: `/api/jobs/:id` se queda completo) — ADS-039
+- [x] Vacante vencida: ya respondía 410 real (archivada, purgada o vencida
+      en sitio) y 301 al portal oficial si fue reemplazada (ADR 0006, sin
+      tocar), sin el shell ni el cargador de anuncios; `test:seo` lo
+      comprueba ahora también (ADS-035). Enlaces: los hubs ya consultan con
+      `liveJobSql()`; además `liveListingJobs()` quita en el render las
+      filas de la caché que ya pasaron los 30 días (o su `validThrough`)
+      en hubs, intención, empresas, `/empleos`, portada y «Más empleos» —
+      ADS-036. Límite: una fila archivada aún joven dentro de una entrada
+      de caché no se detecta hasta que la caché se refresca; el bloque
+      «otras vacantes de la empresa» no trae fecha y no se filtra
+- [x] «Más empleos en <ciudad>» ordenado por cercanía de cargo (palabras
+      del título en común, desempate por el hash del id), mismo número de
+      enlaces — ADS-037
+- [x] `test:seo` en verde
+- [x] Drift local de la ruta real (2026-11-14, `npm run drift:adsense-f2`,
+      `tests/drift-adsense-f2.ts`): 449c981 y esta rama, uno tras otro,
+      contra la misma BD desechable con un hub sintético de Bogotá
+      (16 vacantes, 2 de «Portal oficial»). URLs: 2 vacantes oficiales,
+      2 de terceros (LinkedIn, Computrabajo), `/empleos/bogota`,
+      `sitemap-jobs.xml` y `sitemap-jobs-recent.xml`. Idénticos: status,
+      title, meta description, canonical, robots, H1, JSON-LD (los 4 con
+      JobPosting), `__SSR_JOB__`, marcador de anuncios (sí en las 2
+      oficiales, no en las 2 de terceros), el cuerpo de `#app` fuera de
+      «Más empleos», `__SSR_JOB_LINKS__` fuera de `related`, el hub y los
+      dos sitemaps. **Única diferencia:** la lista de «Más empleos» de las
+      4 vacantes, con 6 enlaces en ambas versiones. Ejemplo: «Mesero» ahora
+      abre con «Mesero de Eventos» y sigue con la rotación anterior
+- [ ] `/seo drift compare` de 2 vacantes de cada procedencia en producción,
+      tras desplegar
+- [x] CX-5 sin perder variedad: en un hub sintético de 60 vacantes con
+      títulos repetidos, 37 listas distintas por rotación → 38 por cercanía;
+      hermanas con el mismo título siguen con listas distintas (ADS-037)
+- [ ] D1(b): API pública de agentes y `/api/jobs/:id` siguen con el texto
+      completo; quedan en «Abierto» del ADR 0016 (no afecta al gate con D1(a))
+- **Gate:** CX-4, CX-9, SP-11, SP-12, PP-4 en CUMPLE con D1(a) — probado
+  por ADS-030…039 y `test:seo`; D1(b) implementada y apagada, con dos
+  consumidores abiertos en el ADR. Drift local de la ruta real hecho;
+  falta el de producción tras desplegar
 
 ## F3 — Guías
 
