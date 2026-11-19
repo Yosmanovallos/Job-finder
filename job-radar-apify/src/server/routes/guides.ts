@@ -33,6 +33,7 @@ import {
   type SsrGuideLinks
 } from "../../lib/guides.js";
 import type { SendBody } from "./agent-readiness.js";
+import { toolLinksForGuide } from "../../lib/tools-content.js";
 
 // /guias, /guias/:slug, /api/guias[/:slug] and /sitemap-guides.xml
 // (adsense-readiness F3, ADS-040). Kept out of server.ts's dashboard paths:
@@ -73,8 +74,15 @@ export function renderGuidePageHtml(indexHtml: string, guide: Guide): string {
   const byline = `<p data-guide-byline>Por ${escapeHtml(meta.autor)} · Publicada el <time datetime="${meta.publicada}">${formatSpanishDate(meta.publicada)}</time>` +
     ` · Actualizada el <time datetime="${modified}">${formatSpanishDate(modified)}</time>` +
     ` · Revisada por ${escapeHtml(meta.revisado_por)} el ${formatSpanishDate(meta.fecha_revision)}</p>`;
+  const toolLinks = toolLinksForGuide(meta.slug);
+  // adsense-readiness F5: «Haz la cuenta» block, added by render code so the signed prose stays untouched.
+  const toolsHtml = toolLinks.length
+    ? `<nav aria-label="Herramientas relacionadas" data-guide-tools><h2>Haz la cuenta con tus datos</h2><ul>` +
+      toolLinks.map((tool) => `<li><a href="${tool.path}">${escapeHtml(tool.name)}</a>: ${escapeHtml(tool.summary)}</li>`).join("") +
+      `</ul></nav>`
+    : "";
   const appHtml = `<article data-guide="${escapeHtml(meta.slug)}"><nav aria-label="Ruta"><a href="${GUIDES_BASE_PATH}">Guías</a></nav>` +
-    `<h1>${escapeHtml(meta.titulo)}</h1>\n${byline}\n${renderGuideBodyHtml(guide)}</article>`;
+    `<h1>${escapeHtml(meta.titulo)}</h1>\n${byline}\n${renderGuideBodyHtml(guide)}${toolsHtml}</article>`;
   let html = withApp(indexHtml, content, appHtml);
   html = html.replace(/<meta[^>]*property=["']og:type["'][^>]*>/, () => `<meta property="og:type" content="article" />`);
   html = appendToHead(html,

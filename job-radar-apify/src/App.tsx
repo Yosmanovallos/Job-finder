@@ -49,6 +49,10 @@ const Opiniones = lazy(() => import("./sections/Opiniones.js"));
 // /guias (adsense-readiness F3): only routed while GUIDES_ENABLED is on.
 const GuidesIndex = lazy(() => import("./sections/Guides.js").then((module) => ({ default: module.GuidesIndex })));
 const GuidePage = lazy(() => import("./sections/Guides.js").then((module) => ({ default: module.GuidePage })));
+// /herramientas calculators (adsense-readiness F5).
+const ToolsIndex = lazy(() => import("./sections/Tools.js").then((module) => ({ default: module.ToolsIndex })));
+const LiquidationToolPage = lazy(() => import("./sections/Tools.js").then((module) => ({ default: module.LiquidationToolPage })));
+const NetSalaryToolPage = lazy(() => import("./sections/Tools.js").then((module) => ({ default: module.NetSalaryToolPage })));
 
 function Landing() {
   // "/" (Colombia, default) vs "/ve" (Venezuela) — same pattern as
@@ -152,6 +156,9 @@ function AppRoutes() {
       <Route path="/privacy" element={<PublicInfoPage />} />
       {GUIDES_ENABLED ? <Route path="/guias" element={<GuidesIndex />} /> : null}
       {GUIDES_ENABLED ? <Route path="/guias/:slug" element={<GuidePage />} /> : null}
+      <Route path="/herramientas" element={<ToolsIndex />} />
+      <Route path="/herramientas/calculadora-de-liquidacion" element={<LiquidationToolPage />} />
+      <Route path="/herramientas/calculadora-salario-neto" element={<NetSalaryToolPage />} />
       <Route
         path="/cuenta"
         element={

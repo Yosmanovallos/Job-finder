@@ -10,7 +10,8 @@ anterior. **No se pulsa «Solicitar revisión» antes de F6.**
 - [ ] D3 quién revisa y firma las guías
 - [ ] D4 correo con dominio propio
 - [ ] D5 activar el mensaje de consentimiento (CMP) en AdSense
-- [ ] D6 incluir una calculadora antes de la primera solicitud
+- [x] D6 incluir una calculadora antes de la primera solicitud: sí, las dos
+      (liquidación y salario neto), aprobado por el propietario el 2026-11-18
 
 ## F0 — Línea base y auditor
 
@@ -172,10 +173,34 @@ anterior. **No se pulsa «Solicitar revisión» antes de F6.**
 
 ## F5 — Herramientas (según D6)
 
-- [ ] Pruebas que fallan primero: casos resueltos a mano por fórmula
-- [ ] Calculadora de liquidación y de salario neto, con norma citada
-- [ ] Valores anuales en un archivo con fuente y fecha
-- [ ] «Herramientas» en menú y pie
+> Hecho en `claude/adsense-f5-calculadoras-04ac33` (2026-11-18), en PR y
+> sin desplegar.
+
+- [x] Pruebas que fallan primero: casos resueltos a mano por fórmula
+      (`tests/validate-labor-calculators.test.ts`, suite `unit`): contratos
+      de 6 meses, 6,5 meses y 3,5 años; salario mínimo con y sin auxilio;
+      auxilio en el borde de 2 SMMLV; salario integral (y su mínimo de 13
+      SMMLV); renuncia, justa causa, vencimiento y despido sin justa causa en
+      fijo, obra (mínimo 15 días) e indefinido (umbral de 10 SMMLV);
+      vacaciones pendientes; tramos del fondo de solidaridad con sus bordes;
+      fechas sin zona horaria; entradas fuera de alcance rechazadas
+- [x] Calculadora de liquidación y de salario neto, con norma citada:
+      `/herramientas/calculadora-de-liquidacion` y
+      `/herramientas/calculadora-salario-neto`, explicación completa en el
+      HTML inicial, cálculo en el navegador sin envío ni almacenamiento
+      (prueba de privacidad), JSON-LD `WebApplication` + `BreadcrumbList`,
+      marcador de anuncios en las calculadoras y no en `/herramientas`
+- [x] Valores anuales en un archivo con fuente y fecha
+      (`src/lib/labor-values.ts`); cada valor leído en `.gov.co` el
+      2026-11-18, citas en `f5-fuentes-calculadoras.md`. La Ley 2466 de 2025
+      no modifica los artículos usados (64, 132, 186, 189, 249, 306)
+- [x] «Herramientas» en menú y pie; sitemap y `llms.txt`; enlaces con las
+      guías de liquidación y prestaciones (bloque de render en la guía y
+      «Guías relacionadas» solo con guías publicadas)
+- [ ] Retención en la fuente: no se calcula (fórmula y UVT 2026 sin
+      verificar); la página lo explica
+- [ ] Tras desplegar: `/seo drift compare` de una calculadora, IndexNow de
+      las 3 URLs y medir `original_pages`/`original_words` con el auditor F0
 - **Gate:** AV-4 reforzada; `original_pages` ≥ 40, `original_words` ≥ 30.000
 
 ## F6 — Gate final y solicitud

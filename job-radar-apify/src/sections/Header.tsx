@@ -22,6 +22,9 @@ function getNavLinks(isVenezuela: boolean) {
     { label: "Empresas", to: isVenezuela ? "/ve/empresas" : "/empresas" },
     ...(PAYWALL_ENABLED ? [{ label: "Precios", to: "/pricing" }] : []),
     ...(GUIDES_ENABLED ? [{ label: "Guías", to: "/guias" }] : []),
+    // Desktop bar shows it from xl up: five links don't fit at 1024–1279 px.
+    // Below xl it stays in the mobile menu and the footer.
+    { label: "Herramientas", to: "/herramientas", wideOnly: true },
     { label: "Preguntas", to: "/preguntas" }
   ];
 }
@@ -218,9 +221,9 @@ export default function Header() {
 
   const isActive = (to: string) => location.pathname === to || location.pathname.startsWith(`${to}/`);
   const ghostButton =
-    "ink-card-sm ink-lift inline-flex h-11 items-center justify-center rounded-xl bg-white px-4 text-sm font-bold text-foreground no-underline";
+    "ink-card-sm ink-lift inline-flex h-11 shrink-0 items-center justify-center whitespace-nowrap rounded-xl bg-white px-3 xl:px-4 text-sm font-bold text-foreground no-underline";
   const ctaButton =
-    "ink-card-sm ink-lift inline-flex h-11 items-center justify-center rounded-xl bg-gold-2 px-5 text-sm font-bold text-[#2a1d06] no-underline";
+    "ink-card-sm ink-lift inline-flex h-11 shrink-0 items-center justify-center whitespace-nowrap rounded-xl bg-gold-2 px-4 xl:px-5 text-sm font-bold text-[#2a1d06] no-underline";
 
   // Same look as the rest of the redesign: ink outline, hard offset shadows,
   // gold call to action. Height stays 64px: the dashboard's sticky search
@@ -242,7 +245,7 @@ export default function Header() {
               key={link.to}
               to={link.to}
               aria-current={isActive(link.to) ? "page" : undefined}
-              className={`flex h-11 items-center rounded-full px-4 text-[15px] font-semibold no-underline transition-colors focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gold-1/60 ${
+              className={`${"wideOnly" in link && link.wideOnly ? "hidden xl:flex" : "flex"} h-11 shrink-0 items-center whitespace-nowrap rounded-full px-2 xl:px-4 text-[15px] font-semibold no-underline transition-colors focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-gold-1/60 ${
                 isActive(link.to) ? "bg-green-soft text-primary" : "text-[#3d413e] hover:bg-[#f4f5f2] hover:text-foreground"
               }`}
             >
