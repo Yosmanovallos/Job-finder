@@ -6,7 +6,7 @@ anterior. **No se pulsa «Solicitar revisión» antes de F6.**
 ## Decisiones previas (propietario)
 
 - [ ] D1 vacantes de terceros: (a) completas sin anuncios / (b) extracto
-- [ ] D2 nombre y rol del responsable para «Acerca de»
+- [x] D2 nombre y rol del responsable para «Acerca de» (2026-11-18: LinkedIn del propietario)
 - [ ] D3 quién revisa y firma las guías
 - [ ] D4 correo con dominio propio
 - [ ] D5 activar el mensaje de consentimiento (CMP) en AdSense
@@ -66,7 +66,9 @@ anterior. **No se pulsa «Solicitar revisión» antes de F6.**
 
 ### F1c — pendiente de datos del propietario
 
-- [ ] «Acerca de» con responsable real: nombre y rol (D2)
+- [x] «Acerca de» con responsable real (D2, propietario 2026-11-18): sección «Quién está
+      detrás de BuscoTrabajo» con nombre, ciudad, perfil profesional y enlace a su LinkedIn,
+      solo con datos de su perfil público. Prueba ADS-021
 - [ ] Correo con dominio propio (D4)
 - [ ] Actualizar `llms.txt`, API Catalog, docs y digests con las rutas reales
 - [ ] lint, typecheck, `test:unit`, `test:integration`, `test:baseline`
@@ -75,28 +77,144 @@ anterior. **No se pulsa «Solicitar revisión» antes de F6.**
 
 ## F2 — Superficie copiada
 
-- [ ] Pruebas que fallan primero: ADS-030…ADS-039
-- [ ] Procedencia oficial / terceros expuesta a la capa de render
-- [ ] Vacante de terceros: sin script de anuncios (ya cubierto por F1) y
-      bloques propios visibles en el HTML inicial
-- [ ] D1(b) implementada detrás de `THIRD_PARTY_JOB_EXCERPT_ENABLED` (apagada)
-- [ ] ADR si se enciende D1(b) (enmienda al contrato JobPosting)
-- [ ] Vacante vencida: 404/410 real, sin enlaces entrantes desde hubs (CX-9)
-- [ ] «Más empleos en <ciudad>» ordenado por cercanía de cargo (CX-5)
-- [ ] `test:seo` y comparación de drift en 2 vacantes de cada procedencia
-- **Gate:** CX-4, CX-9, SP-11, SP-12, PP-4 en CUMPLE según la opción de D1
+> Hecho 2026-11-14 en `claude/adsense-f2-5c9a7f` (PR en borrador contra
+> `codex/adsense-readiness`). D1 = (a), la opción actual.
+
+- [x] Pruebas que fallan primero: `tests/validate-adsense-f2.test.ts`
+      (ADS-030…ADS-039, suite `unit`), escritas antes del código; fallaban
+      por los módulos inexistentes
+- [x] Procedencia: `jobProvenance()` en `src/lib/ad-eligibility.ts`
+      («Portal oficial» → `official`, el resto → `third_party`); la regla
+      de anuncios la usa. La composición de la página de vacante sale de
+      `server.ts` a `src/lib/job-page-render.ts` (`renderJobPageHtml()`),
+      probable sin red
+- [x] Vacante de terceros: sin marcador de anuncios y con los bloques
+      propios en el HTML inicial (miga, ficha, fuente nombrada, enlace al
+      original, reputación, otras vacantes de la empresa, «Más empleos en
+      <ciudad>») — ADS-032. Sin dato, el bloque no se pinta — ADS-033
+- [x] D1(b) detrás de `THIRD_PARTY_JOB_EXCERPT_ENABLED`, **apagada**
+      (`src/lib/third-party-excerpt.ts`): extracto ≤ 300 caracteres (prefijo
+      literal), sin requisitos, sin JobPosting, `noindex,follow`, el mismo
+      extracto en `__SSR_JOB__`, fuera de `sitemap-jobs.xml`,
+      `sitemap-jobs-recent.xml`, `URL_UPDATED` e IndexNow — ADS-034/035.
+      Con la bandera apagada (o con cualquier valor que no sea
+      `true`/`1`/`on`) el HTML de la vacante es byte a byte el de 449c981:
+      ADS-031 contra `tests/fixtures/job-page-golden/` (una vacante de
+      terceros y una oficial, generadas antes del cambio)
+- [x] ADR `docs/adr/0016-third-party-job-excerpt.md` en **borrador**,
+      requisito antes de encender la bandera (enmienda al contrato
+      JobPosting; abierto: `/api/jobs/:id` se queda completo) — ADS-039
+- [x] Vacante vencida: ya respondía 410 real (archivada, purgada o vencida
+      en sitio) y 301 al portal oficial si fue reemplazada (ADR 0006, sin
+      tocar), sin el shell ni el cargador de anuncios; `test:seo` lo
+      comprueba ahora también (ADS-035). Enlaces: los hubs ya consultan con
+      `liveJobSql()`; además `liveListingJobs()` quita en el render las
+      filas de la caché que ya pasaron los 30 días (o su `validThrough`)
+      en hubs, intención, empresas, `/empleos`, portada y «Más empleos» —
+      ADS-036. Límite: una fila archivada aún joven dentro de una entrada
+      de caché no se detecta hasta que la caché se refresca; el bloque
+      «otras vacantes de la empresa» no trae fecha y no se filtra
+- [x] «Más empleos en <ciudad>» ordenado por cercanía de cargo (palabras
+      del título en común, desempate por el hash del id), mismo número de
+      enlaces — ADS-037
+- [x] `test:seo` en verde
+- [x] Drift local de la ruta real (2026-11-14, `npm run drift:adsense-f2`,
+      `tests/drift-adsense-f2.ts`): 449c981 y esta rama, uno tras otro,
+      contra la misma BD desechable con un hub sintético de Bogotá
+      (16 vacantes, 2 de «Portal oficial»). URLs: 2 vacantes oficiales,
+      2 de terceros (LinkedIn, Computrabajo), `/empleos/bogota`,
+      `sitemap-jobs.xml` y `sitemap-jobs-recent.xml`. Idénticos: status,
+      title, meta description, canonical, robots, H1, JSON-LD (los 4 con
+      JobPosting), `__SSR_JOB__`, marcador de anuncios (sí en las 2
+      oficiales, no en las 2 de terceros), el cuerpo de `#app` fuera de
+      «Más empleos», `__SSR_JOB_LINKS__` fuera de `related`, el hub y los
+      dos sitemaps. **Única diferencia:** la lista de «Más empleos» de las
+      4 vacantes, con 6 enlaces en ambas versiones. Ejemplo: «Mesero» ahora
+      abre con «Mesero de Eventos» y sigue con la rotación anterior
+- [ ] `/seo drift compare` de 2 vacantes de cada procedencia en producción,
+      tras desplegar
+- [x] CX-5 sin perder variedad: en un hub sintético de 60 vacantes con
+      títulos repetidos, 37 listas distintas por rotación → 38 por cercanía;
+      hermanas con el mismo título siguen con listas distintas (ADS-037)
+- [ ] D1(b): API pública de agentes y `/api/jobs/:id` siguen con el texto
+      completo; quedan en «Abierto» del ADR 0016 (no afecta al gate con D1(a))
+- **Gate:** CX-4, CX-9, SP-11, SP-12, PP-4 en CUMPLE con D1(a) — probado
+  por ADS-030…039 y `test:seo`; D1(b) implementada y apagada, con dos
+  consumidores abiertos en el ADR. Drift local de la ruta real hecho;
+  falta el de producción tras desplegar
 
 ## F3 — Guías
 
-- [ ] Pruebas que fallan primero: ADS-040…ADS-049 (rutas, JSON-LD, autor,
-      fuentes obligatorias, sin párrafos repetidos, 404 con el interruptor)
-- [ ] `/guias` y `/guias/:slug` renderizadas en el servidor
-- [ ] Lista de 12 temas desde el estudio de palabras clave (#121), aprobada
-      por el propietario
+> Infraestructura en `codex/adsense-guides` (2026-11-14), apagada
+> (`GUIDES_ENABLED = false` en `src/config.ts`). Sin guías firmadas,
+> `/guias*` es un 404 real y no aparece en el sitemap ni en el menú.
+
+- [x] Pruebas que fallan primero: `tests/validate-guides.test.ts` (ADS-040:
+      rutas, JSON-LD `Article`, autor, fechas, fuentes obligatorias, sin
+      párrafos repetidos, ≥ 800 palabras, revisión del propietario, 404 y
+      sitemap con el interruptor), en la suite `unit`
+- [x] `/guias` y `/guias/:slug` renderizadas en el servidor
+      (`src/server/routes/guides.ts`): texto completo en el HTML inicial,
+      Markdown con `Accept: text/markdown`, `/api/guias` para la navegación
+      del cliente, marcador de anuncios solo en la guía publicada (el índice
+      es navegación, PP-3)
+- [x] Contenido en `content/guias/*.md` con validador
+      (`src/lib/guides.ts`, formato en `content/guias/README.md`)
+- [x] `sitemap-guides.xml` en el índice del sitemap solo con guías publicadas
+- [x] «Guías» en menú y pie detrás de `GUIDES_ENABLED`; «Guías
+      relacionadas» (máx. 3, mapeo estático de etiquetas, sin consultas) en
+      hubs y vacantes
+- [x] Lista de 12 temas desde el estudio de palabras clave (#121), aprobada
+      por el propietario el 2026-11-14 (`f3-temas-propuestos.md`)
+- [x] Autor y firmante: «Equipo de BuscoTrabajo» (Organization), decidido
+      por el propietario el 2026-11-14 (D3)
 - [ ] 12 guías: borrador → verificación de cada fuente → dato propio del
       corpus con fecha de corte → revisión y firma (D3)
-- [ ] «Guías» en menú y pie; enlaces desde hubs y vacantes
-- [ ] Sitemap, `llms.txt` y catálogo actualizados
+  - [x] Borradores 1–5 (remoto, sin experiencia, APE del SENA, medio tiempo
+        y fines de semana, temporada), normas leídas en el Gestor Normativo
+        de Función Pública y en los portales oficiales; datos en
+        `f3-datos-corpus-2026-11-14.md`. `secretariasenado.gov.co` no
+        respondió desde este entorno, por eso se cita Función Pública
+  - [x] Firma del propietario de las guías 1–5 (2026-11-14). Aprobadas y
+        sin publicar: `publicada` se fija en el commit de salida
+  - [x] Borradores 6–12 (tipos de contrato, prestaciones, periodo de
+        prueba, liquidación, ofertas falsas, hoja de vida, entrevista),
+        2026-11-14; revisión en `f3-revision-guias-6-12.md`
+  - [x] Firma del propietario de las guías 6–12 (2026-11-14). Las 12
+        están aprobadas y sin publicar
+- [x] Publicación escalonada (decisión del propietario 2026-11-14): cada
+      guía aparece sola en su fecha `publicada` (hora de Colombia); 4 el día
+      del encendido y luego 2 por semana (`scripts/schedule-guides.ts`)
+- [x] `scripts/check-guide-figures.ts`: vuelve a medir las cifras del corpus
+      de cada guía (páginas públicas y API pública con pausas)
+- [x] `llms.txt` lista `/guias` solo con el interruptor encendido
+- [x] Prueba HTTP `tests/validate-guides-http.ts` en `test:seo`, para los dos
+      estados del interruptor. Verificado en local con el interruptor
+      encendido y fechas de prueba (sin commit de ese estado)
+- [x] SEO antes del encendido (2026-11-18): `BreadcrumbList` (Inicio › Guías ›
+      guía) en cada guía e `ItemList` + `BreadcrumbList` en `/guias`; `<title>`
+      de 60 caracteres o menos con `titulo_seo` (el H1 conserva `titulo`; el
+      validador rechaza títulos más largos); `indexnow:submit` añade las guías
+      publicadas o actualizadas en la ventana y `/guias` (vacío con el interruptor
+      apagado). Sin imagen social propia por guía: se usa la general del sitio
+- [ ] **Día del encendido** (después de mergear #136 y #137):
+  1. `npx tsx scripts/check-guide-figures.ts` y actualizar en cada guía las
+     cifras que cambiaron y su `corte`. Con la cuota de la API agotada,
+     esperar al día siguiente
+  2. `npx tsx scripts/schedule-guides.ts --start <fecha real> --write`
+  3. `GUIDES_ENABLED = true` en `src/config.ts`
+  4. `tsc`, `build`, `test:unit`, `test:job-render`, `test:agent-readiness`,
+     `test:seo`, `test:baseline`
+  5. Desplegar; comprobar en producción `/guias`, una guía, el sitemap y un
+     hub; `/seo drift compare` de un hub y una vacante (bloque nuevo
+     «Guías relacionadas»)
+  6. Enviar `sitemap-guides.xml` en Search Console (acción del propietario)
+- [ ] Al encender: `test:seo` y `test:baseline` con la bandera activa y una
+      guía de prueba, para cubrir la inyección en hubs y vacantes de
+      `server.ts`, el índice del sitemap y que la ruta del payload coincida
+      con `location.pathname` en vacantes con slug o tildes
+- [ ] `llms.txt` y catálogo con `/guias` cuando esté encendido (no antes:
+      anunciaría un 404)
 - [ ] Calendario: 2 guías por semana después de la primera docena
 - **Gate:** CX-1, CX-3, AV-4 en CUMPLE; `original_pages` ≥ 20
 
@@ -195,6 +313,16 @@ ninguna página.
       repetir F6
 - [ ] Al aprobar: archivar el cambio y abrir uno nuevo para la colocación
       de anuncios
+
+## Backlog (no implementar todavía)
+
+- [ ] Interruptor por fuente (propietario 2026-11-18): retirar de la web todas
+      las vacantes de una fuente (por ejemplo LinkedIn) con un cambio de
+      configuración de minutos, sin borrar datos ni tocar la ingesta, para el
+      caso de que una fuente pida salir. Debe cubrir páginas de vacante (410 o
+      noindex según ADR), listados, hubs, sitemap, IndexNow, API pública y
+      conteos. Hoy todas las fuentes tienen permiso; guardar esos permisos por
+      escrito.
 
 ## No se toca
 

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import RelatedGuides from "../components/RelatedGuides.js";
 import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
 import { JobDetailPanel } from "../components/JobDetailPanel.js";
 import { PaywallCard } from "../components/PaywallCard.js";
@@ -247,6 +248,10 @@ export default function JobLanding() {
               Ver todos los empleos en {cityHub.label}
             </Link>
           </section>
+        )}
+
+        {(state === "found" || state === "error") && job && !job.isLocked && (
+          <RelatedGuides className="ink-card mt-8 rounded-3xl bg-white p-6 md:p-8" />
         )}
       </div>
 
