@@ -1,5 +1,5 @@
 import { useLocation } from "react-router-dom";
-import { PUBLIC_PAGES } from "../lib/agent-readiness.js";
+import { PUBLIC_PAGES, type PublicContent } from "../lib/agent-readiness.js";
 import { usePageMeta } from "../lib/use-page-meta.js";
 import { TINTS } from "../lib/brand-tints.js";
 import { ContentCta, ContentSection, InkPanel, PageHero, PillLink } from "../components/ContentPage.js";
@@ -15,15 +15,17 @@ const EYEBROW: Record<string, string> = {
   "/privacy": "Privacidad"
 };
 
-export default function PublicInfoPage() {
+// `page`/`eyebrow` let the market reports (MarketReportPage) reuse this
+// layout with their server-computed content.
+export default function PublicInfoPage({ page: provided, eyebrow }: { page?: PublicContent; eyebrow?: string } = {}) {
   const { pathname } = useLocation();
-  const page = PUBLIC_PAGES[pathname] || PUBLIC_PAGES["/about"]!;
+  const page = provided || PUBLIC_PAGES[pathname] || PUBLIC_PAGES["/about"]!;
   usePageMeta({ title: page.title, description: page.description });
   const lastIsAlone = page.sections.length % 2 === 1;
 
   return (
     <div className="bg-white">
-      <PageHero eyebrow={EYEBROW[pathname] ?? "BuscoTrabajo"} heading={page.heading}>
+      <PageHero eyebrow={eyebrow ?? EYEBROW[pathname] ?? "BuscoTrabajo"} heading={page.heading}>
         {page.introduction.map((paragraph) => (
           <p key={paragraph}>{paragraph}</p>
         ))}

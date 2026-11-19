@@ -220,12 +220,77 @@ anterior. **No se pulsa «Solicitar revisión» antes de F6.**
 
 ## F4 — Datos propios
 
-- [ ] Pruebas que fallan primero: ADS-050…ADS-059
-- [ ] Informe mensual calculado por código, con metodología y límites
-- [ ] Párrafo comparativo propio en cada hub; hubs < 10 siguen sin indexar
-- [ ] Portada: secciones con cifra y contexto en lugar de listas de enlaces
-- [ ] Dashboard en frío y con URL única según el runbook
-- **Gate:** CX-2, CX-6, SP-2, SP-6, AV-1, AV-2 en CUMPLE
+Implementado el 2026-11-15 en `claude/adsense-f4-878771`, PR en borrador
+contra `codex/adsense-readiness`. Ver la nota «Implementado» de F4 en
+`design.md`: ediciones congeladas en el repositorio, sin consultas desde
+ninguna página.
+
+- [x] Pruebas que fallan primero: ADS-050…ADS-059 en
+      `tests/validate-market-report.test.ts` (suite `unit`). Se escribieron
+      antes del código: el primer commit tenía 050–055 en verde y 056–059 en
+      rojo. Integración: `tests/validate-market-report.ts` (suites
+      `integration`, `seo` y `market-report`)
+- [x] Informe mensual calculado por código (`src/lib/market-report.ts`):
+      vacantes por ciudad y por cargo, modalidad, cuota del portal oficial,
+      fuentes, empresas que más publican, cobertura y mediana de salario
+      publicado (mínimo 30 en una moneda), variación contra la edición
+      anterior («sin datos suficientes» mientras no exista), fecha de corte,
+      metodología (dentro del JSON) y límites. Solo agregados: grupos con
+      menos de 10 vacantes suprimidos; sin URL, id ni datos personales
+- [x] `scripts/build-market-report.ts`: una consulta acotada
+      (`queryMarketRows`) en `BEGIN READ ONLY` con `statement_timeout` de
+      60 s; `--dry-run` por defecto. La prueba de integración comprueba que
+      un `UPDATE` falla dentro de esa transacción y que el total coincide
+      con el de la portada
+- [x] Rutas: `/informes/empleo-colombia-AAAA-MM` (HTML con el texto
+      completo en el HTML inicial, Markdown y JSON), `/informes/empleo-colombia`
+      → 302 a la más reciente, `/informes` (200 `noindex` hasta la primera
+      edición). En `sitemap-pages.xml` desde la primera edición. Sin
+      marcador de anuncios. `REPORTS_ENABLED=false`: 404 real y fuera del
+      sitemap. «Informes» en el pie
+- [x] Párrafo comparativo propio en cada hub (`buildHubComparison`):
+      cuota frente al país, puesto entre ciudades o cargos, remoto y portal
+      oficial de la muestra frente al país, empresa con más ofertas. ADS-055
+      comprueba que no se repite entre hubs indexables
+- [x] Hubs simples con menos de 10 vacantes: `noindex,follow` (antes solo
+      con 0, SP-2) y fuera de `sitemap-categories.xml` cuando la edición más
+      reciente (de menos de 45 días) los cuenta por debajo de 10; sin
+      edición, el sitemap queda igual que hoy. Sin anuncios (ya lo hacía F1a)
+- [x] Portada: frase de contexto de las ciudades (cuota del país de las
+      tres primeras) y cuota por tarjeta en escritorio; cifra de cada cargo
+      con la fecha de corte de la edición; enlace al informe. No se quitó
+      ningún enlace (ADS-057)
+- [x] Verificación (2026-11-15): `tsc`, `npm run build`, `test:unit`,
+      `test:seo`, `test:job-render`, `test:agent-readiness`,
+      `test:companies-search` y `test:baseline` en verde
+- [x] En frío según el runbook (BD desechable, 9 procesos nuevos por lado,
+      alternados, URL única `?coldcheck=`; base `449c981` frente a la rama;
+      `npx tsx scripts/run-isolated-tests.ts home-cold`). Medianas:
+      primer `/` móvil 391 → 337 ms; `/` escritorio 44 → 48 ms; `/` en
+      caliente 17 → 18 ms; hub de Bogotá 52 → 51 ms; `/dashboard` 37 → 39 ms;
+      arranque hasta `/api/health` 591 → 483 ms; informe 11 ms. HTML de
+      `/` +2,6 KB y del hub +1,3 KB sin comprimir; JS inicial gzip
+      137,6 → 138,9 KB. Sin regresión: no hay consultas nuevas, cachés ni
+      precalentado nuevos; el caché y el precalentado del dashboard no cambian
+- [ ] **Propietario, requisito antes de desplegar a `main`:** generar la
+      primera edición de **ambos países** contra producción y hacer commit
+      de los JSON. Sin ellos: los hubs no muestran comparación (CX-6), la
+      portada no muestra cifras de cargos, el pie enlaza un `/informes`
+      vacío (señal de sección en construcción, PP-2) y los hubs pequeños
+      quedan `noindex` pero todavía en `sitemap-categories.xml` («URL
+      enviada marcada como noindex» en Search Console). Comandos:
+      `npx tsx scripts/build-market-report.ts --dry-run --country CO`,
+      revisar, `--write --country CO`; lo mismo con `--country VE`. Hacerlo
+      cerca del cierre de cada mes: volver a correrlo en el mismo mes
+      reescribe esa edición. Si pasan más de 45 días sin edición nueva, el
+      sitemap vuelve a listar todos los hubs (vuelve el mismo aviso)
+- [ ] Después del despliegue: `/seo drift compare` de un hub y de `/`, y
+      la comprobación en producción del runbook (URL única, `MISS`)
+- [ ] Posible seguimiento (no en esta fase): automatizar la edición
+      mensual con un cron o un Action que abra un PR con el JSON
+- **Gate:** CX-2, CX-6, SP-2, SP-6, AV-1 y AV-2 tienen cobertura de
+  pruebas. Quedan en CUMPLE en producción cuando exista la primera edición
+  (paso del propietario de arriba)
 
 ## F5 — Herramientas (según D6)
 

@@ -7,7 +7,8 @@ import { companyLinkProps } from "../lib/company-page-client.js";
 import { useAuth } from "../auth/auth-provider.js";
 import { jobDateLabel } from "../lib/job-date-label.js";
 import { formatCount, useHomeData, type HomeCompany, type HomeData } from "../lib/use-home-data.js";
-import { getHomeCities } from "../lib/home-stats.js";
+import { getHomeCities, HOME_POPULAR_ROLES } from "../lib/home-stats.js";
+import { buildHomeCityContext, homeRolesContext, homeShareLabel, MARKET_REPORT_INDEX_PATH } from "../lib/market-report.js";
 import { getHomeCityDiscovery } from "../lib/home-city-discovery.js";
 import { CompanyAvatar } from "../components/CompanyAvatar.js";
 import { getSourceColor } from "../lib/source-colors.js";
@@ -45,22 +46,6 @@ const FIGURE = "font-heading font-bold text-[34px] md:text-[56px] leading-none t
 const CONTAINER = "max-w-[1240px] w-full mx-auto px-4 md:px-6";
 const SECTION_Y = "py-10 md:py-16";
 
-// Role pages that exist in sitemap-categories.xml (DEFAULT_ROLES_200) —
-// labels slugify to exactly those URLs through buildCategoryPath.
-const POPULAR_ROLES = [
-  "Asesor comercial",
-  "Auxiliar administrativo",
-  "Auxiliar de enfermería",
-  "Ejecutivo de ventas",
-  "Contador público",
-  "Desarrollador full stack",
-  "Analista de logística",
-  "Cuidadora de adultos mayores",
-  "Diseñador gráfico",
-  "Ingeniero industrial",
-  "Community manager",
-  "Ingeniero civil"
-];
 
 function useCountUp(target: number | null, durationMs = 1600): number | null {
   const [value, setValue] = useState<number | null>(null);
@@ -461,7 +446,13 @@ function Explore({ country, data }: { country: string; data: HomeData }) {
   const cities = getHomeCities(country);
   const discovery = getHomeCityDiscovery(country === "VE" ? "VE" : "CO");
   const remoteCount = formatCount(data.remote);
-  const roles = POPULAR_ROLES;
+  const roles = HOME_POPULAR_ROLES;
+  // adsense-readiness F4 (SP-6): every block of links says what its figures
+  // mean. City shares come from the counts already shown; role counts from
+  // the newest frozen market report (absent: the chips stay as before).
+  const cityContext = buildHomeCityContext(data.cityCounts, data.totalJobs, countryConfig.name);
+  const roleCounts = data.market?.roleCounts ?? {};
+  const rolesContext = homeRolesContext(data.market);
 
   return (
     <section className={`sr-host order-6 ${CONTAINER} ${SECTION_Y}`}>
@@ -483,9 +474,11 @@ function Explore({ country, data }: { country: string; data: HomeData }) {
 
       <div className={tab === "ciudad" ? "" : "hidden md:block"}>
         <SectionHeader title="Ofertas de empleo por ciudad" className="hidden md:flex" />
+        {cityContext ? <p className={`${T.small} md:text-base mb-4 md:mb-6 max-w-[760px] text-[#3d413e]`}>{cityContext}</p> : null}
         <div className="sr-stagger flex flex-col md:grid md:grid-cols-[repeat(auto-fill,minmax(260px,1fr))] md:gap-3.5 overflow-clip md:overflow-visible rounded-2xl md:rounded-none border-2 md:border-0 border-foreground">
           {cities.map((city, i) => {
             const count = formatCount(data.cityCounts[city]);
+            const shareLabel = homeShareLabel(data.cityCounts[city], data.totalJobs);
             const lead = i === 0;
             const path = buildCategoryPath({ kind: "ciudad", label: city, country });
             return (
@@ -502,6 +495,9 @@ function Explore({ country, data }: { country: string; data: HomeData }) {
                   <span className={`${T.small} md:text-base font-mono md:font-sans font-semibold md:font-bold text-muted-foreground ${lead ? "md:text-gold-1" : "md:text-primary"}`}>
                     {count}<span className="hidden md:inline"> vacantes →</span> <span className="md:hidden">›</span>
                   </span>
+                ) : null}
+                {shareLabel ? (
+                  <span className={`${T.small} hidden md:block mt-1 ${lead ? "text-[#a9d6bf]" : "text-muted-foreground"}`}>{shareLabel}</span>
                 ) : null}
               </Link>
             );
@@ -525,6 +521,7 @@ function Explore({ country, data }: { country: string; data: HomeData }) {
 
       <div className={tab === "cargo" ? "" : "hidden md:block"}>
         <SectionHeader title="Vacantes por cargo" className="hidden md:flex md:mt-16" />
+        {rolesContext ? <p className={`${T.small} md:text-base mb-4 md:mb-6 max-w-[760px] text-[#3d413e]`}>{rolesContext}</p> : null}
         <div className="sr-stagger flex flex-col md:flex-row md:flex-wrap md:gap-3 overflow-clip md:overflow-visible rounded-2xl md:rounded-none border-2 md:border-0 border-foreground">
           {roles.map((role, i) => (
             <Link
@@ -533,11 +530,22 @@ function Explore({ country, data }: { country: string; data: HomeData }) {
               className={`${T.body} sr md:ink-card-sm ink-lift ${i >= 6 ? "hidden md:flex" : "flex"} items-center justify-between min-h-[52px] md:min-h-0 px-4 md:px-5 md:py-3 border-b md:border-b-2 border-border md:rounded-[14px] bg-white font-semibold md:font-bold text-foreground no-underline`}
             >
               {role}
-              <span className={`${T.small} md:hidden font-mono text-muted-foreground`}>›</span>
+              <span className="flex items-center gap-2 md:ml-2">
+                {typeof roleCounts[role] === "number" ? (
+                  <span className={`${T.small} font-mono font-semibold text-muted-foreground`}>{formatCount(roleCounts[role])}</span>
+                ) : null}
+                <span className={`${T.small} md:hidden font-mono text-muted-foreground`}>›</span>
+              </span>
             </Link>
           ))}
         </div>
       </div>
+      {country === "CO" && data.market ? (
+        <p className={`${T.small} md:text-base mt-6 md:mt-8 text-[#3d413e]`}>
+          ¿Cómo se reparte el empleo por ciudad, cargo y modalidad?{" "}
+          <Link to={MARKET_REPORT_INDEX_PATH} className="font-semibold text-primary underline underline-offset-4">Informe mensual del mercado laboral</Link>
+        </p>
+      ) : null}
       <nav aria-label={discovery.heading} className="mt-6 md:mt-8 border-t border-border pt-5">
         <h3 className={T.h3}>{discovery.heading}</h3>
         <p className={`${T.small} mt-2 text-muted-foreground`}>{discovery.description}</p>
