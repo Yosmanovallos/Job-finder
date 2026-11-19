@@ -13,6 +13,7 @@ import {
   type GuideSummary
 } from "../lib/guides.js";
 import { ContentCta, ContentSection, PageHero } from "../components/ContentPage.js";
+import { toolLinksForGuide } from "../lib/tools-content.js";
 
 declare global {
   interface Window {
@@ -141,6 +142,21 @@ export function GuidePage() {
           </Link>
         </nav>
         <article className={proseClass} dangerouslySetInnerHTML={{ __html: data.html }} />
+        {toolLinksForGuide(data.slug).length ? (
+          <nav aria-label="Herramientas relacionadas" data-guide-tools className="ink-card-sm mt-12 max-w-[760px] rounded-2xl bg-[#fdf1d3] p-5 md:p-7">
+            <h2 className="font-heading font-bold text-[22px] md:text-[26px] leading-tight text-foreground">Haz la cuenta con tus datos</h2>
+            <ul className="mt-3 space-y-3">
+              {toolLinksForGuide(data.slug).map((tool) => (
+                <li key={tool.path} className="text-[15px] md:text-[16px] leading-relaxed text-[#2b2f2c]">
+                  <Link to={tool.path} className="font-semibold text-foreground underline decoration-foreground/30 underline-offset-4">
+                    {tool.name}
+                  </Link>
+                  : {tool.summary}
+                </li>
+              ))}
+            </ul>
+          </nav>
+        ) : null}
       </ContentSection>
       <ContentCta />
     </div>

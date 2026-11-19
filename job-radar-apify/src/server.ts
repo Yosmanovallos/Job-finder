@@ -189,6 +189,7 @@ import { isExcludedFromGoogleIndex, thirdPartyExcerptEnabled } from "./lib/third
 import { getPublishedGuides } from "./server/guides-store.js";
 import { guidesSitemapEntries, handleGuidesRoute, isGuidesRoute, relatedGuidesSnippet } from "./server/routes/guides.js";
 import { guideTagsForHub, guideTagsForJob } from "./lib/guides.js";
+import { handleToolsRoute, isToolsRoute } from "./server/routes/tools.js";
 import { classifyModality } from "./lib/job-modality.js";
 import { withServerText } from "./lib/route-server-text.js";
 import {
@@ -889,6 +890,19 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
   // off or no guide carries the owner's approval.
   if (isGuidesRoute(pathname)) {
     await handleGuidesRoute(req, res, {
+      pathname,
+      method,
+      guides: getPublishedGuides(),
+      loadIndexHtml: async () => (await readStaticFile(path.join(PUBLIC_DIR, "index.html"))).toString("utf8"),
+      sendBody
+    });
+    return;
+  }
+
+  // /herramientas calculators (adsense-readiness F5): static pages, no DB,
+  // no job cache. The calculation runs in the visitor's browser.
+  if (isToolsRoute(pathname)) {
+    await handleToolsRoute(req, res, {
       pathname,
       method,
       guides: getPublishedGuides(),

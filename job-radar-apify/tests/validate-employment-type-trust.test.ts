@@ -16,6 +16,11 @@ import { buildJobMetaDescription, buildJobPageBody, buildJobPagePayload, buildJo
 import { toPublicJob } from "../src/lib/public-jobs-api.js";
 import { boardJob } from "./fixtures/job-page-blocks.js";
 
+// The shared job fixtures were published 2026-10-20: pin the clock inside the
+// 30-day freshness window so these checks do not expire with the calendar.
+import { mock as clockMock } from "node:test";
+clockMock.timers.enable({ apis: ["Date"], now: new Date("2026-10-25T12:00:00.000Z") });
+
 const here = path.dirname(fileURLToPath(import.meta.url));
 const fixture = (name: string) => fs.readFileSync(path.join(here, "fixtures", "detail", name), "utf8");
 

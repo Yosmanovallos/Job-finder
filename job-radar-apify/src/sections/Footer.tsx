@@ -31,6 +31,7 @@ const resourceLinks: FooterLink[] = [
   ...(GUIDES_ENABLED
     ? [{ label: "Guías", href: "/guias", icon: <svg {...iconProps} stroke="#9c7518"><path d="M4 5a2 2 0 012-2h13v16H6a2 2 0 00-2 2z" /><path d="M4 19V5M9 7h6" /></svg> }]
     : []),
+  { label: "Herramientas", href: "/herramientas", icon: <svg {...iconProps} stroke="#9c7518"><rect x="5" y="3" width="14" height="18" rx="2" /><path d="M8 7h8M8 11h2M12 11h2M8 15h2M12 15h2M16 11v4" /></svg> },
   { label: "Empresas", href: "/empresas", icon: <svg {...iconProps} stroke="#9c7518"><path d="M3 21h18M5 21V7l7-4 7 4v14" /></svg> },
   { label: "API y agentes", href: "/docs", icon: <svg {...iconProps} stroke="#9c7518"><path d="M8 9l-4 3 4 3M16 9l4 3-4 3" /></svg> },
   { label: "Acerca de", href: "/about", icon: <svg {...iconProps} stroke="#9c7518"><circle cx="12" cy="12" r="9" /><path d="M12 8h.01M11 12h1v4h1" /></svg> },

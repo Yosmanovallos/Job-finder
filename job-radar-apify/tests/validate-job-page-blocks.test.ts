@@ -39,7 +39,10 @@ const BASELINE = {
   }
 };
 
-test("JPD-001 description section and JobPosting are byte-identical to origin/main", () => {
+test("JPD-001 description section and JobPosting are byte-identical to origin/main", (t) => {
+  // The fixtures were published 2026-10-20; pin the clock inside the 30-day
+  // freshness window so the pinned hashes do not expire with the calendar.
+  t.mock.timers.enable({ apis: ["Date"], now: new Date("2026-10-25T12:00:00.000Z") });
   for (const job of [boardJob, officialJob]) {
     for (const variant of [job, { ...job, reputation: REPUTATION }]) {
       const expected = BASELINE[job.jobId];

@@ -68,8 +68,17 @@ async function main(): Promise<void> {
       "/about",
       "/contact",
       "/privacy",
+      "/herramientas",
+      "/herramientas/calculadora-de-liquidacion",
+      "/herramientas/calculadora-salario-neto",
       buildJobPath(data.jobs[0])
     ];
+    // adsense-readiness F5: the calculator's default inputs, solved by hand
+    // in tests/validate-labor-calculators.test.ts, once React has hydrated.
+    const toolTotals = new Map([
+      ["/herramientas/calculadora-de-liquidacion", "$2.497.726"],
+      ["/herramientas/calculadora-salario-neto", "$1.859.928"]
+    ]);
     const categoryRoutes = new Set(["/empleos/bogota", "/ve/empleos/project-manager", ...expandedCategories.keys()]);
     const snapshots: object[] = [];
     const browser = await chromium.launch({ headless: true });
@@ -207,6 +216,12 @@ async function main(): Promise<void> {
               emptyHub || (await stats.textContent())?.includes("cifras de las ofertas activas"),
               `[P0] ${route} perdió las cifras del hub después de cargar React.`
             );
+          }
+          const toolTotal = toolTotals.get(route);
+          if (toolTotal) {
+            await page.getByText(toolTotal, { exact: true }).first().waitFor({ state: "visible", timeout: 10000 });
+            const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+            assert.ok(overflow <= 1, `[P0] ${route} tiene scroll horizontal de ${overflow}px a ${viewport.width}px.`);
           }
           await page.screenshot({
             path: path.join(process.cwd(), `baseline-${index}-${viewport.width}.png`),
