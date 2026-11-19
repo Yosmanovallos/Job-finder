@@ -44,6 +44,13 @@ test("Magneto rows: the date is Magneto's publishDate — a row without it is sk
   assert.equal(magnetoRowToJob({ ...rows[0], jobSlug: "../x?q=1" }), null);
 });
 
+test("Magneto rows: isRemote (its 'Remoto / híbrido en' checkbox) never replaces the city nor claims remote", () => {
+  const row = magnetoRows(raw("listing-claro-colombia-complete.html"))[0];
+  assert.equal(magnetoRowToJob({ ...row, cities: ["Cartagena"], isRemote: true })?.location, "Cartagena");
+  assert.equal(magnetoRowToJob({ ...row, cities: ["Cartagena"], isRemote: false })?.location, "Cartagena");
+  assert.equal(magnetoRowToJob({ ...row, cities: [], isRemote: true })?.location, "Colombia");
+});
+
 test("Magneto topic pages rotate every 3-hour window so the 3-minute catalog budget still covers all of them", () => {
   const paths = Array.from({ length: 26 }, (_, index) => `/co/trabajos/t${index}`);
   const window = 3 * 60 * 60 * 1000;

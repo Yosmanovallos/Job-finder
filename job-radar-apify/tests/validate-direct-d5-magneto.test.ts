@@ -79,6 +79,17 @@ test("Magneto: postings carry the declared dates, cities and country id; robots 
   assert.equal(first.validThrough, "2026-10-31T05:00:00.000Z");
   assert.deepEqual(first.countryCodes, ["CO"]);
   assert.equal(first.workplace, null, "isRemote:false is not on-site");
+  // isRemote:true is Magneto's "Remoto / híbrido en" checkbox: never evidence of remote.
+  const flagged = await listBoard(
+    { atsType: "magneto", atsRef: "claro-colombia" },
+    fakeHttp({
+      [`${ORIGIN}/robots.txt`]: { status: 200, body: robots },
+      [`${ORIGIN}/co/empresas/claro-colombia/empleos`]: { status: 200, body: claroPage().replaceAll('\\"isRemote\\":false', '\\"isRemote\\":true') }
+    }),
+    { knownIds: new Set(["1106351"]) }
+  );
+  assert.ok(flagged.kind === "complete" && flagged.postings.length > 0);
+  if (flagged.kind === "complete") assert.ok(flagged.postings.every((posting) => posting.workplace === null));
   assert.equal(first.applyUrl, `${ORIGIN}/co/empresas/claro-colombia/empleos/consultor-a-comercial-contenido-1106351`);
   const { postings } = selectColombianPostings(known.postings, NOW);
   assert.equal(postings.find((posting) => posting.externalId === "1106351")?.city, "Bogotá");

@@ -96,13 +96,6 @@ import {
   escapeHtml,
   escapeJsonForScriptTag,
   isPubliclyDescribable,
-  buildJobMeta,
-  injectJobHeadMeta,
-  injectJobPageContent,
-  buildJobPosting,
-  buildJobPageBody,
-  buildJobPagePayload,
-  isGoogleEligiblePage,
   buildJobPath,
   buildJobSitemapEntry,
   JOBS_SITEMAP_HEADER,
@@ -134,17 +127,15 @@ import {
 } from "./lib/job-seo.js";
 import {
   CITY_HUB_PAGE_LIMIT,
-  buildJobBreadcrumbList,
+  RELATED_JOBS_LIMIT,
   cityHubFilters,
+  liveListingJobs,
   pickRelatedJobs,
-  renderJobBreadcrumbHtml,
-  renderRelatedJobsHtml,
   resolveJobCityHub
 } from "./lib/job-internal-links.js";
 import {
   buildCompanyJobsBlock,
   companyJobsScope,
-  renderCompanyJobsHtml,
   type CompanyJobsScope,
   type CompanyJobsSnapshot
 } from "./lib/job-company-links.js";
@@ -192,8 +183,31 @@ import {
   isBlocked,
   recordSuspiciousEvent
 } from "./lib/security-monitor.js";
-import { isAdEligibleJobPage, isAdEligibleListing, markAdEligible } from "./lib/ad-eligibility.js";
+import { isAdEligibleListing, markAdEligible } from "./lib/ad-eligibility.js";
+import { renderJobPageHtml } from "./lib/job-page-render.js";
+import { isExcludedFromGoogleIndex, thirdPartyExcerptEnabled } from "./lib/third-party-excerpt.js";
+import { getPublishedGuides } from "./server/guides-store.js";
+import { guidesSitemapEntries, handleGuidesRoute, isGuidesRoute, relatedGuidesSnippet } from "./server/routes/guides.js";
+import { guideTagsForHub, guideTagsForJob } from "./lib/guides.js";
+import { classifyModality } from "./lib/job-modality.js";
 import { withServerText } from "./lib/route-server-text.js";
+import {
+  buildHomeMarketFigures,
+  buildHubComparison,
+  buildMarketReportContent,
+  buildMarketReportIndexContent,
+  knownStaticHubTotal,
+  marketEditionPath,
+  marketReportSitemapEntries,
+  marketReportsEnabled,
+  parseMarketReportPath,
+  previousEdition,
+  staticHubRobots,
+  MARKET_REPORT_INDEX_PATH
+} from "./lib/market-report.js";
+import { getMarketEditions, latestMarketSnapshot } from "./server/market-reports.js";
+import { HOME_POPULAR_ROLES } from "./lib/home-stats.js";
+import type { PublicContent } from "./lib/agent-readiness.js";
 
 dotenv.config();
 
@@ -612,7 +626,7 @@ async function loadHomeStats(country: string): Promise<{ body: HomeData; complet
   ]);
   const jobs = counts.status === "fulfilled" ? counts.value : null;
   const companyPage = companies.status === "fulfilled" ? companies.value : null;
-  const latest = jobs ? maskLockedFields(jobs.latestJobs, "free") : [];
+  const latest = jobs ? liveListingJobs(maskLockedFields(jobs.latestJobs, "free")) : [];
   const body: HomeData = {
     totalJobs: jobs?.totalJobs ?? null,
     last7Days: jobs?.last7Days ?? null,
@@ -634,7 +648,10 @@ async function loadHomeStats(country: string): Promise<{ body: HomeData; complet
       company: item.company,
       count: item.count,
       logoUrl: getCompanyLogoUrl(item.company)
-    }))
+    })),
+    // adsense-readiness F4 (SP-6): role figures from the newest frozen
+    // edition, in memory. Null when there is none: the chips stay bare.
+    market: buildHomeMarketFigures(latestMarketSnapshot(country), HOME_POPULAR_ROLES)
   };
   if (!jobs || !companyPage) {
     console.warn(
@@ -734,7 +751,8 @@ const EMPTY_HOME_DATA: HomeData = {
   totalCompanies: null,
   cityCounts: {},
   latestJobs: [],
-  companies: []
+  companies: [],
+  market: null
 };
 
 // Native Node HTTP Server
@@ -866,6 +884,20 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     return;
   }
 
+  // /guias editorial layer (adsense-readiness F3): its own module, no DB,
+  // no job cache. Every /guias path is a real 404 while GUIDES_ENABLED is
+  // off or no guide carries the owner's approval.
+  if (isGuidesRoute(pathname)) {
+    await handleGuidesRoute(req, res, {
+      pathname,
+      method,
+      guides: getPublishedGuides(),
+      loadIndexHtml: async () => (await readStaticFile(path.join(PUBLIC_DIR, "index.html"))).toString("utf8"),
+      sendBody
+    });
+    return;
+  }
+
   if (
     await handleAgentReadinessRoute(req, res, {
       pathname,
@@ -879,6 +911,14 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
   ) {
     return;
   }
+
+  // F4 market report routes (openspec adsense-readiness): frozen editions
+  // read once from data/market-reports (src/server/market-reports.ts). No
+  // database query here and no ad marker (the design keeps reports out of
+  // the AdSense allowlist until it says otherwise). REPORTS_ENABLED=false
+  // turns every one of these URLs into a real 404 and empties the sitemap.
+  if (await handleMarketReportRoute(req, res, pathname, method)) return;
+  // end F4 market report routes
 
   // 2. Health Check Endpoint
   if (pathname === "/api/health" && method === "GET") {
@@ -962,7 +1002,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       return;
     }
     const result = await getIntentPage(intentFilters(intent), CITY_HUB_PAGE_LIMIT);
-    const jobs = maskLockedFields(result.jobs, "free").filter(isPubliclyDescribable);
+    const jobs = liveListingJobs(maskLockedFields(result.jobs, "free").filter(isPubliclyDescribable));
     const answer = isLegacyRemoteCopy(intent) ? null : buildIntentAnswer(intent, result.total, jobs);
     const newToday = buildNewTodayBlock(intent, jobs.map(toRecentReadyJob));
     await sendBody(
@@ -1140,7 +1180,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     const companyView = companyPage.view;
     const companyName = companyView.displayName;
     const matched = { jobs: companyPage.jobs, total: companyPage.total };
-    const page = maskLockedFields(matched.jobs, tier);
+    const page = liveListingJobs(maskLockedFields(matched.jobs, tier));
 
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(
@@ -1769,7 +1809,8 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
             offset: 0,
             includeDetails: false
           });
-      const page = maskLockedFields(matched.jobs, "free").filter(isPubliclyDescribable);
+      // CX-9: a cached page never links a row already past the freshness rule.
+      const page = liveListingJobs(maskLockedFields(matched.jobs, "free").filter(isPubliclyDescribable));
       const total = matched.total;
       // Intent pages only: the guard (total = Google-ready rows), the answer
       // block from the rows already loaded, and the sibling country's total
@@ -1850,6 +1891,12 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
   <p>${escapeHtml(statsCopy.basis)}</p>
 </section>\n`
         : "";
+      // adsense-readiness F4 (CX-6, SP-2): a paragraph of this hub against
+      // the country, from the newest frozen edition (in memory, never a query).
+      const hubComparison = buildHubComparison({ category, total, jobs: page, national: latestMarketSnapshot(category.country) });
+      const hubComparisonHtml = hubComparison
+        ? `<section data-hub-comparison aria-label="Comparación con el país"><h2>Comparación con el país</h2><p>${escapeHtml(hubComparison)}</p><p><a href="${MARKET_REPORT_INDEX_PATH}">Informe del mercado laboral</a></p></section>\n`
+        : "";
       const jobsHeading = page.length > 0 ? `<h2>${escapeHtml(sectionHeadings.jobs)}</h2>\n` : "";
       const relatedCitiesHtml =
         relatedCityLinks.length > 0
@@ -1872,8 +1919,11 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
         ? `<section data-intent-answer aria-label="${escapeHtml(intentAnswer.heading)}">${renderIntentAnswerHtml(intentAnswer)}</section>\n`
         : "";
       const hubIntentLinksHtml = renderHubIntentLinksHtml(hubIntentLinks);
-      const ssrSnippet = `<h1>${escapeHtml(meta.heading)}</h1>\n${intentAnswerHtml}${emptyNotice}${overviewHtml}${newTodayHtml}${statsHtml}${jobsHeading}<nav aria-label="Vacantes"><ul>\n${items}\n</ul></nav>${relatedCitiesHtml}${hubIntentLinksHtml}`;
+      // adsense-readiness F3: 2–3 related guides (static tag mapping, no query).
+      const hubGuides = relatedGuidesSnippet(getPublishedGuides(), guideTagsForHub(category), pathname);
+      const ssrSnippet = `<h1>${escapeHtml(meta.heading)}</h1>\n${intentAnswerHtml}${emptyNotice}${overviewHtml}${newTodayHtml}${statsHtml}${hubComparisonHtml}${jobsHeading}<nav aria-label="Vacantes"><ul>\n${items}\n</ul></nav>${relatedCitiesHtml}${hubIntentLinksHtml}${hubGuides.html}`;
       indexHtml = indexHtml.replace('<div id="app"></div>', () => `<div id="app">${ssrSnippet}</div>`);
+      if (hubGuides.head) indexHtml = indexHtml.replace("</head>", () => `${hubGuides.head}</head>`);
 
       // Same fix /dashboard already had (Fase 1, §5.4) applied here too —
       // CategoryLanding.tsx previously always re-fetched /api/jobs on
@@ -1898,6 +1948,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
         total,
         insights,
         ...(newToday ? { newToday } : {}),
+        ...(hubComparison ? { comparison: hubComparison } : {}),
         ...(isIntent ? { intent: category.intent, indexable: isIntentIndexable(total), ...(intentAnswer ? { answer: intentAnswer } : {}) } : {}),
         ...(hubIntentLinks.length > 0 ? { intentLinks: hubIntentLinks } : {})
       });
@@ -1998,7 +2049,9 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       // Google's index looking like a doorway page until it fills up.
       // Intent pages: the inventory guard (design D2) — below 10 Google-ready
       // jobs, a 200 with noindex,follow, out of the sitemap and unlinked.
-      const categoryRobots = isIntent || isGuardedCity ? intentRobots(total) : total === 0 ? "noindex" : null;
+      // adsense-readiness F4 (SP-2): plain city/role hubs follow the same
+      // inventory guard as intent pages (below 10 jobs: noindex,follow).
+      const categoryRobots = isIntent || isGuardedCity ? intentRobots(total) : staticHubRobots(total);
       if (categoryRobots) {
         indexHtml = indexHtml
           .replace(/<meta[^>]*name=["']robots["'][^>]*>/i, "")
@@ -2084,24 +2137,28 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       return;
     }
 
-    const meta = buildJobMeta(visible);
     // Job SEO V2: USER_VISIBLE and GOOGLE_READY are separate. Every visible
     // job gets the same readable body with the source link in raw HTML; the
     // stored verdict of the shared gate (isGoogleEligiblePage) alone decides
     // robots and JobPosting — the same verdict the sitemap and the Indexing
-    // API read, so the four consumers can never disagree.
-    const googleReady = isGoogleEligiblePage(visible);
-    const jobPosting = googleReady ? buildJobPosting(visible) : null;
+    // API read, so the four consumers can never disagree. renderJobPageHtml()
+    // applies it (and D1(b), off by default: adsense-readiness F2).
     // Link the page back into its city hub (docs/SEO-JOB-LINK-GRAPH-2026-10-29.md).
     // Related jobs come only from the hub's already-cached first page: a cold
     // cache yields none now and warms in the background, never adding a
-    // Postgres round trip to this response.
+    // Postgres round trip to this response. Ranked by role proximity to this
+    // job (CX-5) and never past the freshness rule (CX-9).
     const cityHub = resolveJobCityHub(visible);
     const hubPage = cityHub
       ? peekJobsPage({ filters: cityHubFilters(cityHub), limit: CITY_HUB_PAGE_LIMIT, includeDetails: false })
       : undefined;
     const related = hubPage
-      ? pickRelatedJobs(visible.jobId, maskLockedFields(hubPage.jobs, "free").filter(isPubliclyDescribable))
+      ? pickRelatedJobs(
+          visible.jobId,
+          liveListingJobs(maskLockedFields(hubPage.jobs, "free").filter(isPubliclyDescribable)),
+          RELATED_JOBS_LIMIT,
+          visible.title
+        )
       : [];
     // B1: the employer's other vacancies, peeked like the hub above — never
     // a query this response waits for, never for a placeholder employer.
@@ -2123,20 +2180,11 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     // optional enrichment may fail without making an otherwise healthy
     // vacancy unavailable.
     const publicJob = session ? null : (await attachReputation([visible]).catch(() => [visible]))[0];
-    indexHtml = injectJobPageContent(indexHtml, {
-      appHtml:
-        `${renderJobBreadcrumbHtml(visible, cityHub)}${buildJobPageBody(publicJob ?? visible)}` +
-        `${companyJobs ? renderCompanyJobsHtml(companyJobs) : ""}${renderRelatedJobsHtml(cityHub, related)}`,
-      links: { jobId: visible.jobId, related, ...(companyJobs ? { company: companyJobs } : {}) },
-      breadcrumb: buildJobBreadcrumbList(visible, cityHub),
-      payload: publicJob ? buildJobPagePayload(publicJob) : null,
-      noindex: !googleReady || !jobPosting,
-      jobPosting
-    });
-    indexHtml = injectJobHeadMeta(indexHtml, meta);
     // Ads only on the employer's own vacancy; a copy from another job
     // board is replicated content (adsense-readiness PP-4).
-    if (isAdEligibleJobPage(visible, Boolean(googleReady && jobPosting))) indexHtml = markAdEligible(indexHtml);
+    // adsense-readiness F3: 2–3 related guides (static tag mapping, no query).
+    const guides = relatedGuidesSnippet(getPublishedGuides(), guideTagsForJob({ modality: classifyModality(visible) }), pathname);
+    indexHtml = renderJobPageHtml(indexHtml, { job: visible, publicJob, related, companyJobs, guides });
 
     await sendBody(req, res, 200, { "Content-Type": "text/html; charset=utf-8" }, indexHtml);
     return;
@@ -2410,7 +2458,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     // Never link a job in the visible SSR list that wouldn't also render
     // for the same anonymous visitor — same filter the sitemap/category
     // branches already apply.
-    const page = maskLockedFields(matched.jobs, "free").filter(isPubliclyDescribable);
+    const page = liveListingJobs(maskLockedFields(matched.jobs, "free").filter(isPubliclyDescribable));
 
     const reputation = companyView.reputation;
     const meta = buildCompanyMeta(companyName, matched.total, requestCountry);
@@ -2695,7 +2743,8 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       "https://buscotrabajo.co/sitemap-pages.xml",
       "https://buscotrabajo.co/sitemap-jobs.xml",
       "https://buscotrabajo.co/sitemap-jobs-recent.xml",
-      "https://buscotrabajo.co/sitemap-categories.xml"
+      "https://buscotrabajo.co/sitemap-categories.xml",
+      ...guidesSitemapEntries(getPublishedGuides())
     ]);
     await sendBody(req, res, 200, { "Content-Type": "application/xml; charset=utf-8" }, xml);
     return;
@@ -2713,6 +2762,18 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       res.writeHead(500, { "Content-Type": "text/plain" });
       res.end("Server Error: build not found");
       return;
+    }
+    // F4: the market reports, only once an edition exists (an empty index
+    // is thin) and never with REPORTS_ENABLED=false.
+    const reportEntries = marketReportSitemapEntries(
+      marketReportsEnabled(),
+      getMarketEditions("CO").map((edition) => edition.period)
+    );
+    if (reportEntries.length > 0) {
+      staticSitemap = staticSitemap.replace(
+        "</urlset>",
+        () => `${reportEntries.map((entry) => `  <url>\n    <loc>${SITE_URL}${entry}</loc>\n  </url>`).join("\n")}\n</urlset>`
+      );
     }
     await sendBody(
       req,
@@ -2769,6 +2830,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     };
     try {
       let wroteEntry = false;
+      const excerptEnabled = thirdPartyExcerptEnabled();
       await streamCanonicalSitemapJobs({
         signal: controller.signal,
         limit: 50_000,
@@ -2782,6 +2844,8 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
           await write(JOBS_SITEMAP_HEADER);
         },
         onJob: async (job) => {
+          // D1(b), off by default: a third-party copy shown as an excerpt is noindex.
+          if (isExcludedFromGoogleIndex(job, excerptEnabled)) return;
           const [visibleJob] = maskLockedFields([job], "free");
           const entry = buildJobSitemapEntry({
             ...visibleJob,
@@ -2839,7 +2903,9 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       res.end("Sitemap temporalmente no disponible.");
       return;
     }
+    const excerptEnabled = thirdPartyExcerptEnabled();
     const entries = recent
+      .filter((job) => !isExcludedFromGoogleIndex(job, excerptEnabled))
       .map((job) => buildJobSitemapEntry(job))
       .filter((entry): entry is string => entry !== null);
     await sendBody(
@@ -2885,7 +2951,8 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
         xml = buildCategoriesSitemapXml({
           intents: indexable,
           guardedCities,
-          indexPaths: coverage ? ["/empleos", "/ve/empleos"] : []
+          indexPaths: coverage ? ["/empleos", "/ve/empleos"] : [],
+          knownTotal: knownHubTotalFromEditions
         });
       } catch {
         res.writeHead(503, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store", "Retry-After": "60" });
@@ -2893,7 +2960,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
         return;
       }
     } else {
-      xml = buildCategoriesSitemapXml();
+      xml = buildCategoriesSitemapXml({ knownTotal: knownHubTotalFromEditions });
     }
     await sendBody(req, res, 200, { "Content-Type": "application/xml; charset=utf-8" }, xml);
     return;
@@ -3239,7 +3306,7 @@ async function loadEmpleosIndexPayload(country: EmpleosIndexCountry): Promise<Em
   try {
     const firstPage = await getJobsPage({ filters: { country }, limit: 24, offset: 0, includeDetails: true });
     total = firstPage.total;
-    jobs = maskLockedFields(firstPage.jobs, "free")
+    jobs = liveListingJobs(maskLockedFields(firstPage.jobs, "free"))
       .filter(isPubliclyDescribable)
       .slice(0, EMPLEOS_INDEX_JOB_LIMIT)
       .map((job) => toEmpleosIndexJob(job, country));
@@ -3296,6 +3363,102 @@ function startIntentTotalsKeeper(): void {
     void refreshIntentTotals();
     setInterval(() => void refreshIntentTotals(), INTENT_TOTALS_INTERVAL_MS).unref();
   }, INTENT_TOTALS_FIRST_RUN_MS).unref();
+}
+
+// adsense-readiness F4 (SP-2): a static hub's count in the newest frozen
+// edition decides whether the sitemap lists it. An edition older than this
+// is ignored (every hub stays listed, as before), so a stale month never
+// keeps a hub that grew past the guard out of the sitemap for long.
+const MARKET_SITEMAP_MAX_AGE_MS = 45 * 24 * 60 * 60_000;
+
+function knownHubTotalFromEditions(category: ResolvedCategory): number | undefined {
+  const snapshot = latestMarketSnapshot(category.country);
+  if (!snapshot || Date.now() - Date.parse(snapshot.cutoff) > MARKET_SITEMAP_MAX_AGE_MS) return undefined;
+  return knownStaticHubTotal(snapshot, category);
+}
+
+// F4 market report pages. Only the Colombia report exists. Everything comes
+// from the frozen editions in memory; nothing here reaches the database.
+async function handleMarketReportRoute(
+  req: http.IncomingMessage,
+  res: http.ServerResponse,
+  pathname: string,
+  method: string
+): Promise<boolean> {
+  const isApi = pathname.startsWith("/api/informes");
+  const route = parseMarketReportPath(isApi ? pathname.slice("/api".length) : pathname);
+  if (!route) return false;
+  if (method !== "GET" && (isApi || method !== "HEAD")) return false;
+  const notFound = async () => {
+    if (isApi) {
+      res.writeHead(404, { "Content-Type": "application/json; charset=utf-8" });
+      res.end(JSON.stringify({ error: "Informe no encontrado." }));
+      return;
+    }
+    await sendBody(req, res, 404, { "Content-Type": "text/html; charset=utf-8", Vary: "Accept" }, NOT_FOUND_HTML);
+  };
+  if (!marketReportsEnabled()) {
+    await notFound();
+    return true;
+  }
+  const editions = getMarketEditions("CO");
+  const periods = editions.map((edition) => edition.period);
+  let content: PublicContent | null = null;
+  let noindex = false;
+  if (route.kind === "latest") {
+    if (!editions[0]) {
+      await notFound();
+      return true;
+    }
+    res.writeHead(302, { Location: marketEditionPath(editions[0].period), "Cache-Control": "public, max-age=300" });
+    res.end();
+    return true;
+  }
+  if (route.kind === "index") {
+    content = buildMarketReportIndexContent(editions[0] ?? null, periods);
+    // An index with no edition yet is a 200 for the footer link, but thin:
+    // noindex and out of the sitemap until the first edition exists.
+    noindex = editions.length === 0;
+  } else {
+    const snapshot = editions.find((edition) => edition.period === route.period);
+    if (snapshot) content = buildMarketReportContent(snapshot, previousEdition(editions, snapshot.period), periods);
+  }
+  if (!content) {
+    await notFound();
+    return true;
+  }
+  if (isApi) {
+    await sendBody(req, res, 200, { "Content-Type": "application/json; charset=utf-8" }, JSON.stringify({ content, noindex }));
+    return true;
+  }
+  if (wantsMarkdown(req.headers.accept)) {
+    // Same as "/" and PUBLIC_PAGES: the edge ignores Vary: Accept, so the
+    // Markdown variant must never be cached under the HTML URL.
+    await sendBody(
+      req,
+      res,
+      200,
+      { "Content-Type": "text/markdown; charset=utf-8", "Cache-Control": "private, no-store", Vary: "Accept", Link: DISCOVERY_LINKS },
+      renderContentMarkdown(content)
+    );
+    return true;
+  }
+  let html: string;
+  try {
+    html = injectPublicContent((await readStaticFile(path.join(PUBLIC_DIR, "index.html"))).toString("utf8"), content);
+  } catch {
+    res.writeHead(500, { "Content-Type": "text/plain" });
+    res.end("Server Error: build not found");
+    return true;
+  }
+  html = html.replace(
+    "</head>",
+    () =>
+      (noindex ? `  <meta name="robots" content="noindex,follow">\n` : "") +
+      `  <script>window.__SSR_REPORT__=${escapeJsonForScriptTag({ pathname, content, noindex })};</script>\n</head>`
+  );
+  await sendBody(req, res, 200, { "Content-Type": "text/html; charset=utf-8", Vary: "Accept" }, html);
+  return true;
 }
 
 server.listen(PORT, () => {

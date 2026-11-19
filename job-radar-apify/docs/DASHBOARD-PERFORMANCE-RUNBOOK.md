@@ -452,6 +452,32 @@ What remains of a search:
   is not confirmed from the log. The fast `MISS` responses of the SSR first
   page are consistent with a successful warmup.
 
+### 2026-11-15 AdSense F4 market report (`claude/adsense-f4-878771`, before deploy)
+
+The monthly report, the hub comparison and the home role figures read frozen
+editions from `data/market-reports/` once per process
+(`src/server/market-reports.ts`). No request path queries the database for
+them; there is no new cache, warmup or startup step. The only new query,
+`queryMarketRows`, runs from `scripts/build-market-report.ts` (owner-run,
+`BEGIN READ ONLY`, 60 s `statement_timeout`).
+
+Local cold process (disposable PostgreSQL, 9 fresh processes per side,
+alternating, unique `?coldcheck=` URLs, base `449c981`;
+`npx tsx scripts/run-isolated-tests.ts home-cold`), medians:
+
+| Measurement | Base | Branch |
+| --- | ---: | ---: |
+| First `/` of each process (mobile) | 391 ms | 337 ms |
+| `/` desktop right after | 44 ms | 48 ms |
+| `/` warm | 17 ms | 18 ms |
+| `/empleos/bogota` | 52 ms | 51 ms |
+| `/dashboard` | 37 ms | 39 ms |
+| Report edition | — | 11 ms |
+
+`/` HTML +2.6 KB and hub +1.3 KB uncompressed; initial JS gzip 137.6 to
+138.9 KB. **After deploy (pending):** `/`, one hub and `/dashboard` with unique
+URLs and `MISS`, against this table.
+
 ## Required regression check
 
 For any change that can affect this path:

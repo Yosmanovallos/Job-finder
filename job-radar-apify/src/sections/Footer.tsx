@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { CONTACT_EMAIL } from "../lib/agent-readiness.js";
+import { GUIDES_ENABLED } from "../config.js";
 
 // Site-wide footer in the homepage's ink style (design canvas R3,
 // 2026-10-25). The old "Probar gratis / sin tarjeta" CTA block is gone:
@@ -26,9 +27,14 @@ const iconProps = {
 const resourceLinks: FooterLink[] = [
   { label: "Cómo funciona", href: "/como-funciona", icon: <svg {...iconProps} stroke="#9c7518"><circle cx="12" cy="12" r="9" /><path d="M10 8l6 4-6 4z" /></svg> },
   { label: "Fuentes de datos", href: "/fuentes", icon: <svg {...iconProps} stroke="#9c7518"><path d="M4 6h16M4 12h16M4 18h10" /></svg> },
+  // /guias only while GUIDES_ENABLED is on (adsense-readiness F3): never a link to a 404.
+  ...(GUIDES_ENABLED
+    ? [{ label: "Guías", href: "/guias", icon: <svg {...iconProps} stroke="#9c7518"><path d="M4 5a2 2 0 012-2h13v16H6a2 2 0 00-2 2z" /><path d="M4 19V5M9 7h6" /></svg> }]
+    : []),
   { label: "Empresas", href: "/empresas", icon: <svg {...iconProps} stroke="#9c7518"><path d="M3 21h18M5 21V7l7-4 7 4v14" /></svg> },
   { label: "API y agentes", href: "/docs", icon: <svg {...iconProps} stroke="#9c7518"><path d="M8 9l-4 3 4 3M16 9l4 3-4 3" /></svg> },
   { label: "Acerca de", href: "/about", icon: <svg {...iconProps} stroke="#9c7518"><circle cx="12" cy="12" r="9" /><path d="M12 8h.01M11 12h1v4h1" /></svg> },
+  { label: "Informes", href: "/informes", icon: <svg {...iconProps} stroke="#9c7518"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /></svg> },
   { label: "Metodología", href: "/metodologia", icon: <svg {...iconProps} stroke="#9c7518"><path d="M4 6h16M4 12h10M4 18h6" /><path d="M17 15l2 2 3-4" /></svg> },
   { label: "Contacto", href: "/contact", icon: <svg {...iconProps} stroke="#9c7518"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 7l9 6 9-6" /></svg> },
   { label: "Opiniones y ayuda", href: "/opiniones", icon: <svg {...iconProps} stroke="#9c7518"><path d="M21 12a8 8 0 01-11.6 7.1L4 20l1-4.6A8 8 0 1121 12z" /></svg> }

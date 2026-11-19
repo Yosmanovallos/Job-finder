@@ -2,6 +2,7 @@ import type { PoolClient } from "pg";
 import { pool } from "./client.js";
 import type { NotificationType } from "../lib/google-indexing.js";
 import { buildJobUrl } from "../lib/job-seo.js";
+import { isExcludedFromGoogleIndex } from "../lib/third-party-excerpt.js";
 import { canonicalSql, seoReadySql } from "../lib/google-job-readiness.js";
 import { DEFAULT_SCHEDULER, newestFirstLanes, type LaneQueues, type QueueLane, type Schedulable } from "../lib/indexing-scheduler.js";
 
@@ -331,8 +332,8 @@ export type TargetVerdict = { send: true } | { send: false; reason: string };
 export async function checkIndexingTarget(row: Pick<PendingIndexingRow, "url" | "notification_type" | "job_id">): Promise<TargetVerdict> {
   const jobId = row.job_id ?? jobIdFromUrl(row.url);
   if (!jobId) return { send: false, reason: "unparseable_target" };
-  const result = await pool.query<{ id: string; title: string; location: string | null; ready: boolean; canonical: boolean; in_window: boolean }>(
-    `SELECT j.id, j.title, j.location, ${seoReadySql("j")} AS ready,
+  const result = await pool.query<{ id: string; title: string; location: string | null; source: string | null; ready: boolean; canonical: boolean; in_window: boolean }>(
+    `SELECT j.id, j.title, j.location, j.source, ${seoReadySql("j")} AS ready,
             ${canonicalSql("j")} AS canonical, ${withinApiWindowSql("j")} AS in_window
      FROM jobs j WHERE j.id = $1 AND j.is_active = TRUE`,
     [jobId]
@@ -346,6 +347,8 @@ export async function checkIndexingTarget(row: Pick<PendingIndexingRow, "url" | 
   if (!job) return { send: false, reason: "target_missing" };
   if (!job.canonical) return { send: false, reason: "target_non_canonical" };
   if (!job.ready) return { send: false, reason: "target_not_seo_ready" };
+  // D1(b) (adsense-readiness F2, off by default): an excerpted third-party copy is noindex.
+  if (isExcludedFromGoogleIndex(job)) return { send: false, reason: "target_not_seo_ready" };
   if (buildJobUrl({ jobId: job.id, title: job.title, location: job.location }) !== row.url) {
     return { send: false, reason: "url_changed" };
   }
