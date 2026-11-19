@@ -6,7 +6,7 @@ anterior. **No se pulsa «Solicitar revisión» antes de F6.**
 ## Decisiones previas (propietario)
 
 - [ ] D1 vacantes de terceros: (a) completas sin anuncios / (b) extracto
-- [ ] D2 nombre y rol del responsable para «Acerca de»
+- [x] D2 nombre y rol del responsable para «Acerca de» (2026-11-18: LinkedIn del propietario)
 - [ ] D3 quién revisa y firma las guías
 - [ ] D4 correo con dominio propio
 - [ ] D5 activar el mensaje de consentimiento (CMP) en AdSense
@@ -67,7 +67,9 @@ anterior. **No se pulsa «Solicitar revisión» antes de F6.**
 
 ### F1c — pendiente de datos del propietario
 
-- [ ] «Acerca de» con responsable real: nombre y rol (D2)
+- [x] «Acerca de» con responsable real (D2, propietario 2026-11-18): sección «Quién está
+      detrás de BuscoTrabajo» con nombre, ciudad, perfil profesional y enlace a su LinkedIn,
+      solo con datos de su perfil público. Prueba ADS-021
 - [ ] Correo con dominio propio (D4)
 - [ ] Actualizar `llms.txt`, API Catalog, docs y digests con las rutas reales
 - [ ] lint, typecheck, `test:unit`, `test:integration`, `test:baseline`
@@ -76,16 +78,71 @@ anterior. **No se pulsa «Solicitar revisión» antes de F6.**
 
 ## F2 — Superficie copiada
 
-- [ ] Pruebas que fallan primero: ADS-030…ADS-039
-- [ ] Procedencia oficial / terceros expuesta a la capa de render
-- [ ] Vacante de terceros: sin script de anuncios (ya cubierto por F1) y
-      bloques propios visibles en el HTML inicial
-- [ ] D1(b) implementada detrás de `THIRD_PARTY_JOB_EXCERPT_ENABLED` (apagada)
-- [ ] ADR si se enciende D1(b) (enmienda al contrato JobPosting)
-- [ ] Vacante vencida: 404/410 real, sin enlaces entrantes desde hubs (CX-9)
-- [ ] «Más empleos en <ciudad>» ordenado por cercanía de cargo (CX-5)
-- [ ] `test:seo` y comparación de drift en 2 vacantes de cada procedencia
-- **Gate:** CX-4, CX-9, SP-11, SP-12, PP-4 en CUMPLE según la opción de D1
+> Hecho 2026-11-14 en `claude/adsense-f2-5c9a7f` (PR en borrador contra
+> `codex/adsense-readiness`). D1 = (a), la opción actual.
+
+- [x] Pruebas que fallan primero: `tests/validate-adsense-f2.test.ts`
+      (ADS-030…ADS-039, suite `unit`), escritas antes del código; fallaban
+      por los módulos inexistentes
+- [x] Procedencia: `jobProvenance()` en `src/lib/ad-eligibility.ts`
+      («Portal oficial» → `official`, el resto → `third_party`); la regla
+      de anuncios la usa. La composición de la página de vacante sale de
+      `server.ts` a `src/lib/job-page-render.ts` (`renderJobPageHtml()`),
+      probable sin red
+- [x] Vacante de terceros: sin marcador de anuncios y con los bloques
+      propios en el HTML inicial (miga, ficha, fuente nombrada, enlace al
+      original, reputación, otras vacantes de la empresa, «Más empleos en
+      <ciudad>») — ADS-032. Sin dato, el bloque no se pinta — ADS-033
+- [x] D1(b) detrás de `THIRD_PARTY_JOB_EXCERPT_ENABLED`, **apagada**
+      (`src/lib/third-party-excerpt.ts`): extracto ≤ 300 caracteres (prefijo
+      literal), sin requisitos, sin JobPosting, `noindex,follow`, el mismo
+      extracto en `__SSR_JOB__`, fuera de `sitemap-jobs.xml`,
+      `sitemap-jobs-recent.xml`, `URL_UPDATED` e IndexNow — ADS-034/035.
+      Con la bandera apagada (o con cualquier valor que no sea
+      `true`/`1`/`on`) el HTML de la vacante es byte a byte el de 449c981:
+      ADS-031 contra `tests/fixtures/job-page-golden/` (una vacante de
+      terceros y una oficial, generadas antes del cambio)
+- [x] ADR `docs/adr/0016-third-party-job-excerpt.md` en **borrador**,
+      requisito antes de encender la bandera (enmienda al contrato
+      JobPosting; abierto: `/api/jobs/:id` se queda completo) — ADS-039
+- [x] Vacante vencida: ya respondía 410 real (archivada, purgada o vencida
+      en sitio) y 301 al portal oficial si fue reemplazada (ADR 0006, sin
+      tocar), sin el shell ni el cargador de anuncios; `test:seo` lo
+      comprueba ahora también (ADS-035). Enlaces: los hubs ya consultan con
+      `liveJobSql()`; además `liveListingJobs()` quita en el render las
+      filas de la caché que ya pasaron los 30 días (o su `validThrough`)
+      en hubs, intención, empresas, `/empleos`, portada y «Más empleos» —
+      ADS-036. Límite: una fila archivada aún joven dentro de una entrada
+      de caché no se detecta hasta que la caché se refresca; el bloque
+      «otras vacantes de la empresa» no trae fecha y no se filtra
+- [x] «Más empleos en <ciudad>» ordenado por cercanía de cargo (palabras
+      del título en común, desempate por el hash del id), mismo número de
+      enlaces — ADS-037
+- [x] `test:seo` en verde
+- [x] Drift local de la ruta real (2026-11-14, `npm run drift:adsense-f2`,
+      `tests/drift-adsense-f2.ts`): 449c981 y esta rama, uno tras otro,
+      contra la misma BD desechable con un hub sintético de Bogotá
+      (16 vacantes, 2 de «Portal oficial»). URLs: 2 vacantes oficiales,
+      2 de terceros (LinkedIn, Computrabajo), `/empleos/bogota`,
+      `sitemap-jobs.xml` y `sitemap-jobs-recent.xml`. Idénticos: status,
+      title, meta description, canonical, robots, H1, JSON-LD (los 4 con
+      JobPosting), `__SSR_JOB__`, marcador de anuncios (sí en las 2
+      oficiales, no en las 2 de terceros), el cuerpo de `#app` fuera de
+      «Más empleos», `__SSR_JOB_LINKS__` fuera de `related`, el hub y los
+      dos sitemaps. **Única diferencia:** la lista de «Más empleos» de las
+      4 vacantes, con 6 enlaces en ambas versiones. Ejemplo: «Mesero» ahora
+      abre con «Mesero de Eventos» y sigue con la rotación anterior
+- [ ] `/seo drift compare` de 2 vacantes de cada procedencia en producción,
+      tras desplegar
+- [x] CX-5 sin perder variedad: en un hub sintético de 60 vacantes con
+      títulos repetidos, 37 listas distintas por rotación → 38 por cercanía;
+      hermanas con el mismo título siguen con listas distintas (ADS-037)
+- [ ] D1(b): API pública de agentes y `/api/jobs/:id` siguen con el texto
+      completo; quedan en «Abierto» del ADR 0016 (no afecta al gate con D1(a))
+- **Gate:** CX-4, CX-9, SP-11, SP-12, PP-4 en CUMPLE con D1(a) — probado
+  por ADS-030…039 y `test:seo`; D1(b) implementada y apagada, con dos
+  consumidores abiertos en el ADR. Drift local de la ruta real hecho;
+  falta el de producción tras desplegar
 
 ## F3 — Guías
 
@@ -164,12 +221,77 @@ anterior. **No se pulsa «Solicitar revisión» antes de F6.**
 
 ## F4 — Datos propios
 
-- [ ] Pruebas que fallan primero: ADS-050…ADS-059
-- [ ] Informe mensual calculado por código, con metodología y límites
-- [ ] Párrafo comparativo propio en cada hub; hubs < 10 siguen sin indexar
-- [ ] Portada: secciones con cifra y contexto en lugar de listas de enlaces
-- [ ] Dashboard en frío y con URL única según el runbook
-- **Gate:** CX-2, CX-6, SP-2, SP-6, AV-1, AV-2 en CUMPLE
+Implementado el 2026-11-15 en `claude/adsense-f4-878771`, PR en borrador
+contra `codex/adsense-readiness`. Ver la nota «Implementado» de F4 en
+`design.md`: ediciones congeladas en el repositorio, sin consultas desde
+ninguna página.
+
+- [x] Pruebas que fallan primero: ADS-050…ADS-059 en
+      `tests/validate-market-report.test.ts` (suite `unit`). Se escribieron
+      antes del código: el primer commit tenía 050–055 en verde y 056–059 en
+      rojo. Integración: `tests/validate-market-report.ts` (suites
+      `integration`, `seo` y `market-report`)
+- [x] Informe mensual calculado por código (`src/lib/market-report.ts`):
+      vacantes por ciudad y por cargo, modalidad, cuota del portal oficial,
+      fuentes, empresas que más publican, cobertura y mediana de salario
+      publicado (mínimo 30 en una moneda), variación contra la edición
+      anterior («sin datos suficientes» mientras no exista), fecha de corte,
+      metodología (dentro del JSON) y límites. Solo agregados: grupos con
+      menos de 10 vacantes suprimidos; sin URL, id ni datos personales
+- [x] `scripts/build-market-report.ts`: una consulta acotada
+      (`queryMarketRows`) en `BEGIN READ ONLY` con `statement_timeout` de
+      60 s; `--dry-run` por defecto. La prueba de integración comprueba que
+      un `UPDATE` falla dentro de esa transacción y que el total coincide
+      con el de la portada
+- [x] Rutas: `/informes/empleo-colombia-AAAA-MM` (HTML con el texto
+      completo en el HTML inicial, Markdown y JSON), `/informes/empleo-colombia`
+      → 302 a la más reciente, `/informes` (200 `noindex` hasta la primera
+      edición). En `sitemap-pages.xml` desde la primera edición. Sin
+      marcador de anuncios. `REPORTS_ENABLED=false`: 404 real y fuera del
+      sitemap. «Informes» en el pie
+- [x] Párrafo comparativo propio en cada hub (`buildHubComparison`):
+      cuota frente al país, puesto entre ciudades o cargos, remoto y portal
+      oficial de la muestra frente al país, empresa con más ofertas. ADS-055
+      comprueba que no se repite entre hubs indexables
+- [x] Hubs simples con menos de 10 vacantes: `noindex,follow` (antes solo
+      con 0, SP-2) y fuera de `sitemap-categories.xml` cuando la edición más
+      reciente (de menos de 45 días) los cuenta por debajo de 10; sin
+      edición, el sitemap queda igual que hoy. Sin anuncios (ya lo hacía F1a)
+- [x] Portada: frase de contexto de las ciudades (cuota del país de las
+      tres primeras) y cuota por tarjeta en escritorio; cifra de cada cargo
+      con la fecha de corte de la edición; enlace al informe. No se quitó
+      ningún enlace (ADS-057)
+- [x] Verificación (2026-11-15): `tsc`, `npm run build`, `test:unit`,
+      `test:seo`, `test:job-render`, `test:agent-readiness`,
+      `test:companies-search` y `test:baseline` en verde
+- [x] En frío según el runbook (BD desechable, 9 procesos nuevos por lado,
+      alternados, URL única `?coldcheck=`; base `449c981` frente a la rama;
+      `npx tsx scripts/run-isolated-tests.ts home-cold`). Medianas:
+      primer `/` móvil 391 → 337 ms; `/` escritorio 44 → 48 ms; `/` en
+      caliente 17 → 18 ms; hub de Bogotá 52 → 51 ms; `/dashboard` 37 → 39 ms;
+      arranque hasta `/api/health` 591 → 483 ms; informe 11 ms. HTML de
+      `/` +2,6 KB y del hub +1,3 KB sin comprimir; JS inicial gzip
+      137,6 → 138,9 KB. Sin regresión: no hay consultas nuevas, cachés ni
+      precalentado nuevos; el caché y el precalentado del dashboard no cambian
+- [ ] **Propietario, requisito antes de desplegar a `main`:** generar la
+      primera edición de **ambos países** contra producción y hacer commit
+      de los JSON. Sin ellos: los hubs no muestran comparación (CX-6), la
+      portada no muestra cifras de cargos, el pie enlaza un `/informes`
+      vacío (señal de sección en construcción, PP-2) y los hubs pequeños
+      quedan `noindex` pero todavía en `sitemap-categories.xml` («URL
+      enviada marcada como noindex» en Search Console). Comandos:
+      `npx tsx scripts/build-market-report.ts --dry-run --country CO`,
+      revisar, `--write --country CO`; lo mismo con `--country VE`. Hacerlo
+      cerca del cierre de cada mes: volver a correrlo en el mismo mes
+      reescribe esa edición. Si pasan más de 45 días sin edición nueva, el
+      sitemap vuelve a listar todos los hubs (vuelve el mismo aviso)
+- [ ] Después del despliegue: `/seo drift compare` de un hub y de `/`, y
+      la comprobación en producción del runbook (URL única, `MISS`)
+- [ ] Posible seguimiento (no en esta fase): automatizar la edición
+      mensual con un cron o un Action que abra un PR con el JSON
+- **Gate:** CX-2, CX-6, SP-2, SP-6, AV-1 y AV-2 tienen cobertura de
+  pruebas. Quedan en CUMPLE en producción cuando exista la primera edición
+  (paso del propietario de arriba)
 
 ## F5 — Herramientas (según D6)
 
@@ -216,6 +338,16 @@ anterior. **No se pulsa «Solicitar revisión» antes de F6.**
       repetir F6
 - [ ] Al aprobar: archivar el cambio y abrir uno nuevo para la colocación
       de anuncios
+
+## Backlog (no implementar todavía)
+
+- [ ] Interruptor por fuente (propietario 2026-11-18): retirar de la web todas
+      las vacantes de una fuente (por ejemplo LinkedIn) con un cambio de
+      configuración de minutos, sin borrar datos ni tocar la ingesta, para el
+      caso de que una fuente pida salir. Debe cubrir páginas de vacante (410 o
+      noindex según ADR), listados, hubs, sitemap, IndexNow, API pública y
+      conteos. Hoy todas las fuentes tienen permiso; guardar esos permisos por
+      escrito.
 
 ## No se toca
 

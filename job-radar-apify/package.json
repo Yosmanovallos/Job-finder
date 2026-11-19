@@ -42,6 +42,7 @@
     "test:seo": "tsx scripts/run-isolated-tests.ts seo",
     "bench:intent-pages": "tsx scripts/run-isolated-tests.ts intent-bench",
     "drift:intent-pages": "tsx scripts/run-isolated-tests.ts intent-drift",
+    "drift:adsense-f2": "tsx scripts/run-isolated-tests.ts adsense-drift",
     "test:home-stats": "tsx scripts/run-isolated-tests.ts home",
     "test:social-publisher": "tsx tests/validate-social-publisher.ts",
     "test:reputation": "tsx tests/validate-reputation-tick.ts",

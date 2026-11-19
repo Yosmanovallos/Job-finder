@@ -29,6 +29,7 @@ import { liveJobSql } from "../lib/job-freshness.js";
 import { findExpiredUrlHashes } from "./expired-job-repository.js";
 import { StaleWhileRevalidateCache } from "../lib/stale-while-revalidate-cache.js";
 import { clipVarchar } from "../lib/varchar.js";
+import type { MarketRow } from "../lib/market-report.js";
 import { RECENT_SITEMAP_WINDOW_HOURS, type RecentReadyJob } from "../lib/recent-jobs.js";
 import { copySpecificCityMismatchSql } from "../lib/official-copy-location.js";
 import { trustedEmploymentType } from "../lib/employment-type-trust.js";
@@ -436,6 +437,8 @@ export interface CanonicalSitemapJob {
   isLocked: boolean;
   /** Real content-change time; NULL for legacy rows (then <lastmod> is omitted). */
   contentUpdatedAt: string | Date | null;
+  /** Provenance for D1(b) (adsense-readiness F2): a third-party copy may be left out. */
+  source: string | null;
 }
 
 export interface SitemapStreamOptions {
@@ -463,6 +466,7 @@ interface SitemapJobRow {
   published_at: string | Date;
   is_locked: boolean;
   content_updated_at: string | Date | null;
+  source: string | null;
 }
 
 /**
@@ -503,11 +507,11 @@ export async function streamCanonicalSitemapJobs(options: SitemapStreamOptions):
     ]);
     await client.query(
       `DECLARE sitemap_jobs_cursor NO SCROLL CURSOR FOR
-       SELECT id, title, company, location, url, published_at, content_updated_at,
+       SELECT id, title, company, location, url, published_at, content_updated_at, source,
               (published_at > NOW() - INTERVAL '48 hours') AS is_locked
        FROM (
          SELECT DISTINCT ON (lower(trim(title)), lower(trim(COALESCE(company, 'confidencial'))), lower(trim(COALESCE(location, CASE country WHEN 'VE' THEN 'venezuela' ELSE 'colombia' END))))
-                id, title, company, location, url, published_at, content_updated_at,
+                id, title, company, location, url, published_at, content_updated_at, source,
                 seo_ready, is_active, valid_through
          FROM jobs
          WHERE is_active = TRUE AND ${liveJobSql()}
@@ -544,7 +548,8 @@ export async function streamCanonicalSitemapJobs(options: SitemapStreamOptions):
           url: row.url ? resolveOutboundUrl(row.url) : row.url,
           publishedAt: row.published_at,
           isLocked: row.is_locked,
-          contentUpdatedAt: row.content_updated_at
+          contentUpdatedAt: row.content_updated_at,
+          source: row.source
         });
         count += 1;
       }
@@ -602,11 +607,11 @@ export async function queryRecentSeoReadyJobs(
     await client.query("BEGIN READ ONLY");
     await client.query("SELECT set_config('statement_timeout', $1, true)", [`${statementTimeoutMs}ms`]);
     const result = await client.query<RecentReadyRow>(
-      `SELECT id, title, company, location, url, country, published_at, content_updated_at,
+      `SELECT id, title, company, location, url, country, published_at, content_updated_at, source,
               (published_at > NOW() - INTERVAL '48 hours') AS is_locked
        FROM (
          SELECT DISTINCT ON (lower(trim(title)), lower(trim(COALESCE(company, 'confidencial'))), lower(trim(COALESCE(location, CASE country WHEN 'VE' THEN 'venezuela' ELSE 'colombia' END))))
-                id, title, company, location, url, country, published_at, content_updated_at,
+                id, title, company, location, url, country, published_at, content_updated_at, source,
                 seo_ready, is_active, valid_through
          FROM jobs
          WHERE is_active = TRUE AND ${liveJobSql()} AND published_at >= NOW() - ($1::int * INTERVAL '1 hour')
@@ -627,7 +632,8 @@ export async function queryRecentSeoReadyJobs(
       country: row.country,
       publishedAt: row.published_at,
       isLocked: row.is_locked,
-      contentUpdatedAt: row.content_updated_at
+      contentUpdatedAt: row.content_updated_at,
+      source: row.source
     }));
     // Same public view as the sitemap and hubs (anonymous visitor).
     return maskLockedFields(jobs, "free");
@@ -1417,6 +1423,54 @@ async function queryHomeJobCounts(country: string, cities: string[]): Promise<Ho
         isLocked: Boolean(row.is_locked)
       }))
   };
+}
+
+/** Read-only query client: the pool, or a client inside BEGIN READ ONLY. */
+export interface MarketRowsClient {
+  query(text: string, values?: unknown[]): Promise<{ rows: unknown[] }>;
+}
+
+/**
+ * The live canonical vacancies of one country (remote rows with no country
+ * included, as on the dashboard), only the columns the monthly report
+ * aggregates — no URL, id or description. Same canonical projection and
+ * country scope as queryHomeJobCounts(), so the report total equals the
+ * home's and the dashboard's.
+ *
+ * Only scripts/build-market-report.ts calls this, once per run inside a READ
+ * ONLY transaction with a statement_timeout. No request path calls it
+ * (adsense-readiness F4; Supabase Disk IO incident, 2026-11-03).
+ */
+export async function queryMarketRows(client: MarketRowsClient, country: "CO" | "VE"): Promise<MarketRow[]> {
+  const sql = createSqlParts();
+  const scope = buildJobWhere({ country }, sql);
+  const result = await client.query(
+    `WITH canonical AS MATERIALIZED (
+       SELECT DISTINCT ON (${VACANCY_IDENTITY_KEYS})
+              title, company, location, source, sources, remote_type, published_at, country,
+              salary_min, salary_max, salary_currency
+       FROM ${vacancyIdentitySourceSql(`is_active = TRUE AND ${liveJobSql()}`)} jobs
+       ORDER BY ${VACANCY_IDENTITY_KEYS}, published_at DESC, id DESC
+     )
+     SELECT title, company, location, source, sources, remote_type, published_at, country,
+            salary_min, salary_max, salary_currency
+     FROM canonical
+     WHERE ${scope.join(" AND ")}`,
+    sql.values
+  );
+  return (result.rows as Array<Record<string, unknown>>).map((row) => ({
+    title: String(row.title ?? ""),
+    company: (row.company as string | null) ?? null,
+    location: (row.location as string | null) ?? null,
+    source: String(row.source ?? ""),
+    sources: Array.isArray(row.sources) ? (row.sources as unknown[]).filter((item): item is string => typeof item === "string") : [],
+    remoteType: (row.remote_type as string | null) ?? null,
+    publishedAt: new Date(row.published_at as string).toISOString(),
+    country: (row.country as string | null) ?? null,
+    salaryMin: row.salary_min === null || row.salary_min === undefined ? null : Number(row.salary_min),
+    salaryMax: row.salary_max === null || row.salary_max === undefined ? null : Number(row.salary_max),
+    salaryCurrency: (row.salary_currency as string | null) ?? null
+  }));
 }
 
 export interface CompanyGroup {

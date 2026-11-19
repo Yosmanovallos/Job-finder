@@ -46,6 +46,8 @@ const suites: Record<string, string[]> = {
     "validate-page-meta.test.ts",
     "validate-adsense-readiness.test.ts",
     "validate-guides.test.ts",
+    "validate-adsense-f2.test.ts",
+    "validate-market-report.test.ts",
     "validate-labor-calculators.test.ts",
     "validate-tools-pages.test.ts",
     "validate-source-closure.test.ts",
@@ -88,6 +90,7 @@ const suites: Record<string, string[]> = {
     "validate-job-page-blocks.ts",
     "validate-companies-search.ts",
     "validate-home-stats.ts",
+    "validate-market-report.ts",
     "validate-sitemap-streaming.ts",
     "validate-run-observability.ts",
     "validate-execution-deadlines.ts",
@@ -113,12 +116,15 @@ const suites: Record<string, string[]> = {
   observability: ["validate-run-observability.ts"],
   pagination: ["validate-job-pagination.ts", "validate-search-narrowing.ts"],
   modality: ["validate-job-modality.test.ts", "validate-job-modality.ts", "validate-backfill-false-remote.ts"],
-  seo: ["validate-seo-job-pages.ts", "validate-job-page-blocks.ts", "validate-intent-pages.ts", "validate-guides-http.ts"],
+  seo: ["validate-seo-job-pages.ts", "validate-job-page-blocks.ts", "validate-intent-pages.ts", "validate-guides-http.ts", "validate-market-report.ts"],
   "intent-bench": ["bench-intent-pages.ts"],
+  "home-cold": ["bench-home-cold.ts"],
   "intent-drift": ["drift-intent-pages.ts"],
+  "adsense-drift": ["drift-adsense-f2.ts"],
   "job-page-blocks": ["validate-job-page-blocks.ts", "validate-job-page-blocks.test.ts"],
   companies: ["validate-company-identity.test.ts", "validate-companies-search.ts"],
   home: ["validate-home-stats.ts"],
+  "market-report": ["validate-market-report.test.ts", "validate-market-report.ts"],
   "saved-jobs": ["validate-saved-jobs.ts"],
   "site-feedback": ["validate-site-feedback.test.ts", "validate-site-feedback.ts"],
   baseline: ["validate-public-baseline.ts"],
@@ -133,7 +139,7 @@ const selection = process.argv[2] || "unit";
 const offline = selection === "unit" || selection === "job-render";
 if (!Object.hasOwn(suites, selection) || process.argv.slice(3).some((arg) => arg !== "--dry-run")) {
   throw new Error(
-    "[P0] Suite inválida. Usa unit, integration, intent-bench, intent-drift, job-render, sitemap, observability, pagination, modality, seo, companies, home, baseline, agent-readiness, job-seo, job-page-blocks, source-closure, job-freshness o direct; --dry-run es opcional."
+    "[P0] Suite inválida. Usa unit, integration, intent-bench, intent-drift, adsense-drift, job-render, sitemap, observability, pagination, modality, seo, companies, home, baseline, agent-readiness, job-seo, job-page-blocks, source-closure, job-freshness o direct; --dry-run es opcional."
   );
 }
 

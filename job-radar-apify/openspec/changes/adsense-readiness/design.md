@@ -179,6 +179,32 @@ En ambos casos:
 - **Portada:** las listas de ciudades y cargos pasan a ser secciones con
   cifra y contexto, no hileras de enlaces (SP-6).
 
+**Implementado (2026-11-15), con dos cambios respecto a lo de arriba:**
+
+- **Ediciones congeladas en el repositorio, no cálculo en vivo.** `jobs`
+  solo guarda 30 días, así que la variación mensual y una URL estable por
+  mes exigen congelar cada edición. `scripts/build-market-report.ts` hace
+  una sola consulta acotada (`queryMarketRows`: la proyección canónica del
+  dashboard, columnas ligeras, sin URL, id ni descripción) dentro de
+  `BEGIN READ ONLY` con `statement_timeout`, agrega en código y escribe
+  `data/market-reports/<CO|VE>-<AAAA-MM>.json` (`--dry-run` por defecto).
+  El archivo trae solo agregados: un grupo con menos de 10 vacantes se
+  suprime; la fecha de corte y la metodología van dentro. El servidor lee
+  los archivos una vez (`src/server/market-reports.ts`); ninguna petición
+  consulta la base para el informe, los hubs ni la portada. Decisión del
+  plan (sesión principal, 2026-11-15); la tabla nueva o leer
+  `archived_jobs` quedaron descartadas sin aprobación del propietario.
+- **URL:** cada edición vive en `/informes/empleo-colombia-AAAA-MM`;
+  `/informes/empleo-colombia` responde 302 a la más reciente y `/informes`
+  las lista (200 `noindex` y fuera del sitemap mientras no haya ninguna).
+  Sin marcador de anuncios. `REPORTS_ENABLED=false`: 404 real y fuera del
+  sitemap.
+- **Hubs:** párrafo calculado contra la edición más reciente del país del
+  hub. Los hubs simples de ciudad o cargo con menos de 10 vacantes pasan a
+  `noindex,follow` (antes solo con 0) y salen de `sitemap-categories.xml`
+  cuando la edición más reciente (de menos de 45 días) los cuenta por
+  debajo de 10.
+
 ## F5 — Herramientas
 
 Calculadoras deterministas, del lado del cliente, sin guardar datos:
