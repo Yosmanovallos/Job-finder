@@ -35,7 +35,9 @@ const dollarJob = {
 const scriptBodies = (html: string, opener: string) =>
   html.split(opener).slice(1).map((rest) => rest.slice(0, rest.indexOf("</script>")));
 
-test("SSR-001 job page body, payload and JSON-LD keep '$' patterns verbatim", () => {
+test("SSR-001 job page body, payload and JSON-LD keep '$' patterns verbatim", (t) => {
+  // Fixtures published 2026-10-20: pin the clock inside the 30-day freshness window.
+  t.mock.timers.enable({ apis: ["Date"], now: new Date("2026-10-25T12:00:00.000Z") });
   const appHtml = buildJobPageBody(dollarJob);
   const links = { jobId: dollarJob.jobId, related: [] };
   const breadcrumb = buildJobBreadcrumbList(dollarJob, null);
@@ -66,7 +68,9 @@ test("SSR-001 job page body, payload and JSON-LD keep '$' patterns verbatim", ()
   assert.doesNotMatch(html, /noindex/);
 });
 
-test("SSR-002 the fixture really triggers the bug a string replacement had", () => {
+test("SSR-002 the fixture really triggers the bug a string replacement had", (t) => {
+  // Fixtures published 2026-10-20: pin the clock inside the 30-day freshness window.
+  t.mock.timers.enable({ apis: ["Date"], now: new Date("2026-10-25T12:00:00.000Z") });
   const pieces = [
     ['<div id="app"></div>', `<div id="app">${buildJobPageBody(dollarJob)}</div>`],
     ["</head>", `<script>window.__SSR_JOB__=${escapeJsonForScriptTag(buildJobPagePayload(dollarJob))};</script></head>`],

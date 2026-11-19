@@ -42,6 +42,11 @@ import {
   remoteJob
 } from "./fixtures/job-meta.js";
 
+// The shared job fixtures were published 2026-10-20: pin the clock inside the
+// 30-day freshness window so these checks do not expire with the calendar.
+import { mock as clockMock } from "node:test";
+clockMock.timers.enable({ apis: ["Date"], now: new Date("2026-10-25T12:00:00.000Z") });
+
 const sha = (value: unknown) =>
   createHash("sha256").update(typeof value === "string" ? value : JSON.stringify(value)).digest("hex");
 const length = (text: string) => Array.from(text).length;
