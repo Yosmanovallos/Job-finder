@@ -1,44 +1,49 @@
-# Línea base del auditor de AdSense — 2026-11-15
+# Línea base del auditor de AdSense
 
-Cambio: `openspec/changes/adsense-readiness`, fase **F0**. Rama
-`claude/adsense-f0-audit-5fec2b` sobre `codex/adsense-readiness` (`449c981`,
-F1a + F1b). F2 (PR #138), F3 (PR #137) y F4 (PR #139) **no están
-fusionados** aquí.
+Cambio: `openspec/changes/adsense-readiness`, fase **F0**. La línea base se
+generó el **2026-11-15** sobre `codex/adsense-readiness` (F1a + F1b) y se
+**actualizó el 2026-11-18** sobre `origin/main`. Ese `main` ya incluye F1
+(#136), F3 con las guías (#137, `GUIDES_ENABLED=true`), F2 (#138), F1c
+(#144) y F4 (#139). F4 está desplegada, pero no hay ninguna edición en
+`data/market-reports/`. F5 (#145, `/herramientas`) todavía no está fusionada.
 
-- Datos: build sintético (`envDir: false`) y PostgreSQL desechable
+- **Datos.** Build sintético (`envDir: false`) y PostgreSQL desechable
   (`production-baseline.sql` + `tests/fixtures/adsense-audit.sql`). Ninguna
-  petición a producción.
-- Informe: [`adsense-audit-baseline.json`](adsense-audit-baseline.json). Solo
-  indicadores: estados, evidencia en una línea, rutas sintéticas y conteos.
-  No incluye HTML, texto de páginas ni datos personales.
-- Reproducir (requiere Docker y Chromium de Playwright):
+  petición a producción. Las guías son las del repo, publicadas hasta la
+  fecha del día (`colombiaToday()`).
+- **Informe.** [`adsense-audit-baseline.json`](adsense-audit-baseline.json)
+  contiene solo indicadores: estados, una línea de evidencia, rutas
+  sintéticas y conteos. No incluye HTML, texto de páginas ni datos personales.
+- **Reproducir.** Requiere Docker y el Chromium de Playwright.
   - `npm run adsense:audit` ejecuta el auditor. **Hoy sale con código 1 a
     propósito**, porque hay reglas medibles que no cumplen.
   - `npm run test:adsense-audit` es el gate de F0. Compara los 50 estados con
     ese JSON y falla si alguno cambia o si falta el archivo.
-- **La línea base la genera el propio auditor.** Fija los estados para
-  detectar regresiones, pero no prueba nada de forma independiente. La
-  justificación independiente es la tabla regla por regla de abajo. Cuando
-  se fusione una fase, copia el informe nuevo que imprime la suite y explica
-  aquí cada estado que cambie.
+- **Límites de la línea base.**
+  - La genera el propio auditor, así que sirve para detectar regresiones, no
+    como prueba independiente. La justificación independiente es la tabla
+    regla por regla de abajo.
+  - **Depende de la fecha.** Las guías programadas salen 2 cada miércoles
+    hasta el 2026-12-16. Con 10 guías (unas 20 páginas originales), CX-1
+    pasará de NO CUMPLE a PARCIAL. Cuando eso pase, o se fusione F5 o exista
+    un informe, copia el informe nuevo que imprime la suite y explica aquí
+    cada estado que cambie.
 
 ## Resultado
 
 | | CUMPLE | PARCIAL | NO CUMPLE | MANUAL |
 |---|---:|---:|---:|---:|
 | `proposal.md` (2026-11-14) | 26 ✅ | 15 ⚠️ | 9 ❌ | — |
-| Auditor sobre esta rama | **21** | **1** | **14** | **14** |
+| Auditor, 2026-11-15 (F1 sola) | 21 | 1 | 14 | 14 |
+| **Auditor, 2026-11-18 (`main`)** | **24** | **4** | **8** | **14** |
 
-Hay 36 reglas medibles por código y 15 de ellas no cumplen: AV-1, AV-2, AV-4,
-CX-1, CX-2, CX-3, CX-4, CX-6, SP-1, SP-2, SP-6, SP-11, SP-12, PP-5 y TX-1.
-Por eso `npm run adsense:audit` sale con código 1. Es lo esperado hasta
-F2–F5. `npm run test:adsense-audit` pasa porque comprueba que el auditor
-**reproduce esta matriz**. Ese es el gate de F0 ajustado por F1.
+Hay 36 reglas medibles por código y 12 todavía no cumplen. Por eso
+`npm run adsense:audit` sale con código 1.
 
 | Métrica (design.md) | Valor | Umbral del gate |
 |---|---:|---|
-| `original_pages` | 10 | ≥ 40 (F5); ≥ 20 en F3 |
-| `original_words` | 2.291 | ≥ 30.000 |
+| `original_pages` | 14 (10 institucionales y legales + 4 guías) | ≥ 40 (F5); ≥ 20 en F3 |
+| `original_words` | 8.304 (2.380 + 5.924 de las guías) | ≥ 30.000 |
 | `copied_indexable_share` | 0,667 (2 de 3 vacantes indexables de la muestra sintética) | según D1 |
 | `ads_on_ineligible_routes` | 0 | 0 |
 | `raw_html_words` mínimo en páginas de texto | 109 (`/legal/uso-aceptable`) | ≥ 150 |
@@ -46,89 +51,84 @@ F2–F5. `npm run test:adsense-audit` pasa porque comprueba que el auditor
 | `broken_internal_links` | 0 de 150 comprobados | 0 |
 | `duplicate_policy_pages` | 0 | 0 |
 
-`original_pages` y `original_words` se calculan desde `sitemap-pages.xml`.
-Cuentan las páginas indexables de familias con texto propio: las
-institucionales (`/about`, `/metodologia`, `/contact`, `/como-funciona`,
-`/preguntas`, `/fuentes`), las cuatro legales y los hijos de `/guias/`,
-`/informes/` y `/herramientas/`. No cuentan la portada, los listados, las
-vacantes, `/privacy` (resume `/legal/privacidad`) ni `/docs` (referencia de la
-API). Cuando se fusionen F3, F4 o F5, el auditor las contará sin cambios.
+La capa original se descubre desde el índice `/sitemap.xml`: todos sus hijos
+salvo vacantes y categorías, es decir, `sitemap-pages.xml` y
+`sitemap-guides.xml`. Por eso solo se cuentan las guías **publicadas**, y los
+informes y herramientas se contarán cuando aparezcan en un sitemap. Las
+familias que cuentan:
 
-## Diferencias con `proposal.md`, regla por regla
+- las institucionales: `/about`, `/metodologia`, `/contact`, `/como-funciona`,
+  `/preguntas` y `/fuentes`;
+- las cuatro páginas legales;
+- las páginas hijas de `/guias/`, `/informes/` y `/herramientas/`.
 
-Estado: C = CUMPLE · P = PARCIAL · N = NO CUMPLE · M = MANUAL.
+No cuentan la portada, los listados, las vacantes, `/privacy` (resume
+`/legal/privacidad`) ni `/docs` (referencia de la API).
 
-### F1 movió estas reglas (ya hecho en `codex/adsense-readiness`)
+## Qué cambió del 2026-11-15 al 2026-11-18 y por qué
 
-| ID | Propuesta | Auditor | Evidencia |
+| ID | Antes | Ahora | Motivo |
 |---|:-:|:-:|---|
-| PP-1 | ❌ | C | `/login`, `/reset-password`, `/cuenta`, la URL inexistente y la vacante vencida: sin marcador `bt-ads` y sin petición a `adsbygoogle.js` en Chromium |
-| PP-2 | ⚠️ | C | `/opiniones` y el hub de Santa Marta (5 vacantes) sin anuncios |
-| PP-3 | ⚠️ | C | `/dashboard` con y sin filtros, sin anuncios |
-| PP-4 | ❌ | C | Las dos vacantes de LinkedIn no llevan anuncios. Control positivo: la vacante de «Portal oficial» sí lleva el marcador |
-| AV-5 | ⚠️ | C | `/metodologia`: 549 palabras en el HTML inicial, enlazada desde `/about` y desde el pie |
-| CX-5 | ⚠️ | C | `/privacy` ya no contradice a `/legal/privacidad` sobre pagos. «Más empleos» no se repite entre vacantes hermanas (0 enlaces en común). La rotación por `stableHash` ya existía antes de F2 |
-| SP-17 | ⚠️ | C | `/contact` explica en el HTML inicial cómo retirar una vacante |
-| SP-19 | ⚠️ | C | «Reportar esta vacante» visible en la vacante oficial y en la de terceros, tras hidratar |
-| PG-5 | ⚠️ | C | Una sola historia de privacidad: Google, publicidad, cookies y cómo desactivar la personalización. **Pendiente:** D5 (CMP) |
-| CX-9 | ⚠️ | C | La vacante vencida responde 410 con noindex y sin anuncios; la URL inexistente, 404; 0 enlaces rotos de 150. **Pendiente:** soft 404 en Search Console |
+| CX-4, SP-11, SP-12 | N | **C** | **Cambio del auditor.** Antes exigía que el propietario registrara D1. Ahora mide la opción que aplican las páginas: hoy es D1(a), porque el extracto está apagado y la página completa es indexable. Comprueba que se cumple: fuente nombrada, enlace al original y sin anuncios. Queda **pendiente** que el propietario confirme D1 con `--attest`, como en las demás reglas mixtas |
+| AV-2 | N | P | `/guias` responde 200 y es indexable (F3). `/informes` responde 200 pero con noindex, porque no hay ninguna edición |
+| AV-4 | N | P | 4 guías publicadas de las 12 del umbral; 0 herramientas (F5 sin fusionar, `/herramientas` responde 404) |
+| CX-3 | N | P | 4 guías publicadas; todavía no hay informe mensual |
+| AV-1, CX-1 | N | N | `original_pages` subió de 10 a 14 y `original_words` de 2.291 a 8.304, pero sigue lejos de 40 páginas y 30.000 palabras |
+| CX-6, SP-2 | N | N | Las causas cambiaron, ver «Brechas reales» |
 
-### Dependen de F2, F3 o F4 (PR sin fusionar): NO CUMPLE declarado
+El resto no cambió. Que el texto de evidencia ya no diga «sin fusionar» es
+deliberado: el auditor dice lo que mide (estado HTTP, noindex, conteos) en
+lugar de suponer qué PR falta.
 
-| ID | Propuesta | Auditor | Qué falta |
-|---|:-:|:-:|---|
-| AV-1 | ❌ | N | `original_pages` 10 < 40, `original_words` 2.291 < 30.000, hubs sin análisis propio (F4) y D1 sin decidir |
-| AV-2 | ⚠️ | N | `/guias` (F3) e `/informes` (F4) responden 404 |
-| AV-4 | ⚠️ | N | 0 guías (F3) y 0 herramientas (F5, D6 sin decidir) |
-| CX-1 | ❌ | N | `original_pages` 10 y `original_words` 2.291 |
-| CX-2 | ❌ | N | Hubs sin `data-hub-comparison` (F4) y D1 sin decidir |
-| CX-3 | ❌ | N | 0 guías publicadas y ningún informe mensual |
-| CX-4, SP-11, SP-12 | ❌ | N | D1 sin decidir. Las vacantes de terceros ya nombran la fuente, enlazan al original y no llevan anuncios. Con D1(a) registrada pasarían; con D1(b) el auditor exige noindex, sin JobPosting y fuera del sitemap |
-| CX-6, SP-2 | ⚠️ | N | El hub de Santa Marta (5 vacantes) es indexable y está en `sitemap-categories.xml`. F4 trae `staticHubRobots` |
-| SP-6 | ⚠️ | N | La portada CO y la VE tienen una lista de solo enlaces cada una (≥ 8 enlaces y < 20 % de texto propio) |
+## NO CUMPLE y PARCIAL: brechas reales o errores del auditor
 
-### Hallazgos nuevos del auditor
+| ID | Estado | ¿Real? | Diagnóstico |
+|---|:-:|---|---|
+| **TX-1** | N | **Real.** Ya estaba antes de este merge | `/fuentes` llega incompleta sin JavaScript: tiene 130 palabras en el HTML inicial y 226 hidratada. Lo que solo aparece después de hidratar es un párrafo real («diez pestañas abiertas, cada una con su propio buscador…») y los nombres de las fuentes. F1 dio `/fuentes` por resuelta («ya lo tenía»), pero su render del servidor no incluye esa sección. Además, 4 páginas completas quedan bajo las 150 palabras de `design.md`: `/legal/uso-aceptable` (109), `/como-funciona` (113), `/fuentes` (130) y `/legal/cookies` (139). Las demás páginas de texto están completas, con al menos el 90 % de las palabras de la versión hidratada |
+| **CX-6, SP-2** | N | **Real.** Depende de los datos de F4 | El hub de Santa Marta (5 vacantes) ya lleva `noindex,follow` (F4, `staticHubRobots`), pero **sigue en `sitemap-categories.xml`**. El sitemap solo excluye un hub cuando hay un snapshot de mercado que conozca su total (`knownStaticHubTotal`). Sin ninguna edición en `data/market-reports/`, el hub se queda listado: es una señal contradictoria (noindex dentro del sitemap). Además, ningún hub tiene `data-hub-comparison`, por la misma causa |
+| **AV-1, CX-1, CX-2** | N | **Real** | La capa original es pequeña (14 páginas, 8.304 palabras) y no hay análisis propio en los hubs mientras no exista un informe |
+| **SP-6** | N | **Real** | La portada CO y la VE tienen una lista de solo enlaces cada una (≥ 8 enlaces y < 20 % de texto propio). F4 añadió `buildHomeCityContext`, pero ese contexto depende del snapshot, que todavía no existe |
+| **PP-5** | N | **Parcialmente un efecto del dato sintético** | `/empresas` lleva anuncios con 83 palabras, porque la muestra sintética tiene 16 empresas. En producción lista 48 y probablemente pase de 150 palabras. La pregunta de fondo sigue abierta: es un directorio de enlaces, ¿debe llevar anuncios? Hay que medirlo con `--live` |
+| **SP-1** | P | **Real, menor** | Paridad del 99,6 % de las palabras. Las diferencias son de redacción entre el HTML del servidor y React: `/opiniones` 94 % («puedes escribir desde esta…»), y en las vacantes la etiqueta «Ubicación» y la fecha absoluta («noviembre») frente a la fecha relativa |
+| **AV-2, AV-4, CX-3** | P | **Real, se resuelve con el tiempo** | Faltan guías hasta llegar a 12, el primer informe (que ejecute el propietario) y F5 |
+| ADS-020 (fuera de la matriz) | — | **Real** | `/opiniones` muestra «Todavía no hay opiniones publicadas» en el HTML inicial |
 
-| ID | Propuesta | Auditor | Hallazgo |
-|---|:-:|:-:|---|
-| TX-1 | ⚠️ (F1 lo dio por hecho) | N | **`/fuentes` llega incompleta sin JavaScript.** Tiene 130 palabras en el HTML inicial frente a 226 después de hidratar. El texto que solo aparece tras hidratar es un párrafo real («diez pestañas abiertas, cada una con su propio buscador…») y los nombres de las fuentes. Además, cuatro páginas completas quedan bajo el umbral de 150 palabras de `design.md`: `/legal/uso-aceptable` (109), `/como-funciona` (113), `/fuentes` (130) y `/legal/cookies` (139) |
-| SP-1 | ✅ «falta prueba» | P | La prueba existe y la paridad es del 99,6 % de las palabras. Las diferencias son de redacción: `/opiniones` 94 % («puedes escribir desde esta…» solo en el servidor) y las vacantes 97–98 % (la etiqueta «Ubicación» y la fecha absoluta «noviembre», que React muestra como fecha relativa). La lista de cada página está en `indicadores.navegador[].palabrasAusentes`. El umbral es el 100 % |
-| PP-5 | ✅ | N | `/empresas` lleva el marcador (≥ 10 vacantes), pero su contenido es solo una lista de empresas: 83 palabras en el sintético, que tiene 16 empresas. En producción muestra 48 empresas y probablemente supere 150 palabras. Hay que medirlo con `--live` y decidir si un directorio de enlaces debe llevar anuncios (PP-3/PP-5) |
-| — (ADS-020) | — | — | **`/opiniones` muestra un apartado vacío en el HTML inicial.** Dice «Todavía no hay opiniones publicadas», y la versión hidratada dice algo parecido. El escenario «sección vacía» de ADS-020 pide no mostrarlo. F1 lo mantuvo como diseño («la invitación a opinar»). La página no lleva anuncios (PP-2 cumple), pero un revisor lo ve. Lo anota AV-3 (MANUAL) |
+**Errores del auditor corregidos en esta actualización:**
 
-### Dependen del propietario o de Google: MANUAL
+1. Solo leía `sitemap-pages.xml`, así que no veía `sitemap-guides.xml` y
+   contaba 0 guías.
+2. Daba CX-4, SP-11 y SP-12 por NO CUMPLE sin medir las páginas, solo porque
+   D1 no estaba registrada.
+3. La evidencia tenía textos fijos que decían «sin fusionar».
+
+El TX-1 que se ve con el merge no es un error del auditor: es el mismo
+hallazgo de `/fuentes` del 2026-11-15.
+
+## MANUAL: dependen del propietario o de Google
 
 El código no puede comprobarlas. Cada entrada del JSON dice qué hay que
 verificar. Con un archivo `--attest` (fecha y evidencia) pasan a CUMPLE.
 
-| ID | Propuesta | Qué hay que verificar |
-|---|:-:|---|
-| AV-3 | ⚠️ | Sesiones y fuentes en GA4 y opiniones publicadas reales. El auditor anota que `/opiniones` sigue mostrando «Todavía no hay opiniones publicadas» |
-| CX-10 | ✅ | Chromium, Firefox y WebKit, en escritorio y móvil (F6). Chromium de escritorio: 22/22 páginas sin errores de JavaScript |
-| SP-3, SP-7, SP-8, SP-13, SP-18 | ✅ | Declaraciones del propietario: dominio, enlaces, tráfico automatizado, reputación y elusión |
-| SP-4, MA-1 | ✅ | Search Console: problemas de seguridad y acciones manuales |
-| SP-10 | ✅ | Revisión humana de que el buscador hace lo que dice |
-| SP-16 | ✅ | Moderación de opiniones (`npm run test:site-feedback`) |
-| PG-1, PG-2, PG-7 | ✅ | Conducta del propietario, GA4 → Adquisición y edad del titular |
+| ID | Qué hay que verificar |
+|---|---|
+| AV-3 | Sesiones y fuentes en GA4 y opiniones publicadas reales |
+| CX-10 | Chromium, Firefox y WebKit, en escritorio y móvil (F6). Chromium de escritorio: 22/22 páginas sin errores de JavaScript |
+| SP-3, SP-7, SP-8, SP-13, SP-18 | Declaraciones del propietario: dominio, enlaces, tráfico automatizado, reputación y elusión |
+| SP-4, MA-1 | Search Console: problemas de seguridad y acciones manuales |
+| SP-10 | Revisión humana de que el buscador hace lo que dice |
+| SP-16 | Moderación de opiniones (`npm run test:site-feedback`) |
+| PG-1, PG-2, PG-7 | Conducta del propietario, GA4 → Adquisición y edad del titular |
 
-### Sin cambios (✅ en la propuesta y CUMPLE en el auditor)
+Pendientes dentro de reglas que ya cumplen por código:
 
-CX-7 (pie con contacto, acerca de, metodología y legales; 0 enlaces rotos),
-CX-8, SP-5 (sin texto oculto, salvo acordeones y variantes responsivas),
-SP-9, SP-14, SP-15, PP-6, PG-3, PG-4, PG-6 (`ads.txt` coincide con la meta
-`google-adsense-account`) y TX-2.
+- D1: el propietario confirma la opción (a) (CX-4, SP-11, SP-12).
+- D5: activar el mensaje de consentimiento (CMP) (PG-5).
+- Soft 404 en Search Console (CX-9).
 
-## Lo que F0 no puede medir
+Los clics de Google a vacantes de terceros, que son el insumo de D1, solo
+están en Search Console y no se inventan.
 
-- **Clics de Google a vacantes de terceros en 28 días** (insumo de D1): son
-  datos de Search Console. Es una tarea MANUAL del propietario y no se
-  inventa.
-- **Vacantes indexables por procedencia en producción:** el modo `--live` las
-  estima con una muestra del sitemap de vacantes (4 por defecto, dentro del
-  límite de URLs). Requiere aprobación del propietario y **no se ha
-  ejecutado**.
-
-## Modo `--live`
+## Modo `--live` (no ejecutado: requiere aprobación)
 
 `npm run adsense:audit -- --live [--max-urls 40] [--delay-ms 1000]`
 
@@ -137,11 +137,13 @@ SP-9, SP-14, SP-15, PP-6, PG-3, PG-4, PG-6 (`ads.txt` coincide con la meta
 - Una pausa de 1 s o más entre peticiones.
 - User-Agent genérico `Mozilla/5.0 (compatible; site-audit/1.0)`.
 - El informe se guarda en el directorio temporal.
+- Las vacantes de la muestra salen del sitemap de vacantes.
 
-Se probó el perfil contra el servidor local (descubrimiento por sitemap,
-presupuesto, pausa y solo GET) en `tests/validate-adsense-audit.ts`: 8 GET en
-unos 7 s. `--browser` no se admite con `--live`, porque las peticiones de la
-SPA no tendrían pausa ni contarían en el límite. En el navegador solo salen
-GET y HEAD al origen auditado. El User-Agent y el rechazo de métodos distintos de GET, de hosts
-ajenos, de pausas menores de 1 s y de más de 120 URLs se prueban sin red en
-`tests/validate-adsense-audit.test.ts`.
+`--browser` no se admite con `--live`, porque las peticiones de la SPA no
+tendrían pausa ni contarían en el límite. En el navegador solo salen GET y
+HEAD al origen auditado.
+
+El perfil se probó contra el servidor local en
+`tests/validate-adsense-audit.ts` (8 GET en unos 7 s). El User-Agent y los
+rechazos (métodos distintos de GET, hosts ajenos, pausas menores de 1 s y más
+de 120 URLs) se prueban sin red en `tests/validate-adsense-audit.test.ts`.

@@ -215,7 +215,15 @@ export async function collectFacts(fetcher: GetFetcher, plan: SamplePlan, mode: 
 
   const robotsTxt = await text("/robots.txt");
   const adsTxt = await text("/ads.txt");
-  const sitemapPages = sitemapLocs((await text("/sitemap-pages.xml")) || "").map((loc) => new URL(loc).pathname);
+  // Every child of the sitemap index except jobs and categories is a content
+  // sitemap (sitemap-pages.xml, sitemap-guides.xml, …): what F3/F4/F5 publish
+  // is discovered here, never assumed.
+  const sitemapIndex = sitemapLocs((await text("/sitemap.xml")) || "").map((loc) => new URL(loc).pathname);
+  const contentMaps = sitemapIndex.filter((path) => !/sitemap-(jobs|categories)/.test(path));
+  const sitemapPages: string[] = [];
+  for (const map of contentMaps.length > 0 ? contentMaps : ["/sitemap-pages.xml"]) {
+    for (const loc of sitemapLocs((await text(map)) || "")) sitemapPages.push(new URL(loc).pathname);
+  }
   const sitemapCategories = sitemapLocs((await text("/sitemap-categories.xml")) || "").map((loc) => new URL(loc).pathname);
 
   for (const [kind, path] of plan.pages) await add(kind, path);
@@ -224,8 +232,7 @@ export async function collectFacts(fetcher: GetFetcher, plan: SamplePlan, mode: 
   const jobs = { ...plan.jobs };
   const jobSample: SiteFacts["jobSample"] = [];
   if (!jobs.official || !jobs.thirdParty) {
-    const index = sitemapLocs((await text("/sitemap.xml")) || "").map((loc) => new URL(loc).pathname);
-    const jobMap = index.find((path) => /sitemap-jobs/.test(path));
+    const jobMap = sitemapIndex.find((path) => /sitemap-jobs/.test(path));
     const jobUrls = jobMap ? sitemapLocs((await text(jobMap)) || "").map((loc) => new URL(loc).pathname) : [];
     for (const path of jobUrls.slice(0, plan.jobSampleSize)) {
       const fetched = await fetcher.get(path);

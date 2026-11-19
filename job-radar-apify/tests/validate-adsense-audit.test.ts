@@ -220,11 +220,17 @@ test("ADS-001 MANUAL rules stay MANUAL without an attestation and never fail the
   assert.equal(exitCodeFor(results), 0);
 });
 
-test("ADS-001 without D1 the third-party rules do not pass", () => {
+test("ADS-001 without an attested D1 the option the pages apply is measured and the owner's confirmation stays pending", () => {
   const results = evaluateRules(compliantSite(), {});
-  for (const id of ["CX-4", "SP-11", "SP-12", "AV-1", "CX-2"]) {
-    assert.equal(results.find((result) => result.id === id)!.estado, "NO CUMPLE", id);
+  for (const id of ["CX-4", "SP-11", "SP-12"]) {
+    const result = results.find((entry) => entry.id === id)!;
+    assert.equal(result.estado, "CUMPLE", id);
+    assert.match(result.pendiente_manual ?? "", /D1: el propietario confirma la opción \(a\)/, id);
   }
+  // A third-party copy with ads still fails, decided or not.
+  const facts = compliantSite();
+  facts.pages = facts.pages.map((entry) => (entry.kind === "vacante-terceros" ? { ...entry, adMarker: true } : entry));
+  assert.equal(evaluateRules(facts, {}).find((entry) => entry.id === "SP-11")!.estado, "NO CUMPLE");
 });
 
 test("ADS-001 D1(b) requires noindex, no JobPosting and no sitemap entry", () => {

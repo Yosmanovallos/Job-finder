@@ -271,6 +271,24 @@ function contradictsPayments(privacy: PageFact, legal: PageFact): boolean {
   return claimsPayments(privacy) !== claimsPayments(legal);
 }
 
+/** «12 institucionales/legales, 4 /guias/…» — what the original layer is made of. */
+function originalBreakdown(facts: SiteFacts): string {
+  const families = new Map<string, { pages: number; words: number }>();
+  for (const page of facts.originalPages) {
+    const family = ORIGINAL_PREFIXES.find((prefix) => page.path.startsWith(prefix)) ?? "institucionales y legales";
+    const entry = families.get(family) ?? { pages: 0, words: 0 };
+    entry.pages += 1;
+    entry.words += page.words;
+    families.set(family, entry);
+  }
+  return [...families].map(([family, entry]) => `${family} ${entry.pages} (${entry.words} palabras)`).join(", ") || "ninguna";
+}
+
+function sectionState(ctx: Context, kind: PageKind, path: string): string {
+  const page = ctx.page(kind);
+  return page ? `${path} (${page.status}${ctx.noindex(page) ? ", noindex" : ""})` : `${path} (sin muestra)`;
+}
+
 function guideCount(facts: SiteFacts): number {
   return facts.originalPages.filter((page) => page.path.startsWith("/guias/")).length;
 }
@@ -292,6 +310,16 @@ function d1(ctx: Context): "a" | "b" | null {
   return value === "a" || value === "b" ? value : null;
 }
 
+/**
+ * D1 option the site applies today, read from the third-party job pages:
+ * (b) = noindex and no JobPosting (excerpt); (a) = the full indexable page.
+ */
+function appliedD1(ctx: Context): "a" | "b" | null {
+  const sample = ctx.pages(THIRD_PARTY_JOBS).filter((page) => page.status === 200);
+  if (sample.length === 0) return null;
+  return sample.every((page) => ctx.noindex(page) && !page.jsonLd.some((block) => block.types.includes("JobPosting"))) ? "b" : "a";
+}
+
 /** Third-party job copies: treatment required by the chosen D1 option. */
 function thirdPartyTreatment(facts: SiteFacts, ctx: Context, needOriginalLink: boolean): Verdict {
   const sample = ctx.pages(THIRD_PARTY_JOBS).filter((page) => page.status === 200);
@@ -304,7 +332,8 @@ function thirdPartyTreatment(facts: SiteFacts, ctx: Context, needOriginalLink: b
     if (!page.jobSource) problems.push(`${page.path}: no nombra la fuente`);
     if (needOriginalLink && page.externalLinks.length === 0) problems.push(`${page.path}: sin enlace al original`);
   }
-  const option = d1(ctx);
+  const decided = d1(ctx);
+  const option = decided ?? appliedD1(ctx);
   if (option === "b") {
     for (const page of sample) {
       if (!ctx.noindex(page)) problems.push(`${page.path}: D1(b) exige noindex`);
@@ -312,20 +341,14 @@ function thirdPartyTreatment(facts: SiteFacts, ctx: Context, needOriginalLink: b
       if (facts.sitemapPages.includes(page.path)) problems.push(`${page.path}: D1(b) la saca del sitemap`);
     }
   }
-  if (!option) {
-    return {
-      estado: "NO CUMPLE",
-      evidencia: `D1 sin decidir; F2 (PR #138) sin fusionar. ${shareText}. ${problems.length ? `Además: ${list(problems)}` : "Tratamiento actual: fuente nombrada, enlace al original, sin anuncios"}`,
-      umbral: "D1 decidida y tratamiento de la opción elegida en todas las vacantes de terceros",
-      valor: shareText,
-      pendiente: "Decisión D1 del propietario (registrar en el archivo de atestaciones)"
-    };
-  }
   return {
     estado: problems.length === 0 ? "CUMPLE" : "NO CUMPLE",
-    evidencia: problems.length === 0 ? `D1(${option}) aplicada en ${sample.length} vacantes de terceros. ${shareText}` : list(problems),
-    umbral: `tratamiento D1(${option})`,
-    valor: shareText
+    evidencia: problems.length === 0
+      ? `D1(${option}) ${decided ? "decidida y " : ""}aplicada en ${sample.length} vacantes de terceros: fuente nombrada, enlace al original, sin anuncios. ${shareText}`
+      : list(problems),
+    umbral: `tratamiento D1(${option}) en todas las vacantes de terceros`,
+    valor: shareText,
+    pendiente: decided ? undefined : `D1: el propietario confirma la opción (${option}) que el sitio aplica hoy (registrar con --attest)`
   };
 }
 
@@ -341,7 +364,7 @@ function hubAnalysis(ctx: Context): { ok: boolean; evidence: string } {
   const without = hubs.filter((page) => !page.markers.includes("data-hub-comparison")).map((page) => page.path);
   return without.length === 0
     ? { ok: true, evidence: `${hubs.length} hubs con análisis propio (data-hub-comparison)` }
-    : { ok: false, evidence: `hubs sin análisis propio (F4, PR #139 sin fusionar): ${list(without)}` };
+    : { ok: false, evidence: `hubs sin análisis propio (data-hub-comparison; F4 lo pinta solo cuando existe una edición en data/market-reports): ${list(without)}` };
 }
 
 function smallHubGuard(facts: SiteFacts, ctx: Context): { ok: boolean; evidence: string } {
@@ -381,11 +404,10 @@ export const RULES: RuleDef[] = [
       if (totals.pages < THRESHOLDS.originalPages) problems.push(`original_pages ${totals.pages} < ${THRESHOLDS.originalPages}`);
       if (totals.words < THRESHOLDS.originalWords) problems.push(`original_words ${totals.words} < ${THRESHOLDS.originalWords}`);
       if (!hubs.ok) problems.push(hubs.evidence);
-      if (!d1(ctx)) problems.push("D1 sin decidir");
       return {
         estado: problems.length === 0 ? "CUMPLE" : "NO CUMPLE",
         evidencia: problems.length === 0 ? `capa original visible: ${totals.pages} páginas, ${totals.words} palabras; ${hubs.evidence}` : list(problems),
-        umbral: `original_pages ≥ ${THRESHOLDS.originalPages}, original_words ≥ ${THRESHOLDS.originalWords}, hubs con análisis propio, D1 aplicada`,
+        umbral: `original_pages ≥ ${THRESHOLDS.originalPages}, original_words ≥ ${THRESHOLDS.originalWords}, hubs con análisis propio`,
         valor: `${totals.pages} páginas / ${totals.words} palabras`
       };
     }
@@ -403,7 +425,7 @@ export const RULES: RuleDef[] = [
       const live = [guides && "/guias", reports && "/informes"].filter(Boolean) as string[];
       return {
         estado: live.length === 2 ? "CUMPLE" : live.length === 1 ? "PARCIAL" : "NO CUMPLE",
-        evidencia: `secciones permanentes indexables: ${list(live)}; ${!guides ? "/guias (F3, PR #137 sin fusionar) " : ""}${!reports ? "/informes (F4, PR #139 sin fusionar) " : ""}${live.length < 2 ? "no responden 200 indexable" : ""}`.trim(),
+        evidencia: `secciones permanentes indexables: ${list(live)}${live.length < 2 ? `; no responden 200 indexable: ${[!guides && sectionState(ctx, "guias", "/guias"), !reports && sectionState(ctx, "informes", "/informes")].filter(Boolean).join(", ")}` : ""}`,
         umbral: "/guias y /informes en 200 e indexables",
         valor: live.length,
         pendiente: "14 días de la capa nueva en producción y tendencia de 404 en Search Console (F6)"
@@ -438,8 +460,8 @@ export const RULES: RuleDef[] = [
       const okGuides = guides >= THRESHOLDS.guides;
       const okTools = tools >= 1 || sectionLive(ctx, "herramientas");
       return {
-        estado: okGuides && okTools ? "CUMPLE" : okGuides || okTools ? "PARCIAL" : "NO CUMPLE",
-        evidencia: `${guides} guías indexables (F3, PR #137 sin fusionar), ${tools} herramientas (F5, según D6)`,
+        estado: okGuides && okTools ? "CUMPLE" : guides > 0 || okTools ? "PARCIAL" : "NO CUMPLE",
+        evidencia: `${guides} guías publicadas e indexables (umbral ${THRESHOLDS.guides}), ${tools} herramientas en el sitemap${sectionLive(ctx, "herramientas") ? "" : `; /herramientas responde ${ctx.page("herramientas")?.status ?? "sin muestra"}`}`,
         umbral: `≥ ${THRESHOLDS.guides} guías y ≥ 1 herramienta`,
         valor: `${guides} guías / ${tools} herramientas`
       };
@@ -480,7 +502,7 @@ export const RULES: RuleDef[] = [
       const ok = totals.pages >= THRESHOLDS.originalPages && totals.words >= THRESHOLDS.originalWords;
       return {
         estado: ok ? "CUMPLE" : totals.pages >= THRESHOLDS.originalPagesPartial ? "PARCIAL" : "NO CUMPLE",
-        evidencia: `original_pages ${totals.pages}, original_words ${totals.words} (institucionales y legales; guías F3 e informes F4 sin fusionar)`,
+        evidencia: `original_pages ${totals.pages}, original_words ${totals.words}: ${originalBreakdown(facts)}`,
         umbral: `original_pages ≥ ${THRESHOLDS.originalPages} y original_words ≥ ${THRESHOLDS.originalWords} (PARCIAL desde ${THRESHOLDS.originalPagesPartial} páginas)`,
         valor: `${totals.pages} / ${totals.words}`
       };
@@ -495,12 +517,12 @@ export const RULES: RuleDef[] = [
     propuesta: "❌",
     evaluate: (_facts, ctx) => {
       const hubs = hubAnalysis(ctx);
-      const option = d1(ctx);
+      const option = d1(ctx) ?? appliedD1(ctx);
       const ok = hubs.ok && option !== null;
       return {
         estado: ok ? "CUMPLE" : "NO CUMPLE",
-        evidencia: `${hubs.evidence}; D1 ${option ? `= ${option}` : "sin decidir"}`,
-        umbral: "análisis propio en cada hub indexable y D1 aplicada"
+        evidencia: `${hubs.evidence}; D1 ${option ? `= ${option}` : "sin muestra"}`,
+        umbral: "análisis propio en cada hub indexable y tratamiento D1 de las vacantes de terceros"
       };
     }
   },
@@ -517,7 +539,7 @@ export const RULES: RuleDef[] = [
       const ok = guides >= THRESHOLDS.guides && reports;
       return {
         estado: ok ? "CUMPLE" : guides > 0 || reports ? "PARCIAL" : "NO CUMPLE",
-        evidencia: `${guides} guías publicadas; informe mensual: ${reports ? "sí" : "no (F4 sin fusionar)"}`,
+        evidencia: `${guides} guías publicadas; informe mensual: ${reports ? "sí" : `no: ${sectionState(ctx, "informes", "/informes")}`}`,
         umbral: `≥ ${THRESHOLDS.guides} guías e informe mensual publicado`,
         valor: guides,
         pendiente: `Ritmo de 2 guías por semana sostenido (fechas de publicación de las últimas ${THRESHOLDS.guideFreshDays} días)`
@@ -557,7 +579,7 @@ export const RULES: RuleDef[] = [
         if (a.length === 0 && b.length === 0) related = "sin bloque «Más empleos» en el HTML inicial";
         else if (a.join("|") === b.join("|")) {
           related = `bloque «Más empleos» idéntico entre vacantes hermanas (${a.length} enlaces)`;
-          problems.push(`${related} — F2 (PR #138) sin fusionar`);
+          problems.push(related);
         } else {
           const shared = a.filter((href) => b.includes(href)).length;
           related = `bloque «Más empleos» distinto entre vacantes hermanas (${a.length} y ${b.length} enlaces, ${shared} en común)`;
@@ -753,7 +775,7 @@ export const RULES: RuleDef[] = [
       const total = homes.reduce((sum, page) => sum + page.bareLinkLists, 0);
       return {
         estado: total === 0 ? "CUMPLE" : "NO CUMPLE",
-        evidencia: `listas que solo enumeran enlaces (≥ 8 enlaces, < 20 % de texto propio): ${lists.join(", ")}${total ? " — F4 (PR #139) sin fusionar" : ""}`,
+        evidencia: `listas que solo enumeran enlaces (≥ 8 enlaces, < 20 % de texto propio): ${lists.join(", ")}`,
         umbral: "0 listas de solo enlaces en la portada (criterio propio)",
         valor: total
       };

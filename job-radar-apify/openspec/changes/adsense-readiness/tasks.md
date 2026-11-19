@@ -52,27 +52,38 @@ anterior. **No se pulsa «Solicitar revisión» antes de F6.**
       palabras, 99,6 %, y por bloque; SP-5 texto oculto en escritorio **y** móvil,
       acordeones `<details>` permitidos). Anuncios observados por petición
       real a `adsbygoogle.js` (abortada) tras disparar el cargador diferido
-- [x] Métricas `original_pages` / `original_words` desde
-      `sitemap-pages.xml` (familias propias: institucionales, legales,
-      `/guias/*`, `/informes/*`, `/herramientas/*`): 10 / 2.291
+- [x] Métricas `original_pages` / `original_words` desde los sitemaps de
+      contenido del índice (`sitemap-pages.xml`, `sitemap-guides.xml`…;
+      familias propias: institucionales, legales, `/guias/*`, `/informes/*`,
+      `/herramientas/*`, solo publicadas): 14 / 8.304 con `main` del
+      2026-11-18 (10 / 2.291 sobre F1 sola)
 - [x] Línea base en `docs/seo-evidence/adsense-audit-baseline.json` (solo
       indicadores; la genera el auditor, es un candado de regresión) y
       `adsense-audit-baseline-2026-11-15.md` (justificación regla por regla
       frente a la propuesta)
-- **Gate (ajustado por F1):** el auditor reproduce la matriz de la línea
-  base — 21 CUMPLE · 1 PARCIAL · 14 NO CUMPLE · 14 MANUAL — con 0
+- **Gate:** el auditor reproduce la matriz de la línea base con 0
   diferencias (`npm run test:adsense-audit` en verde; `npm run
-  adsense:audit` sale 1 hasta F2–F5). F1 movió PP-1…PP-4, AV-5,
-  CX-5, CX-9, SP-17, SP-19 y PG-5 a CUMPLE; AV-1, AV-2, AV-4, CX-1…CX-4,
-  CX-6, SP-2, SP-6, SP-11 y SP-12 siguen en NO CUMPLE porque F2 (#138),
-  F3 (#137) y F4 (#139) no están fusionados; 14 reglas que la propuesta
-  daba por ✅/⚠️ dependen del propietario o de Google (MANUAL)
-- **Hallazgos nuevos:** TX-1 NO CUMPLE (`/fuentes` 130 palabras sin JS
-  frente a 226 hidratada, falta un párrafo; 4 páginas < 150), SP-1 PARCIAL
-  (99,6 % de palabras; diferencias de redacción en `/opiniones` y en las
-  vacantes), PP-5 NO CUMPLE en sintético (`/empresas` con anuncios y solo
-  una lista de enlaces; medir con `--live`), `/opiniones` muestra
-  «Todavía no hay opiniones publicadas» en el HTML inicial (ADS-020)
+  adsense:audit` sale 1 mientras haya medibles sin cumplir).
+  - 2026-11-15, sobre F1: 21 CUMPLE · 1 PARCIAL · 14 NO CUMPLE · 14 MANUAL.
+  - **2026-11-18, sobre `main` (F1, F1c, F2, F3, F4; sin F5 ni ediciones
+    de informe): 24 CUMPLE · 4 PARCIAL · 8 NO CUMPLE · 14 MANUAL.**
+    CX-4/SP-11/SP-12 → CUMPLE (D1(a) medida en las páginas; confirmar D1
+    con `--attest`); AV-2/AV-4/CX-3 → PARCIAL (4 guías publicadas,
+    `/informes` noindex sin edición, `/herramientas` 404). Explicación
+    regla por regla en `docs/seo-evidence/adsense-audit-baseline-2026-11-15.md`
+  - La línea base depende de la fecha (guías programadas): CX-1 pasa a
+    PARCIAL con 10 guías (~2026-12-09)
+- **Brechas reales (no errores del auditor):** TX-1 NO CUMPLE (`/fuentes`
+  130 palabras sin JS frente a 226 hidratada, falta un párrafo; 4 páginas
+  < 150); CX-6/SP-2 (hub < 10 con noindex pero aún en
+  `sitemap-categories.xml` mientras no exista una edición de
+  `data/market-reports`; sin `data-hub-comparison`); SP-6 (listas de solo
+  enlaces en la portada); SP-1 PARCIAL (99,6 %, redacción); PP-5 en
+  sintético (`/empresas`; medir con `--live`); `/opiniones` muestra
+  «Todavía no hay opiniones publicadas» (ADS-020)
+- **Errores del auditor corregidos (2026-11-18):** no leía
+  `sitemap-guides.xml`; exigía D1 registrada en vez de medir la opción
+  aplicada; textos fijos «sin fusionar»
 - Al fusionar cada fase, regenerar la línea base con el informe de la suite
 
 ## F1 — Confianza, higiene y elegibilidad de anuncios

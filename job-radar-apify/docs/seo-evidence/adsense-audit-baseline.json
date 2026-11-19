@@ -1,13 +1,13 @@
 {
-  "generado": "2026-11-15T14:29:58.652Z",
+  "generado": "2026-11-19T01:02:11.027Z",
   "modo": "sintetico",
-  "base": "http://127.0.0.1:54271",
+  "base": "http://127.0.0.1:62999",
   "resumen": {
     "total": 50,
     "porEstado": {
-      "CUMPLE": 21,
-      "PARCIAL": 1,
-      "NO CUMPLE": 14,
+      "CUMPLE": 24,
+      "PARCIAL": 4,
+      "NO CUMPLE": 8,
       "MANUAL": 14
     },
     "medibles": 36,
@@ -18,26 +18,23 @@
       "CX-1",
       "CX-2",
       "CX-3",
-      "CX-4",
       "CX-6",
       "SP-1",
       "SP-2",
       "SP-6",
-      "SP-11",
-      "SP-12",
       "PP-5",
       "TX-1"
     ],
     "metricas": {
-      "original_pages": 10,
-      "original_words": 2291,
+      "original_pages": 14,
+      "original_words": 8304,
       "copied_indexable_share": 0.667,
       "ads_on_ineligible_routes": 0,
       "ssr_hydration_parity": 0.996,
       "broken_internal_links": 0,
       "duplicate_policy_pages": 0,
       "raw_html_words_min_text_pages": 109,
-      "requests": 164
+      "requests": 167
     }
   },
   "reglas": [
@@ -49,9 +46,9 @@
       "fase": "F2–F5",
       "propuesta": "❌",
       "estado": "NO CUMPLE",
-      "evidencia": "original_pages 10 < 40, original_words 2291 < 30000, hubs sin análisis propio (F4, PR #139 sin fusionar): /empleos/bogota, D1 sin decidir",
-      "umbral": "original_pages ≥ 40, original_words ≥ 30000, hubs con análisis propio, D1 aplicada",
-      "valor": "10 páginas / 2291 palabras",
+      "evidencia": "original_pages 14 < 40, original_words 8304 < 30000, hubs sin análisis propio (data-hub-comparison; F4 lo pinta solo cuando existe una edición en data/market-reports): /empleos/bogota",
+      "umbral": "original_pages ≥ 40, original_words ≥ 30000, hubs con análisis propio",
+      "valor": "14 páginas / 8304 palabras",
       "pendiente_manual": null
     },
     {
@@ -61,10 +58,10 @@
       "tipo": "mixta",
       "fase": "F3, F4",
       "propuesta": "⚠️",
-      "estado": "NO CUMPLE",
-      "evidencia": "secciones permanentes indexables: ninguna; /guias (F3, PR #137 sin fusionar) /informes (F4, PR #139 sin fusionar) no responden 200 indexable",
+      "estado": "PARCIAL",
+      "evidencia": "secciones permanentes indexables: /guias; no responden 200 indexable: /informes (200, noindex)",
       "umbral": "/guias y /informes en 200 e indexables",
-      "valor": 0,
+      "valor": 1,
       "pendiente_manual": "14 días de la capa nueva en producción y tendencia de 404 en Search Console (F6)"
     },
     {
@@ -87,10 +84,10 @@
       "tipo": "codigo",
       "fase": "F3, F5",
       "propuesta": "⚠️",
-      "estado": "NO CUMPLE",
-      "evidencia": "0 guías indexables (F3, PR #137 sin fusionar), 0 herramientas (F5, según D6)",
+      "estado": "PARCIAL",
+      "evidencia": "4 guías publicadas e indexables (umbral 12), 0 herramientas en el sitemap; /herramientas responde 404",
       "umbral": "≥ 12 guías y ≥ 1 herramienta",
-      "valor": "0 guías / 0 herramientas",
+      "valor": "4 guías / 0 herramientas",
       "pendiente_manual": null
     },
     {
@@ -114,9 +111,9 @@
       "fase": "F3",
       "propuesta": "❌",
       "estado": "NO CUMPLE",
-      "evidencia": "original_pages 10, original_words 2291 (institucionales y legales; guías F3 e informes F4 sin fusionar)",
+      "evidencia": "original_pages 14, original_words 8304: institucionales y legales 10 (2380 palabras), /guias/ 4 (5924 palabras)",
       "umbral": "original_pages ≥ 40 y original_words ≥ 30000 (PARCIAL desde 20 páginas)",
-      "valor": "10 / 2291",
+      "valor": "14 / 8304",
       "pendiente_manual": null
     },
     {
@@ -127,8 +124,8 @@
       "fase": "F2, F4",
       "propuesta": "❌",
       "estado": "NO CUMPLE",
-      "evidencia": "hubs sin análisis propio (F4, PR #139 sin fusionar): /empleos/bogota; D1 sin decidir",
-      "umbral": "análisis propio en cada hub indexable y D1 aplicada",
+      "evidencia": "hubs sin análisis propio (data-hub-comparison; F4 lo pinta solo cuando existe una edición en data/market-reports): /empleos/bogota; D1 = a",
+      "umbral": "análisis propio en cada hub indexable y tratamiento D1 de las vacantes de terceros",
       "valor": null,
       "pendiente_manual": null
     },
@@ -139,10 +136,10 @@
       "tipo": "mixta",
       "fase": "F3, F4",
       "propuesta": "❌",
-      "estado": "NO CUMPLE",
-      "evidencia": "0 guías publicadas; informe mensual: no (F4 sin fusionar)",
+      "estado": "PARCIAL",
+      "evidencia": "4 guías publicadas; informe mensual: no: /informes (200, noindex)",
       "umbral": "≥ 12 guías e informe mensual publicado",
-      "valor": 0,
+      "valor": 4,
       "pendiente_manual": "Ritmo de 2 guías por semana sostenido (fechas de publicación de las últimas 14 días)"
     },
     {
@@ -152,11 +149,11 @@
       "tipo": "mixta",
       "fase": "F2",
       "propuesta": "❌",
-      "estado": "NO CUMPLE",
-      "evidencia": "D1 sin decidir; F2 (PR #138) sin fusionar. 67 % de la muestra de vacantes indexables viene de portales de terceros. Tratamiento actual: fuente nombrada, enlace al original, sin anuncios",
-      "umbral": "D1 decidida y tratamiento de la opción elegida en todas las vacantes de terceros",
+      "estado": "CUMPLE",
+      "evidencia": "D1(a) aplicada en 2 vacantes de terceros: fuente nombrada, enlace al original, sin anuncios. 67 % de la muestra de vacantes indexables viene de portales de terceros",
+      "umbral": "tratamiento D1(a) en todas las vacantes de terceros",
       "valor": "67 % de la muestra de vacantes indexables viene de portales de terceros",
-      "pendiente_manual": "Decisión D1 del propietario (registrar en el archivo de atestaciones)"
+      "pendiente_manual": "D1: el propietario confirma la opción (a) que el sitio aplica hoy (registrar con --attest)"
     },
     {
       "id": "CX-5",
@@ -166,7 +163,7 @@
       "fase": "F1, F2",
       "propuesta": "⚠️",
       "estado": "CUMPLE",
-      "evidencia": "duplicate_policy_pages 0 (/privacy no contradice a /legal/privacidad); bloque «Más empleos» distinto entre vacantes hermanas (6 y 6 enlaces, 0 en común)",
+      "evidencia": "duplicate_policy_pages 0 (/privacy no contradice a /legal/privacidad); bloque «Más empleos» distinto entre vacantes hermanas (5 y 5 enlaces, 3 en común)",
       "umbral": "duplicate_policy_pages = 0 y «Más empleos» distinto entre vacantes hermanas",
       "valor": 0,
       "pendiente_manual": null
@@ -179,7 +176,7 @@
       "fase": "F4",
       "propuesta": "⚠️",
       "estado": "NO CUMPLE",
-      "evidencia": "hubs sin análisis propio (F4, PR #139 sin fusionar): /empleos/bogota; /empleos/santa-marta: robots «(ninguno)», en sitemap de categorías",
+      "evidencia": "hubs sin análisis propio (data-hub-comparison; F4 lo pinta solo cuando existe una edición en data/market-reports): /empleos/bogota; /empleos/santa-marta: robots «noindex,follow», en sitemap de categorías",
       "umbral": "hubs indexables con análisis propio; hubs < 10 vacantes con noindex y fuera del sitemap",
       "valor": null,
       "pendiente_manual": null
@@ -244,7 +241,7 @@
       "fase": "F0",
       "propuesta": "✅",
       "estado": "PARCIAL",
-      "evidencia": "ssr_hydration_parity (palabras) 99.6 % en 18 páginas; por bloque exacto 68.2 %; páginas por debajo del 100 %: /opiniones 94 % (puedes escribir desde esta), /empleos/a0000000-0000-4000-8000-000000000001… 97 % (ubicación noviembre todos), /empleos/a0000000-0000-4000-8000-000000000002… 98 % (ubicación noviembre)",
+      "evidencia": "ssr_hydration_parity (palabras) 99.6 % en 18 páginas; por bloque exacto 69.9 %; páginas por debajo del 100 %: /opiniones 94 % (puedes escribir desde esta), /empleos/a0000000-0000-4000-8000-000000000001… 97 % (ubicación noviembre todos), /empleos/a0000000-0000-4000-8000-000000000002… 98 % (ubicación noviembre)",
       "umbral": "100 % de las palabras del HTML inicial presentes en el DOM hidratado (PARCIAL ≥ 75 % por página)",
       "valor": 99.6,
       "pendiente_manual": null
@@ -257,7 +254,7 @@
       "fase": "F4",
       "propuesta": "⚠️",
       "estado": "NO CUMPLE",
-      "evidencia": "/empleos/santa-marta: robots «(ninguno)», en sitemap de categorías; hubs sin análisis propio (F4, PR #139 sin fusionar): /empleos/bogota",
+      "evidencia": "/empleos/santa-marta: robots «noindex,follow», en sitemap de categorías; hubs sin análisis propio (data-hub-comparison; F4 lo pinta solo cuando existe una edición en data/market-reports): /empleos/bogota",
       "umbral": "hubs < 10 con noindex y fuera del sitemap; hubs indexables con análisis propio",
       "valor": null,
       "pendiente_manual": null
@@ -309,7 +306,7 @@
       "fase": "F4",
       "propuesta": "⚠️",
       "estado": "NO CUMPLE",
-      "evidencia": "listas que solo enumeran enlaces (≥ 8 enlaces, < 20 % de texto propio): /: 1, /ve: 1 — F4 (PR #139) sin fusionar",
+      "evidencia": "listas que solo enumeran enlaces (≥ 8 enlaces, < 20 % de texto propio): /: 1, /ve: 1",
       "umbral": "0 listas de solo enlaces en la portada (criterio propio)",
       "valor": 2,
       "pendiente_manual": null
@@ -373,11 +370,11 @@
       "tipo": "mixta",
       "fase": "F2",
       "propuesta": "❌",
-      "estado": "NO CUMPLE",
-      "evidencia": "D1 sin decidir; F2 (PR #138) sin fusionar. 67 % de la muestra de vacantes indexables viene de portales de terceros. Tratamiento actual: fuente nombrada, enlace al original, sin anuncios",
-      "umbral": "D1 decidida y tratamiento de la opción elegida en todas las vacantes de terceros",
+      "estado": "CUMPLE",
+      "evidencia": "D1(a) aplicada en 2 vacantes de terceros: fuente nombrada, enlace al original, sin anuncios. 67 % de la muestra de vacantes indexables viene de portales de terceros",
+      "umbral": "tratamiento D1(a) en todas las vacantes de terceros",
       "valor": "67 % de la muestra de vacantes indexables viene de portales de terceros",
-      "pendiente_manual": "Decisión D1 del propietario (registrar en el archivo de atestaciones)"
+      "pendiente_manual": "D1: el propietario confirma la opción (a) que el sitio aplica hoy (registrar con --attest)"
     },
     {
       "id": "SP-12",
@@ -386,11 +383,11 @@
       "tipo": "mixta",
       "fase": "F2",
       "propuesta": "❌",
-      "estado": "NO CUMPLE",
-      "evidencia": "D1 sin decidir; F2 (PR #138) sin fusionar. 67 % de la muestra de vacantes indexables viene de portales de terceros. Tratamiento actual: fuente nombrada, enlace al original, sin anuncios",
-      "umbral": "D1 decidida y tratamiento de la opción elegida en todas las vacantes de terceros",
+      "estado": "CUMPLE",
+      "evidencia": "D1(a) aplicada en 2 vacantes de terceros: fuente nombrada, enlace al original, sin anuncios. 67 % de la muestra de vacantes indexables viene de portales de terceros",
+      "umbral": "tratamiento D1(a) en todas las vacantes de terceros",
       "valor": "67 % de la muestra de vacantes indexables viene de portales de terceros",
-      "pendiente_manual": "Decisión D1 del propietario (registrar en el archivo de atestaciones)"
+      "pendiente_manual": "D1: el propietario confirma la opción (a) que el sitio aplica hoy (registrar con --attest)"
     },
     {
       "id": "SP-13",
@@ -569,7 +566,7 @@
       "fase": "—",
       "propuesta": "✅",
       "estado": "CUMPLE",
-      "evidencia": "27 páginas con <html lang=\"es…\">",
+      "evidencia": "29 páginas con <html lang=\"es…\">",
       "umbral": "lang es en todas las páginas",
       "valor": null,
       "pendiente_manual": null
@@ -673,7 +670,7 @@
       "fase": "F1",
       "propuesta": "⚠️",
       "estado": "NO CUMPLE",
-      "evidencia": "11 páginas de texto; incompletas sin JavaScript: /fuentes (solo tras hidratar: transparencia magneto torre getonboard remoteok remotive workana weremoto); por debajo de 150 palabras: /legal/uso-aceptable (109), /legal/cookies (139), /como-funciona (113), /fuentes (130); palabras inicial/hidratado: /legal/terminos 177/185, /legal/privacidad 241/250, /legal/uso-aceptable 109/117, /legal/cookies 139/146, /privacy 267/285, /about 233/252, /contact 357/376, /metodologia 549/572, /preguntas 243/270, /como-funciona 113/130, /fuentes 130/226",
+      "evidencia": "11 páginas de texto; incompletas sin JavaScript: /fuentes (solo tras hidratar: transparencia magneto torre getonboard remoteok remotive workana weremoto); por debajo de 150 palabras: /legal/uso-aceptable (109), /legal/cookies (139), /como-funciona (113), /fuentes (130); palabras inicial/hidratado: /legal/terminos 177/185, /legal/privacidad 241/250, /legal/uso-aceptable 109/117, /legal/cookies 139/146, /privacy 267/285, /about 322/342, /contact 357/376, /metodologia 549/572, /preguntas 243/270, /como-funciona 113/130, /fuentes 130/226",
       "umbral": "HTML inicial ≥ 80 % del texto hidratado y raw_html_words ≥ 150 en cada página de texto (design.md)",
       "valor": 109,
       "pendiente_manual": null
@@ -700,7 +697,7 @@
         "estado": 200,
         "robots": "",
         "anuncios": true,
-        "palabras": 864,
+        "palabras": 916,
         "jsonld": [
           "Organization",
           "WebSite"
@@ -712,7 +709,7 @@
         "estado": 200,
         "robots": "",
         "anuncios": true,
-        "palabras": 779,
+        "palabras": 827,
         "jsonld": [
           "Organization",
           "WebSite"
@@ -738,7 +735,7 @@
         "estado": 200,
         "robots": "",
         "anuncios": true,
-        "palabras": 636,
+        "palabras": 660,
         "jsonld": [
           "Organization",
           "WebSite",
@@ -750,9 +747,9 @@
         "tipo": "hub-cargo",
         "ruta": "/empleos/ingeniero-civil",
         "estado": 200,
-        "robots": "noindex",
+        "robots": "noindex,follow",
         "anuncios": false,
-        "palabras": 59,
+        "palabras": 93,
         "jsonld": [
           "Organization",
           "WebSite",
@@ -848,7 +845,7 @@
         "estado": 200,
         "robots": "",
         "anuncios": false,
-        "palabras": 233,
+        "palabras": 322,
         "jsonld": [
           "Organization",
           "WebSite"
@@ -989,20 +986,28 @@
       {
         "tipo": "guias",
         "ruta": "/guias",
-        "estado": 404,
-        "robots": "noindex",
+        "estado": 200,
+        "robots": "",
         "anuncios": false,
-        "palabras": 11,
-        "jsonld": []
+        "palabras": 214,
+        "jsonld": [
+          "Organization",
+          "WebSite",
+          "ItemList",
+          "BreadcrumbList"
+        ]
       },
       {
         "tipo": "informes",
         "ruta": "/informes",
-        "estado": 404,
-        "robots": "noindex",
+        "estado": 200,
+        "robots": "noindex,follow",
         "anuncios": false,
-        "palabras": 11,
-        "jsonld": []
+        "palabras": 139,
+        "jsonld": [
+          "Organization",
+          "WebSite"
+        ]
       },
       {
         "tipo": "herramientas",
@@ -1019,7 +1024,7 @@
         "estado": 200,
         "robots": "",
         "anuncios": true,
-        "palabras": 217,
+        "palabras": 239,
         "jsonld": [
           "Organization",
           "WebSite",
@@ -1033,7 +1038,7 @@
         "estado": 200,
         "robots": "",
         "anuncios": false,
-        "palabras": 274,
+        "palabras": 300,
         "jsonld": [
           "Organization",
           "WebSite",
@@ -1047,7 +1052,7 @@
         "estado": 200,
         "robots": "",
         "anuncios": false,
-        "palabras": 276,
+        "palabras": 301,
         "jsonld": [
           "Organization",
           "WebSite",
@@ -1068,9 +1073,9 @@
         "tipo": "hub-pequeno",
         "ruta": "/empleos/santa-marta",
         "estado": 200,
-        "robots": "",
+        "robots": "noindex,follow",
         "anuncios": false,
-        "palabras": 295,
+        "palabras": 319,
         "jsonld": [
           "Organization",
           "WebSite",
@@ -1083,28 +1088,22 @@
       {
         "ruta": "/",
         "anunciosPedidos": true,
-        "bloques": 74,
+        "bloques": 81,
         "ausentes": 1,
         "ocultos": 0,
         "capa": 0.007,
-        "palabrasHidratadas": 815,
-        "palabrasServidor": 253,
+        "palabrasHidratadas": 867,
+        "palabrasServidor": 267,
         "palabrasAusentes": [],
         "palabrasSoloHidratadas": [
           "remotas",
           "presenciales",
           "todo",
           "bogota",
-          "medellin",
-          "cali",
-          "barranquilla",
-          "cartagena",
-          "bucaramanga",
           "instrucciones",
           "llms",
           "txt",
           "mapa",
-          "del",
           "sitio"
         ],
         "errores": 0,
@@ -1113,12 +1112,12 @@
       {
         "ruta": "/empleos/bogota",
         "anunciosPedidos": true,
-        "bloques": 62,
+        "bloques": 64,
         "ausentes": 43,
         "ocultos": 0,
         "capa": 0.007,
         "palabrasHidratadas": 850,
-        "palabrasServidor": 69,
+        "palabrasServidor": 81,
         "palabrasAusentes": [],
         "palabrasSoloHidratadas": [
           "encontradas",
@@ -1291,16 +1290,17 @@
       {
         "ruta": "/about",
         "anunciosPedidos": false,
-        "bloques": 8,
+        "bloques": 12,
         "ausentes": 0,
         "ocultos": 0,
         "capa": 0.007,
-        "palabrasHidratadas": 252,
-        "palabrasServidor": 142,
+        "palabrasHidratadas": 342,
+        "palabrasServidor": 177,
         "palabrasAusentes": [],
         "palabrasSoloHidratadas": [
           "sobre",
           "acerca",
+          "contacto",
           "responsabilidad",
           "funciona",
           "fuentes",
@@ -1671,19 +1671,18 @@
       {
         "ruta": "/empleos/a0000000-0000-4000-8000-000000000001/analista-de-operaciones-sintetico-oficial-medellin-colombia",
         "anunciosPedidos": true,
-        "bloques": 12,
+        "bloques": 14,
         "ausentes": 8,
         "ocultos": 0,
         "capa": 0.007,
         "palabrasHidratadas": 227,
-        "palabrasServidor": 102,
+        "palabrasServidor": 113,
         "palabrasAusentes": [
           "ubicación",
           "noviembre",
           "todos"
         ],
         "palabrasSoloHidratadas": [
-          "sin",
           "especificar",
           "hace",
           "días",
@@ -1709,18 +1708,17 @@
       {
         "ruta": "/empleos/a0000000-0000-4000-8000-000000000002/analista-de-operaciones-sintetico-terceros-uno-bogota-colombia",
         "anunciosPedidos": false,
-        "bloques": 19,
+        "bloques": 21,
         "ausentes": 13,
         "ocultos": 0,
         "capa": 0.007,
-        "palabrasHidratadas": 277,
-        "palabrasServidor": 109,
+        "palabrasHidratadas": 281,
+        "palabrasServidor": 117,
         "palabrasAusentes": [
           "ubicación",
           "noviembre"
         ],
         "palabrasSoloHidratadas": [
-          "sin",
           "especificar",
           "hace",
           "días",
@@ -1772,12 +1770,12 @@
       {
         "ruta": "/empleos/santa-marta",
         "anunciosPedidos": false,
-        "bloques": 22,
+        "bloques": 24,
         "ausentes": 6,
         "ocultos": 0,
         "capa": 0.007,
         "palabrasHidratadas": 324,
-        "palabrasServidor": 68,
+        "palabrasServidor": 80,
         "palabrasAusentes": [],
         "palabrasSoloHidratadas": [
           "encontradas",
@@ -1829,7 +1827,7 @@
       },
       {
         "ruta": "/about",
-        "palabras": 233
+        "palabras": 322
       },
       {
         "ruta": "/metodologia",
@@ -1854,6 +1852,22 @@
       {
         "ruta": "/legal/cookies",
         "palabras": 139
+      },
+      {
+        "ruta": "/guias/agencia-publica-de-empleo-sena",
+        "palabras": 1373
+      },
+      {
+        "ruta": "/guias/trabajo-de-temporada",
+        "palabras": 1381
+      },
+      {
+        "ruta": "/guias/trabajo-remoto-colombia",
+        "palabras": 1821
+      },
+      {
+        "ruta": "/guias/trabajo-sin-experiencia",
+        "palabras": 1349
       }
     ],
     "muestraVacantes": [
@@ -1875,7 +1889,7 @@
     ],
     "enlacesRotos": [],
     "enlacesComprobados": 150,
-    "peticiones": 164,
+    "peticiones": 167,
     "metodos": [
       "GET"
     ]
