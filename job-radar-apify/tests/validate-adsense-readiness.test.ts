@@ -151,3 +151,11 @@ test("ADS-020 every job page offers «Reportar esta vacante»", () => {
   const footer = fs.readFileSync(path.join(here, "..", "src", "sections", "Footer.tsx"), "utf-8");
   for (const href of ["/metodologia", "/contact"]) assert.ok(footer.includes(`href: "${href}"`), href);
 });
+
+test("ADS-021 «Acerca de» names the real person behind the site (D2)", () => {
+  const html = renderContentHtml(PUBLIC_PAGES["/about"]!);
+  assert.match(html, /Yosman Andres Ovallos Melo/);
+  assert.match(html, /Medellín/);
+  assert.match(html, /href="https:\/\/www\.linkedin\.com\/in\/yosmanovallos\/"/);
+  assert.match(html, /href="\/contact"/);
+});

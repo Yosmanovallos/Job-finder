@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import RelatedGuides from "../components/RelatedGuides.js";
 import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
 import { CategoryJobRow } from "../components/CategoryJobRow.js";
 import { ContentCta } from "../components/ContentPage.js";
@@ -22,6 +23,7 @@ import { Job } from "../sources/types.js";
 import { ArrowLeft } from "lucide-react";
 import type { NewTodayBlock } from "../lib/recent-jobs.js";
 import { IntentAnswerBlock } from "../components/IntentAnswerBlock.js";
+import { MARKET_REPORT_INDEX_PATH } from "../lib/market-report.js";
 import { INTENT_LINKS_HEADING, isIntentAnswer, type IntentAnswer, type IntentLink } from "../lib/intent-pages.js";
 
 function isIntentLinks(value: unknown): value is IntentLink[] {
@@ -55,6 +57,8 @@ interface SsrCategoryPayload {
   answer?: IntentAnswer;
   /** City hubs: intent pages that pass the guard. */
   intentLinks?: IntentLink[];
+  /** adsense-readiness F4: this hub against the country (src/lib/market-report.ts). */
+  comparison?: string;
 }
 
 declare global {
@@ -74,6 +78,7 @@ interface CategoryPageState {
   newToday?: NewTodayBlock | null;
   answer?: IntentAnswer | null;
   intentLinks?: IntentLink[];
+  comparison?: string | null;
   fromSsr?: boolean;
 }
 
@@ -135,14 +140,15 @@ export default function CategoryLanding() {
         fromSsr: true,
         newToday: isNewTodayBlock(ssrCategory.newToday) ? ssrCategory.newToday : null,
         answer: isIntentAnswer(ssrCategory.answer) ? ssrCategory.answer : null,
-        intentLinks: isIntentLinks(ssrCategory.intentLinks) ? ssrCategory.intentLinks : []
+        intentLinks: isIntentLinks(ssrCategory.intentLinks) ? ssrCategory.intentLinks : [],
+        comparison: typeof ssrCategory.comparison === "string" ? ssrCategory.comparison : null
       };
     }
     return { id: pageKey, jobs: [], total: 0, insights: null, state: category ? "loading" : "not-found" };
   });
   const current: CategoryPageState =
     page.id === pageKey ? page : { id: pageKey, jobs: [], total: 0, insights: null, state: category ? "loading" : "not-found" };
-  const { jobs, total, insights, state, newToday, answer, intentLinks = [] } = current;
+  const { jobs, total, insights, state, newToday, answer, intentLinks = [], comparison } = current;
 
   useEffect(() => {
     if (!category) {
@@ -441,6 +447,24 @@ export default function CategoryLanding() {
             </section>
           )}
 
+          {comparison && (
+            <section
+              data-hub-comparison
+              aria-label="Comparación con el país"
+              className="sr-host max-w-[1240px] w-full mx-auto px-4 md:px-6 pt-8 md:pt-12"
+            >
+              <h2 className="sr font-heading font-bold text-[24px] md:text-[36px] leading-tight tracking-[-0.03em] mb-2 md:mb-3">
+                Comparación con el país
+              </h2>
+              <p className="sr text-sm md:text-base leading-relaxed text-[#3d413e] max-w-[900px]">{comparison}</p>
+              <p className="sr mt-3 text-sm">
+                <Link to={MARKET_REPORT_INDEX_PATH} className="font-bold text-primary underline underline-offset-4">
+                  Informe del mercado laboral
+                </Link>
+              </p>
+            </section>
+          )}
+
           {jobs.length > 0 && (
             <section className="sr-host max-w-[1240px] w-full mx-auto px-4 md:px-6 py-8 md:py-12">
               {sectionHeadings && (
@@ -504,6 +528,7 @@ export default function CategoryLanding() {
               </ul>
             </nav>
           )}
+          <RelatedGuides className="max-w-[1240px] w-full mx-auto px-4 md:px-6 pb-8 md:pb-12" />
           <ContentCta to={dashboardPath} />
         </>
       )}

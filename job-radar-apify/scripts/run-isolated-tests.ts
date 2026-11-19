@@ -45,6 +45,10 @@ const suites: Record<string, string[]> = {
     "validate-public-api-limits.test.ts",
     "validate-page-meta.test.ts",
     "validate-adsense-readiness.test.ts",
+    "validate-guides.test.ts",
+    "validate-adsense-f2.test.ts",
+    "validate-market-report.test.ts",
+    "validate-adsense-audit.test.ts",
     "validate-source-closure.test.ts",
     "validate-job-freshness.test.ts",
     "validate-company-identity.test.ts",
@@ -85,6 +89,7 @@ const suites: Record<string, string[]> = {
     "validate-job-page-blocks.ts",
     "validate-companies-search.ts",
     "validate-home-stats.ts",
+    "validate-market-report.ts",
     "validate-sitemap-streaming.ts",
     "validate-run-observability.ts",
     "validate-execution-deadlines.ts",
@@ -110,15 +115,20 @@ const suites: Record<string, string[]> = {
   observability: ["validate-run-observability.ts"],
   pagination: ["validate-job-pagination.ts", "validate-search-narrowing.ts"],
   modality: ["validate-job-modality.test.ts", "validate-job-modality.ts", "validate-backfill-false-remote.ts"],
-  seo: ["validate-seo-job-pages.ts", "validate-job-page-blocks.ts", "validate-intent-pages.ts"],
+  seo: ["validate-seo-job-pages.ts", "validate-job-page-blocks.ts", "validate-intent-pages.ts", "validate-guides-http.ts", "validate-market-report.ts"],
   "intent-bench": ["bench-intent-pages.ts"],
+  "home-cold": ["bench-home-cold.ts"],
   "intent-drift": ["drift-intent-pages.ts"],
+  "adsense-drift": ["drift-adsense-f2.ts"],
   "job-page-blocks": ["validate-job-page-blocks.ts", "validate-job-page-blocks.test.ts"],
   companies: ["validate-company-identity.test.ts", "validate-companies-search.ts"],
   home: ["validate-home-stats.ts"],
+  "market-report": ["validate-market-report.test.ts", "validate-market-report.ts"],
   "saved-jobs": ["validate-saved-jobs.ts"],
   "site-feedback": ["validate-site-feedback.test.ts", "validate-site-feedback.ts"],
   baseline: ["validate-public-baseline.ts"],
+  "adsense-audit": ["run-adsense-audit.ts"],
+  "adsense-audit-baseline": ["validate-adsense-audit.ts"],
   "agent-readiness": ["validate-agent-readiness.test.ts", "validate-agent-readiness.ts"],
   "job-seo": [
     "validate-google-readiness.test.ts",
@@ -130,7 +140,7 @@ const selection = process.argv[2] || "unit";
 const offline = selection === "unit" || selection === "job-render";
 if (!Object.hasOwn(suites, selection) || process.argv.slice(3).some((arg) => arg !== "--dry-run")) {
   throw new Error(
-    "[P0] Suite inválida. Usa unit, integration, intent-bench, intent-drift, job-render, sitemap, observability, pagination, modality, seo, companies, home, baseline, agent-readiness, job-seo, job-page-blocks, source-closure, job-freshness o direct; --dry-run es opcional."
+    "[P0] Suite inválida. Usa unit, integration, intent-bench, intent-drift, adsense-drift, job-render, sitemap, observability, pagination, modality, seo, companies, home, baseline, agent-readiness, job-seo, job-page-blocks, source-closure, job-freshness, adsense-audit, adsense-audit-baseline o direct; --dry-run es opcional."
   );
 }
 
@@ -209,7 +219,8 @@ async function executeSuite(file: string, env: NodeJS.ProcessEnv, cwd: string): 
       }
     }
   };
-  const timer = setTimeout(kill, 120000);
+  // The AdSense audit loads ~20 pages in Chromium plus a paced live profile.
+  const timer = setTimeout(kill, file === "validate-adsense-audit.ts" || file === "run-adsense-audit.ts" ? 300000 : 120000);
   const interrupt = () => kill();
   process.once("SIGINT", interrupt);
   process.once("SIGTERM", interrupt);
@@ -266,7 +277,7 @@ async function main(): Promise<void> {
   const results: { suite: string; status: string; durationMs: number }[] = [];
   console.log(`[P0] Entorno temporal: ${directory}`);
   try {
-    if (selection === "baseline" || selection === "job-render") {
+    if (selection === "baseline" || selection === "job-render" || selection.startsWith("adsense-audit")) {
       const buildOptions = {
         root,
         envDir: false,

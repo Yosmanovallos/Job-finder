@@ -20,7 +20,8 @@ const EMPTY: HomeData = {
   totalCompanies: null,
   cityCounts: {},
   latestJobs: [],
-  companies: []
+  companies: [],
+  market: null
 };
 
 export function useHomeData(country: string): HomeData {

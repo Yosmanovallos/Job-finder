@@ -18,8 +18,19 @@ export const MIN_LISTING_JOBS_FOR_ADS = 10;
 /** The employer's own careers site — the only job copy we don't replicate from another job board. */
 export const OFFICIAL_SOURCE = "Portal oficial";
 
+/**
+ * Where a vacancy's text comes from (adsense-readiness F2): "official" is the
+ * employer's own careers site, published to be spread; anything else is a
+ * copy read from another job board.
+ */
+export type JobProvenance = "official" | "third_party";
+
+export function jobProvenance(job: { source?: string | null }): JobProvenance {
+  return job.source === OFFICIAL_SOURCE ? "official" : "third_party";
+}
+
 export function isAdEligibleJobPage(job: { source?: string | null }, googleReady: boolean): boolean {
-  return googleReady && job.source === OFFICIAL_SOURCE;
+  return googleReady && jobProvenance(job) === "official";
 }
 
 /** A hub, company or index listing: indexable and with enough real vacancies to be a page of its own. */

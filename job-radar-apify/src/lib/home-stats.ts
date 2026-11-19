@@ -1,4 +1,5 @@
 import { COUNTRIES, getCountryConfig } from "../countries/index.js";
+import type { HomeMarketFigures } from "./market-report.js";
 
 // Shape of GET /api/home-stats, shared by server.ts (which builds it) and
 // use-home-data.ts (which reads it). No JSX or DB imports: both bundles use
@@ -32,7 +33,27 @@ export interface HomeData {
   cityCounts: Record<string, number | null>;
   latestJobs: HomeJob[];
   companies: HomeCompany[];
+  /** Role figures of the newest frozen market report (adsense-readiness F4); null without one. */
+  market?: HomeMarketFigures | null;
 }
+
+// Role pages that exist in sitemap-categories.xml (DEFAULT_ROLES_200) —
+// labels slugify to exactly those URLs through buildCategoryPath. The home
+// links every one of them; the server attaches their report figures.
+export const HOME_POPULAR_ROLES = [
+  "Asesor comercial",
+  "Auxiliar administrativo",
+  "Auxiliar de enfermería",
+  "Ejecutivo de ventas",
+  "Contador público",
+  "Desarrollador full stack",
+  "Analista de logística",
+  "Cuidadora de adultos mayores",
+  "Diseñador gráfico",
+  "Ingeniero industrial",
+  "Community manager",
+  "Ingeniero civil"
+];
 
 // The "Explora por ciudad" cards. The server only counts these cities, so
 // the endpoint can't be asked for arbitrary filters.
