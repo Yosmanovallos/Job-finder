@@ -194,6 +194,16 @@ anterior. **No se pulsa «Solicitar revisión» antes de F6.**
 - [ ] Al aprobar: archivar el cambio y abrir uno nuevo para la colocación
       de anuncios
 
+## Backlog (no implementar todavía)
+
+- [ ] Interruptor por fuente (propietario 2026-11-18): retirar de la web todas
+      las vacantes de una fuente (por ejemplo LinkedIn) con un cambio de
+      configuración de minutos, sin borrar datos ni tocar la ingesta, para el
+      caso de que una fuente pida salir. Debe cubrir páginas de vacante (410 o
+      noindex según ADR), listados, hubs, sitemap, IndexNow, API pública y
+      conteos. Hoy todas las fuentes tienen permiso; guardar esos permisos por
+      escrito.
+
 ## No se toca
 
 `src/lib/job-filters.ts` (`CITY_OPTIONS`), el caché de páginas del
