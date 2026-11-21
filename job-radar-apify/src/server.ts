@@ -243,6 +243,12 @@ const SPA_ROUTES = new Set([
   "/opiniones"
 ]);
 
+// AI Resume Studio (ADR 0017): read once at startup; only the literal
+// "true" turns it on (same rule as parseResumeStudioFlag in
+// src/lib/resume-studio.ts, kept inline so the main server doesn't import
+// the module's zod schemas).
+const RESUME_STUDIO_ENABLED = process.env.RESUME_STUDIO_ENABLED === "true";
+
 // "Opiniones y ayuda": 5 messages per IP every 10 minutes is plenty for a
 // person and keeps a script from filling the table.
 const FEEDBACK_RATE_LIMIT = 5;
@@ -1215,6 +1221,23 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
         preferredRoles: session.preferredRoles
       })
     );
+    return;
+  }
+
+  // 4b-resume. AI Resume Studio (ADR 0017, R1): /hoja-de-vida/* and
+  // /api/resume/*. Off by default: with RESUME_STUDIO_ENABLED unset or
+  // anything but "true", this is one boolean check and both prefixes fall
+  // into the same 404s as before. The module is imported lazily, so startup
+  // and the dashboard warmup don't load it.
+  if (
+    RESUME_STUDIO_ENABLED &&
+    (pathname === "/hoja-de-vida" || pathname.startsWith("/hoja-de-vida/") || pathname.startsWith("/api/resume/"))
+  ) {
+    const { handleResumeRoute } = await import("./server/routes/resume.js");
+    await handleResumeRoute(req, res, pathname, method, {
+      getSession: verifySession,
+      loadIndexHtml: async () => (await readStaticFile(path.join(PUBLIC_DIR, "index.html"))).toString("utf8")
+    });
     return;
   }
 

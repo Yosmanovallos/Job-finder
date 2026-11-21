@@ -1,8 +1,18 @@
 # Resume Studio R1 — CV base: subir, extraer, confirmar (sin IA)
 
-**Estado:** propuesto en R0 (2026-11-21). **No implementado.** Se ejecuta en una
-sesión propia, después de R0.
-**ADR:** [`docs/adr/0017-resume-studio-implementation.md`](../../../docs/adr/0017-resume-studio-implementation.md).
+**Estado:** implementado con **alcance ajustado** y archivado (2026-11-21).
+Rama `codex/resume-studio-r1`, PR contra `codex/resume-studio`. Evidencia en
+[`validation.md`](validation.md).
+
+> **Alcance ajustado (2026-11-21, encargo de la sesión R0).** R1 se cerró sin
+> subida de archivos: CV base **creado desde cero y editado a mano**. Quedan
+> fuera de R1 y pasan a un cambio posterior (antes de R3): subida PDF/DOCX,
+> validaciones de archivo y su auditoría de librerías (punto 4), extracción
+> determinista con `source_span` (punto 5) y la prueba T-FILE. El esquema de
+> hechos ya trae `source` y `sourceSpan` (nulo) para recibirlas. La
+> precondición D6 **sigue abierta**: necesita acceso de solo lectura a
+> Supabase y aprobación del propietario; R1 no toca esas tablas ni Supabase.
+**ADR:** [`docs/adr/0017-resume-studio-implementation.md`](../../../../docs/adr/0017-resume-studio-implementation.md).
 **Rama:** `codex/resume-studio-r1`, cortada de `codex/resume-studio` (no de
 `origin/main`); vuelve a `codex/resume-studio` por PR. Nada a `main`.
 **Fuente de fases:** doc 11 §8 (manda sobre la tabla del doc 10).
