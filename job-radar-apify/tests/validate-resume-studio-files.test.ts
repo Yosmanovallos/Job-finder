@@ -214,3 +214,19 @@ test("T-FILE the process is alive and its memory stayed bounded", () => {
   const grownMb = (process.memoryUsage().rss - rssBefore) / (1024 * 1024);
   assert.ok(grownMb < 200, `RSS grew ${grownMb.toFixed(0)} MB`);
 });
+
+test("RS2-FILE-NATIVE pdf.js's optional native canvas is blocked by the owner's decision (2026-11-21)", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const { createRequire } = await import("node:module");
+  const pkg = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8")) as {
+    dependencies: Record<string, string>;
+    overrides?: Record<string, string>;
+  };
+  assert.equal(pkg.dependencies["@napi-rs/canvas"], "file:./vendor/napi-rs-canvas-stub");
+  assert.equal(pkg.overrides?.["@napi-rs/canvas"], "$@napi-rs/canvas");
+  const lock = await readFile(new URL("../package-lock.json", import.meta.url), "utf8");
+  assert.doesNotMatch(lock, /"node_modules\/@napi-rs\/canvas-/, "no per-platform native canvas package in the lockfile");
+  // Requiring it throws, exactly like a missing optional dependency (pdf.js catches and only warns).
+  const require = createRequire(new URL("../node_modules/pdfjs-dist/package.json", import.meta.url));
+  assert.throws(() => require("@napi-rs/canvas"), /intentionally not installed/);
+});

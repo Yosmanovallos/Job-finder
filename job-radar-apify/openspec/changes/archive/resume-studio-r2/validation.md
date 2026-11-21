@@ -132,13 +132,23 @@ sigue apagada por defecto. Gates corridos sobre el HEAD final del código
 | `pdfjs-dist` **6.5.438** (exacta) | texto de PDF, solo dentro del worker | Apache-2.0 | Mozilla; esta versión es del 2026-11-01 y publican una al mes | CVE-2024-4367 (ejecución de código por fuentes) se corrigió en 4.2.67; la v6 ya no usa `eval` (`isEvalSupported` desapareció). `npm audit --omit=dev`: 0 avisos de pdf.js |
 | DOCX | lector ZIP y tokenizador propios, sobre `zlib` de Node | — | código nuestro, unas 200 líneas con pruebas | sin parser XML, así que no hay entidades que resolver |
 
-**Para decidir (propietario):** `pdfjs-dist` declara como **opcional** el
-binario nativo `@napi-rs/canvas` (Skia precompilado), y npm lo instala. El
-doc 06 pide «sin binarios nativos». La extracción de texto no lo usa: pdf.js
-solo lo carga para pintar, y aquí corre aislado en el worker. Opciones:
+**Binario nativo bloqueado (decisión del propietario, 2026-11-21:
+«Bloquearlo»).** `pdfjs-dist` declara como opcional `@napi-rs/canvas` (Skia
+precompilado), y el doc 06 pide «sin binarios nativos». Cómo se bloqueó:
 
-- (a) aceptarlo;
-- (b) reemplazarlo por un paquete vacío con `overrides` de npm.
+- Un paquete local vacío, `vendor/napi-rs-canvas-stub/`, cuyo `require`
+  lanza un error igual que si no estuviera instalado. pdf.js ya envuelve ese
+  `require` en try/catch y solo avisa.
+- Es dependencia directa (`file:`) y `overrides` la impone a pdf.js con
+  `"$@napi-rs/canvas"`. La forma `file:` directa dentro de `overrides` no
+  sirve: npm resuelve la ruta relativa a `pdfjs-dist` y deja una entrada rota
+  en el lockfile.
+- Verificado con un `npm ci` limpio: el lockfile solo tiene el enlace al
+  stub, sin paquetes por plataforma, y hay **0 archivos `.node` de canvas o
+  pdf.js** en `node_modules`.
+- Siguen en verde T-FILE-1..8, incluida la bomba PDF, `tsc`, `build` (CSS
+  idéntico) y `test:integration` (27/27).
+- `RS2-FILE-NATIVE` protege el bloqueo: si alguien lo quita, falla.
 
 `npm audit --omit=dev` muestra un aviso **alto** en `zod <4.6.6`
 (GHSA-mrhx-c7xc-m3w5). Es preexistente y no viene de R2.

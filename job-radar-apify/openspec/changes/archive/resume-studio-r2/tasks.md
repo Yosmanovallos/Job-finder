@@ -3,7 +3,7 @@
 Rama `codex/resume-studio-r2` desde `codex/resume-studio-r1`. Evidencia en
 `validation.md`.
 
-- [x] Auditoría de librerías para PDF (pdf.js 6.5.438) y decisión DOCX sin librería. **Abierto para el propietario:** binario opcional `@napi-rs/canvas`.
+- [x] Auditoría de librerías para PDF (pdf.js 6.5.438) y decisión DOCX sin librería. Binario opcional `@napi-rs/canvas` **bloqueado** por decisión del propietario (stub local + `overrides`).
 - [x] Pruebas T-FILE-1..8 (F1–F8 del doc 09 §2) + casos válidos generados en la prueba (sin binarios en el repo).
 - [x] `POST /api/resume/import`: multipart con corte a 2 MB, firma de bytes, worker con 5 s y memoria acotada, 1 parseo a la vez, nada guardado.
 - [x] Pruebas SSRF (IP privada directa y por DNS, redirección a IP privada, IPv4 embebida en IPv6, puertos, esquemas, > 2 MB, cuerpo lento, tipo de contenido).
@@ -19,6 +19,5 @@ Rama `codex/resume-studio-r2` desde `codex/resume-studio-r1`. Evidencia en
 
 ## Pendientes antes de R5 (no bloquean R2)
 
-- Decidir `@napi-rs/canvas` (aceptar u `overrides` vacío).
 - Revisión visual de las dos tarjetas nuevas con sesión real (escritorio y 375 px).
 - Bitácora de eventos sin PII para subida y links (doc 08 §7).
