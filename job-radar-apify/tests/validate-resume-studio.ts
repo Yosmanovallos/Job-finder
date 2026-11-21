@@ -29,7 +29,8 @@ const PORT = Number(process.env.TEST_HTTP_PORT);
 const BASE = `http://127.0.0.1:${PORT}`;
 const USER_A = "4e500000-0000-4000-8000-00000000000a";
 const USER_B = "4e500000-0000-4000-8000-00000000000b";
-const TOKENS: Record<string, string> = { "token-a": USER_A, "token-b": USER_B };
+const USER_D = "4e500000-0000-4000-8000-00000000000d";
+const TOKENS: Record<string, string> = { "token-a": USER_A, "token-b": USER_B, "token-d": USER_D };
 
 function session(id: string): VerifiedSession {
   return { id, email: `${id}@example.test`, name: null, tier: "free", subscriptionEnd: null, preferredRoles: null, authCreatedAt: null };
@@ -309,6 +310,37 @@ async function main() {
     assert.equal(await count(`SELECT COUNT(*) AS n FROM rs_resumes WHERE user_id = $1`, [pruneUser]), 0);
     assert.equal(await count(`SELECT COUNT(*) AS n FROM rs_resume_versions WHERE user_id = $1`, [pruneUser]), 0);
     console.log("✅ [PASSED] T-DEL: borrar todo = 0 filas de CV y versiones; constancias y datos ajenos intactos.");
+
+    // 10. The consent texts are what happens: unchecking «guardar» removes the
+    // server copy, and revoking records granted=false rows and removes it too.
+    await pool.query(`INSERT INTO users (id, email) VALUES ($1, 'rs-d@example.test') ON CONFLICT (id) DO NOTHING`, [USER_D]);
+    const grant = (cloud_storage: boolean) =>
+      call("POST", "/api/resume/consent", "token-d", {
+        policyVersion: RESUME_POLICY_VERSION,
+        decisions: { cv_processing: true, terms: true, cloud_storage }
+      });
+    await grant(true);
+    assert.equal((await call("POST", "/api/resume/resumes", "token-d", sampleInput("Persona D"))).status, 201);
+    res = await grant(false);
+    assert.equal(res.status, 201);
+    assert.equal(res.data.deletedResumes, 1);
+    assert.equal(await count(`SELECT COUNT(*) AS n FROM rs_resumes WHERE user_id = $1`, [USER_D]), 0, "sin «guardar» no queda copia en el servidor");
+    assert.equal(await count(`SELECT COUNT(*) AS n FROM rs_resume_versions WHERE user_id = $1`, [USER_D]), 0);
+    assert.equal((await call("POST", "/api/resume/resumes", "token-d", sampleInput("Persona D"))).data.code, "storage_consent_required");
+    await grant(true);
+    assert.equal((await call("POST", "/api/resume/resumes", "token-d", sampleInput("Persona D"))).status, 201);
+    const before = await count(`SELECT COUNT(*) AS n FROM rs_consents WHERE user_id = $1`, [USER_D]);
+    res = await call("POST", "/api/resume/consent", "token-d", { policyVersion: RESUME_POLICY_VERSION, revoke: true });
+    assert.equal(res.status, 201);
+    assert.equal(res.data.required, false);
+    assert.equal(res.data.deletedResumes, 1);
+    assert.equal(await count(`SELECT COUNT(*) AS n FROM rs_consents WHERE user_id = $1`, [USER_D]), before + 3, "revocar = filas nuevas");
+    assert.equal(await count(`SELECT COUNT(*) AS n FROM rs_consents WHERE user_id = $1 AND granted = FALSE`, [USER_D]), 4);
+    assert.equal(await count(`SELECT COUNT(*) AS n FROM rs_resumes WHERE user_id = $1`, [USER_D]), 0, "revocar borra la hoja de vida guardada");
+    res = await call("POST", "/api/resume/resumes", "token-d", sampleInput("Persona D"));
+    assert.equal(res.status, 403);
+    assert.equal(res.data.code, "consent_required", "tras revocar no se puede escribir");
+    console.log("✅ [PASSED] Desmarcar «guardar» borra la copia del servidor; revocar = filas granted=false + borrado + escrituras 403.");
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()));
     await pool.end();

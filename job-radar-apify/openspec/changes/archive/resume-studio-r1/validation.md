@@ -39,6 +39,12 @@ versionó). No se suprimió nada.
   - **T-IDOR ✅**: el usuario B lee, edita, lista versiones, deshace,
     restaura y borra el CV de A → 404 sin datos de A; su exportación y su
     lista no contienen nada de A; el CV de A queda intacto.
+  - **Texto = comportamiento ✅**: desmarcar «Guardar mi hoja de vida en mi
+    cuenta» borra en la misma transacción la copia del servidor (el cliente
+    deja antes la última versión en este navegador); «Revocar» inserta una
+    fila `granted=false` por finalidad, borra la hoja de vida guardada y
+    después toda escritura responde 403. Se eligió borrar (no 409) para que
+    el texto de la casilla se cumpla sin pasos extra.
   - **T-DEL ✅**: «Borrar todo» deja 0 filas de A en `rs_resumes` y
     `rs_resume_versions`; las 6 constancias de A se conservan; los datos de B
     siguen; borrar la cuenta (`users`) borra en cascada.
@@ -62,7 +68,7 @@ versionó). No se suprimió nada.
 - JS inicial (entrada + `modulepreload`): 139 708 → 140 368 B gzip
   (+0,66 KB, +0,5 %). El chunk `utils` (ya precargado en la base) quedó
   dentro de `index`; la página va en su propio chunk `ResumeStudio`
-  (83,6 KB, 20,7 KB gzip) que solo se descarga en `/hoja-de-vida`.
+  (85,1 KB, 21,1 KB gzip) que solo se descarga en `/hoja-de-vida`.
 - Frío local (`home-cold`, 9 procesos por lado alternados, URLs únicas,
   medianas):
 

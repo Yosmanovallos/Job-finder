@@ -130,9 +130,19 @@ export async function handleResumeRoute(
       if (method !== "POST") return json(res, 405, { error: "Método no permitido" });
       const body = await readBody(req, res);
       if (!body) return;
-      const value = body.value as { policyVersion?: unknown; decisions?: Record<string, unknown> } | null;
+      const value = body.value as { policyVersion?: unknown; decisions?: Record<string, unknown>; revoke?: unknown } | null;
       if (!value || value.policyVersion !== RESUME_POLICY_VERSION) {
         return json(res, 409, { error: "El texto de la autorización cambió. Recarga la página.", policyVersion: RESUME_POLICY_VERSION });
+      }
+      // Revocation (Ley 1581 art. 8; doc 06 §4 «revocar = fila nueva»): one
+      // granted=false row per purpose, and the stored CV goes with it.
+      if (value.revoke === true) {
+        const { deletedResumes } = await recordConsents(
+          userId,
+          CONSENT_ITEMS.map((item) => ({ purpose: item.purpose, granted: false, textHash: consentTextHash(item.text) })),
+          true
+        );
+        return json(res, 201, { ...consentStatus(await getConsentState(userId)), deletedResumes });
       }
       const decisions = value.decisions && typeof value.decisions === "object" ? value.decisions : {};
       for (const item of CONSENT_ITEMS) {
@@ -144,11 +154,15 @@ export async function handleResumeRoute(
       if (Object.keys(decisions).some((key) => !CONSENT_ITEMS.some((item) => item.purpose === key))) {
         return json(res, 400, { error: "Autorización desconocida." });
       }
-      await recordConsents(
+      const { deletedResumes } = await recordConsents(
         userId,
-        CONSENT_ITEMS.map((item) => ({ purpose: item.purpose, granted: decisions[item.purpose] === true, textHash: consentTextHash(item.text) }))
+        CONSENT_ITEMS.map((item) => ({ purpose: item.purpose, granted: decisions[item.purpose] === true, textHash: consentTextHash(item.text) })),
+        // Without «guardar en mi cuenta» nothing stays on the server: a copy
+        // saved under an earlier grant is removed now (the client keeps it
+        // in this browser first).
+        decisions.cloud_storage !== true
       );
-      return json(res, 201, consentStatus(await getConsentState(userId)));
+      return json(res, 201, { ...consentStatus(await getConsentState(userId)), deletedResumes });
     }
 
     // Holder's rights: export and delete everything (no consent needed) ----

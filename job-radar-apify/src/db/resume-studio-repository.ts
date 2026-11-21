@@ -140,9 +140,19 @@ export async function getConsentState(userId: string): Promise<Partial<Record<Co
   }
 }
 
-export async function recordConsents(userId: string, decisions: ConsentDecision[]): Promise<void> {
+/**
+ * Records one decision per purpose. `deleteStoredData` (storage not granted,
+ * or a full revocation) removes the user's stored resumes and versions in
+ * the same transaction, so the consent text («sin esta casilla… solo en este
+ * navegador», «revocar») is what actually happens. Returns resumes removed.
+ */
+export async function recordConsents(
+  userId: string,
+  decisions: ConsentDecision[],
+  deleteStoredData: boolean
+): Promise<{ deletedResumes: number }> {
   try {
-    await inTransaction(async (client) => {
+    return await inTransaction(async (client) => {
       for (const decision of decisions) {
         await client.query(
           `INSERT INTO rs_consents (user_id, purpose, policy_version, granted, text_hash)
@@ -150,6 +160,10 @@ export async function recordConsents(userId: string, decisions: ConsentDecision[
           [userId, decision.purpose, RESUME_POLICY_VERSION, decision.granted, decision.textHash]
         );
       }
+      if (!deleteStoredData) return { deletedResumes: 0 };
+      const deleted = await client.query(`DELETE FROM rs_resumes WHERE user_id = $1`, [userId]);
+      await client.query(`DELETE FROM rs_resume_versions WHERE user_id = $1`, [userId]);
+      return { deletedResumes: deleted.rowCount ?? 0 };
     });
   } catch (error) {
     rethrow(error);

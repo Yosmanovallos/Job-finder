@@ -355,6 +355,8 @@ Referencias de conversión [3º RevenueCat 2026, apps móviles, no web]:
 | **R4b** | «Mis postulaciones» (tracker) | Flujo completo vacante → CV → postulé → entrevista |
 | **R5** | Un solo merge aprobado | — |
 
+> **R1 cerrada con alcance ajustado (2026-11-21):** CV base creado y editado a mano, sin subida ni extracción. Subir PDF/DOCX, extraer con `source_span` y T-FILE pasan a un cambio posterior (antes de R3); D6 sigue abierta. Ver [`openspec/changes/archive/resume-studio-r1/`](../../openspec/changes/archive/resume-studio-r1/proposal.md).
+
 Decidido el 2026-11-21: **pases sin renovación automática**; se empieza R0.
 Pendiente del propietario: capturas del precio de la prueba de JobStep
 (las consigue él). Decisiones abiertas: D2 precio final (propuesta

@@ -48,8 +48,9 @@ export const CONSENT_ITEMS: readonly ConsentItem[] = [
       "formación, habilidades e idiomas) para crearla, editarla, mostrarla en vista previa y, cuando use esas funciones, " +
       "adaptarla a vacantes con ayuda de un proveedor de inteligencia artificial ubicado en Estados Unidos (Alibaba Cloud, " +
       "región Virginia), que puede conservar las solicitudes hasta 30 días. No debo incluir datos sensibles (foto, cédula, " +
-      "estado civil, salud). Puedo conocer, actualizar, rectificar y suprimir mis datos, revocar esta autorización y " +
-      "descargar una copia en cualquier momento desde esta misma página (Ley 1581 de 2012, art. 8). Las consultas se " +
+      "estado civil, salud). Puedo conocer, actualizar, rectificar y suprimir mis datos, descargar una copia y revocar " +
+      "esta autorización en cualquier momento desde esta misma página; al revocarla se borra la hoja de vida guardada en " +
+      "mi cuenta (Ley 1581 de 2012, art. 8). Las consultas se " +
       "responden en 10 días hábiles y los reclamos en 15. Política de privacidad: /legal/privacidad."
   },
   {
@@ -71,7 +72,8 @@ export const CONSENT_ITEMS: readonly ConsentItem[] = [
     text:
       "Si marcas esta casilla, guardamos en tu cuenta el contenido de tu hoja de vida, la plantilla elegida y hasta 50 " +
       "versiones anteriores para que puedas deshacer cambios. No guardamos archivos ni fotos. Solo tú puedes verla. Puedes " +
-      "descargar todo en JSON o borrarlo en cualquier momento. Sin esta casilla, la hoja de vida vive solo en este navegador."
+      "descargar todo en JSON o borrarlo en cualquier momento. Sin esta casilla, la hoja de vida vive solo en este navegador; " +
+      "si la desmarcas después, pasamos tu última versión a este navegador y borramos la copia guardada en tu cuenta."
   }
 ];
 

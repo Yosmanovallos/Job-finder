@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { Download, History, Plus, Save, Trash2, Undo2, X } from "lucide-react";
+import { Download, History, Plus, Save, ShieldCheck, ShieldOff, Trash2, Undo2, X } from "lucide-react";
 import { useAuth } from "../auth/auth-provider.js";
 import { ResumeTemplate } from "../components/resume/ResumeTemplate.js";
 import {
@@ -293,6 +293,29 @@ export default function ResumeStudio() {
     }
   };
 
+  const revoke = async () => {
+    if (
+      !window.confirm(
+        "Vas a revocar tu autorización: borraremos la hoja de vida guardada en tu cuenta y la copia de este navegador. ¿Continuar?"
+      )
+    )
+      return;
+    setBusy(true);
+    try {
+      const { res, data } = await api("/consent", { method: "POST", body: JSON.stringify({ policyVersion: RESUME_POLICY_VERSION, revoke: true }) });
+      if (!res.ok) return showError(data);
+      writeLocalDraft(userId, null);
+      setResume(null);
+      setVersions(null);
+      setDraft(emptyDraft());
+      setDirty(false);
+      setMessage(null);
+      await load();
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (phase === "loading") return <div className="p-10 text-center text-muted-foreground">Cargando…</div>;
   if (phase === "unavailable") {
     return (
@@ -304,7 +327,14 @@ export default function ResumeStudio() {
     );
   }
   if (phase === "consent" && consent) {
-    return <ConsentStep consent={consent} api={api} onDone={() => void load()} />;
+    return (
+      <ConsentStep
+        consent={consent}
+        api={api}
+        keepLocalCopy={() => writeLocalDraft(userId, draft)}
+        onDone={() => void load()}
+      />
+    );
   }
 
   const canSave = Boolean(consent?.storage);
@@ -334,6 +364,12 @@ export default function ResumeStudio() {
           </button>
           <button className={buttonClass} onClick={() => void deleteAll()} disabled={busy}>
             <Trash2 className="h-4 w-4" /> Borrar todo
+          </button>
+          <button className={buttonClass} onClick={() => setPhase("consent")} disabled={busy}>
+            <ShieldCheck className="h-4 w-4" /> Autorización
+          </button>
+          <button className={buttonClass} onClick={() => void revoke()} disabled={busy}>
+            <ShieldOff className="h-4 w-4" /> Revocar
           </button>
         </div>
       </div>
@@ -429,9 +465,11 @@ export default function ResumeStudio() {
 function ConsentStep({
   consent,
   api,
+  keepLocalCopy,
   onDone
 }: {
   consent: ConsentView;
+  keepLocalCopy: () => void;
   api: (path: string, init?: RequestInit) => Promise<{ res: Response; data: { error?: string } | null }>;
   onDone: () => void;
 }) {
@@ -442,6 +480,11 @@ function ConsentStep({
   const ready = consent.items.filter((i) => i.required).every((i) => checked[i.purpose]);
 
   const submit = async () => {
+    const storageOff = consent.storage && !checked.cloud_storage;
+    if (storageOff) {
+      if (!window.confirm("Borraremos la copia guardada en tu cuenta y tu última versión quedará solo en este navegador. ¿Continuar?")) return;
+      keepLocalCopy();
+    }
     setBusy(true);
     setError(null);
     const decisions = Object.fromEntries(consent.items.map((i) => [i.purpose, checked[i.purpose] === true]));
