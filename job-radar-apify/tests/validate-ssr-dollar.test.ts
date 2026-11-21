@@ -19,7 +19,16 @@ import {
   injectJobHeadMeta,
   injectJobPageContent
 } from "../src/lib/job-seo.js";
-import { fullJob } from "./fixtures/job-meta.js";
+import { FIXTURE_NOW, fullJob } from "./fixtures/job-meta.js";
+
+// buildJobPosting() reads the wall clock (job-freshness.ts); freeze it at
+// FIXTURE_NOW so the fixed-date fixtures never age out of the 30-day window.
+test.beforeEach(() => {
+  test.mock.timers.enable({ apis: ["Date"], now: FIXTURE_NOW });
+});
+test.afterEach(() => {
+  test.mock.timers.reset();
+});
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const shell = fs.readFileSync(path.join(here, "..", "index.html"), "utf-8");
