@@ -13,12 +13,12 @@ Rama `codex/resume-studio-r2` desde `codex/resume-studio-r1`. Evidencia en
 - [x] Caché 24 h por URL canónica (`rs_job_snapshot_cache`), sin texto pegado.
 - [x] UI mínima en `/hoja-de-vida`: subir archivo / pegar texto; link de vacante.
 - [x] Gates: tsc, build, test:unit (JPD-001 heredado aparte), test:integration, test:resume-studio, test:direct; T-FREE sin cambios.
-- [x] Muestra de 30 links reales (CO) con aprobación del propietario: 63,3 % resuelto sin LLM (peor caso).
+- [x] Muestra de 30 links reales (CO) con aprobación del propietario: 63,3 % resuelto sin LLM en el peor caso (62,1 % sin el link leído por la API de SmartRecruiters, que ahora va por la web).
+- [x] Revisión: bomba de descompresión en PDF (+867 MB → rechazo a +27 MB), JS en `/ObjStm`, cupo liberado al salir el hilo.
 - [x] Revisar el diff, PR en borrador contra `codex/resume-studio`, archivar este cambio.
 
 ## Pendientes antes de R5 (no bloquean R2)
 
-- Probar JS dentro de `/ObjStm` con un PDF de flujo xref real (ver validation §5).
 - Decidir `@napi-rs/canvas` (aceptar u `overrides` vacío).
 - Revisión visual de las dos tarjetas nuevas con sesión real (escritorio y 375 px).
 - Bitácora de eventos sin PII para subida y links (doc 08 §7).

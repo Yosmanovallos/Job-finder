@@ -54,10 +54,11 @@ Orden fijo (AGENTS.md §Source priority):
    `maskLockedFields`, igual que la ruta pública).
 2. URL que ya está en nuestra tabla `jobs` (por `url`): datos que ya
    tenemos, sin tocar el sitio.
-3. Greenhouse / Lever / Ashby / SmartRecruiters con id de la vacante →
-   API pública, reutilizando los parsers del pipeline directo (movidos sin
-   cambios a `src/lib/ats-posting-parsers.ts` para que el servidor web siga
-   sin importar `src/direct/`, ADR 0006 §9).
+3. Greenhouse / Lever / Ashby con id de la vacante → API pública,
+   reutilizando los parsers del pipeline directo (movidos sin cambios a
+   `src/lib/ats-posting-parsers.ts` para que el servidor web siga sin
+   importar `src/direct/`, ADR 0006 §9). SmartRecruiters va por el paso 4:
+   el `robots.txt` de su API dice `Disallow: /` (ADR 0002).
 4. Otro sitio → GET con controles SSRF y `robots.txt` → `JobPosting`
    JSON-LD.
 5. LinkedIn (`linkedin.com`, `lnkd.in`) y sitios con login o anti-bot
