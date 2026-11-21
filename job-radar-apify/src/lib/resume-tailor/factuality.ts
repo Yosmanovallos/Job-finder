@@ -10,7 +10,7 @@ import { normalizeText } from "./text.js";
 //   - anything else      → the proposal is DISCARDED.
 // An unknown supporting fact id also discards it.
 
-export type ClaimKind = "number" | "month" | "skill" | "proper_noun" | "title";
+export type ClaimKind = "number" | "month" | "skill" | "proper_noun" | "title" | "link";
 
 export interface Claim {
   kind: ClaimKind;
@@ -42,7 +42,7 @@ const TITLE_WORDS = new Set(
 
 function numbersIn(n: string): string[] {
   const out: string[] = [];
-  for (const m of n.matchAll(/\d+(?:[.,]\d+)?%?/g)) out.push(m[0].replace(",", "."));
+  for (const m of n.matchAll(/(?<![a-z0-9])\d+(?:[.,]\d+)?%?(?![a-z])/g)) out.push(m[0].replace(",", "."));
   for (const w of n.split(/[^a-z]+/)) if (NUMBER_WORDS[w]) out.push(NUMBER_WORDS[w]);
   return out;
 }
@@ -62,7 +62,9 @@ function properNouns(text: string): string[] {
       const capital = /^\p{Lu}/u.test(token);
       const acronym = /^\p{Lu}{2,}$/u.test(token);
       const inner = /\p{Ll}\p{Lu}/u.test(token);
-      if (acronym || inner || (capital && !sentenceStart)) out.push(token);
+      // «B2», «ISO9001», «GA4»: letters and digits together name something specific.
+      const mixed = /\d/.test(token) && /\p{L}/u.test(token);
+      if (acronym || inner || mixed || (capital && !sentenceStart)) out.push(token);
       sentenceStart = false;
     }
     if (/[.!?:;]["»)]*$/.test(raw) || raw === "·" || raw === "-" || raw === "–" || raw === "|") sentenceStart = true;
@@ -82,6 +84,8 @@ export function newClaims(text: string, sources: string[]): Claim[] {
     if (!claims.some((c) => c.kind === kind && normalizeText(c.value) === normalizeText(value))) claims.push({ kind, value });
   };
 
+  // Links, e-mails, HTML or Markdown never come from the model (doc 08 §3 «exfiltración»).
+  for (const m of text.matchAll(/https?:\/\/\S+|www\.\S+|\S+@\S+\.\w+|<\/?[a-z][^>]*>|\]\(\S+\)/gi)) push("link", m[0]);
   for (const num of numbersIn(nt)) {
     const bare = num.replace("%", "");
     const supported = num.endsWith("%")

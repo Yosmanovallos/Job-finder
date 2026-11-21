@@ -8,6 +8,9 @@ const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
 const URL = /\b(?:https?:\/\/|www\.)[^\s<>()]+|\b(?:linkedin\.com|github\.com)\/[^\s<>()]+/gi;
 const PHONE = /(?:\+?\d{1,3}[\s.-]?)?(?:\(?\d{3}\)?[\s.-]?)\d{3}[\s.-]?\d{4}\b/g;
 
+export const INSTRUCTION_TO_AI =
+  /(ignora|ignore|olvida|disregard|omite)\b.{0,40}\b(instrucci|instruction|reglas|rules|prompt|anteriores|previous)|nuevas instrucciones|new instructions|system prompt|eres ahora|you are now|<<<|>>>/i;
+
 export const SENSITIVE_PATTERNS: { label: string; re: RegExp }[] = [
   { label: "documento de identidad", re: /\b(c[ée]dula|c\.?\s?c\.?\s*(no\.?|n[°º])?\s*\d|documento de identidad|pasaporte|tarjeta de identidad|\bnit\b|\bdni\b)/i },
   { label: "estado civil", re: /\b(estado civil|solter[oa]|casad[oa]|divorciad[oa]|viud[oa]|uni[óo]n libre)\b/i },
@@ -17,6 +20,8 @@ export const SENSITIVE_PATTERNS: { label: string; re: RegExp }[] = [
   { label: "afiliación política o sindical", re: /\b(partido pol[íi]tico|afiliaci[óo]n pol[íi]tica|sindicato)\b/i },
   { label: "foto", re: /\b(foto(graf[íi]a)?\s*:)/i },
   { label: "libreta militar", re: /\blibreta militar\b/i },
+  // Text aimed at the AI inside a CV is not CV content (doc 09 §4 adversarial).
+  { label: "texto dirigido a la IA", re: INSTRUCTION_TO_AI },
   { label: "dirección de residencia", re: /\b(direcci[óo]n\s*:|calle\s+\d+|carrera\s+\d+|cra\.?\s*\d+|cl\.?\s*\d+\s*#|barrio\s+\w+)/i }
 ];
 

@@ -28,6 +28,8 @@ export interface JobAnalysis {
   titleTerms: string[];
   /** "rules", "model" or "none" — shown so the user knows where the list came from. */
   source: "rules" | "model" | "none";
+  /** Lines that looked like instructions to an AI (prompt injection) and were ignored. */
+  suspiciousLines: number;
 }
 
 export const MAX_REQUIREMENTS = 12;
@@ -38,9 +40,12 @@ const HEADINGS: { re: RegExp; section: Section }[] = [
   { re: /^(requisitos|requerimientos|requisitos minimos|perfil|perfil requerido|que buscamos|que necesitas|que necesitamos|lo que buscamos|requirements|qualifications|must have|necesitamos|buscamos)$/, section: "must" },
   { re: /^(deseable|deseables|plus|seria un plus|es un plus|valoramos|se valorara|nice to have|preferred|preferible|te destacaras si)$/, section: "nice" },
   { re: /^(funciones|responsabilidades|que haras|tus funciones|actividades|responsibilities|mision del cargo)$/, section: "tasks" },
-  { re: /^(beneficios|ofrecemos|te ofrecemos|condiciones|salario|horario|lugar de trabajo|ubicacion|sobre nosotros|quienes somos|benefits|about us|tipo de contrato|contrato)$/, section: "other" }
+  { re: /^(beneficios|ofrecemos|te ofrecemos|que ofrecemos|que te ofrecemos|lo que ofrecemos|condiciones|salario|horario|lugar de trabajo|ubicacion|sobre nosotros|quienes somos|benefits|about us|tipo de contrato|contrato)$/, section: "other" }
 ];
 
+const INSTRUCTION_LIKE =
+  /(ignora|ignore|olvida|disregard|omite)\b.{0,40}\b(instrucci|instruction|reglas|rules|prompt|anteriores|previous)|nuevas instrucciones|new instructions|system prompt|eres ahora|you are now|<<<|>>>/i;
+const OFFER_START = /^(ofrecemos|te ofrecemos|beneficios|salario|sueldo|horario|contrato|tipo de contrato|lugar de trabajo|modalidad|we offer|benefits)\b/;
 const NICE_WORDS = /\b(deseable|plus|valorara|valoramos|preferible|preferiblemente|ideal|nice to have|preferred|bonus)\b/;
 const MUST_WORDS = /\b(indispensable|obligatorio|excluyente|minimo|minima|requerido|requerida|must|required|necesario)\b/;
 
@@ -86,7 +91,13 @@ export function analyzeJob(input: { title: string; description: string }): JobAn
   const tasks: string[] = [];
   let section: Section = null;
   const seen = new Set<string>();
+  let suspicious = 0;
   const add = (text: string, kind: RequirementKind) => {
+    // Lines that talk to the AI are not requirements (doc 09 V4): dropped and counted.
+    if (INSTRUCTION_LIKE.test(text)) {
+      suspicious++;
+      return;
+    }
     const key = normalizeText(text);
     if (seen.has(key)) return;
     seen.add(key);
@@ -118,7 +129,12 @@ export function analyzeJob(input: { title: string; description: string }): JobAn
     }
     if (section === "must" || section === "nice") {
       for (const item of items(rest)) {
-        const ni = normalizeText(item);
+        const ni = normalizeText(item)
+        // «… Deseable: pruebas A/B. Ofrecemos contrato…»: the offer ends the list.
+        if (OFFER_START.test(ni)) {
+          section = "other";
+          break;
+        }
         const kind: RequirementKind = NICE_WORDS.test(ni) ? "nice" : MUST_WORDS.test(ni) ? "must" : section;
         add(item, kind);
       }
@@ -137,7 +153,8 @@ export function analyzeJob(input: { title: string; description: string }): JobAn
     tasks: tasks.slice(0, 12),
     skills: findSkills(`${input.title}\n${input.description}`),
     titleTerms: contentTerms(input.title),
-    source: ordered.length ? "rules" : "none"
+    source: ordered.length ? "rules" : "none",
+    suspiciousLines: suspicious
   };
 }
 
@@ -154,7 +171,7 @@ export function acceptModelRequirements(
   const seen = new Set<string>();
   for (const p of proposed) {
     const key = normalizeText(p.text);
-    if (key.length < 6 || !hay.includes(key) || seen.has(key)) continue;
+    if (key.length < 6 || !hay.includes(key) || seen.has(key) || INSTRUCTION_LIKE.test(p.text)) continue;
     seen.add(key);
     out.push({ id: `r${out.length + 1}`, text: p.text.trim(), kind: p.kind, skills: findSkills(p.text), terms: contentTerms(p.text) });
     if (out.length >= MAX_REQUIREMENTS) break;
