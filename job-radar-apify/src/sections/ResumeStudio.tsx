@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Download, History, Plus, Save, ShieldCheck, ShieldOff, Trash2, Undo2, X } from "lucide-react";
 import { useAuth } from "../auth/auth-provider.js";
 import { ResumeTemplate } from "../components/resume/ResumeTemplate.js";
+import { TailorAgent, type TailorJob } from "../components/resume/TailorAgent.js";
 import {
   RESUME_POLICY_VERSION,
   RESUME_TEMPLATES,
@@ -18,7 +19,9 @@ import {
 // CV written by hand with a live preview in one of three templates, server
 // versions with undo/restore, JSON export and «borrar todo». R2 adds two
 // inputs with no AI: CV file → text (or paste) and vacancy link → JobSnapshot
-// (or paste). No payments. Signed-in only (RequireAuth in App).
+// (or paste). R3 adds the AI: «Llenar los campos» (CV text → facts with
+// verified source spans) and the card agent that adapts the CV to the
+// vacancy (TailorAgent). No payments. Signed-in only (RequireAuth in App).
 // The server answers 404 for all of this while RESUME_STUDIO_ENABLED is off.
 
 interface ConsentItemView {
@@ -126,6 +129,7 @@ export default function ResumeStudio() {
   const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string; issues?: string[] } | null>(null);
   const [versions, setVersions] = useState<VersionView[] | null>(null);
   const [mobileTab, setMobileTab] = useState<"edit" | "preview">("edit");
+  const [tailorJob, setTailorJob] = useState<TailorJob | null>(null);
 
   useEffect(() => {
     document.title = "Mi hoja de vida | BuscoTrabajo";
@@ -419,6 +423,24 @@ export default function ResumeStudio() {
         </Card>
       ) : null}
 
+      {tailorJob ? (
+        <div className="mt-4">
+          <TailorAgent
+            accessToken={accessToken ?? ""}
+            baseFacts={draft.facts}
+            templateId={draft.templateId}
+            job={tailorJob}
+            onClose={() => setTailorJob(null)}
+            onUse={(facts) => {
+              setDraft({ ...draft, facts });
+              setDirty(true);
+              setTailorJob(null);
+              setMessage({ kind: "ok", text: "La versión adaptada quedó en el editor. Revísala y guárdala si te sirve; tu base guardada no ha cambiado." });
+            }}
+          />
+        </div>
+      ) : (
+      <>
       <div className="md:hidden flex gap-2 mt-4" role="tablist">
         {(["edit", "preview"] as const).map((tab) => (
           <button
@@ -435,8 +457,14 @@ export default function ResumeStudio() {
 
       <div className="grid md:grid-cols-2 gap-6 mt-4">
         <div className={`space-y-4 ${mobileTab === "edit" ? "" : "hidden md:block"}`}>
-          <CvImport accessToken={accessToken ?? ""} />
-          <JobLink accessToken={accessToken ?? ""} />
+          <CvImport
+            accessToken={accessToken ?? ""}
+            onFacts={(facts) => {
+              setDraft({ ...draft, facts });
+              setDirty(true);
+            }}
+          />
+          <JobLink accessToken={accessToken ?? ""} onTailor={(job) => setTailorJob(job)} />
           <Editor draft={draft} setDraft={(next) => { setDraft(next); setDirty(true); }} update={update} />
         </div>
         <div className={mobileTab === "preview" ? "" : "hidden md:block"}>
@@ -461,6 +489,8 @@ export default function ResumeStudio() {
           </div>
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 }
@@ -773,7 +803,7 @@ function Editor({
 
 const CV_MAX_BYTES = 2 * 1024 * 1024;
 
-function CvImport({ accessToken }: { accessToken: string }) {
+function CvImport({ accessToken, onFacts }: { accessToken: string; onFacts: (facts: ResumeFacts) => void }) {
   const [text, setText] = useState("");
   const [note, setNote] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -799,11 +829,35 @@ function CvImport({ accessToken }: { accessToken: string }) {
     }
   };
 
+  const fill = async () => {
+    if (!window.confirm("Los campos de abajo se reemplazarán con lo que se lea de este texto. Podrás revisarlos antes de guardar. ¿Continuar?")) return;
+    setBusy(true);
+    setNote(null);
+    try {
+      const res = await fetch("/api/resume/extract", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({ text })
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) return setNote({ kind: "error", text: data?.error ?? "No pudimos leer el texto. Llena los campos a mano." });
+      onFacts(data.facts);
+      const parts = ["Llenamos los campos: revísalos antes de guardar."];
+      if (data.removed?.length) parts.push(`Dejamos por fuera datos que no hacen falta: ${data.removed.join(", ")}.`);
+      if (data.dropped?.length) parts.push(`No pudimos comprobar en tu texto: ${data.dropped.slice(0, 6).join(", ")}${data.dropped.length > 6 ? "…" : ""}. Agrégalos a mano si son correctos.`);
+      setNote({ kind: "ok", text: parts.join(" ") });
+    } catch {
+      setNote({ kind: "error", text: "No pudimos leer el texto. Llena los campos a mano." });
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <Card title="Tu hoja de vida desde un archivo">
       <p className="text-sm text-muted-foreground">
         Sube un PDF o Word (.docx) de hasta 2 MB y 4 páginas, o pega el texto. Solo leemos el texto; el archivo no se guarda.
-        Llenar los campos de abajo con este texto llega en la siguiente fase.
+        Con «Llenar los campos», la IA separa el texto en secciones; cada dato se comprueba contra tu texto y nada se inventa.
       </p>
       <Field label="Archivo (PDF o DOCX)">
         <input
@@ -817,7 +871,10 @@ function CvImport({ accessToken }: { accessToken: string }) {
       <Field label="O pega el texto de tu hoja de vida">
         <textarea className={inputClass} rows={6} value={text} onChange={(event) => setText(event.target.value)} />
       </Field>
-      {busy && <p className="text-xs text-muted-foreground">Leyendo el archivo…</p>}
+      <button className={primaryButtonClass} onClick={() => void fill()} disabled={busy || text.trim().length < 40}>
+        Llenar los campos con este texto
+      </button>
+      {busy && <p className="text-xs text-muted-foreground">Leyendo…</p>}
       {note && <p className={note.kind === "error" ? "text-sm text-destructive" : "text-sm text-muted-foreground"}>{note.text}</p>}
     </Card>
   );
@@ -842,7 +899,7 @@ const PASTE_REASONS: Record<string, string> = {
   fetch_failed: "No pudimos abrir la página."
 };
 
-function JobLink({ accessToken }: { accessToken: string }) {
+function JobLink({ accessToken, onTailor }: { accessToken: string; onTailor: (job: TailorJob) => void }) {
   const [url, setUrl] = useState("");
   const [paste, setPaste] = useState<{ reason: string; url: string } | null>(null);
   const [title, setTitle] = useState("");
@@ -934,11 +991,16 @@ function JobLink({ accessToken }: { accessToken: string }) {
             {snapshot.description.slice(0, 400)}
             {snapshot.description.length > 400 ? "…" : ""}
           </p>
-          {snapshot.sourceUrl && (
-            <a className="underline text-primary" href={snapshot.sourceUrl} target="_blank" rel="noopener noreferrer nofollow">
-              Ir a la vacante
-            </a>
-          )}
+          <div className="flex flex-wrap gap-3 items-center">
+            <button className={primaryButtonClass} onClick={() => onTailor({ title: snapshot.title, company: snapshot.company, description: snapshot.description })}>
+              Adaptar mi hoja de vida a esta vacante
+            </button>
+            {snapshot.sourceUrl && (
+              <a className="underline text-primary" href={snapshot.sourceUrl} target="_blank" rel="noopener noreferrer nofollow">
+                Ir a la vacante
+              </a>
+            )}
+          </div>
         </div>
       )}
       {error && <p className="text-sm text-destructive">{error}</p>}

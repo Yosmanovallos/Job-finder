@@ -46,10 +46,10 @@ interface FactLine {
   text: string;
 }
 
-function factLinesOf(block: string | undefined): FactLine[] {
-  if (!block) return [];
+function factLinesOf(data: string | undefined): FactLine[] {
+  if (data === undefined) return [];
   const out: FactLine[] = [];
-  for (const line of block.split("\n")) {
+  for (const line of data.split("\n")) {
     const m = /^\[([^\]]+)\]\s+([a-z]+):\s*(.*)$/.exec(line);
     if (m) out.push({ id: m[1], section: m[2], text: m[3] });
   }
