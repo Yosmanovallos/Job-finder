@@ -1059,3 +1059,90 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS first_touch_utm_medium VARCHAR(100);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS first_touch_utm_campaign VARCHAR(100);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS first_touch_at TIMESTAMPTZ;
 -- END signup-attribution
+
+-- BEGIN resume-studio
+-- AI Resume Studio R1 (ADR 0017, docs/resume-studio/06 §4). Aditivo e
+-- idempotente; lo aplica scripts/migrate-resume-studio.ts SOLO contra una base
+-- local o el Postgres desechable de npm run test:integration. No se ejecuta
+-- en Supabase hasta R5 (merge único aprobado). No reutiliza las tablas
+-- viejas cv_* / llm_* / user_ai_credentials / cv_pii_vault (pendiente D6).
+--
+-- rs_consents: constancias de autorización, SOLO inserción (un trigger
+-- rechaza UPDATE y DELETE; revocar = fila nueva con granted = false). Sin FK
+-- a users a propósito: la constancia sobrevive al borrado de los datos.
+-- Sin IP ni texto: guarda la versión y el SHA-256 del texto mostrado.
+CREATE TABLE IF NOT EXISTS rs_consents (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id         UUID NOT NULL,
+    purpose         VARCHAR(32) NOT NULL CHECK (purpose IN ('cv_processing', 'terms', 'cloud_storage')),
+    policy_version  VARCHAR(32) NOT NULL,
+    granted         BOOLEAN NOT NULL,
+    text_hash       CHAR(64) NOT NULL,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
+);
+CREATE INDEX IF NOT EXISTS idx_rs_consents_user
+    ON rs_consents (user_id, policy_version, purpose, created_at DESC);
+
+CREATE OR REPLACE FUNCTION rs_consents_insert_only() RETURNS trigger
+LANGUAGE plpgsql AS $rs_consents$
+BEGIN
+  RAISE EXCEPTION 'rs_consents es solo de inserción';
+END
+$rs_consents$;
+DROP TRIGGER IF EXISTS rs_consents_no_update_delete ON rs_consents;
+CREATE TRIGGER rs_consents_no_update_delete
+    BEFORE UPDATE OR DELETE ON rs_consents
+    FOR EACH ROW EXECUTE FUNCTION rs_consents_insert_only();
+
+-- rs_resumes: la hoja de vida actual. R1 solo crea la base (una por
+-- usuario); las adaptadas llegan en R3. facts_json sigue el esquema Zod de
+-- src/lib/resume-studio.ts (objetos estrictos: sin foto, cédula ni estado
+-- civil). Cifrado de aplicación de facts_json: pendiente antes de R5.
+CREATE TABLE IF NOT EXISTS rs_resumes (
+    id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id      UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    kind         VARCHAR(16) NOT NULL DEFAULT 'base' CHECK (kind IN ('base')),
+    title        VARCHAR(80) NOT NULL,
+    template_id  VARCHAR(32) NOT NULL CHECK (template_id IN ('clasica', 'moderna', 'compacta')),
+    facts_json   JSONB NOT NULL,
+    version_no   INTEGER NOT NULL DEFAULT 1 CHECK (version_no >= 1),
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS rs_resumes_one_base_per_user
+    ON rs_resumes (user_id) WHERE kind = 'base';
+
+-- rs_resume_versions: historial para deshacer/restaurar en el servidor
+-- (máx. 50 por hoja de vida; se podan las más viejas). user_id repetido a
+-- propósito: toda consulta filtra por user_id Y resume_id.
+CREATE TABLE IF NOT EXISTS rs_resume_versions (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    resume_id       UUID NOT NULL REFERENCES rs_resumes(id) ON DELETE CASCADE,
+    user_id         UUID NOT NULL,
+    version_no      INTEGER NOT NULL CHECK (version_no >= 1),
+    title           VARCHAR(80) NOT NULL,
+    template_id     VARCHAR(32) NOT NULL,
+    facts_json      JSONB NOT NULL,
+    change_summary  VARCHAR(120) NOT NULL DEFAULT '',
+    created_by      VARCHAR(16) NOT NULL DEFAULT 'user' CHECK (created_by IN ('user', 'ai_accepted')),
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (resume_id, version_no)
+);
+CREATE INDEX IF NOT EXISTS idx_rs_resume_versions_user
+    ON rs_resume_versions (user_id, resume_id, version_no DESC);
+
+-- Mismo blindaje que el resto: solo el servidor (rol postgres) lee y
+-- escribe; la anon key pública no ve nada.
+ALTER TABLE rs_consents ENABLE ROW LEVEL SECURITY;
+ALTER TABLE rs_resumes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE rs_resume_versions ENABLE ROW LEVEL SECURITY;
+DO $revoke$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon')
+     AND EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+    REVOKE ALL ON rs_consents, rs_resumes, rs_resume_versions FROM anon, authenticated;
+    REVOKE ALL ON FUNCTION rs_consents_insert_only() FROM anon, authenticated;
+  END IF;
+END
+$revoke$;
+-- END resume-studio

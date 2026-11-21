@@ -47,6 +47,9 @@ const Account = lazy(() => import("./sections/Account.js"));
 const PublicInfoPage = lazy(() => import("./sections/PublicInfoPage.js"));
 const MarketReportPage = lazy(() => import("./sections/MarketReportPage.js"));
 const Opiniones = lazy(() => import("./sections/Opiniones.js"));
+// AI Resume Studio (ADR 0017): its own chunk. The server only serves this
+// path when RESUME_STUDIO_ENABLED=true; nothing links to it in R1.
+const ResumeStudio = lazy(() => import("./sections/ResumeStudio.js"));
 // /guias (adsense-readiness F3): only routed while GUIDES_ENABLED is on.
 const GuidesIndex = lazy(() => import("./sections/Guides.js").then((module) => ({ default: module.GuidesIndex })));
 const GuidePage = lazy(() => import("./sections/Guides.js").then((module) => ({ default: module.GuidePage })));
@@ -200,6 +203,14 @@ function AppRoutes() {
             <PageMeta {...ROUTE_META["/opiniones"]!} />
             <Opiniones />
           </>
+        }
+      />
+      <Route
+        path="/hoja-de-vida/*"
+        element={
+          <RequireAuth>
+            <ResumeStudio />
+          </RequireAuth>
         }
       />
     </Routes>
