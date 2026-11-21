@@ -36,6 +36,14 @@ pantalla de pase (1 o 3 meses) como la referencia, con la vacante arriba.
 Ver doc 03 §0, doc 04 §0 y doc 06 §9.3. Donde los documentos de abajo
 contradigan esta revisión, manda la revisión.
 
+## Estado (2026-11-21)
+
+**Implementación aprobada: [ADR 0017](../adr/0017-resume-studio-implementation.md).**
+Flujo por link (doc 11), IA Qwen en Alibaba Cloud Virginia (sustituye la
+recomendación de Gemini de abajo), pases sin renovación (precio final D2
+abierto). Rama de integración `codex/resume-studio`; nada a `main` hasta R5.
+El resumen de abajo es el de la revisión 2 y se conserva como historial.
+
 ## Resumen para decidir
 
 - **Precio (revisión 2):** pase de 1 mes COP 14.900 o 3 meses COP 9.900/mes

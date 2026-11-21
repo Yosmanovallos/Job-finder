@@ -104,9 +104,12 @@ pnpm apply:prepare --job <uuid> && pnpm apply:approve --application <uuid>
 - Roadmap maestro: `job-radar-apify/docs/PROD-IMPROVEMENTS-PLAN.md`
   (estado por fase, gates, rollback). Artefactos spec-driven por cambio:
   `job-radar-apify/openspec/` — un cambio por fase, archivar al completar.
-- Work in an isolated `codex/` worktree started from `origin/main`. The CV
-  Generator / Resume Studio / BYOK was removed from production on 2026-10-18;
-  do not reintroduce it.
+- Work in an isolated `codex/` worktree started from `origin/main`. The old
+  CV Generator / BYOK (removed 2026-10-18, `053a21a`) stays frozen: do not
+  restore its code or reuse `cv_*` tables without audit. The NEW AI Resume
+  Studio is authorized by `job-radar-apify/docs/adr/0017-*` on branches
+  `codex/resume-studio-rN` cut from `codex/resume-studio` (not `origin/main`);
+  nothing reaches `main` before the single approved R5 merge.
 - In `job-radar-apify`, `npm run test:unit` runs offline safety, dashboard
   filter and role-matching checks with sanitized environment and blocked TCP.
 - `npm run test:integration` provisions its own disposable PostgreSQL 16

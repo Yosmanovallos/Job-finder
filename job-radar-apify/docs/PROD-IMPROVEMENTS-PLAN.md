@@ -10,8 +10,12 @@ cada fase. Los artefactos OpenSpec por cambio viven en `../openspec/`.
 **Regla:** una fase por sesión; cada fase requiere propuesta → spec →
 implementación → gates → registro aquí antes de pasar a la siguiente.
 
-**Congelado:** CV Generator — no inspeccionar, modificar, mergear ni
-cherry-pick nada relacionado.
+**Congelado:** el CV Generator viejo (retirado el 2026-10-18, `053a21a`) —
+no restaurar su código, mergear ni hacer cherry-pick; las tablas `cv_*` no se
+reutilizan sin auditoría. El **AI Resume Studio nuevo** está autorizado por el
+[ADR 0017](adr/0017-resume-studio-implementation.md) solo en la rama de
+integración `codex/resume-studio` (fases R0–R4); nada llega a `main` hasta el
+merge único de R5.
 
 ## Objetivo
 

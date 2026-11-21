@@ -1,7 +1,8 @@
 # ADR 0015 — Descongelar el AI Resume Studio solo para diseño y documentación
 
 **Fecha:** 2026-11-14
-**Estado:** aceptado por el propietario (solo diseño). La implementación sigue congelada.
+**Estado:** aceptado por el propietario (solo diseño). Las decisiones 2 y 5 quedan
+reemplazadas por el [ADR 0017](0017-resume-studio-implementation.md) (2026-11-21), que autoriza la implementación.
 **Rama:** `codex/resume-studio-design` (desde `origin/main` `320fcec`).
 **Entregables:** `docs/resume-studio/` (documentos 01–10 y mockups).
 
