@@ -1,12 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { readAtsPosting } from "../src/resume-studio/job-link/ats.js";
+import { readAtsPosting, type JsonGet } from "../src/resume-studio/job-link/ats.js";
 import { jobSnapshotSchema, type JobSnapshot, type SnapshotDraft } from "../src/resume-studio/job-link/job-snapshot.js";
 import { jobPostingFromHtml } from "../src/resume-studio/job-link/jsonld.js";
 import { canonicalizeJobUrl, classifyLink, urlKey } from "../src/resume-studio/job-link/link-kind.js";
 import { resolveJobLink, resolvePastedJob, type ResolverDeps } from "../src/resume-studio/job-link/resolve.js";
 import { SafeFetchError, type SafeFetchResult } from "../src/resume-studio/job-link/safe-fetch.js";
-import type { HttpGet } from "../src/direct/types.js";
 
 // AI Resume Studio R2 — link resolver (doc 11 §5.3). Offline: every source
 // is a fake that records whether it was asked.
@@ -212,7 +211,7 @@ test("RS2-LINK-7 paste: same vacancy found by company + title, otherwise the pas
 
 test("RS2-LINK-8 ATS reads reuse the pipeline parsers and only call the fixed API hosts", async () => {
   const asked: string[] = [];
-  const http = (replies: Record<string, { status: number; body: unknown }>): HttpGet => async (url) => {
+  const http = (replies: Record<string, { status: number; body: unknown }>): JsonGet => async (url) => {
     asked.push(url);
     const reply = replies[url] ?? { status: 404, body: {} };
     return { status: reply.status, body: JSON.stringify(reply.body) };

@@ -1,4 +1,4 @@
-import { htmlToText } from "../../direct/text.js";
+import { htmlToText } from "../../lib/ats-text.js";
 import { httpUrlOrNull, isoOrNull, type SnapshotDraft } from "./job-snapshot.js";
 
 // AI Resume Studio R2 — schema.org JobPosting from a page's JSON-LD (doc 11

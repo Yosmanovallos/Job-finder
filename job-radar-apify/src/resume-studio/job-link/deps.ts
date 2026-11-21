@@ -1,4 +1,3 @@
-import { boundedGet } from "../../direct/http.js";
 import {
   findJobIdByUrl,
   findSameJob,
@@ -18,7 +17,7 @@ export function jobLinkDeps(): ResolverDeps {
     findSameJob,
     getCached: (key) => getCachedSnapshot(key),
     putCached: (key, snapshot) => putCachedSnapshot(key, snapshot),
-    readAts: (ref) => readAtsPosting(ref, boundedGet),
+    readAts: (ref) => readAtsPosting(ref),
     fetchHtml: (url) => safeFetchHtml(url)
   };
 }

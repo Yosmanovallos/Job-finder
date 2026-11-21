@@ -117,7 +117,7 @@ function liveDeps(): ResolverDeps {
     putCached: async () => undefined,
     readAts: async (ref) => {
       await sleep(PAUSE_MS);
-      return readAtsPosting(ref, boundedGet);
+      return readAtsPosting(ref);
     },
     fetchHtml: async (url) => {
       await pace(url);

@@ -7,36 +7,9 @@
 export const DIRECT_ATS_TYPES = ["greenhouse", "lever", "ashby", "smartrecruiters", "successfactors", "teamtailor", "workday", "phenom", "eightfold", "magneto", "google", "tp", "workeando", "frisby", "altipal"] as const;
 export type DirectAtsType = (typeof DIRECT_ATS_TYPES)[number];
 
-export type Workplace = "onsite" | "hybrid" | "remote";
+import type { RawAtsPosting, Workplace } from "../lib/ats-posting-parsers.js";
+export type { RawAtsPosting, Workplace } from "../lib/ats-posting-parsers.js";
 
-/** One posting as the ATS states it, before the Colombia filter. */
-export interface RawAtsPosting {
-  externalId: string;
-  title: string;
-  applyUrl: string;
-  /** Every location string the ATS lists for the posting. */
-  locationTexts: string[];
-  /** ISO-3166 alpha-2 codes the ATS states in a structured field (upper case); [] when it has none. */
-  countryCodes: string[];
-  /** Structured city when the ATS has one. */
-  structuredCity: string | null;
-  /** Workplace only when the ATS states it in a field. */
-  workplace: Workplace | null;
-  descriptionText: string | null;
-  department: string | null;
-  employmentType: string | null;
-  /** Posting date as stated by the ATS; null when it states none. */
-  publishedAt: string | null;
-  validThrough: string | null;
-  /** Employer name as the ATS writes it, when it has one. */
-  companyName: string | null;
-  /**
-   * True when the posting comes from a listing that lacks the detail fields
-   * (description, validThrough): storing it must keep what an earlier detail
-   * read saved instead of blanking it.
-   */
-  partial?: boolean;
-}
 
 /** A posting that passed the Colombia filter, ready to store. */
 export interface DirectPosting {
