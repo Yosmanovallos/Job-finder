@@ -16,8 +16,9 @@ import {
 
 // AI Resume Studio R1 (ADR 0017): authorization (3 boxes, S3), then the base
 // CV written by hand with a live preview in one of three templates, server
-// versions with undo/restore, JSON export and «borrar todo». No AI, no
-// upload, no payments in this phase. Signed-in only (RequireAuth in App).
+// versions with undo/restore, JSON export and «borrar todo». R2 adds two
+// inputs with no AI: CV file → text (or paste) and vacancy link → JobSnapshot
+// (or paste). No payments. Signed-in only (RequireAuth in App).
 // The server answers 404 for all of this while RESUME_STUDIO_ENABLED is off.
 
 interface ConsentItemView {
@@ -434,6 +435,8 @@ export default function ResumeStudio() {
 
       <div className="grid md:grid-cols-2 gap-6 mt-4">
         <div className={`space-y-4 ${mobileTab === "edit" ? "" : "hidden md:block"}`}>
+          <CvImport accessToken={accessToken ?? ""} />
+          <JobLink accessToken={accessToken ?? ""} />
           <Editor draft={draft} setDraft={(next) => { setDraft(next); setDirty(true); }} update={update} />
         </div>
         <div className={mobileTab === "preview" ? "" : "hidden md:block"}>
@@ -763,5 +766,182 @@ function Editor({
         })}
       </Card>
     </>
+  );
+}
+
+// ---------- R2: CV file or text, and vacancy by link (no AI) ----------
+
+const CV_MAX_BYTES = 2 * 1024 * 1024;
+
+function CvImport({ accessToken }: { accessToken: string }) {
+  const [text, setText] = useState("");
+  const [note, setNote] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const upload = async (file: File | undefined) => {
+    if (!file) return;
+    // Checked here too, so a big file is never sent (the server cuts at 2 MB anyway).
+    if (file.size > CV_MAX_BYTES) return setNote({ kind: "error", text: "El archivo pesa más de 2 MB. Sube uno más liviano o pega el texto." });
+    setBusy(true);
+    setNote(null);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch("/api/resume/import", { method: "POST", headers: { Authorization: `Bearer ${accessToken}` }, body: form });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) return setNote({ kind: "error", text: data?.error ?? "No pudimos leer el archivo. Pega el texto." });
+      setText(data.text);
+      setNote({ kind: "ok", text: `Leímos ${data.pages ? `${data.pages} página(s)` : "el archivo"}. Revisa el texto: no guardamos el archivo.` });
+    } catch {
+      setNote({ kind: "error", text: "No pudimos subir el archivo. Pega el texto." });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card title="Tu hoja de vida desde un archivo">
+      <p className="text-sm text-muted-foreground">
+        Sube un PDF o Word (.docx) de hasta 2 MB y 4 páginas, o pega el texto. Solo leemos el texto; el archivo no se guarda.
+        Llenar los campos de abajo con este texto llega en la siguiente fase.
+      </p>
+      <Field label="Archivo (PDF o DOCX)">
+        <input
+          type="file"
+          accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+          className={inputClass}
+          disabled={busy}
+          onChange={(event) => void upload(event.target.files?.[0])}
+        />
+      </Field>
+      <Field label="O pega el texto de tu hoja de vida">
+        <textarea className={inputClass} rows={6} value={text} onChange={(event) => setText(event.target.value)} />
+      </Field>
+      {busy && <p className="text-xs text-muted-foreground">Leyendo el archivo…</p>}
+      {note && <p className={note.kind === "error" ? "text-sm text-destructive" : "text-sm text-muted-foreground"}>{note.text}</p>}
+    </Card>
+  );
+}
+
+interface JobSnapshotView {
+  via: string;
+  title: string;
+  company: string | null;
+  location: string | null;
+  description: string;
+  sourceUrl: string | null;
+}
+
+const PASTE_REASONS: Record<string, string> = {
+  linkedin: "LinkedIn no permite leer sus vacantes automáticamente.",
+  login_wall: "Ese sitio pide iniciar sesión o bloquea la lectura automática.",
+  anti_bot: "Ese sitio bloquea la lectura automática.",
+  robots: "Ese sitio pide no leer esa página automáticamente.",
+  no_structured_data: "No encontramos los datos de la vacante en esa página.",
+  not_found: "La vacante ya no está publicada o el link no existe.",
+  fetch_failed: "No pudimos abrir la página."
+};
+
+function JobLink({ accessToken }: { accessToken: string }) {
+  const [url, setUrl] = useState("");
+  const [paste, setPaste] = useState<{ reason: string; url: string } | null>(null);
+  const [title, setTitle] = useState("");
+  const [company, setCompany] = useState("");
+  const [text, setText] = useState("");
+  const [snapshot, setSnapshot] = useState<JobSnapshotView | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const post = async (path: string, body: unknown) => {
+    const res = await fetch(`/api/resume${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+      body: JSON.stringify(body)
+    });
+    return { res, data: await res.json().catch(() => null) };
+  };
+
+  const read = async () => {
+    setBusy(true);
+    setError(null);
+    setSnapshot(null);
+    setPaste(null);
+    try {
+      const { res, data } = await post("/job-link", { url });
+      if (!res.ok) return setError(data?.error ?? "No pudimos revisar ese link.");
+      if (data.status === "resolved") return setSnapshot(data.snapshot);
+      setPaste({ reason: data.reason, url });
+    } catch {
+      setError("No pudimos revisar ese link.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const sendPaste = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const { res, data } = await post("/job-link/paste", { url: paste?.url || null, title, company, text });
+      if (!res.ok) return setError(data?.error ?? "Revisa los datos de la vacante.");
+      setSnapshot(data.snapshot);
+      setPaste(null);
+    } catch {
+      setError("No pudimos usar esa descripción.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card title="Vacante por link">
+      <p className="text-sm text-muted-foreground">Pega el link de la vacante. Si no la podemos leer, te pedimos copiar su descripción.</p>
+      <div className="flex flex-wrap gap-2 items-end">
+        <Field label="Link de la vacante">
+          <input className={inputClass} type="url" inputMode="url" value={url} onChange={(event) => setUrl(event.target.value)} placeholder="https://…" />
+        </Field>
+        <button className={primaryButtonClass} onClick={() => void read()} disabled={busy || !url.trim()}>
+          Leer vacante
+        </button>
+      </div>
+      {paste && (
+        <div className="rounded-xl border border-border p-3 space-y-2">
+          <p className="text-sm text-[#3d413e]">
+            {PASTE_REASONS[paste.reason] ?? "No pudimos leer esa página."} Copia la descripción de la vacante y pégala aquí
+            (en el celular: Compartir → Copiar). Guardamos el link para que puedas volver a la vacante.
+          </p>
+          <div className="grid sm:grid-cols-2 gap-2">
+            <Field label="Cargo">
+              <input className={inputClass} value={title} onChange={(event) => setTitle(event.target.value)} />
+            </Field>
+            <Field label="Empresa (opcional)">
+              <input className={inputClass} value={company} onChange={(event) => setCompany(event.target.value)} />
+            </Field>
+          </div>
+          <Field label="Descripción de la vacante">
+            <textarea className={inputClass} rows={6} value={text} onChange={(event) => setText(event.target.value)} autoFocus />
+          </Field>
+          <button className={primaryButtonClass} onClick={() => void sendPaste()} disabled={busy || !title.trim() || !text.trim()}>
+            Usar esta descripción
+          </button>
+        </div>
+      )}
+      {snapshot && (
+        <div className="rounded-xl border border-border p-3 space-y-2">
+          <p className="text-base font-bold">{snapshot.title}</p>
+          <p className="text-sm text-muted-foreground">{[snapshot.company, snapshot.location].filter(Boolean).join(" · ") || "Empresa no indicada"}</p>
+          <p className="text-xs text-muted-foreground">
+            {snapshot.description.slice(0, 400)}
+            {snapshot.description.length > 400 ? "…" : ""}
+          </p>
+          {snapshot.sourceUrl && (
+            <a className="underline text-primary" href={snapshot.sourceUrl} target="_blank" rel="noopener noreferrer nofollow">
+              Ir a la vacante
+            </a>
+          )}
+        </div>
+      )}
+      {error && <p className="text-sm text-destructive">{error}</p>}
+    </Card>
   );
 }
