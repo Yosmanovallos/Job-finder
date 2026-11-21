@@ -1,7 +1,8 @@
 # Resume Studio R2 — subir CV y leer vacantes por link (sin IA, sin pagos)
 
-**Estado:** en curso (2026-11-21).
-**ADR:** [`docs/adr/0017-resume-studio-implementation.md`](../../../docs/adr/0017-resume-studio-implementation.md).
+**Estado:** implementado y archivado (2026-11-21). Evidencia en
+[`validation.md`](validation.md).
+**ADR:** [`docs/adr/0017-resume-studio-implementation.md`](../../../../docs/adr/0017-resume-studio-implementation.md).
 **Rama:** `codex/resume-studio-r2`, cortada de `codex/resume-studio-r1`
 (PR #147); PR en borrador contra `codex/resume-studio`. Nada a `main`.
 **Fuente de fases:** doc 11 §8 (fila R2) y §5.3; doc 06 §5; doc 08; doc 09 §5.
@@ -54,7 +55,9 @@ Orden fijo (AGENTS.md §Source priority):
 2. URL que ya está en nuestra tabla `jobs` (por `url`): datos que ya
    tenemos, sin tocar el sitio.
 3. Greenhouse / Lever / Ashby / SmartRecruiters con id de la vacante →
-   API pública, reutilizando los parsers de `src/direct/connectors.ts`.
+   API pública, reutilizando los parsers del pipeline directo (movidos sin
+   cambios a `src/lib/ats-posting-parsers.ts` para que el servidor web siga
+   sin importar `src/direct/`, ADR 0006 §9).
 4. Otro sitio → GET con controles SSRF y `robots.txt` → `JobPosting`
    JSON-LD.
 5. LinkedIn (`linkedin.com`, `lnkd.in`) y sitios con login o anti-bot
