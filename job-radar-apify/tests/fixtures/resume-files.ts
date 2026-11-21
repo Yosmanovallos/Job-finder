@@ -174,3 +174,45 @@ export function multipartBody(file: Buffer, boundary = "----rs-test-boundary", f
     Buffer.from(`\r\n--${boundary}--\r\n`)
   ]);
 }
+
+/**
+ * A PDF whose page content stream is `inflatedBytes` of spaces compressed
+ * with FlateDecode (a decompression bomb: tiny on disk, huge inflated).
+ * Built by streaming through zlib so the test never holds the inflated data.
+ */
+export async function makePdfBomb(inflatedBytes: number): Promise<Buffer> {
+  const { createDeflate } = await import("node:zlib");
+  const deflate = createDeflate({ level: 9 });
+  const parts: Buffer[] = [];
+  deflate.on("data", (chunk: Buffer) => parts.push(chunk));
+  const done = new Promise<void>((resolve, reject) => {
+    deflate.on("end", resolve);
+    deflate.on("error", reject);
+  });
+  const block = Buffer.alloc(1024 * 1024, 0x20);
+  for (let written = 0; written < inflatedBytes; written += block.length) {
+    if (!deflate.write(block)) await new Promise((resolve) => deflate.once("drain", resolve));
+  }
+  deflate.end();
+  await done;
+  const compressed = Buffer.concat(parts);
+  const head = "%PDF-1.4\n";
+  const objects = [
+    "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n",
+    "2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n",
+    "3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R >>\nendobj\n"
+  ];
+  const streamHead = `4 0 obj\n<< /Length ${compressed.length} /Filter /FlateDecode >>\nstream\n`;
+  const streamTail = "\nendstream\nendobj\n";
+  const offsets: number[] = [];
+  let size = head.length;
+  for (const object of objects) {
+    offsets.push(size);
+    size += object.length;
+  }
+  offsets.push(size);
+  size += streamHead.length + compressed.length + streamTail.length;
+  const xref = `xref\n0 5\n0000000000 65535 f \n${offsets.map((o) => `${String(o).padStart(10, "0")} 00000 n \n`).join("")}`;
+  const trailer = `trailer\n<< /Size 5 /Root 1 0 R >>\nstartxref\n${size}\n%%EOF\n`;
+  return Buffer.concat([Buffer.from(head + objects.join("") + streamHead, "latin1"), compressed, Buffer.from(streamTail + xref + trailer, "latin1")]);
+}

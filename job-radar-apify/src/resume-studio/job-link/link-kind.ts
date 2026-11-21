@@ -35,8 +35,7 @@ export function urlKey(canonicalUrl: string): string {
 export type AtsPostingRef =
   | { ats: "greenhouse"; board: string; id: string }
   | { ats: "lever"; board: string; id: string }
-  | { ats: "ashby"; board: string; id: string }
-  | { ats: "smartrecruiters"; board: string; id: string };
+  | { ats: "ashby"; board: string; id: string };
 
 export type LinkKind =
   | { kind: "buscotrabajo"; jobId: string }
@@ -102,10 +101,9 @@ export function classifyLink(raw: string): LinkKind | null {
     }
     return { kind: "web" };
   }
-  if (host === "jobs.smartrecruiters.com" || host === "careers.smartrecruiters.com") {
-    const id = /^(\d{6,20})(-|$)/.exec(segments[1] ?? "")?.[1];
-    if (segments[0] && BOARD.test(segments[0]) && id) return { kind: "ats", ref: { ats: "smartrecruiters", board: segments[0], id } };
-    return { kind: "web" };
-  }
+  // SmartRecruiters: its API host's robots.txt says Disallow: / (ADR 0002,
+  // root docs/adr), so the pipeline keeps that adapter opt-in. A user's link
+  // goes the web way instead: robots.txt of jobs.smartrecruiters.com, then
+  // the page's JSON-LD.
   return { kind: "web" };
 }

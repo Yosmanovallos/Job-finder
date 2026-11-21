@@ -101,6 +101,9 @@ async function candidates(): Promise<Candidate[]> {
   return picked;
 }
 
+/** What the page GET answered, for the row (status and final host only). */
+let lastFetch: { status: number | null; finalHost: string | null; error: string | null } | null = null;
+
 function liveDeps(): ResolverDeps {
   let lastHost = "";
   const pace = async (url: string) => {
@@ -121,7 +124,14 @@ function liveDeps(): ResolverDeps {
     },
     fetchHtml: async (url) => {
       await pace(url);
-      return safeFetchHtml(url);
+      try {
+        const page = await safeFetchHtml(url);
+        lastFetch = { status: page.status, finalHost: new URL(page.finalUrl).hostname, error: null };
+        return page;
+      } catch (error) {
+        lastFetch = { status: null, finalHost: null, error: (error as { code?: string }).code ?? "error" };
+        throw error;
+      }
     }
   };
 }
@@ -152,6 +162,7 @@ async function main() {
     const started = Date.now();
     let result: JobLinkResult;
     try {
+      lastFetch = null;
       result = await resolveJobLink(candidate.url, liveDeps());
     } catch (error) {
       result = { status: "paste_required", reason: "fetch_failed", sourceUrl: candidate.url, canonicalUrl: null };
@@ -166,6 +177,9 @@ async function main() {
       route: kind?.kind === "ats" ? `ats:${kind.ref.ats}` : (kind?.kind ?? "invalid"),
       status: result.status,
       ...(result.status === "resolved" ? shape(result.snapshot) : { reason: result.reason }),
+      httpStatus: lastFetch?.status ?? null,
+      finalHost: lastFetch?.finalHost ?? null,
+      fetchError: lastFetch?.error ?? null,
       ms: Date.now() - started
     };
     rows.push(row);

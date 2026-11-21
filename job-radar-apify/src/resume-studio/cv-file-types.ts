@@ -62,7 +62,7 @@ export const CV_FILE_MESSAGES: Record<CvFileRejection, string> = {
   external_relations: "El Word enlaza contenido externo y no lo abrimos. Pega el texto de tu hoja de vida.",
   xml_entities: "El Word tiene una estructura no permitida. Guárdalo de nuevo o pega el texto.",
   too_many_pages: "La hoja de vida tiene más de 4 páginas. Resúmela o pega el texto.",
-  zip_bomb: "El Word está dañado o es demasiado grande al abrirlo. Pega el texto.",
+  zip_bomb: "El archivo está dañado o es demasiado grande al abrirlo. Pega el texto de tu hoja de vida.",
   no_text: "No encontramos texto: parece un documento escaneado. Pega el texto de tu hoja de vida.",
   malformed: "No pudimos leer el archivo. Pega el texto de tu hoja de vida.",
   timeout: "El archivo tardó demasiado en leerse. Pega el texto de tu hoja de vida.",

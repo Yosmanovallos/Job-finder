@@ -120,24 +120,33 @@ export async function parseCvFile(bytes: Buffer, options: ParseOptions = {}): Pr
   if (!kind) throw new CvFileError("unsupported_type");
   if (parsing) throw new CvFileError("busy");
   parsing = true;
+  // A copy, so the worker owns its memory and the request buffer can go.
+  const copy = new Uint8Array(bytes.length);
+  copy.set(bytes);
+  // execArgv: [] — the worker does NOT inherit tsx: Node 24 strips the
+  // types itself (the worker chain uses .ts specifiers and erasable syntax
+  // only). With tsx loaded the worker needed > 160 MB of heap just to
+  // start; without it a parse uses ~16 MB, which matters on a 512 MB
+  // Render Starter instance shared with the whole site.
+  let worker: Worker;
+  try {
+    worker = new Worker(new URL("./cv-parse-worker.ts", import.meta.url), {
+      execArgv: [],
+      workerData: { kind, bytes: copy },
+      transferList: [copy.buffer],
+      resourceLimits: { maxOldGenerationSizeMb: options.maxHeapMb ?? CV_WORKER_HEAP_MB, maxYoungGenerationSizeMb: 16 },
+      stdout: true,
+      stderr: true
+    });
+  } catch {
+    parsing = false;
+    throw new CvFileError("malformed");
+  }
+  // The slot is freed only when the thread is really gone: a timed-out
+  // worker still holds its memory until it exits.
+  const exited = new Promise<void>((resolve) => worker.once("exit", () => resolve()));
   try {
     return await new Promise<CvFileText>((resolve, reject) => {
-      // A copy, so the worker owns its memory and the request buffer can go.
-      const copy = new Uint8Array(bytes.length);
-      copy.set(bytes);
-      // execArgv: [] — the worker does NOT inherit tsx: Node 24 strips the
-      // types itself (the worker chain uses .ts specifiers and erasable syntax
-      // only). With tsx loaded the worker needed > 160 MB of heap just to
-      // start; without it a parse uses ~16 MB, which matters on a 512 MB
-      // Render Starter instance shared with the whole site.
-      const worker = new Worker(new URL("./cv-parse-worker.ts", import.meta.url), {
-        execArgv: [],
-        workerData: { kind, bytes: copy },
-        transferList: [copy.buffer],
-        resourceLimits: { maxOldGenerationSizeMb: options.maxHeapMb ?? CV_WORKER_HEAP_MB, maxYoungGenerationSizeMb: 16 },
-        stdout: true,
-        stderr: true
-      });
       let done = false;
       const settle = (fn: () => void) => {
         if (done) return;
@@ -158,6 +167,7 @@ export async function parseCvFile(bytes: Buffer, options: ParseOptions = {}): Pr
       worker.on("exit", () => settle(() => reject(new CvFileError("malformed"))));
     });
   } finally {
+    await exited;
     parsing = false;
   }
 }

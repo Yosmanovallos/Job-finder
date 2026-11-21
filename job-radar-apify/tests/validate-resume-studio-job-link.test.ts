@@ -32,7 +32,8 @@ test("RS2-LINK-2 classify: our pages, ATS postings, LinkedIn and login walls, ev
   assert.deepEqual(classifyLink("https://boards.greenhouse.io/embed/job_app?for=Rappi&token=7000123"), { kind: "ats", ref: { ats: "greenhouse", board: "rappi", id: "7000123" } });
   assert.deepEqual(classifyLink(`https://jobs.lever.co/acme/${id}/apply`), { kind: "ats", ref: { ats: "lever", board: "acme", id } });
   assert.deepEqual(classifyLink(`https://jobs.ashbyhq.com/Acme/${id}`), { kind: "ats", ref: { ats: "ashby", board: "Acme", id } });
-  assert.deepEqual(classifyLink("https://jobs.smartrecruiters.com/Acme/743999912345678-analista"), { kind: "ats", ref: { ats: "smartrecruiters", board: "Acme", id: "743999912345678" } });
+  // SmartRecruiters goes the robots-checked web way (ADR 0002), not its API.
+  assert.deepEqual(classifyLink("https://jobs.smartrecruiters.com/Acme/743999912345678-analista"), { kind: "web" });
   for (const url of ["https://www.linkedin.com/jobs/view/4100000000/", "https://co.linkedin.com/jobs/view/x", "https://lnkd.in/abc"]) {
     assert.deepEqual(classifyLink(url), { kind: "paste_only", reason: "linkedin" }, url);
   }
@@ -209,7 +210,7 @@ test("RS2-LINK-7 paste: same vacancy found by company + title, otherwise the pas
   assert.deepEqual(await resolvePastedJob({ title: "Mesero", text, url: "javascript:x" }, plain.deps), { status: "invalid", reason: "invalid_url" });
 });
 
-test("RS2-LINK-8 ATS reads reuse the pipeline parsers and only call the fixed API hosts", async () => {
+test("RS2-LINK-8 ATS reads reuse the pipeline parsers and only call the three fixed API hosts", async () => {
   const asked: string[] = [];
   const http = (replies: Record<string, { status: number; body: unknown }>): JsonGet => async (url) => {
     asked.push(url);
@@ -234,11 +235,6 @@ test("RS2-LINK-8 ATS reads reuse the pipeline parsers and only call the fixed AP
     http({ "https://api.ashbyhq.com/posting-api/job-board/Acme": { status: 200, body: { jobs: [{ id: leverId, title: "PM", jobUrl: "https://jobs.ashbyhq.com/Acme/x", descriptionPlain: "Producto." }] } } })
   );
   assert.equal(ashby.kind === "found" && ashby.draft.title, "PM");
-  const sr = await readAtsPosting(
-    { ats: "smartrecruiters", board: "Acme", id: "744000000000001" },
-    http({ "https://api.smartrecruiters.com/v1/companies/Acme/postings/744000000000001": { status: 200, body: { id: "744000000000001", name: "Cajero", company: { name: "Acme" }, location: { city: "Cali", country: "co" }, jobAd: { sections: { jobDescription: { title: "Funciones", text: "<p>Atender caja</p>" } } } } } })
-  );
-  assert.match(sr.kind === "found" ? sr.draft.description ?? "" : "", /Funciones\nAtender caja/);
   assert.equal((await readAtsPosting({ ats: "greenhouse", board: "acme", id: "9" }, http({}))).kind, "not_found");
-  assert.ok(asked.every((url) => /^https:\/\/(boards-api\.greenhouse\.io|api\.lever\.co|api\.ashbyhq\.com|api\.smartrecruiters\.com)\//.test(url)));
+  assert.ok(asked.every((url) => /^https:\/\/(boards-api\.greenhouse\.io|api\.lever\.co|api\.ashbyhq\.com)\//.test(url)));
 });

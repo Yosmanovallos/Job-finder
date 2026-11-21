@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ashby, greenhouse, lever, SmartRecruitersPage, smartRecruitersPosting, type RawAtsPosting } from "../../lib/ats-posting-parsers.js";
+import { ashby, greenhouse, lever, type RawAtsPosting } from "../../lib/ats-posting-parsers.js";
 import { htmlToText, safeJson } from "../../lib/ats-text.js";
 import { httpUrlOrNull, type SnapshotDraft } from "./job-snapshot.js";
 import type { AtsPostingRef } from "./link-kind.js";
@@ -19,12 +19,12 @@ const ATS_MAX_BYTES = 8 * 1024 * 1024;
 const USER_AGENT = "BuscoTrabajoBot/1.0 (+https://buscotrabajo.co)";
 
 /**
- * Bounded GET for the four fixed ATS API hosts only (the URL is built here
+ * Bounded GET for the three fixed ATS API hosts only (the URL is built here
  * from validated board/id, never taken from the user): 8 s, 8 MB, no
  * redirects followed, JSON only.
  */
 export const atsJsonGet: JsonGet = async (url) => {
-  if (!/^https:\/\/(boards-api\.greenhouse\.io|api\.lever\.co|api\.ashbyhq\.com|api\.smartrecruiters\.com)\//.test(url)) {
+  if (!/^https:\/\/(boards-api\.greenhouse\.io|api\.lever\.co|api\.ashbyhq\.com)\//.test(url)) {
     throw new Error("host de ATS no permitido");
   }
   const response = await fetch(url, {
@@ -81,21 +81,6 @@ const LeverExtras = z
   })
   .partial();
 
-const SmartRecruitersDetail = z
-  .object({
-    jobAd: z
-      .object({
-        sections: z
-          .record(z.string(), z.object({ title: z.string().nullable().optional(), text: z.string().nullable().optional() }).partial().nullable())
-          .nullable()
-          .optional()
-      })
-      .partial()
-      .nullable()
-      .optional()
-  })
-  .partial();
-
 export async function readAtsPosting(ref: AtsPostingRef, http: JsonGet = atsJsonGet): Promise<AtsRead> {
   try {
     if (ref.ats === "greenhouse") {
@@ -118,31 +103,14 @@ export async function readAtsPosting(ref: AtsPostingRef, http: JsonGet = atsJson
         : [];
       return { kind: "found", draft: draftOf(posting, [...lists, extras.success ? (extras.data.additionalPlain ?? "") : ""]) };
     }
-    if (ref.ats === "ashby") {
-      // No single-posting endpoint: the public board, then the one id.
-      const response = await http(`https://api.ashbyhq.com/posting-api/job-board/${encodeURIComponent(ref.board)}`);
-      if (response.status === 404) return { kind: "not_found" };
-      if (response.status !== 200) return { kind: "error" };
-      const postings = ashby(safeJson(response.body));
-      if (!postings) return { kind: "error" };
-      const posting = postings.find((entry) => entry.externalId.toLowerCase() === ref.id);
-      return posting ? { kind: "found", draft: draftOf(posting) } : { kind: "not_found" };
-    }
-    // SmartRecruiters: the documented public posting endpoint (not the
-    // country-filtered listing the direct pipeline uses).
-    const response = await http(`https://api.smartrecruiters.com/v1/companies/${encodeURIComponent(ref.board)}/postings/${ref.id}`);
-    if (response.status === 404 || response.status === 400) return { kind: "not_found" };
+    // Ashby: no single-posting endpoint: the public board, then the one id.
+    const response = await http(`https://api.ashbyhq.com/posting-api/job-board/${encodeURIComponent(ref.board)}`);
+    if (response.status === 404) return { kind: "not_found" };
     if (response.status !== 200) return { kind: "error" };
-    const body = safeJson(response.body);
-    const item = SmartRecruitersPage.shape.content.element.safeParse(body);
-    if (!item.success) return { kind: "error" };
-    const posting = smartRecruitersPosting(ref.board, item.data);
-    const detail = SmartRecruitersDetail.safeParse(body);
-    const sections = detail.success ? Object.values(detail.data.jobAd?.sections ?? {}) : [];
-    const texts = sections
-      .map((section) => (section?.text ? [section.title, htmlToText(section.text)].filter(Boolean).join("\n") : null))
-      .filter((part): part is string => Boolean(part));
-    return { kind: "found", draft: draftOf(posting, texts) };
+    const postings = ashby(safeJson(response.body));
+    if (!postings) return { kind: "error" };
+    const posting = postings.find((entry) => entry.externalId.toLowerCase() === ref.id);
+    return posting ? { kind: "found", draft: draftOf(posting) } : { kind: "not_found" };
   } catch {
     return { kind: "error" };
   }

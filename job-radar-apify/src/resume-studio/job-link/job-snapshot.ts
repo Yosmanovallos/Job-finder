@@ -7,7 +7,7 @@ import { z } from "zod";
 // delimiters and treat them as data (AGENTS.md rule 6). Fields the source
 // doesn't state stay null: nothing is inferred (rule 5).
 
-export const SNAPSHOT_VIAS = ["buscotrabajo", "our_index", "greenhouse", "lever", "ashby", "smartrecruiters", "jsonld", "pasted"] as const;
+export const SNAPSHOT_VIAS = ["buscotrabajo", "our_index", "greenhouse", "lever", "ashby", "jsonld", "pasted"] as const;
 export type SnapshotVia = (typeof SNAPSHOT_VIAS)[number];
 
 export const SNAPSHOT_TEXT_MAX = 20_000;

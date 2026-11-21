@@ -10,7 +10,8 @@ import {
   readBodyCapped
 } from "../src/resume-studio/cv-file-import.js";
 import { CvFileError, CV_FILE_MAX_BYTES, sniffCvFile, type CvFileRejection } from "../src/resume-studio/cv-file-types.js";
-import { documentXml, makeDocx, makePdf, multipartBody, SAMPLE_CV_LINES } from "./fixtures/resume-files.js";
+import { deflateSync } from "node:zlib";
+import { documentXml, makeDocx, makePdf, makePdfBomb, multipartBody, SAMPLE_CV_LINES } from "./fixtures/resume-files.js";
 
 // AI Resume Studio R2 — T-FILE-1..8 (doc 09 §2 F1–F8, §5): every hostile
 // file is rejected with a clear code, the process stays alive and its memory
@@ -72,6 +73,18 @@ test("T-FILE-3 a PDF with JavaScript is rejected, also behind #xx-escaped names"
     extraObjects: ["20 0 obj\n<< /S /Launch /F (calc.exe) >>\nendobj"]
   });
   assert.equal(await rejection(launch), "active_content");
+  // JavaScript hidden inside a compressed object stream (/ObjStm): invisible
+  // to a byte scan of the file, found once the stream is inflated.
+  const header = "20 0 ";
+  const hidden = deflateSync(Buffer.from(`${header}<< /S /JavaScript /JS (app.alert\\(1\\)) >>`, "latin1"));
+  const objStm = Buffer.concat([
+    Buffer.from(`21 0 obj\n<< /Type /ObjStm /N 1 /First ${header.length} /Filter /FlateDecode /Length ${hidden.length} >>\nstream\n`, "latin1"),
+    hidden,
+    Buffer.from("\nendstream\nendobj", "latin1")
+  ]).toString("latin1");
+  const inObjStm = makePdf({ catalogExtra: "/OpenAction 20 0 R", extraObjects: [objStm] });
+  assert.doesNotMatch(inObjStm.toString("latin1"), /JavaScript/, "the action is only inside the compressed stream");
+  assert.equal(await rejection(inObjStm), "active_content");
   // A plain open *destination* (how Word sets the first view) is fine.
   const view = makePdf({ catalogExtra: "/OpenAction [4 0 R /Fit]" });
   assert.equal((await parseCvFile(view)).kind, "pdf");
@@ -104,6 +117,22 @@ test("T-FILE-5 a ZIP bomb is stopped by the declared size and by the inflate cei
   // Lying header: claims 1 KB, inflates to 30 MB — the inflater's own cap stops it.
   const liar = makeDocx({ extra: [{ name: "word/media/big.xml", data: zeros, declaredSize: 1024 }] });
   assert.equal(await rejection(liar), "zip_bomb");
+  // PDF bomb: a ~400 KB file whose content stream inflates to 400 MB. pdf.js
+  // would allocate it outside the worker's heap limit (+867 MB RSS measured
+  // before this guard); it must be refused with memory flat.
+  const pdfBomb = await makePdfBomb(400 * 1024 * 1024);
+  assert.ok(pdfBomb.length < CV_FILE_MAX_BYTES);
+  const base = process.memoryUsage().rss;
+  let peak = base;
+  const sampler = setInterval(() => {
+    peak = Math.max(peak, process.memoryUsage().rss);
+  }, 10);
+  try {
+    assert.equal(await rejection(pdfBomb), "zip_bomb");
+  } finally {
+    clearInterval(sampler);
+  }
+  assert.ok((peak - base) / (1024 * 1024) < 150, `RSS peak grew ${((peak - base) / (1024 * 1024)).toFixed(0)} MB`);
   // Too many entries.
   const many = makeDocx({ extra: Array.from({ length: 250 }, (_, i) => ({ name: `word/media/x${i}.txt`, data: "x" })) });
   assert.equal(await rejection(many), "zip_bomb");
