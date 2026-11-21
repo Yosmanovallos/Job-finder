@@ -27,6 +27,7 @@ import {
   ResumeVersionConflictError
 } from "../../db/resume-studio-repository.js";
 import { readJsonBodyCapped } from "../http-helpers.js";
+import { CV_FILE_MESSAGES, CvFileError } from "../../resume-studio/cv-file-types.js";
 
 // AI Resume Studio R1 — /hoja-de-vida/* and /api/resume/* (ADR 0017).
 // server.ts only imports this module when RESUME_STUDIO_ENABLED=true and the
@@ -119,6 +120,70 @@ export async function handleResumeRoute(
 
   const route = pathname.slice("/api/resume".length) || "/";
   try {
+    // CV file → plain text (R2, doc 06 §5). Nothing is stored: the file
+    // lives in memory for this request and only its text goes back.
+    if (route === "/import") {
+      if (method !== "POST") return json(res, 405, { error: "Método no permitido" });
+      if (!checkRateLimit(`resume-import:${userId}`, IMPORT_LIMIT, WRITE_WINDOW_MS, "resume-import")) {
+        return json(res, 429, { error: "Subiste muchos archivos seguidos. Intenta en unos minutos." }, { "Retry-After": "600" });
+      }
+      const { readBodyCapped, extractFilePart, multipartBoundary, parseCvFile, CV_UPLOAD_BODY_MAX_BYTES } = await import("../../resume-studio/cv-file-import.js");
+      const boundary = multipartBoundary(req.headers["content-type"]);
+      if (!boundary) return json(res, 415, { error: "Envía el archivo como formulario (multipart/form-data)." });
+      if (!consentStatus(await getConsentState(userId)).required) {
+        req.resume();
+        return json(res, 403, { error: "Primero acepta la autorización y los términos.", code: "consent_required" });
+      }
+      const body = await readBodyCapped(req, CV_UPLOAD_BODY_MAX_BYTES);
+      if (!body.ok) {
+        const status = body.code === "too_large" ? 413 : 400;
+        json(res, status, { error: CV_FILE_MESSAGES[body.code], code: body.code }, { Connection: "close" });
+        return;
+      }
+      const file = extractFilePart(body.body, boundary);
+      if (!file || file.length === 0) return json(res, 400, { error: "No llegó ningún archivo.", code: "malformed" });
+      try {
+        const result = await parseCvFile(file);
+        // The text is the user's own CV, but it is still untrusted input for
+        // R3's prompts (doc 08 «inyección»): flagged as such.
+        return json(res, 200, { ...result, untrusted: true });
+      } catch (error) {
+        const code = error instanceof CvFileError ? error.code : "malformed";
+        const status = code === "busy" ? 429 : code === "too_large" ? 413 : code === "unsupported_type" ? 415 : 422;
+        return json(res, status, { error: CV_FILE_MESSAGES[code], code }, code === "busy" ? { "Retry-After": "5" } : {});
+      }
+    }
+
+    // Vacancy by link (R2, doc 11 §5.3) ---------------------------------
+    // Reading a job link involves no CV data, so no consent is needed; a
+    // session and a per-user budget are (each link may cost one outside GET).
+    if (route === "/job-link" || route === "/job-link/paste") {
+      if (method !== "POST") return json(res, 405, { error: "Método no permitido" });
+      if (!checkRateLimit(`resume-job-link:${userId}`, JOB_LINK_LIMIT, WRITE_WINDOW_MS, "resume-job-link")) {
+        return json(res, 429, { error: "Revisaste muchos links seguidos. Intenta en unos minutos." }, { "Retry-After": "600" });
+      }
+      const body = await readBody(req, res);
+      if (!body) return;
+      const value = (body.value ?? {}) as Record<string, unknown>;
+      const { jobLinkDeps } = await import("../../resume-studio/job-link/deps.js");
+      const { resolveJobLink, resolvePastedJob } = await import("../../resume-studio/job-link/resolve.js");
+      if (route === "/job-link") {
+        if (typeof value.url !== "string" || !value.url.trim() || value.url.length > 2000) return json(res, 400, { error: "Pega el link de la vacante." });
+        const result = await resolveJobLink(value.url, jobLinkDeps());
+        if (result.status === "invalid") {
+          return json(res, 400, { ...result, error: result.reason === "not_public" ? "Ese link no es una página pública." : "Ese link no es válido." });
+        }
+        return json(res, 200, result);
+      }
+      const text = (field: string) => (typeof value[field] === "string" ? (value[field] as string) : null);
+      const result = await resolvePastedJob({ url: text("url"), title: text("title") ?? "", company: text("company"), text: text("text") ?? "" }, jobLinkDeps());
+      if (result.status === "invalid") {
+        const error = result.reason === "title_required" ? "Escribe el cargo de la vacante." : result.reason === "invalid_url" ? "Ese link no es válido." : "Pega la descripción completa de la vacante.";
+        return json(res, 400, { ...result, error });
+      }
+      return json(res, 200, result);
+    }
+
     // Consent ------------------------------------------------------------
     if (route === "/consent") {
       if (method === "GET") {
@@ -269,6 +334,9 @@ export async function handleResumeRoute(
     return json(res, 500, { error: "No se pudo completar la acción. Intenta de nuevo." });
   }
 }
+
+const IMPORT_LIMIT = 10;
+const JOB_LINK_LIMIT = 30;
 
 const UUID_IN_PATH = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
 

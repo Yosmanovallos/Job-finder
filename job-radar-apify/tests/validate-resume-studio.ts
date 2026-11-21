@@ -105,7 +105,7 @@ async function main() {
   await pool.query(users);
   await applyBlock();
   await applyBlock();
-  for (const table of ["rs_consents", "rs_resumes", "rs_resume_versions"]) {
+  for (const table of ["rs_consents", "rs_resumes", "rs_resume_versions", "rs_job_snapshot_cache"]) {
     const rls = await pool.query(`SELECT relrowsecurity FROM pg_class WHERE relname = $1`, [table]);
     assert.equal(rls.rows[0]?.relrowsecurity, true, `RLS debe estar activo en ${table}`);
     const grants = await pool.query(
@@ -117,7 +117,7 @@ async function main() {
   for (const [id, email] of [[USER_A, "rs-a@example.test"], [USER_B, "rs-b@example.test"]]) {
     await pool.query(`INSERT INTO users (id, email) VALUES ($1, $2) ON CONFLICT (id) DO NOTHING`, [id, email]);
   }
-  console.log("✅ [PASSED] Bloque idempotente; RLS activo y 0 permisos públicos en las 3 tablas.");
+  console.log("✅ [PASSED] Bloque idempotente; RLS activo y 0 permisos públicos en las 4 tablas.");
 
   const server = http.createServer((req, res) => {
     const url = new URL(req.url || "/", BASE);

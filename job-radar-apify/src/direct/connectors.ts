@@ -467,3 +467,16 @@ async function listSmartRecruiters(identifier: string, http: HttpGet): Promise<B
   }
   return { kind: "error", detail: `más de ${MAX_PAGES} páginas: listado incompleto, no se cierra nada` };
 }
+
+/**
+ * The per-ATS parsers above, reused as-is by the Resume Studio link
+ * resolver (R2, src/resume-studio/job-link/ats.ts) to read ONE posting the
+ * user linked. Same schemas, same rules; nothing here changes the board reads.
+ */
+export const atsPostingParsers = {
+  greenhouseBoard: greenhouse,
+  leverBoard: lever,
+  ashbyBoard: ashby,
+  smartRecruitersItem: SmartRecruitersPage.shape.content.element,
+  smartRecruitersPosting
+};

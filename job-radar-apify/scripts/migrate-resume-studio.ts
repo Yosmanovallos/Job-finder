@@ -1,7 +1,7 @@
 /**
  * Migration for the AI Resume Studio R1 (ADR 0017, 2026-11-21).
- * Applies schema.sql's additive `resume-studio` block: three new tables
- * (rs_consents, rs_resumes, rs_resume_versions) with RLS + REVOKE and an
+ * Applies schema.sql's additive `resume-studio` block: new tables
+ * (rs_consents, rs_resumes, rs_resume_versions; R2: rs_job_snapshot_cache) with RLS + REVOKE and an
  * insert-only trigger on rs_consents. Nothing existing is altered.
  *
  * LOCAL ONLY until R5: ADR 0017 §6 says the rs_* tables are tested in the
@@ -20,7 +20,7 @@ import { assertDirectDatabaseAllowed } from "../src/direct/db-guard.js";
 
 dotenv.config();
 
-const TABLES = ["rs_consents", "rs_resumes", "rs_resume_versions"];
+const TABLES = ["rs_consents", "rs_resumes", "rs_resume_versions", "rs_job_snapshot_cache"];
 
 async function main() {
   if (process.argv.includes("--allow-remote-db")) {

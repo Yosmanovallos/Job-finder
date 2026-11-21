@@ -1131,8 +1131,24 @@ CREATE TABLE IF NOT EXISTS rs_resume_versions (
 CREATE INDEX IF NOT EXISTS idx_rs_resume_versions_user
     ON rs_resume_versions (user_id, resume_id, version_no DESC);
 
+-- rs_job_snapshot_cache (R2, doc 11 §5.3): vacante leída de un link público
+-- o de nuestra base, por URL canónica, 24 h. Compartida entre usuarios y SIN
+-- user_id a propósito: nunca guarda texto que pegó un usuario, solo lo que
+-- cualquiera vería en la página pública. url_key = SHA-256 de la URL canónica.
+CREATE TABLE IF NOT EXISTS rs_job_snapshot_cache (
+    url_key        CHAR(64) PRIMARY KEY,
+    canonical_url  TEXT NOT NULL,
+    via            VARCHAR(24) NOT NULL,
+    snapshot_json  JSONB NOT NULL,
+    fetched_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    expires_at     TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_rs_job_snapshot_cache_expires
+    ON rs_job_snapshot_cache (expires_at);
+
 -- Mismo blindaje que el resto: solo el servidor (rol postgres) lee y
 -- escribe; la anon key pública no ve nada.
+ALTER TABLE rs_job_snapshot_cache ENABLE ROW LEVEL SECURITY;
 ALTER TABLE rs_consents ENABLE ROW LEVEL SECURITY;
 ALTER TABLE rs_resumes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE rs_resume_versions ENABLE ROW LEVEL SECURITY;
@@ -1140,7 +1156,7 @@ DO $revoke$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon')
      AND EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
-    REVOKE ALL ON rs_consents, rs_resumes, rs_resume_versions FROM anon, authenticated;
+    REVOKE ALL ON rs_consents, rs_resumes, rs_resume_versions, rs_job_snapshot_cache FROM anon, authenticated;
     REVOKE ALL ON FUNCTION rs_consents_insert_only() FROM anon, authenticated;
   END IF;
 END
