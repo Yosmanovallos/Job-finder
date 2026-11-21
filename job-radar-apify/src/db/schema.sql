@@ -1146,8 +1146,39 @@ CREATE TABLE IF NOT EXISTS rs_job_snapshot_cache (
 CREATE INDEX IF NOT EXISTS idx_rs_job_snapshot_cache_expires
     ON rs_job_snapshot_cache (expires_at);
 
+-- rs_ai_usage (R3, ADR 0017 §4): ledger de costo de IA. SIN contenido:
+-- nunca texto del CV, de la vacante ni de la respuesta; solo ids, prompt,
+-- modelo, tokens, costo (micro-USD) y estado. Cada llamada se reserva al
+-- peor costo antes de hacerse (topes duros por adaptación, usuario/día,
+-- global/día y global/mes). Al borrar todo o revocar, user_id/adaptation_id
+-- quedan NULL y el costo sigue contando para los topes globales.
+CREATE TABLE IF NOT EXISTS rs_ai_usage (
+    id             BIGSERIAL PRIMARY KEY,
+    user_id        UUID,
+    adaptation_id  UUID,
+    purpose        VARCHAR(30) NOT NULL CHECK (purpose ~ '^[a-z_]{1,30}$'),
+    prompt_id      VARCHAR(40) CHECK (prompt_id IS NULL OR prompt_id ~ '^[a-z_]{1,40}$'),
+    prompt_version SMALLINT,
+    alias          VARCHAR(20),
+    model          VARCHAR(64),
+    attempt        SMALLINT NOT NULL DEFAULT 0,
+    status         VARCHAR(16) NOT NULL
+                   CHECK (status IN ('start', 'reserved', 'ok', 'invalid_json', 'error', 'cache_hit')),
+    input_tokens   INTEGER NOT NULL DEFAULT 0 CHECK (input_tokens >= 0),
+    output_tokens  INTEGER NOT NULL DEFAULT 0 CHECK (output_tokens >= 0),
+    cached_tokens  INTEGER NOT NULL DEFAULT 0 CHECK (cached_tokens >= 0),
+    cost_micros    BIGINT NOT NULL DEFAULT 0 CHECK (cost_micros >= 0),
+    cache_hit      BOOLEAN NOT NULL DEFAULT FALSE,
+    latency_ms     INTEGER NOT NULL DEFAULT 0,
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_rs_ai_usage_adaptation ON rs_ai_usage (adaptation_id);
+CREATE INDEX IF NOT EXISTS idx_rs_ai_usage_user_time ON rs_ai_usage (user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_rs_ai_usage_time ON rs_ai_usage (created_at);
+
 -- Mismo blindaje que el resto: solo el servidor (rol postgres) lee y
 -- escribe; la anon key pública no ve nada.
+ALTER TABLE rs_ai_usage ENABLE ROW LEVEL SECURITY;
 ALTER TABLE rs_job_snapshot_cache ENABLE ROW LEVEL SECURITY;
 ALTER TABLE rs_consents ENABLE ROW LEVEL SECURITY;
 ALTER TABLE rs_resumes ENABLE ROW LEVEL SECURITY;
@@ -1156,7 +1187,8 @@ DO $revoke$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon')
      AND EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
-    REVOKE ALL ON rs_consents, rs_resumes, rs_resume_versions, rs_job_snapshot_cache FROM anon, authenticated;
+    REVOKE ALL ON rs_consents, rs_resumes, rs_resume_versions, rs_job_snapshot_cache, rs_ai_usage FROM anon, authenticated;
+    REVOKE ALL ON SEQUENCE rs_ai_usage_id_seq FROM anon, authenticated;
     REVOKE ALL ON FUNCTION rs_consents_insert_only() FROM anon, authenticated;
   END IF;
 END

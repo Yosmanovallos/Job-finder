@@ -83,7 +83,9 @@ const line = (max: number) => z.string().trim().max(max);
 const month = z.string().trim().regex(MONTH, "Usa el formato AAAA-MM.");
 const factMeta = {
   id: ID,
-  source: z.literal("user").default("user"),
+  // R3 widens this additively: "file" = extracted from the user's own
+  // uploaded CV with a verified sourceSpan. R1 rows ("user") stay valid.
+  source: z.enum(["user", "file"]).default("user"),
   sourceSpan: z
     .object({ start: z.number().int().min(0), end: z.number().int().min(0) })
     .strict()

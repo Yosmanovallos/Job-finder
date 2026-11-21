@@ -26,6 +26,7 @@ import {
   ResumeStudioUnavailableError,
   ResumeVersionConflictError
 } from "../../db/resume-studio-repository.js";
+import { anonymizeAiUsage } from "../../db/resume-studio-ai-repository.js";
 import { readJsonBodyCapped } from "../http-helpers.js";
 import { CV_FILE_MESSAGES, CvFileError } from "../../resume-studio/cv-file-types.js";
 
@@ -72,12 +73,12 @@ function json(res: http.ServerResponse, status: number, body?: unknown, extra: R
   res.end(body === undefined ? undefined : JSON.stringify(body));
 }
 
-async function readBody(req: http.IncomingMessage, res: http.ServerResponse): Promise<{ ok: true; value: unknown } | null> {
+async function readBody(req: http.IncomingMessage, res: http.ServerResponse, maxBytes = RESUME_BODY_MAX_BYTES): Promise<{ ok: true; value: unknown } | null> {
   if (!String(req.headers["content-type"] || "").toLowerCase().startsWith("application/json")) {
     json(res, 415, { error: "Formato no soportado" });
     return null;
   }
-  const body = await readJsonBodyCapped(req, RESUME_BODY_MAX_BYTES, 10000);
+  const body = await readJsonBodyCapped(req, maxBytes, 10000);
   if (!body.ok) {
     json(res, 413, { error: "Contenido demasiado grande o no válido" });
     return null;
@@ -184,6 +185,23 @@ export async function handleResumeRoute(
       return json(res, 200, result);
     }
 
+    // AI (R3): CV → JSON and the card agent (doc 11 §5.2) ------------------
+    if (route === "/extract" || route === "/tailor/start" || route === "/tailor/card") {
+      if (method !== "POST") return json(res, 405, { error: "Método no permitido" });
+      const limit = route === "/tailor/card" ? AI_CARD_LIMIT : AI_START_LIMIT;
+      if (!checkRateLimit(`resume-ai${route}:${userId}`, limit, WRITE_WINDOW_MS, "resume-ai")) {
+        return json(res, 429, { error: "Muchas solicitudes seguidas. Intenta en unos minutos." }, { "Retry-After": "600" });
+      }
+      const body = await readBody(req, res, AI_BODY_MAX_BYTES);
+      if (!body) return;
+      // The CV goes to an AI provider: the two required authorizations first.
+      if (!consentStatus(await getConsentState(userId)).required) {
+        return json(res, 403, { error: "Primero acepta la autorización y los términos.", code: "consent_required" });
+      }
+      const ai = await import("./resume-ai.js");
+      return ai.handleResumeAi(res, route, userId, body.value, json);
+    }
+
     // Consent ------------------------------------------------------------
     if (route === "/consent") {
       if (method === "GET") {
@@ -202,6 +220,7 @@ export async function handleResumeRoute(
       // Revocation (Ley 1581 art. 8; doc 06 §4 «revocar = fila nueva»): one
       // granted=false row per purpose, and the stored CV goes with it.
       if (value.revoke === true) {
+        await anonymizeAiUsage(userId);
         const { deletedResumes } = await recordConsents(
           userId,
           CONSENT_ITEMS.map((item) => ({ purpose: item.purpose, granted: false, textHash: consentTextHash(item.text) })),
@@ -239,7 +258,9 @@ export async function handleResumeRoute(
     }
     if (route === "/data") {
       if (method !== "DELETE") return json(res, 405, { error: "Método no permitido" });
-      return json(res, 200, { deleted: await deleteAllResumeData(userId) });
+      const deleted = await deleteAllResumeData(userId);
+      await anonymizeAiUsage(userId);
+      return json(res, 200, { deleted });
     }
 
     // Resumes ------------------------------------------------------------
@@ -336,6 +357,10 @@ export async function handleResumeRoute(
 }
 
 const IMPORT_LIMIT = 10;
+const AI_START_LIMIT = 20;
+const AI_CARD_LIMIT = 80;
+// CV facts (≤ 64 KB) + vacancy text (≤ 20.000 chars) + the card's own fields.
+const AI_BODY_MAX_BYTES = 160 * 1024;
 const JOB_LINK_LIMIT = 30;
 
 const UUID_IN_PATH = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
