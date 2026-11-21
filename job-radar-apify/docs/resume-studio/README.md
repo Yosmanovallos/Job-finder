@@ -19,6 +19,7 @@ Marcas en todos los documentos: **[V]** verificado · **[P]** propuesto · **[?]
 | 08 | [Security & Threat Model](08-security-threat-model.md) | Amenazas, controles, hallazgos |
 | 09 | [Testing Strategy](09-testing-strategy.md) | Perfiles sintéticos, evals, pruebas de seguridad |
 | 10 | [Implementation Roadmap](10-implementation-roadmap.md) | Decisiones previas, fases R0–R5, rollback |
+| 11 | [JobStep a fondo y réplica](11-jobstep-replica.md) | Video del flujo por link, negocio y precios de JobStep, IA, economía con Qwen, qué copiar y qué no, plan R0–R5 actualizado |
 
 **Mockups y prototipo:** [`mockups/resume-studio-prototype.html`](mockups/resume-studio-prototype.html)
 (abrir en el navegador; también publicado como artifact privado). Las 12
