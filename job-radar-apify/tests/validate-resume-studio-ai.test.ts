@@ -2,9 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { z } from "zod";
 import { costMicros, parseResumeAiConfig, usBaseUrl } from "../src/resume-studio/ai/config.js";
-import { createGateway, parseJsonObject, type Transport, type TransportRequest } from "../src/resume-studio/ai/gateway.js";
+import { createGateway, parseJsonObject, type InvalidInfo, type Transport, type TransportRequest } from "../src/resume-studio/ai/gateway.js";
 import { colombiaWindows, MemoryLedger } from "../src/resume-studio/ai/ledger.js";
-import { PROMPTS, type PromptSpec } from "../src/resume-studio/ai/prompts.js";
+import { evidenceMapOutput, PROMPTS, proposalOutput, type PromptSpec } from "../src/resume-studio/ai/prompts.js";
 import { buildQwenBody, qwenTransport } from "../src/resume-studio/ai/qwen.js";
 
 // AI Resume Studio R3 — gateway (ADR 0017 §4): provider switch, prices,
@@ -94,7 +94,8 @@ test("RS3-AI-QWEN body: no thinking, JSON mode, no tools; transport parses usage
   }) as unknown as typeof fetch;
   const t = qwenTransport({ baseUrl: "https://ws-1.us-east-1.maas.aliyuncs.com/compatible-mode/v1", apiKey: "sk-test", fetchImpl });
   const out = await t(req);
-  assert.deepEqual(out, { content: '{"answer":"x"}', usage: { promptTokens: 40, completionTokens: 5, cachedTokens: 30 } });
+  assert.deepEqual(out, { content: '{"answer":"x"}', finishReason: null, usage: { promptTokens: 40, completionTokens: 5, cachedTokens: 30 } });
+  assert.equal(body.temperature, 0);
   assert.equal(seen!.url, "https://ws-1.us-east-1.maas.aliyuncs.com/compatible-mode/v1/chat/completions");
   assert.equal(seen!.init.redirect, "error");
 
@@ -199,4 +200,26 @@ test("RS3-AI-WINDOWS Colombian day and month (UTC−5)", () => {
   const w = colombiaWindows(new Date("2026-12-01T03:00:00Z")); // 2026-11-30 22:00 in Bogotá
   assert.equal(w.dayStart.toISOString(), "2026-11-30T05:00:00.000Z");
   assert.equal(w.monthStart.toISOString(), "2026-11-01T05:00:00.000Z");
+});
+
+test("RS3-AI-V2 tolerant shape (not content), retry carries a field-only hint, diagnostics without content", async () => {
+  // Shape: unknown keys dropped, null → "", a bad list item skipped, over-long lists cut.
+  const parsed = proposalOutput.parse({ text: "Auxiliar", supportingFactIds: ["e1", 7, null, { x: 1 }], why: null, extra: "x" });
+  assert.deepEqual(parsed, { text: "Auxiliar", supportingFactIds: ["e1", "7"], why: "", question: "" });
+  assert.equal(proposalOutput.safeParse({ text: "", question: "" }).success, false, "empty answer is still invalid");
+  assert.equal(proposalOutput.parse({ text: "", question: "¿Cuántas campañas fueron?" }).question, "¿Cuántas campañas fueron?");
+  const ev = evidenceMapOutput.parse({ items: [{ requirementId: "r1", citations: [{ factId: "b1", quote: "ok ok" }, { factId: "b2" }] }] });
+  assert.deepEqual(ev.items[0].citations, [{ factId: "b1", quote: "ok ok" }]);
+  assert.deepEqual(parseJsonObject('Claro, aquí está: {"a":1} ¡listo!'), { a: 1 });
+
+  const seen: InvalidInfo[] = [];
+  const t = fakeTransport(['{"otra":"cosa"}', '{"answer":"bien"}']);
+  const g = createGateway({ config: mockConfig(), ledger: new MemoryLedger(), transport: t, onInvalid: (i) => seen.push(i) });
+  assert.equal((await g.complete(SPEC, { q: "Laura secreto" }, ctx)).ok, true);
+  assert.equal(seen.length, 1);
+  assert.deepEqual([seen[0].promptId, seen[0].attempt, seen[0].kind], ["card_headline", 1, "schema"]);
+  assert.ok(seen[0].paths.includes("answer"), seen[0].paths.join(","));
+  assert.match(t.calls[1].system, /CORRECCIÓN: .*claves con problema: answer/);
+  assert.equal(t.calls[1].system.includes("Laura"), false, "the hint holds field names only");
+  assert.equal(t.calls[0].system.includes("CORRECCIÓN"), false);
 });

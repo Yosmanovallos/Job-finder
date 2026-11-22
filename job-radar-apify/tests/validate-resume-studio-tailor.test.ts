@@ -167,19 +167,19 @@ const CASES: [string, "accept" | "question" | "discard"][] = [
   ["Apoyé a la gerencia con un informe semanal de ventas.", "accept"],
   ["Gestioné campañas con presupuesto limitado.", "accept"],
   ["Trabajé en Tienda La 70 Demo S.A.S. como auxiliar de mercadeo.", "accept"],
-  ["Configuré 8 campañas en Meta Ads.", "discard"],
-  ["Configuré 6 campañas y aumenté las ventas un 35%.", "discard"],
-  ["Atendí 60 llamadas por turno con 98 % de satisfacción.", "discard"],
-  ["En 2021 atendí 60 llamadas por turno.", "discard"],
-  ["Desde enero atendí 60 llamadas por turno.", "discard"],
+  ["Configuré 8 campañas en Meta Ads.", "question"],
+  ["Configuré 6 campañas y aumenté las ventas un 35%.", "question"],
+  ["Atendí 60 llamadas por turno con 98 % de satisfacción.", "question"],
+  ["En 2021 atendí 60 llamadas por turno.", "question"],
+  ["Desde enero atendí 60 llamadas por turno.", "question"],
   ["Configuré campañas para Bancolombia en Meta Ads.", "discard"],
   ["Trabajé en Rappi Demo como auxiliar.", "discard"],
   ["Lideré como Gerente las campañas en Meta Ads.", "discard"],
   ["Especialista senior en campañas de Meta Ads.", "discard"],
   ["Experto certificado en Meta Ads.", "discard"],
-  ["Con 10 años de experiencia en campañas.", "discard"],
-  ["Lideré un equipo de 12 personas.", "discard"],
-  ["Gestioné un presupuesto de 500 millones.", "discard"],
+  ["Con 10 años de experiencia en campañas.", "question"],
+  ["Lideré un equipo de 12 personas.", "question"],
+  ["Gestioné un presupuesto de 500 millones.", "question"],
   ["Configuré campañas en Google Ads.", "question"],
   ["Configuré 6 campañas usando Salesforce.", "question"],
   ["Analicé los resultados con Python y SQL.", "question"],
@@ -187,7 +187,7 @@ const CASES: [string, "accept" | "question" | "discard"][] = [
   ["Hice el informe semanal en Looker Studio.", "question"],
   ["Configuré campañas en Meta Ads con HubSpot.", "question"],
   ["Armé reportes en GA4.", "question"],
-  ["Configuré 6 campañas en Google Ads y aumenté 40% las ventas.", "discard"],
+  ["Configuré 6 campañas en Google Ads y aumenté 40% las ventas.", "question"],
   ["Configuré campañas con Salesforce en Bancolombia.", "discard"],
   ["Gerente de mercadeo con Python.", "discard"],
   ["", "discard"],
@@ -196,10 +196,10 @@ const CASES: [string, "accept" | "question" | "discard"][] = [
   ["Atendí 60 llamadas por turno (2023).", "accept"],
   ["Configuré campañas en Meta Ads, TikTok Ads y Excel.", "accept"],
   ["Coordinadora de campañas en Meta Ads.", "discard"],
-  ["Logré un 95 % de satisfacción en 2024.", "discard"]
+  ["Logré un 95 % de satisfacción en 2024.", "question"]
 ];
 
-test("RS3-FACT 40 cases: new numbers, dates, names and titles discard; new tools ask", () => {
+test("RS3-FACT 40 cases: new names, titles and links discard; new figures, dates, tools and results become a question (never applied)", () => {
   assert.equal(CASES.length, 40);
   for (const [after, expected] of CASES) {
     const got = validateProposal({ after, sources: SRC });
@@ -207,7 +207,7 @@ test("RS3-FACT 40 cases: new numbers, dates, names and titles discard; new tools
   }
 });
 
-test("RS3-FACT-2 number-free result, scope and leadership claims are discarded; headlines reuse CV words only", () => {
+test("RS3-FACT-2 number-free result, scope and leadership claims are never accepted; headlines reuse CV words only", () => {
   const src = ["Configuré 6 campañas pequeñas en Meta Ads y TikTok Ads con presupuesto limitado.", "Comunicadora social con experiencia en redes sociales y eventos."];
   for (const after of [
     "Configuré 6 campañas en Meta Ads, duplicando las ventas.",
@@ -220,8 +220,11 @@ test("RS3-FACT-2 number-free result, scope and leadership claims are discarded; 
     "Configuré campañas en Meta Ads y aumenté las ventas.",
     "Comunicadora social · Marketing digital"
   ]) {
-    assert.equal(validateProposal({ after, sources: src }).verdict, "discard", after);
+    // Never accepted: a result only the user can confirm is asked, a new name is discarded.
+    assert.notEqual(validateProposal({ after, sources: src }).verdict, "accept", after);
   }
+  assert.equal(validateProposal({ after: "Comunicadora social · Marketing digital", sources: src }).verdict, "discard");
+  assert.equal(validateProposal({ after: "Lideré las campañas en Meta Ads.", sources: src }).verdict, "question");
   // Supported when the source says it.
   assert.equal(validateProposal({ after: "Lideré 6 campañas en Meta Ads.", sources: ["Lideré 6 campañas pequeñas en Meta Ads."] }).verdict, "accept");
   // Headline: every content word must already be in the CV.

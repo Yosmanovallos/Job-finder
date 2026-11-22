@@ -93,14 +93,36 @@ Sobre el costo:
 - El **criterio ≤ COP 150 queda garantizado por código**: el tope duro por adaptación por defecto es USD 0,035 (≈ COP 140 con TRM 4.000), y la prueba RS3-AI-CFG lo comprueba.
 - Con el presupuesto del doc 11 §5.4 (~63.000 tokens de entrada y ~10.500 de salida), los precios oficiales dan ≈ COP 13 todo en flash y ≈ COP 37 con plus en las 4 reescrituras.
 
-**Pendiente con aprobación del propietario:** una sola corrida real contra
-Qwen para medir costo y calidad:
+## Corrida real contra Qwen (2026-11-22, aprobada por el propietario)
 
-```
-RESUME_AI_EVAL_LIVE=1 RESUME_AI_PROVIDER=qwen RESUME_AI_WORKSPACE_ID=… RESUME_AI_API_KEY=… npx tsx scripts/eval-resume-tailor.ts --live
-```
+El propietario la corrió en su PowerShell, con su llave, sobre `f0d3d54`. El
+agente no leyó el `.env`: lo bloquea la configuración. Workspace en Virginia,
+alcance «United States». El script impuso un tope de USD 1 a toda la corrida.
 
-No se corrió en R3: requiere su llave y su aprobación explícita.
+- **Humo:** ok. `qwen3.7-flash`, 1.720 ms, 401/67 tokens, USD 0,000021.
+- **Eval:** 6 CV (P2, P3, P5, P10, P13, P20) × 4 vacantes (V1, V2, V4, V7) = 24 adaptaciones y 6 extracciones. **PASS.**
+
+| Métrica | Resultado real |
+| --- | --- |
+| **Hechos inventados aceptados** (tarjetas / extracción) | **0 / 0** |
+| Fugas de datos sensibles | 0. P10 trae cédula, estado civil, EPS y fecha de nacimiento; P20 trae inyección. |
+| Propuestas mostradas | 42: título 15, resumen 8, reescritura 4, chat 15 |
+| Descartadas / preguntas / no disponibles | 19 / 0 / 6 |
+| Compatibilidad media | 25 → 29 |
+| Llamadas | 106. JSON inválido 17 (16 %), errores 0, aciertos de caché 2. |
+| Latencia p50 | `cv_extract` 2.923 ms · `evidence_map` 1.135 · título 1.100 · reescritura 1.778 · resumen 1.529 · chat 1.008 |
+| Tokens medios por adaptación | 2.523 de entrada (165 en caché), 466 de salida |
+| **Costo real por adaptación** | **USD 0,000186 de media (≈ COP 0,74); máximo USD 0,001142 (≈ COP 4,57)** con TRM 4.000 |
+| Total de la corrida | USD 0,005046 en 150 s |
+
+Lectura de los resultados:
+
+- **El criterio de salida de R3 se cumple con datos reales.** 0 hechos inventados aceptados, y el costo queda unas 30 veces por debajo de COP 150, aun en el peor caso.
+- **Calidad para ajustar, sin aflojar el validador.** Ver «Ajustes tras la corrida real» abajo:
+  - el 16 % de las llamadas devolvió JSON inválido;
+  - 19 propuestas se descartaron, sobre todo títulos con palabras nuevas y resúmenes con logros o cargos;
+  - 0 preguntas;
+  - la compatibilidad sube poco, porque la eval solo responde los requisitos para los que la persona sintética tiene una respuesta escrita.
 
 ## Revisión visual
 

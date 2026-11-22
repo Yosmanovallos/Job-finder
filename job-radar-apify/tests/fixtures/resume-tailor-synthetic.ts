@@ -1,3 +1,6 @@
+import { findSkills } from "../../src/lib/resume-tailor/skills.js";
+import { contentTerms } from "../../src/lib/resume-tailor/text.js";
+
 // AI Resume Studio R3 — synthetic evaluation set (doc 09 §1 and §4): 20 CVs
 // × 10 vacancies. 100 % invented: «… Demo S.A.S.» companies, «… Ejemplo»
 // institutions, @ejemplo.test e-mails and 300 000 0000 phones. No real CV.
@@ -133,5 +136,17 @@ export function cvText(cv: SyntheticCv): string {
 export function personaAnswer(cv: SyntheticCv, requirement: string): string | null {
   const n = requirement.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
   for (const [key, answer] of Object.entries(cv.truth)) if (n.includes(key)) return answer;
+  // Otherwise the persona points at a bullet of its own CV that shares a
+  // skill or at least two content words with the requirement: still true,
+  // and it exercises the whole mapping → rewrite flow (live run 2026-11-22).
+  const reqSkills = findSkills(requirement);
+  const reqTerms = new Set(contentTerms(requirement));
+  for (const e of cv.experience) {
+    for (const b of e.bullets) {
+      const sharedSkill = reqSkills.some((s) => findSkills(b).includes(s));
+      const sharedTerms = contentTerms(b).filter((t) => reqTerms.has(t)).length;
+      if (sharedSkill || sharedTerms >= 2) return `En ${e.company}: ${b.charAt(0).toLowerCase()}${b.slice(1).replace(/\.$/, "")}`;
+    }
+  }
   return null;
 }

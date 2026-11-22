@@ -22,7 +22,8 @@ export function buildQwenBody(request: TransportRequest): Record<string, unknown
       { role: "user", content: request.user }
     ],
     max_tokens: request.maxTokens,
-    temperature: 0.2,
+    // 0: the first live run had 16 % invalid JSON at 0.2.
+    temperature: 0,
     response_format: { type: "json_object" },
     enable_thinking: false,
     stream: false
@@ -65,6 +66,7 @@ export function qwenTransport(options: { baseUrl: string; apiKey: string; fetchI
       const usage = json?.usage;
       return {
         content,
+        finishReason: typeof json?.choices?.[0]?.finish_reason === "string" ? json.choices[0].finish_reason : null,
         usage:
           usage && Number.isFinite(usage.prompt_tokens) && Number.isFinite(usage.completion_tokens)
             ? {

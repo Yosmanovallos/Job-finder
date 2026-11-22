@@ -23,6 +23,16 @@ export interface TransportRequest {
 export interface TransportResponse {
   content: string;
   usage: { promptTokens: number; completionTokens: number; cachedTokens: number } | null;
+  /** «stop», «length»… when the provider says it. */
+  finishReason?: string | null;
+}
+
+/** Why an answer was rejected — field paths only, never content. */
+export interface InvalidInfo {
+  promptId: string;
+  attempt: number;
+  kind: "parse" | "schema" | "truncated";
+  paths: string[];
 }
 
 export type Transport = (request: TransportRequest) => Promise<TransportResponse>;
@@ -60,6 +70,8 @@ export interface GatewayOptions {
   clock?: () => Date;
   cacheSize?: number;
   cacheTtlMs?: number;
+  /** Diagnostics for invalid answers (evals). Receives no content. */
+  onInvalid?: (info: InvalidInfo) => void;
 }
 
 export interface ResumeAiGateway {
@@ -124,6 +136,7 @@ export function createGateway(options: GatewayOptions): ResumeAiGateway {
       }
 
       let spent = 0;
+      let hint = "";
       for (let attempt = 1; attempt <= 2; attempt++) {
         const worst = costMicros(price, inputTokens, spec.maxOutputTokens);
         const reservation = await ledger.reserve({
@@ -142,7 +155,7 @@ export function createGateway(options: GatewayOptions): ResumeAiGateway {
           response = await transport({
             promptId: spec.id,
             model,
-            system: rendered.system,
+            system: rendered.system + hint,
             user: rendered.user,
             maxTokens: spec.maxOutputTokens,
             timeoutMs: config.timeoutMs
@@ -182,6 +195,14 @@ export function createGateway(options: GatewayOptions): ResumeAiGateway {
           cacheSet(key, valid.data);
           return { ok: true, data: valid.data, cached: false, attempts: attempt, costMicros: spent };
         }
+        const kind = response.finishReason === "length" ? "truncated" : parsed === undefined ? "parse" : "schema";
+        const paths = valid && !valid.success ? [...new Set(valid.error.issues.map((i) => i.path.join(".") || "(raíz)"))].slice(0, 8) : [];
+        options.onInvalid?.({ promptId: spec.id, attempt, kind, paths });
+        // The retry says what was wrong (field names only, nothing from the answer).
+        hint =
+          "\n\nCORRECCIÓN: tu respuesta anterior no fue válida (" +
+          (kind === "truncated" ? "se cortó: responde más corto" : kind === "parse" ? "no era un objeto JSON" : `claves con problema: ${paths.join(", ")}`) +
+          "). Responde SOLO el objeto JSON, con exactamente las claves del formato.";
       }
       return { ok: false, code: "invalid_output" };
     }
@@ -191,10 +212,18 @@ export function createGateway(options: GatewayOptions): ResumeAiGateway {
 /** The first JSON object of the content, or undefined. Tolerates ```json fences. */
 export function parseJsonObject(content: string): unknown {
   const trimmed = content.trim().replace(/^```(?:json)?\s*|\s*```$/g, "");
-  try {
-    const value = JSON.parse(trimmed);
-    return value && typeof value === "object" && !Array.isArray(value) ? value : undefined;
-  } catch {
-    return undefined;
-  }
+  const attempt = (text: string): unknown => {
+    try {
+      const value = JSON.parse(text);
+      return value && typeof value === "object" && !Array.isArray(value) ? value : undefined;
+    } catch {
+      return undefined;
+    }
+  };
+  const direct = attempt(trimmed);
+  if (direct !== undefined) return direct;
+  // «Claro, aquí está: {…}»: the outermost object, if it parses as a whole.
+  const first = trimmed.indexOf("{");
+  const last = trimmed.lastIndexOf("}");
+  return first >= 0 && last > first ? attempt(trimmed.slice(first, last + 1)) : undefined;
 }

@@ -46,16 +46,27 @@ export interface EvalReport {
   /** Mean tokens per adaptation and per extraction (provider-reported when available). */
   tokensPerAdaptation: { input: number; output: number; cached: number };
   tokensPerExtraction: { input: number; output: number };
+  /** Why answers were invalid: prompt:kind:paths → count (no content). */
+  invalidReasons: Record<string, number>;
   /** Total spent by the whole run, micro-USD. */
   totalCostMicros: number;
 }
 
-export async function runTailorEval(options: { transport?: Transport; env?: Record<string, string>; cvs?: SyntheticCv[]; jobs?: typeof SYNTHETIC_JOBS } = {}): Promise<EvalReport> {
+export async function runTailorEval(options: { transport?: Transport; env?: Record<string, string>; cvs?: SyntheticCv[]; jobs?: typeof SYNTHETIC_JOBS; answerAll?: boolean } = {}): Promise<EvalReport> {
   const env = { RESUME_AI_PROVIDER: "mock", RESUME_AI_CAP_GLOBAL_DAILY_USD: "500", RESUME_AI_CAP_GLOBAL_MONTHLY_USD: "5000", RESUME_AI_CAP_USER_DAILY_USD: "50", ...(options.env ?? {}) };
   const config = parseResumeAiConfig(env);
   const ledger = new MemoryLedger();
   const mock = options.transport ? null : mockTransport();
-  const gateway = createGateway({ config, ledger, transport: options.transport ?? mock });
+  const invalidReasons: Record<string, number> = {};
+  const gateway = createGateway({
+    config,
+    ledger,
+    transport: options.transport ?? mock,
+    onInvalid: (info) => {
+      const key = `${info.promptId}:${info.kind}${info.paths.length ? `:${info.paths.join("|")}` : ""}`;
+      invalidReasons[key] = (invalidReasons[key] ?? 0) + 1;
+    }
+  });
   const cvs = options.cvs ?? SYNTHETIC_CVS;
   const jobs = options.jobs ?? SYNTHETIC_JOBS;
   const adaptationIds: string[] = [];
@@ -83,6 +94,7 @@ export async function runTailorEval(options: { transport?: Transport; env?: Reco
     latencyP50ByPrompt: {},
     tokensPerAdaptation: { input: 0, output: 0, cached: 0 },
     tokensPerExtraction: { input: 0, output: 0 },
+    invalidReasons: {},
     totalCostMicros: 0
   };
   const adaptationCosts: number[] = [];
@@ -162,7 +174,13 @@ export async function runTailorEval(options: { transport?: Transport; env?: Reco
           const real = card.options.filter((s) => Object.keys(cv.truth).some((k) => s.toLowerCase().includes(k)));
           facts = applySkills(facts, real, card.options);
         } else if (card.type === "requirement_mapping") {
-          const answer = personaAnswer(cv, card.requirement);
+          // answerAll: the fictional persona says it did every requirement, in its
+          // own words (a synthetic answer). That answer becomes the source the
+          // validator checks against, so nothing beyond it can be accepted.
+          const target0 = card.options.find((o) => o.experienceId === card.suggested) ?? card.options[0];
+          const answer =
+            personaAnswer(cv, card.requirement) ??
+            (options.answerAll ? `Como ${target0?.label ?? "parte de mi trabajo"} hice esto: ${card.requirement.charAt(0).toLowerCase()}${card.requirement.slice(1)}` : null);
           if (!answer) continue;
           answers.push(answer);
           const target = card.suggested ?? card.options[0]?.experienceId ?? null;
@@ -216,6 +234,7 @@ export async function runTailorEval(options: { transport?: Transport; env?: Reco
   const ex = tokens(extractionIds);
   report.tokensPerExtraction = { input: ex.input, output: ex.output };
   report.totalCostMicros = ledger.rows.reduce((a, r) => a + r.costMicros, 0);
+  report.invalidReasons = invalidReasons;
   return report;
 }
 

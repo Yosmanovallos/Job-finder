@@ -5,6 +5,7 @@
  *   npx tsx scripts/eval-resume-tailor.ts                     (adversarial mock, offline, 20 × 10)
  *   RESUME_AI_EVAL_LIVE=1 npx tsx scripts/eval-resume-tailor.ts --live --smoke
  *   RESUME_AI_EVAL_LIVE=1 npx tsx scripts/eval-resume-tailor.ts --live --cvs P2,P3 --jobs V1,V2
+ *   … --answer-all   the persona answers every requirement card (full mapping → rewrite flow)
  *
  * --live calls the real Qwen endpoint (Virginia, «United States» scope) with
  * the RESUME_AI_* variables of the process. It costs money and sends the
@@ -76,12 +77,14 @@ async function main() {
     transport,
     env,
     cvs: cvIds ? SYNTHETIC_CVS.filter((c) => cvIds.includes(c.id)) : undefined,
-    jobs: jobIds ? SYNTHETIC_JOBS.filter((j) => jobIds.includes(j.id)) : undefined
+    jobs: jobIds ? SYNTHETIC_JOBS.filter((j) => jobIds.includes(j.id)) : undefined,
+    answerAll: process.argv.includes("--answer-all")
   });
   const cop = (m: number) => copOf(m, report.copPerUsd);
   const usd = (m: number) => Math.round(m) / 1e6;
   const summary = {
     mode: live ? "qwen (real)" : "mock adversarial",
+    answerAll: process.argv.includes("--answer-all"),
     pairs: report.pairs,
     extractions: report.extractions,
     inventedAccepted: report.inventedAccepted.length,
@@ -95,6 +98,7 @@ async function main() {
     rejections: report.rejections,
     compatibilityAvg: `${report.scoreBefore} → ${report.scoreAfter}`,
     calls: report.calls,
+    invalidReasons: report.invalidReasons,
     latencyP50MsByPrompt: report.latencyP50ByPrompt,
     tokensPerAdaptation: report.tokensPerAdaptation,
     tokensPerExtraction: report.tokensPerExtraction,

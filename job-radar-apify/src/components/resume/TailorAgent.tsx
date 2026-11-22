@@ -32,7 +32,7 @@ interface StartResponse {
 }
 
 type Proposal =
-  | { status: "proposal"; text: string; why: string; byAi: boolean; reply?: string }
+  | { status: "proposal"; text: string; why: string; byAi: boolean; reply?: string; ask?: string }
   | { status: "question"; claims: Claim[]; question: string }
   | { status: "discarded"; claims: Claim[] }
   | { status: "error"; error: string };
@@ -446,6 +446,7 @@ function ProposalCard({
             {before ? <del style={delStyle}>{before}</del> : null} <ins style={insStyle}>{proposal.text}</ins>
           </p>
           {proposal.why ? <p className="text-xs text-muted-foreground mt-2">{proposal.why}</p> : null}
+          {proposal.ask ? <p className="text-xs mt-1">Pregunta: {proposal.ask} Si tienes ese dato, usa «Editar» y escríbelo tú.</p> : null}
           {!proposal.byAi ? <p className="text-xs text-muted-foreground mt-1">IA apagada: es tu texto, con mayúscula y punto.</p> : null}
         </>
       ) : null}
