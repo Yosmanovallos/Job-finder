@@ -29,3 +29,13 @@ test("RS3-EVAL 20 CV × 10 vacancies: 0 invented facts accepted, cost ≤ COP 15
   const maxCop = copOf(report.costMicrosPerAdaptation.max, report.copPerUsd);
   assert.ok(maxCop <= 150, `max COP ${maxCop}`);
 });
+
+test("RS3-EVAL-FULL every requirement card answered: full mapping → rewrite flow, still 0 invented", async () => {
+  const report = await runTailorEval({ answerAll: true });
+  assert.deepEqual(report.inventedAccepted, []);
+  assert.deepEqual(report.extractionInvented, []);
+  assert.ok((report.shownByCard.rewrite ?? 0) > 200, `rewrites ${report.shownByCard.rewrite}`);
+  assert.ok(report.questions > 0, "missing data surfaces as questions");
+  assert.ok(report.scoreAfter >= report.scoreBefore + 20, `${report.scoreBefore} → ${report.scoreAfter}`);
+  assert.ok(copOf(report.costMicrosPerAdaptation.max, report.copPerUsd) <= 150);
+});

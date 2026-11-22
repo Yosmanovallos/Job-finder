@@ -189,7 +189,7 @@ export type CardRequest =
   | { card: "chat"; cardType: "headline" | "summary" | "rewrite"; current: string; instruction: string; facts: ResumeFacts; experienceId: string | null; answer: string };
 
 export type CardResult =
-  | { status: "proposal"; text: string; why: string; supportingFactIds: string[]; byAi: boolean; reply?: string }
+  | { status: "proposal"; text: string; why: string; supportingFactIds: string[]; byAi: boolean; reply?: string; ask?: string }
   | { status: "question"; claims: Claim[]; question: string; discardedText: string }
   | { status: "discarded"; claims: Claim[]; reason: "new_data" | "unknown_fact" | "empty" }
   | { status: "unavailable"; code: GatewayFailure };
@@ -205,17 +205,25 @@ export function cardSources(request: CardRequest): { sources: string[]; knownFac
   return { sources: all.map((f) => f.text), knownFactIds };
 }
 
-function judge(text: string, why: string, supportingFactIds: string[], request: CardRequest, byAi: boolean, reply?: string): CardResult {
+function judge(text: string, why: string, supportingFactIds: string[], request: CardRequest, byAi: boolean, reply?: string, modelQuestion = ""): CardResult {
   const { sources, knownFactIds } = cardSources(request);
+  // The model's own question is shown as a question, never applied. A question
+  // with a link/HTML or other new data is replaced by a neutral one.
+  const ask = modelQuestion && newClaims(modelQuestion, []).every((c) => c.kind !== "link") ? modelQuestion : "";
+  if (!text.trim()) {
+    return { status: "question", claims: [], question: ask || "Falta un dato para esta tarjeta. Escríbelo con tus palabras o sáltala.", discardedText: "" };
+  }
   const headline = request.card === "headline" || (request.card === "chat" && request.cardType === "headline");
   const verdict = validateProposal({ after: text, sources, supportingFactIds, knownFactIds, strictWords: headline });
-  if (verdict.verdict === "accept") return { status: "proposal", text, why, supportingFactIds, byAi, ...(reply ? { reply } : {}) };
+  if (verdict.verdict === "accept") return { status: "proposal", text, why, supportingFactIds, byAi, ...(reply ? { reply } : {}), ...(ask ? { ask } : {}) };
   if (verdict.verdict === "question") {
-    const names = verdict.newClaims.map((c) => c.value);
+    const names = verdict.newClaims.map((c) => `«${c.value}»`);
     return {
       status: "question",
       claims: verdict.newClaims,
-      question: `La propuesta menciona ${names.join(", ")}, que no está en tu hoja de vida. ¿Lo usaste de verdad? Si es así, agrégalo con tus palabras.`,
+      question:
+        `La propuesta incluía ${names.join(", ")}, que no está en tu hoja de vida ni en lo que nos contaste. ` +
+        `Si es real, escríbelo tú con tus palabras (Editar); si no, omite esta tarjeta.${ask ? ` ${ask}` : ""}`,
       discardedText: text
     };
   }
@@ -231,18 +239,18 @@ export async function proposeCard(gateway: ResumeAiGateway, ctx: Omit<CallContex
     const experience = request.experienceId ? factTexts(request.facts).filter((f) => f.factId === request.experienceId || f.parentId === request.experienceId) : [];
     const r = await gateway.complete(CARD_REWRITE, { requirement: request.requirement, experience, answer: request.answer }, { ...ctx, purpose: "card_rewrite" });
     if (!r.ok) return { status: "unavailable", code: r.code };
-    return judge(r.data.text, r.data.why, r.data.supportingFactIds, request, true);
+    return judge(r.data.text, r.data.why, r.data.supportingFactIds, request, true, undefined, r.data.question);
   }
   if (!gateway.enabled) return { status: "unavailable", code: "ai_off" };
   if (request.card === "headline") {
     const r = await gateway.complete(CARD_HEADLINE, { jobTitle: request.jobTitle, facts: citableFacts(request.facts) }, { ...ctx, purpose: "card_headline" });
     if (!r.ok) return { status: "unavailable", code: r.code };
-    return judge(r.data.text, r.data.why, r.data.supportingFactIds, request, true);
+    return judge(r.data.text, r.data.why, r.data.supportingFactIds, request, true, undefined, r.data.question);
   }
   if (request.card === "summary") {
     const r = await gateway.complete(CARD_SUMMARY, { jobTitle: request.jobTitle, tasks: request.tasks, facts: citableFacts(request.facts) }, { ...ctx, purpose: "card_summary" });
     if (!r.ok) return { status: "unavailable", code: r.code };
-    return judge(r.data.text, r.data.why, r.data.supportingFactIds, request, true);
+    return judge(r.data.text, r.data.why, r.data.supportingFactIds, request, true, undefined, r.data.question);
   }
   const { sources } = cardSources(request);
   const r = await gateway.complete(

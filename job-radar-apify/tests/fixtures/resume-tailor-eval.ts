@@ -39,15 +39,38 @@ export interface EvalReport {
   costMicrosPerExtraction: { avg: number; max: number };
   copPerUsd: number;
   mock: MockStats | null;
+  /** Real-call metrics from the ledger (meaningful with a real transport). */
+  calls: { total: number; invalidJson: number; errors: number; cacheHits: number };
+  /** p50 latency (ms) of settled calls, by prompt. */
+  latencyP50ByPrompt: Record<string, number>;
+  /** Mean tokens per adaptation and per extraction (provider-reported when available). */
+  tokensPerAdaptation: { input: number; output: number; cached: number };
+  tokensPerExtraction: { input: number; output: number };
+  /** Why answers were invalid: prompt:kind:paths → count (no content). */
+  invalidReasons: Record<string, number>;
+  /** Total spent by the whole run, micro-USD. */
+  totalCostMicros: number;
 }
 
-export async function runTailorEval(options: { transport?: Transport; env?: Record<string, string>; cvs?: SyntheticCv[] } = {}): Promise<EvalReport> {
+export async function runTailorEval(options: { transport?: Transport; env?: Record<string, string>; cvs?: SyntheticCv[]; jobs?: typeof SYNTHETIC_JOBS; answerAll?: boolean } = {}): Promise<EvalReport> {
   const env = { RESUME_AI_PROVIDER: "mock", RESUME_AI_CAP_GLOBAL_DAILY_USD: "500", RESUME_AI_CAP_GLOBAL_MONTHLY_USD: "5000", RESUME_AI_CAP_USER_DAILY_USD: "50", ...(options.env ?? {}) };
   const config = parseResumeAiConfig(env);
   const ledger = new MemoryLedger();
   const mock = options.transport ? null : mockTransport();
-  const gateway = createGateway({ config, ledger, transport: options.transport ?? mock });
+  const invalidReasons: Record<string, number> = {};
+  const gateway = createGateway({
+    config,
+    ledger,
+    transport: options.transport ?? mock,
+    onInvalid: (info) => {
+      const key = `${info.promptId}:${info.kind}${info.paths.length ? `:${info.paths.join("|")}` : ""}`;
+      invalidReasons[key] = (invalidReasons[key] ?? 0) + 1;
+    }
+  });
   const cvs = options.cvs ?? SYNTHETIC_CVS;
+  const jobs = options.jobs ?? SYNTHETIC_JOBS;
+  const adaptationIds: string[] = [];
+  const extractionIds: string[] = [];
 
   const report: EvalReport = {
     pairs: 0,
@@ -66,7 +89,13 @@ export async function runTailorEval(options: { transport?: Transport; env?: Reco
     costMicrosPerAdaptation: { avg: 0, max: 0 },
     costMicrosPerExtraction: { avg: 0, max: 0 },
     copPerUsd: config.copPerUsd,
-    mock: null
+    mock: null,
+    calls: { total: 0, invalidJson: 0, errors: 0, cacheHits: 0 },
+    latencyP50ByPrompt: {},
+    tokensPerAdaptation: { input: 0, output: 0, cached: 0 },
+    tokensPerExtraction: { input: 0, output: 0 },
+    invalidReasons: {},
+    totalCostMicros: 0
   };
   const adaptationCosts: number[] = [];
   const extractionCosts: number[] = [];
@@ -79,6 +108,7 @@ export async function runTailorEval(options: { transport?: Transport; env?: Reco
     const original = cvText(cv);
     const exId = nextId();
     await ledger.startAdaptation(userId, exId);
+    extractionIds.push(exId);
     const transportSpy: string[] = [];
     const extracted = await extractCvFacts(gateway, { userId, adaptationId: exId, purpose: "cv_extract" }, original);
     report.extractions++;
@@ -95,10 +125,11 @@ export async function runTailorEval(options: { transport?: Transport; env?: Reco
     if ((cv.sensitive ?? []).some((line) => JSON.stringify(base).includes(line.split(":")[1]?.trim() ?? "§"))) report.sensitiveLeaks++;
     void transportSpy;
 
-    for (const job of SYNTHETIC_JOBS) {
+    for (const job of jobs) {
       report.pairs++;
       const adaptationId = nextId();
       await ledger.startAdaptation(userId, adaptationId);
+      adaptationIds.push(adaptationId);
       const ctx = { userId, adaptationId };
       const start = await startTailor(gateway, ctx, { facts: base, title: job.title, description: job.description });
       report.scoreBefore += start.scores.compatibility.total;
@@ -143,7 +174,13 @@ export async function runTailorEval(options: { transport?: Transport; env?: Reco
           const real = card.options.filter((s) => Object.keys(cv.truth).some((k) => s.toLowerCase().includes(k)));
           facts = applySkills(facts, real, card.options);
         } else if (card.type === "requirement_mapping") {
-          const answer = personaAnswer(cv, card.requirement);
+          // answerAll: the fictional persona says it did every requirement, in its
+          // own words (a synthetic answer). That answer becomes the source the
+          // validator checks against, so nothing beyond it can be accepted.
+          const target0 = card.options.find((o) => o.experienceId === card.suggested) ?? card.options[0];
+          const answer =
+            personaAnswer(cv, card.requirement) ??
+            (options.answerAll ? `Como ${target0?.label ?? "parte de mi trabajo"} hice esto: ${card.requirement.charAt(0).toLowerCase()}${card.requirement.slice(1)}` : null);
           if (!answer) continue;
           answers.push(answer);
           const target = card.suggested ?? card.options[0]?.experienceId ?? null;
@@ -173,6 +210,31 @@ export async function runTailorEval(options: { transport?: Transport; env?: Reco
   report.scoreBefore = Math.round(report.scoreBefore / Math.max(1, report.pairs));
   report.scoreAfter = Math.round(report.scoreAfter / Math.max(1, report.pairs));
   report.mock = mock ? { ...mock.stats } : null;
+  const calls = ledger.rows.filter((r) => r.status === "ok" || r.status === "invalid_json" || r.status === "error");
+  report.calls = {
+    total: calls.length,
+    invalidJson: calls.filter((r) => r.status === "invalid_json").length,
+    errors: calls.filter((r) => r.status === "error").length,
+    cacheHits: ledger.rows.filter((r) => r.status === "cache_hit").length
+  };
+  const byPrompt = new Map<string, number[]>();
+  for (const r of calls) if (r.promptId) byPrompt.set(r.promptId, [...(byPrompt.get(r.promptId) ?? []), r.latencyMs]);
+  report.latencyP50ByPrompt = Object.fromEntries([...byPrompt].map(([k, v]) => [k, v.sort((a, b) => a - b)[Math.floor((v.length - 1) / 2)]]));
+  const tokens = (ids: string[]) => {
+    const set = new Set(ids);
+    const rows = ledger.rows.filter((r) => r.adaptationId && set.has(r.adaptationId));
+    const n = Math.max(1, ids.length);
+    return {
+      input: Math.round(rows.reduce((a, r) => a + r.inputTokens, 0) / n),
+      output: Math.round(rows.reduce((a, r) => a + r.outputTokens, 0) / n),
+      cached: Math.round(rows.reduce((a, r) => a + r.cachedTokens, 0) / n)
+    };
+  };
+  report.tokensPerAdaptation = tokens(adaptationIds);
+  const ex = tokens(extractionIds);
+  report.tokensPerExtraction = { input: ex.input, output: ex.output };
+  report.totalCostMicros = ledger.rows.reduce((a, r) => a + r.costMicros, 0);
+  report.invalidReasons = invalidReasons;
   return report;
 }
 

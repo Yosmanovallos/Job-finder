@@ -6,7 +6,7 @@ import { contentTerms, normalizeText } from "./text.js";
 // user's own answer say. Code, not the model, decides: numbers, percentages,
 // years and months, tools/skills, proper nouns and seniority/title words in
 // the proposed text must all appear in the sources. Anything new:
-//   - only skills/tools → the card becomes a QUESTION («¿Usaste X?»);
+//   - only tools, figures, dates or results → the card becomes a QUESTION;
 //   - anything else      → the proposal is DISCARDED.
 // An unknown supporting fact id also discards it.
 
@@ -16,6 +16,8 @@ export interface Claim {
   kind: ClaimKind;
   value: string;
 }
+
+const ASKABLE = new Set<ClaimKind>(["skill", "number", "month", "achievement"]);
 
 export interface FactualityResult {
   verdict: "accept" | "question" | "discard";
@@ -149,6 +151,9 @@ export function validateProposal(input: {
   }
   const claims = newClaims(input.after, input.sources, { strictWords: input.strictWords });
   if (!claims.length) return { verdict: "accept", newClaims: [], reason: "ok" };
-  const onlySkills = claims.every((c) => c.kind === "skill");
-  return { verdict: onlySkills ? "question" : "discard", newClaims: claims, reason: "new_data" };
+  // Facts only the user can confirm (a tool, a figure, a date, a result) turn
+  // the card into a QUESTION: nothing is applied and the user writes it in
+  // their own words. Names, titles, links and new headline words are discarded.
+  const askable = claims.every((c) => ASKABLE.has(c.kind));
+  return { verdict: askable ? "question" : "discard", newClaims: claims, reason: "new_data" };
 }
