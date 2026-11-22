@@ -31,7 +31,10 @@ test("child env: only allowlisted keys survive; the rest of .env is blanked; DB 
   assert.equal(env.SOME_SHELL_SECRET, undefined);
   assert.equal(env.Path, "C:/bin");
   assert.equal(env.WOMPI_PUBLIC_KEY, "pub_test_abc");
-  assert.equal(env.RESUME_AI_PROVIDER, "qwen");
+  assert.equal(env.RESUME_AI_PROVIDER, "mock", "qwen sin llave → mock");
+  const withKey = buildChildEnv({ ...DOTENV, RESUME_AI_API_KEY: "k", RESUME_AI_WORKSPACE_ID: "ws-1" }, {}, LOCAL, "3000");
+  assert.equal(withKey.RESUME_AI_PROVIDER, "qwen");
+  assert.equal(buildChildEnv({ ...DOTENV, RESUME_AI_PROVIDER: "" }, {}, LOCAL, "3000").RESUME_AI_PROVIDER, "mock");
   assert.equal(env.RESUME_STUDIO_ENABLED, "true");
   assert.equal(env.RESUME_STUDIO_PAYMENTS, "true");
   assert.equal(env.RESUME_STUDIO_PAYMENTS_LIVE, "");

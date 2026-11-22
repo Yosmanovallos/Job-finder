@@ -96,7 +96,9 @@ export function buildChildEnv(dotenvValues: Record<string, string>, parent: Node
   }
   env.RESUME_STUDIO_ENABLED = env.RESUME_STUDIO_ENABLED || "true";
   env.RESUME_STUDIO_PAYMENTS = env.RESUME_STUDIO_PAYMENTS || "true";
-  env.RESUME_AI_PROVIDER = env.RESUME_AI_PROVIDER || "mock";
+  // Provider from .env; without a usable Qwen key the local run uses the free mock.
+  const provider = (env.RESUME_AI_PROVIDER || "").trim().toLowerCase();
+  env.RESUME_AI_PROVIDER = provider === "qwen" && env.RESUME_AI_API_KEY && env.RESUME_AI_WORKSPACE_ID ? "qwen" : provider === "none" ? "none" : "mock";
   env.RESUME_STUDIO_PAYMENTS_LIVE = "";
   env.DATABASE_URL = databaseUrl;
   env.PORT = port;
