@@ -9,6 +9,7 @@ import {
   type ApplicationSummary
 } from "../../lib/resume-applications.js";
 import type { ResumeFacts } from "../../lib/resume-studio.js";
+import { useConfirm } from "./ui.js";
 
 // AI Resume Studio R4b — «Mis postulaciones» (doc 11 §1 fila 3 y §5.1;
 // prototype «5 · Postulaciones»). Free for everyone. Five columns; each card
@@ -95,8 +96,16 @@ export function ApplicationsBoard({
     }
   };
 
+  const [confirmElement, confirm] = useConfirm();
+
   const remove = async (item: ApplicationSummary) => {
-    if (!window.confirm(`¿Quitar «${item.job.title}» de tus postulaciones? Se borra también su hoja de vida adaptada.`)) return;
+    const ok = await confirm({
+      title: "¿Quitar esta postulación?",
+      body: `Quitaremos «${item.job.title}» de tus postulaciones y también su hoja de vida adaptada.`,
+      confirmLabel: "Quitar",
+      danger: true
+    });
+    if (!ok) return;
     const { res, data } = await api(`/${item.id}`, { method: "DELETE" });
     if (!res.ok) return setError(data?.error ?? "No se pudo borrar.");
     setItems((list) => list?.filter((a) => a.id !== item.id) ?? list);
@@ -119,6 +128,7 @@ export function ApplicationsBoard({
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-6 md:py-8">
+      {confirmElement}
       <div className="flex flex-wrap items-end justify-between gap-3 mb-4">
         <div>
           <p className="font-mono text-xs font-semibold uppercase tracking-wide text-muted-foreground">Mis postulaciones</p>

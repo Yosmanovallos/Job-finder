@@ -7,6 +7,7 @@ import { computeEvidence, type Citation } from "../../lib/resume-tailor/evidence
 import type { Claim } from "../../lib/resume-tailor/factuality.js";
 import type { JobAnalysis } from "../../lib/resume-tailor/requirements.js";
 import { compatibilityScore, qualityScore } from "../../lib/resume-tailor/score.js";
+import { btnPrimary, newKey, once, Steps, useStagedSteps } from "./ui.js";
 
 // AI Resume Studio R3 — the card agent (doc 11 §1.1 and §5.1, prototype
 // docs/resume-studio/mockups/resume-tailor-link-prototype.html). The code
@@ -99,21 +100,33 @@ export function TailorAgent({
   baseFacts,
   templateId,
   job,
+  clientKey,
+  cvNotes = [],
   onUse,
   onClose,
+  onDownload,
+  onSeePasses,
   tracker
 }: {
   accessToken: string;
   baseFacts: ResumeFacts;
   templateId: ResumeTemplateId;
   job: TailorJob;
+  /** R4c: made at click time; the server answers the same adaptation for the same key. */
+  clientKey: string;
+  cvNotes?: string[];
   onUse: (facts: ResumeFacts) => void;
   onClose: () => void;
+  /** R4c: the pass appears only here, when the user wants the file (doc 11 §1, screen 10). */
+  onDownload: (facts: ResumeFacts) => void;
+  /** No adaptations left at the start (402): the only early door to the passes. */
+  onSeePasses: () => void;
   /** R4b: «Guardar en Mis postulaciones». canSave = «guardar en mi cuenta». */
   tracker?: { canSave: boolean; resumeRef: { id: string; versionNo: number } | null };
 }) {
   const [start, setStart] = useState<StartResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{ text: string; quota: boolean } | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const [facts, setFacts] = useState<ResumeFacts>(baseFacts);
   const [cursor, setCursor] = useState(0);
   const [closed, setClosed] = useState<Closed[]>([]);
@@ -133,16 +146,21 @@ export function TailorAgent({
     [accessToken]
   );
 
+  // One request per (key, attempt), shared by React's double effect and any
+  // remount; the server also answers the same adaptation for the same key.
   useEffect(() => {
     let cancelled = false;
+    setError(null);
     void (async () => {
       try {
-        const { res, data } = await post("/tailor/start", { facts: baseFacts, job: { title: job.title, description: job.description } });
+        const { res, data } = await once(`start:${clientKey}:${attempt}`, () =>
+          post("/tailor/start", { facts: baseFacts, job: { title: job.title, description: job.description }, clientKey })
+        );
         if (cancelled) return;
-        if (!res.ok) return setError(data?.error ?? "No pudimos analizar la vacante.");
+        if (!res.ok) return setError({ text: data?.error ?? "No pudimos analizar la vacante.", quota: res.status === 402 });
         setStart(data);
       } catch {
-        if (!cancelled) setError("No pudimos analizar la vacante.");
+        if (!cancelled) setError({ text: "Se perdió la conexión mientras analizábamos la vacante.", quota: false });
       }
     })();
     return () => {
@@ -150,7 +168,8 @@ export function TailorAgent({
     };
     // The base and the vacancy are fixed for one adaptation.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [attempt]);
+  const loadingStep = useStagedSteps(3, !start && !error);
 
   const score = useMemo(() => {
     if (!start) return null;
@@ -173,17 +192,36 @@ export function TailorAgent({
 
   if (error) {
     return (
-      <div className="rounded-2xl border-2 border-foreground bg-white p-5 space-y-3">
-        <p role="alert" className="text-sm text-destructive">{error}</p>
-        <button className={button} onClick={onClose}>Volver</button>
+      <div className="max-w-xl mx-auto rounded-2xl border-2 border-foreground bg-white p-5 space-y-3 ink-card-sm">
+        <h2 className="text-lg font-bold">{error.quota ? "No te quedan adaptaciones con IA" : "No pudimos empezar la adaptación"}</h2>
+        <p role="alert" className="text-sm" style={{ color: error.quota ? "#3d413e" : "#b42318" }}>{error.text}</p>
+        <div className="flex flex-wrap gap-2">
+          {error.quota ? (
+            <button className={primary} onClick={onSeePasses}>Ver pases</button>
+          ) : (
+            <button className={primary} onClick={() => setAttempt((a) => a + 1)}>Reintentar</button>
+          )}
+          <button className={button} onClick={onClose}>Volver</button>
+        </div>
       </div>
     );
   }
   if (!start || !score || initial === null) {
     return (
-      <div className="rounded-2xl border-2 border-foreground bg-white p-5 space-y-2" aria-live="polite">
-        <p className="text-sm font-semibold">Leyendo la vacante y comparándola con tu hoja de vida…</p>
-        <p className="text-xs text-muted-foreground">Nada se cambia sin que lo apruebes.</p>
+      <div className="max-w-xl mx-auto rounded-2xl border-2 border-foreground bg-white p-5 space-y-4 ink-card-sm" aria-busy="true">
+        <div>
+          <p className="font-mono text-xs font-semibold uppercase tracking-wide" style={{ color: "#0f6b4f" }}>
+            {job.company ? `${job.title} · ${job.company}` : job.title}
+          </p>
+          <h2 className="text-lg font-bold">Estamos preparando tu adaptación</h2>
+        </div>
+        <Steps labels={["Leyendo la vacante", "Comparando con tu hoja de vida", "Preparando sugerencias"]} current={loadingStep} done={false} />
+        <div className="space-y-2" aria-hidden="true">
+          <div className="rs-skel" style={{ height: 14, width: "70%" }} />
+          <div className="rs-skel" style={{ height: 14, width: "90%" }} />
+          <div className="rs-skel" style={{ height: 14, width: "55%" }} />
+        </div>
+        <p className="text-xs text-muted-foreground">Suele tardar entre 10 y 30 segundos. Nada se cambia sin que lo apruebes.</p>
       </div>
     );
   }
@@ -249,6 +287,9 @@ export function TailorAgent({
                   : "No encontré requisitos claros en la vacante: revisamos tu hoja de vida en general."}{" "}
                 Vamos uno por uno: tú apruebas cada cambio.
               </p>
+              {cvNotes.map((note) => (
+                <p key={note} className="text-xs text-muted-foreground">{note}</p>
+              ))}
               {start.job.suspiciousLines > 0 ? (
                 <p className="text-xs text-muted-foreground">La vacante traía texto dirigido a la IA; lo ignoramos.</p>
               ) : null}
@@ -289,10 +330,14 @@ export function TailorAgent({
                     <b className="font-mono">{initial} → {score.compatibility.total}</b>. {closed.filter((c) => c.ok).length} cambios aprobados por ti; nada se agregó sin tu respuesta.
                   </p>
                   <div className="flex flex-wrap gap-2">
-                    <button className={primary} onClick={() => onUse(facts)}>Usar esta versión en el editor</button>
-                    <button className={button} onClick={onClose}>Descartar adaptación</button>
+                    <button className={btnPrimary} style={{ padding: "10px 18px" }} onClick={() => onDownload(facts)}>
+                      Descargar mi hoja de vida
+                    </button>
+                    <button className={button} onClick={() => onUse(facts)}>Editar a mano</button>
                   </div>
-                  <p className="text-xs text-muted-foreground">Tu hoja de vida base guardada no cambia hasta que guardes en el editor.</p>
+                  <p className="text-xs text-muted-foreground">
+                    Tu hoja de vida base no cambia. La versión adaptada queda en este navegador hasta que la descargues o la guardes.
+                  </p>
                   {tracker ? (
                     <SaveToTracker
                       canSave={tracker.canSave}
@@ -311,7 +356,7 @@ export function TailorAgent({
                 </div>
               ) : (
                 <div className="flex justify-end">
-                  <button className={ghost} onClick={onClose}>Salir sin adaptar</button>
+                  <button className={ghost} onClick={onClose}>Salir</button>
                 </div>
               )}
             </div>
@@ -470,24 +515,28 @@ function ProposalCard({
   const [chat, setChat] = useState("");
   const [reply, setReply] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // R4c: one model call per card and attempt, even with React's double effect.
+  const [cardKey] = useState(() => newKey());
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
+    setProposal(null);
     void (async () => {
       try {
-        const { res, data } = await request();
+        const { res, data } = await once(`card:${cardKey}:${attempt}`, request);
         if (cancelled) return;
         setProposal(res.ok ? data : { status: "error", error: data?.error ?? "No pudimos preparar la propuesta." });
       } catch {
-        if (!cancelled) setProposal({ status: "error", error: "No pudimos preparar la propuesta." });
+        if (!cancelled) setProposal({ status: "error", error: "Se perdió la conexión al preparar la propuesta." });
       }
     })();
     return () => {
       cancelled = true;
     };
-    // One request per card.
+    // One request per card (and per «Reintentar»).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [attempt]);
 
   const sendChat = async () => {
     if (!chat.trim() || proposal?.status !== "proposal") return;
@@ -511,7 +560,11 @@ function ProposalCard({
 
   return (
     <CardBox kicker={kicker} step={step} title={title}>
-      {!proposal ? <p className="text-sm text-muted-foreground">Preparando la propuesta…</p> : null}
+      {!proposal ? (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground" role="status">
+          <span className="rs-spin" aria-hidden="true" /> Preparando la propuesta…
+        </div>
+      ) : null}
       {proposal?.status === "proposal" && editing === null ? (
         <>
           <p className="text-sm">
@@ -530,7 +583,12 @@ function ProposalCard({
           Descartamos la propuesta: agregaba {describeClaims(proposal.claims)} que no está en tu hoja de vida. Puedes escribirlo tú u omitir.
         </p>
       ) : null}
-      {proposal?.status === "error" ? <p className="text-sm text-destructive">{proposal.error}</p> : null}
+      {proposal?.status === "error" ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <p role="alert" className="text-sm" style={{ color: "#b42318" }}>{proposal.error}</p>
+          <button className={button} onClick={() => setAttempt((a) => a + 1)}>Reintentar</button>
+        </div>
+      ) : null}
 
       {editing !== null ? (
         <textarea className={field} rows={3} value={editing} onChange={(e) => setEditing(e.target.value)} aria-label="Texto de la tarjeta" />
@@ -675,7 +733,7 @@ function MappingCard({
   }
 
   return (
-    <CardBox kicker="¿Dónde demostraste esto?" step={step} title={card.requirement}>
+    <CardBox kicker="¿Dónde hiciste esto?" step={step} title={card.requirement}>
       <p className="text-xs text-muted-foreground">
         {card.kind === "must" ? "Requisito obligatorio." : "Requisito deseable."} {card.suggested ? "Marqué donde lo veo en tu hoja de vida. Cámbialo si hace falta." : ""}
       </p>

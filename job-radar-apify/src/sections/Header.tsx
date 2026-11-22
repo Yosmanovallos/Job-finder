@@ -16,13 +16,23 @@ import { getEffectiveCountry, setStoredCountry, isVePrefixed } from "../lib/coun
 // picked at render time below. The rest (Cómo funciona/Precios/Preguntas)
 // are shared informational pages, not job-data pages, so they stay
 // unprefixed for both countries.
+// AI Resume Studio R4c: with RESUME_STUDIO_ENABLED=true the last link is
+// «Hoja de vida» instead of «Preguntas». In the browser bundle the flag is
+// a build-time literal (__RS_NAV__, vite.config.ts); in the server render of
+// the home (tsx, no Vite) it is read from the same environment variable, so
+// SSR and hydration agree. Off → exactly the links of before.
+function resumeNavEnabled(): boolean {
+  if (typeof __RS_NAV__ !== "undefined") return __RS_NAV__;
+  return typeof process !== "undefined" && process.env?.RESUME_STUDIO_ENABLED === "true";
+}
+
 function getNavLinks(isVenezuela: boolean) {
   return [
     { label: "Cómo funciona", to: "/como-funciona" },
     { label: "Empresas", to: isVenezuela ? "/ve/empresas" : "/empresas" },
     ...(PAYWALL_ENABLED ? [{ label: "Precios", to: "/pricing" }] : []),
     ...(GUIDES_ENABLED ? [{ label: "Guías", to: "/guias" }] : []),
-    { label: "Preguntas", to: "/preguntas" }
+    resumeNavEnabled() ? { label: "Hoja de vida", to: "/hoja-de-vida" } : { label: "Preguntas", to: "/preguntas" }
   ];
 }
 

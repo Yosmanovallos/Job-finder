@@ -6,6 +6,8 @@
  *   npm run dev:resume-studio -- --skip-build (reuse public/)
  *   npm run dev:resume-studio -- --port 3100
  *   npm run dev:resume-studio -- --dry-run    (checks only, no Docker)
+ *   npm run dev:resume-studio -- --env-file ..\..\..\..\job-radar-apify\.env
+ *                                             (a worktree using the main .env)
  *
  * Why it exists: the `.env` DATABASE_URL is PRODUCTION (CLAUDE.md), and the
  * rs_* tables must not reach Supabase before R5 (ADR 0017 §6). So:
@@ -83,7 +85,11 @@ function arg(name: string): string | undefined {
 }
 
 function readDotenv(): Record<string, string> {
-  const file = path.join(root, ".env");
+  // R4c: --env-file lets a git worktree use the main checkout's .env without
+  // copying it. Same allowlist either way; the children never read it.
+  const given = arg("--env-file");
+  const file = given ? path.resolve(given) : path.join(root, ".env");
+  if (given && !existsSync(file)) fail(`No existe ${given}.`);
   if (!existsSync(file)) return {};
   return dotenv.parse(readFileSync(file));
 }

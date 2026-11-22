@@ -64,13 +64,16 @@ export function ResumePass({
   facts,
   templateId,
   printAreaId,
-  onActiveChange
+  onActiveChange,
+  onBeforeCheckout
 }: {
   accessToken: string;
   facts: ResumeFacts;
   templateId: ResumeTemplateId;
   printAreaId: string;
   onActiveChange: (active: boolean) => void;
+  /** R4c: keep the CV being downloaded for the return from Wompi (this tab only). */
+  onBeforeCheckout?: () => void;
 }) {
   const [info, setInfo] = useState<PassInfo | null>(null);
   const [selected, setSelected] = useState<PassId>("pass_3m");
@@ -158,6 +161,7 @@ export function ResumePass({
         form.appendChild(input);
       }
       document.body.appendChild(form);
+      onBeforeCheckout?.();
       form.submit();
     } catch (error) {
       setMessage({ kind: "error", text: (error as Error).message });

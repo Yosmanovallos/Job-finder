@@ -1,17 +1,20 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
-import { Download, History, Plus, Save, ShieldCheck, ShieldOff, Trash2, Undo2, X } from "lucide-react";
+import { Download, Plus, Save, Undo2, X } from "lucide-react";
 import { useAuth } from "../auth/auth-provider.js";
 import { AuthSpinner } from "../components/AuthShell.js";
 import { ResumeTemplate } from "../components/resume/ResumeTemplate.js";
-import { TailorAgent, type TailorJob } from "../components/resume/TailorAgent.js";
+import { TailorAgent } from "../components/resume/TailorAgent.js";
+import { hasContent, TailorStart, type StartInput } from "../components/resume/TailorStart.js";
 import { ResumePass } from "../components/resume/ResumePass.js";
 import { ApplicationsBoard } from "../components/resume/ApplicationsBoard.js";
+import { btnGhost, Dialog, RsStyle, useConfirm, type ConfirmOptions } from "../components/resume/ui.js";
 import {
   RESUME_POLICY_VERSION,
   RESUME_TEMPLATES,
   emptyResumeFacts,
   newFactId,
+  resumeFactsSchema,
   resumeInputSchema,
   type ConsentPurpose,
   type ResumeFacts,
@@ -269,7 +272,13 @@ function ResumeStudioApp({ userId, accessToken }: { userId: string; accessToken:
   const [versions, setVersions] = useState<VersionView[] | null>(null);
   const [mobileTab, setMobileTab] = useState<"edit" | "preview">("edit");
   const [passActive, setPassActive] = useState(false);
-  const [tailorJob, setTailorJob] = useState<TailorJob | null>(null);
+  // R4c: start (link + CV) → agent → download, like JobStep; the editor and
+  // the account tools live behind «Más opciones».
+  const [view, setView] = useState<"start" | "agent" | "editor">("start");
+  const [run, setRun] = useState<StartInput | null>(null);
+  const [download, setDownload] = useState<ResumeFacts | null>(null);
+  const [consentOpen, setConsentOpen] = useState(false);
+  const [confirmElement, confirm] = useConfirm();
   const location = useLocation();
   const navigate = useNavigate();
   const onBoard = location.pathname.replace(/\/+$/, "") === "/hoja-de-vida/postulaciones";
@@ -425,7 +434,13 @@ function ResumeStudioApp({ userId, accessToken }: { userId: string; accessToken:
   };
 
   const deleteAll = async () => {
-    if (!window.confirm("Se borrarán tu hoja de vida, todas sus versiones y tus postulaciones. No se puede deshacer. ¿Continuar?")) return;
+    const ok = await confirm({
+      title: "¿Borrar todos tus datos?",
+      body: "Se borrarán tu hoja de vida, todas sus versiones y tus postulaciones. No se puede deshacer. Si quieres una copia, primero usa «Exportar mis datos».",
+      confirmLabel: "Borrar todo",
+      danger: true
+    });
+    if (!ok) return;
     setBusy(true);
     try {
       const { res, data } = await api("/data", { method: "DELETE" });
@@ -442,12 +457,13 @@ function ResumeStudioApp({ userId, accessToken }: { userId: string; accessToken:
   };
 
   const revoke = async () => {
-    if (
-      !window.confirm(
-        "Vas a revocar tu autorización: borraremos la hoja de vida guardada en tu cuenta, tus postulaciones y la copia de este navegador. ¿Continuar?"
-      )
-    )
-      return;
+    const ok = await confirm({
+      title: "¿Revocar tu autorización?",
+      body: "Borraremos la hoja de vida guardada en tu cuenta, tus postulaciones y la copia de este navegador. Para volver a usar la herramienta tendrás que autorizar de nuevo.",
+      confirmLabel: "Revocar y borrar",
+      danger: true
+    });
+    if (!ok) return;
     setBusy(true);
     try {
       const { res, data } = await api("/consent", { method: "POST", body: JSON.stringify({ policyVersion: RESUME_POLICY_VERSION, revoke: true }) });
@@ -464,7 +480,26 @@ function ResumeStudioApp({ userId, accessToken }: { userId: string; accessToken:
     }
   };
 
-  if (phase === "loading") return <div className="p-10 text-center text-muted-foreground">Cargando…</div>;
+  // Coming back from Wompi (?pase=retorno): reopen the download with the
+  // adapted CV kept in this tab before leaving (sessionStorage, this browser only).
+  useEffect(() => {
+    if (phase !== "editor") return;
+    if (new URLSearchParams(window.location.search).get("pase") !== "retorno") return;
+    setDownload(readPendingDownload() ?? draft.facts);
+    // Only once, when the page is ready.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
+
+  if (phase === "loading") {
+    return (
+      <div className="max-w-2xl mx-auto px-4 py-10 space-y-3" aria-busy="true">
+        <div className="rs-skel" style={{ height: 28, width: "60%" }} />
+        <div className="rs-skel" style={{ height: 120 }} />
+        <div className="rs-skel" style={{ height: 120 }} />
+        <RsStyle />
+      </div>
+    );
+  }
   if (phase === "unavailable") {
     return (
       <div className="max-w-xl mx-auto p-6 md:p-10 text-center space-y-3">
@@ -474,220 +509,431 @@ function ResumeStudioApp({ userId, accessToken }: { userId: string; accessToken:
       </div>
     );
   }
-  if (phase === "consent" && consent) {
-    return (
+
+  const canSave = Boolean(consent?.storage);
+  const needsConsent = phase === "consent" && consent !== null;
+  const consentForm = (inDialog: boolean) =>
+    consent ? (
       <ConsentStep
         consent={consent}
         api={api}
+        confirm={confirm}
+        inDialog={inDialog}
         keepLocalCopy={() => writeLocalDraft(userId, draft)}
-        onDone={() => void load()}
-      />
-    );
-  }
-
-  const canSave = Boolean(consent?.storage);
-
-  if (onBoard) {
-    return (
-      <ApplicationsBoard
-        accessToken={accessToken ?? ""}
-        canSave={canSave}
-        onChangeConsent={() => setPhase("consent")}
-        onUseCv={(facts) => {
-          setDraft({ ...draft, facts });
-          setDirty(true);
-          setMobileTab("preview");
-          setMessage({ kind: "ok", text: "La versión adaptada quedó en el editor. Revísala y guárdala si te sirve; tu base guardada no ha cambiado." });
-          navigate("/hoja-de-vida");
+        onDone={() => {
+          setConsentOpen(false);
+          void load();
         }}
-        renderPreview={(facts) => (
-          <div style={{ position: "relative" }}>
-            <ResumeTemplate facts={facts} templateId={draft.templateId} />
-            <PreviewWatermark />
-          </div>
-        )}
       />
+    ) : null;
+
+  if (onBoard && !needsConsent) {
+    return (
+      <div className="rs-root">
+        <RsStyle />
+        <ApplicationsBoard
+          accessToken={accessToken ?? ""}
+          canSave={canSave}
+          onChangeConsent={() => setConsentOpen(true)}
+          onUseCv={(facts) => {
+            setDraft({ ...draft, facts });
+            setDirty(true);
+            setMobileTab("preview");
+            setView("editor");
+            setMessage({ kind: "ok", text: "La versión adaptada quedó en el editor. Revísala y guárdala si te sirve; tu base guardada no ha cambiado." });
+            navigate("/hoja-de-vida");
+          }}
+          renderPreview={(facts) => (
+            <div style={{ position: "relative" }}>
+              <ResumeTemplate facts={facts} templateId={draft.templateId} />
+              <PreviewWatermark />
+            </div>
+          )}
+        />
+        <Dialog open={consentOpen} title="Autorizaciones" wide onClose={() => setConsentOpen(false)}>
+          {consentForm(true)}
+        </Dialog>
+        {confirmElement}
+      </div>
     );
   }
+
+  const base = hasContent(draft.facts)
+    ? {
+        title: draft.title,
+        facts: draft.facts,
+        note: resume && !dirty
+          ? `Guardada en tu cuenta · versión ${resume.versionNo} · ${new Date(resume.updatedAt).toLocaleDateString("es-CO", { day: "numeric", month: "short", year: "numeric" })}`
+          : "Borrador en este navegador"
+      }
+    : null;
+
+  const messageBox = message ? (
+    <div
+      role={message.kind === "error" ? "alert" : "status"}
+      className={`mb-4 rounded-xl p-3 text-sm border ${message.kind === "error" ? "border-destructive/40 bg-destructive/10 text-destructive" : "border-primary/30 bg-primary/10"}`}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <span>{message.text}</span>
+        <button className="rs-x" style={{ width: 28, height: 28 }} aria-label="Cerrar aviso" onClick={() => setMessage(null)}>
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+      {message.issues?.length ? (
+        <ul className="list-disc pl-4 mt-1">
+          {message.issues.map((issue) => (
+            <li key={issue}>{issue}</li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  ) : null;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-6 md:py-8">
-      <div className="flex flex-wrap items-end justify-between gap-3 mb-4">
-        <div>
-          <p className="font-mono text-xs font-semibold uppercase tracking-wide text-muted-foreground">Hoja de vida base</p>
-          <h1 className="text-2xl md:text-3xl font-bold">{draft.title || "Mi hoja de vida"}</h1>
-          <p className="text-sm text-muted-foreground">
-            {resume ? `Versión ${resume.versionNo}${dirty ? " · cambios sin guardar" : ""}` : "Aún no la has guardado"}
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button className={primaryButtonClass} onClick={() => void save()} disabled={busy || !canSave || (!dirty && Boolean(resume))}>
-            <Save className="h-4 w-4" /> Guardar
+    <div className="rs-root max-w-7xl mx-auto px-4 py-5 md:py-8">
+      <RsStyle />
+      <div className="flex items-center justify-between gap-3 mb-5">
+        {view === "start" ? (
+          <span className="font-heading text-base font-bold">Hoja de vida</span>
+        ) : (
+          <button className={btnGhost} onClick={() => setView("start")}>
+            ← Empezar otra adaptación
           </button>
-          <button className={buttonClass} onClick={() => void undo()} disabled={busy || !resume || resume.versionNo < 2 || !canSave}>
-            <Undo2 className="h-4 w-4" /> Deshacer
-          </button>
-          <button className={buttonClass} onClick={() => void openVersions()} disabled={!resume}>
-            <History className="h-4 w-4" /> Versiones
-          </button>
-          <Link to="/hoja-de-vida/postulaciones" className={buttonClass}>
-            Mis postulaciones
-          </Link>
-          <button className={buttonClass} onClick={() => void exportAll()}>
-            <Download className="h-4 w-4" /> Exportar JSON
-          </button>
-          <button className={buttonClass} onClick={() => void deleteAll()} disabled={busy}>
-            <Trash2 className="h-4 w-4" /> Borrar todo
-          </button>
-          <button className={buttonClass} onClick={() => setPhase("consent")} disabled={busy}>
-            <ShieldCheck className="h-4 w-4" /> Autorización
-          </button>
-          <button className={buttonClass} onClick={() => void revoke()} disabled={busy}>
-            <ShieldOff className="h-4 w-4" /> Revocar
-          </button>
-        </div>
+        )}
+        {needsConsent ? null : (
+          <div className="flex items-center gap-2">
+            <Link to="/hoja-de-vida/postulaciones" className={`${btnGhost} hidden sm:inline-flex`}>
+              Mis postulaciones
+            </Link>
+            <MoreMenu
+              items={[
+                { label: "Editar mi hoja de vida a mano", onSelect: () => setView("editor") },
+                { label: "Mis postulaciones", to: "/hoja-de-vida/postulaciones" },
+                ...(resume ? [{ label: "Versiones guardadas", onSelect: () => void openVersions() }] : []),
+                { label: "Exportar mis datos (JSON)", onSelect: () => void exportAll() },
+                { label: "Autorizaciones", onSelect: () => setConsentOpen(true) },
+                { divider: true },
+                { label: "Borrar todo", danger: true, onSelect: () => void deleteAll() },
+                { label: "Revocar autorización", danger: true, onSelect: () => void revoke() }
+              ]}
+            />
+          </div>
+        )}
       </div>
 
-      {!canSave ? (
-        <p className="mb-4 rounded-xl border p-3 text-sm" style={{ background: "#fff6dc", borderColor: "#e8d9a6" }}>
-          No marcaste «Guardar mi hoja de vida en mi cuenta»: lo que escribas queda solo en este navegador.{" "}
-          <button className="underline font-semibold" onClick={() => setPhase("consent")}>Cambiar autorización</button>
-        </p>
-      ) : null}
-      {message ? (
-        <div
-          role={message.kind === "error" ? "alert" : "status"}
-          className={`mb-4 rounded-xl p-3 text-sm border ${message.kind === "error" ? "border-destructive/40 bg-destructive/10 text-destructive" : "border-primary/30 bg-primary/10"}`}
-        >
-          {message.text}
-          {message.issues?.length ? (
-            <ul className="list-disc pl-4 mt-1">
-              {message.issues.map((issue) => (
-                <li key={issue}>{issue}</li>
-              ))}
-            </ul>
-          ) : null}
-        </div>
+      {messageBox}
+
+      {view === "start" || needsConsent ? (
+        <TailorStart
+          accessToken={accessToken ?? ""}
+          saved={needsConsent ? null : base}
+          consentBlock={needsConsent ? consentForm(false) : undefined}
+          onStart={(input) => {
+            setMessage(null);
+            setRun(input);
+            setView("agent");
+          }}
+        />
       ) : null}
 
-      {versions ? (
-        <Card title="Versiones" action={<button aria-label="Cerrar versiones" onClick={() => setVersions(null)}><X className="h-4 w-4" /></button>}>
-          <ul className="divide-y divide-foreground/5 max-h-48 overflow-y-auto">
-            {versions.map((v) => (
-              <li key={v.versionNo} className="flex items-center justify-between gap-2 py-2 text-sm">
-                <span>
-                  <strong>v{v.versionNo}</strong> · {v.changeSummary} ·{" "}
-                  <span className="text-muted-foreground">{new Date(v.createdAt).toLocaleString("es-CO")}</span>
-                </span>
-                {resume && v.versionNo !== resume.versionNo ? (
-                  <button className="text-primary font-semibold" disabled={busy || !canSave} onClick={() => void restore(v.versionNo)}>
-                    Restaurar
-                  </button>
-                ) : (
-                  <span className="text-xs text-muted-foreground">actual</span>
-                )}
-              </li>
-            ))}
-          </ul>
-        </Card>
+      {view === "agent" && run && !needsConsent ? (
+        <TailorAgent
+          key={run.clientKey}
+          accessToken={accessToken ?? ""}
+          baseFacts={run.facts}
+          templateId={draft.templateId}
+          job={run.job}
+          clientKey={run.clientKey}
+          cvNotes={run.cvNotes}
+          tracker={{ canSave, resumeRef: resume && !dirty && run.facts === draft.facts ? { id: resume.id, versionNo: resume.versionNo } : null }}
+          onClose={() => setView("start")}
+          onDownload={(facts) => setDownload(facts)}
+          onSeePasses={() => setDownload(run.facts)}
+          onUse={(facts) => {
+            setDraft({ ...draft, facts });
+            setDirty(true);
+            setView("editor");
+            setMobileTab("edit");
+            setMessage({ kind: "ok", text: "La versión adaptada quedó en el editor. Revísala y guárdala si te sirve como base; tu base guardada no ha cambiado." });
+          }}
+        />
       ) : null}
 
-      {tailorJob ? (
-        <div className="mt-4">
-          <TailorAgent
-            accessToken={accessToken ?? ""}
-            baseFacts={draft.facts}
-            templateId={draft.templateId}
-            job={tailorJob}
-            tracker={{ canSave, resumeRef: resume && !dirty ? { id: resume.id, versionNo: resume.versionNo } : null }}
-            onClose={() => setTailorJob(null)}
-            onUse={(facts) => {
-              setDraft({ ...draft, facts });
-              setDirty(true);
-              setTailorJob(null);
-              setMobileTab("preview");
-              setMessage({ kind: "ok", text: "La versión adaptada quedó en el editor. Revísala y guárdala si te sirve; tu base guardada no ha cambiado." });
-            }}
-          />
-        </div>
-      ) : (
-      <>
-      <div className="md:hidden flex gap-2 mt-4" role="tablist">
-        {(["edit", "preview"] as const).map((tab) => (
-          <button
-            key={tab}
-            role="tab"
-            aria-selected={mobileTab === tab}
-            className={`flex-1 rounded-full border-2 border-foreground py-1.5 text-sm font-semibold ${mobileTab === tab ? "bg-foreground text-white" : "bg-white"}`}
-            onClick={() => setMobileTab(tab)}
-          >
-            {tab === "edit" ? "Editar" : "Vista previa"}
-          </button>
-        ))}
-      </div>
-
-      <div className="grid md:grid-cols-2 gap-6 mt-4">
-        <div className={`space-y-4 ${mobileTab === "edit" ? "" : "hidden md:block"}`}>
-          <CvImport
-            accessToken={accessToken ?? ""}
-            onFacts={(facts) => {
-              setDraft({ ...draft, facts });
-              setDirty(true);
-            }}
-          />
-          <JobLink accessToken={accessToken ?? ""} canSave={canSave} onTailor={(job) => setTailorJob(job)} />
-          <Editor draft={draft} setDraft={(next) => { setDraft(next); setDirty(true); }} update={update} />
-        </div>
-        <div className={mobileTab === "preview" ? "" : "hidden md:block"}>
-          <div className="space-y-3">
-            <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Plantilla">
-              {RESUME_TEMPLATES.map((t) => (
-                <button
-                  key={t.id}
-                  role="radio"
-                  aria-checked={draft.templateId === t.id}
-                  title={t.description}
-                  className={`rounded-full border-2 px-3 py-1 text-sm font-semibold ${draft.templateId === t.id ? "border-foreground bg-foreground text-white" : "border-border bg-white"}`}
-                  onClick={() => { setDraft({ ...draft, templateId: t.id }); setDirty(true); }}
-                >
-                  {t.label}
-                </button>
-              ))}
+      {view === "editor" && !needsConsent ? (
+        <>
+          <div className="flex flex-wrap items-end justify-between gap-3 mb-4">
+            <div>
+              <h1 className="text-2xl md:text-3xl font-bold">{draft.title || "Mi hoja de vida"}</h1>
+              <p className="text-sm text-muted-foreground">
+                {resume ? `Versión ${resume.versionNo}${dirty ? " · cambios sin guardar" : ""}` : "Aún no la has guardado"}
+              </p>
             </div>
-            <div id={PRINT_SCROLL_ID} className="ink-card-sm rounded-2xl overflow-hidden bg-white max-h-[70vh] overflow-y-auto">
-              <div id={PRINT_AREA_ID} style={{ position: "relative" }}>
-                <ResumeTemplate facts={draft.facts} templateId={draft.templateId} />
+            <div className="flex flex-wrap gap-2">
+              <button className={primaryButtonClass} onClick={() => void save()} disabled={busy || !canSave || (!dirty && Boolean(resume))}>
+                <Save className="h-4 w-4" /> Guardar
+              </button>
+              <button className={buttonClass} onClick={() => void undo()} disabled={busy || !resume || resume.versionNo < 2 || !canSave}>
+                <Undo2 className="h-4 w-4" /> Deshacer
+              </button>
+              <button className={buttonClass} onClick={() => setDownload(draft.facts)} disabled={!hasContent(draft.facts)}>
+                <Download className="h-4 w-4" /> Descargar
+              </button>
+            </div>
+          </div>
+          {!canSave ? (
+            <p className="mb-4 rounded-xl border p-3 text-sm" style={{ background: "#fff6dc", borderColor: "#e8d9a6" }}>
+              No marcaste «Guardar mi hoja de vida en mi cuenta»: lo que escribas queda solo en este navegador.{" "}
+              <button className="underline font-semibold" onClick={() => setConsentOpen(true)}>Cambiar autorización</button>
+            </p>
+          ) : null}
+          <div className="md:hidden flex gap-2 mt-2" role="tablist">
+            {(["edit", "preview"] as const).map((tab) => (
+              <button
+                key={tab}
+                role="tab"
+                aria-selected={mobileTab === tab}
+                className={`flex-1 rounded-full border-2 border-foreground py-1.5 text-sm font-semibold ${mobileTab === tab ? "bg-foreground text-white" : "bg-white"}`}
+                onClick={() => setMobileTab(tab)}
+              >
+                {tab === "edit" ? "Editar" : "Vista previa"}
+              </button>
+            ))}
+          </div>
+          <div className="grid md:grid-cols-2 gap-6 mt-4">
+            <div className={`space-y-4 ${mobileTab === "edit" ? "" : "hidden md:block"}`}>
+              <CvImport
+                accessToken={accessToken ?? ""}
+                confirm={confirm}
+                onFacts={(facts) => {
+                  setDraft({ ...draft, facts });
+                  setDirty(true);
+                }}
+              />
+              <Editor draft={draft} setDraft={(next) => { setDraft(next); setDirty(true); }} update={update} />
+            </div>
+            <div className={mobileTab === "preview" ? "" : "hidden md:block"}>
+              <div className="space-y-3">
+                <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Plantilla">
+                  {RESUME_TEMPLATES.map((t) => (
+                    <button
+                      key={t.id}
+                      role="radio"
+                      aria-checked={draft.templateId === t.id}
+                      title={t.description}
+                      className={`rounded-full border-2 px-3 py-1 text-sm font-semibold ${draft.templateId === t.id ? "border-foreground bg-foreground text-white" : "border-border bg-white"}`}
+                      onClick={() => { setDraft({ ...draft, templateId: t.id }); setDirty(true); }}
+                    >
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="ink-card-sm rounded-2xl overflow-hidden bg-white max-h-[70vh] overflow-y-auto">
+                  <div style={{ position: "relative" }}>
+                    <ResumeTemplate facts={draft.facts} templateId={draft.templateId} />
+                    {passActive ? null : <PreviewWatermark />}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      ) : null}
+
+      {/* The pass, only when the user wants the file (JobStep: pay at the end). */}
+      <Dialog
+        open={download !== null}
+        wide
+        title="Descarga tu hoja de vida"
+        description="Revisa cómo queda. La vista previa es gratis; el archivo sin marca necesita un pase."
+        onClose={() => {
+          setDownload(null);
+          clearPendingDownload();
+        }}
+      >
+        {download ? (
+          <div className="grid gap-4 md:grid-cols-2 items-start">
+            <div className="ink-card-sm rounded-2xl overflow-hidden bg-white max-h-[60vh] overflow-y-auto" aria-label="Vista previa">
+              <div style={{ position: "relative", zoom: 0.8 }}>
+                <ResumeTemplate facts={download} templateId={draft.templateId} />
                 {passActive ? null : <PreviewWatermark />}
               </div>
             </div>
             <ResumePass
               accessToken={accessToken ?? ""}
-              facts={draft.facts}
+              facts={download}
               templateId={draft.templateId}
               printAreaId={PRINT_AREA_ID}
               onActiveChange={setPassActive}
+              onBeforeCheckout={() => writePendingDownload(download)}
             />
-            <style>{PRINT_CSS}</style>
+          </div>
+        ) : null}
+      </Dialog>
+      {/* Print-only copy of the CV being downloaded (window.print → PDF). */}
+      {download ? (
+        <div id={PRINT_SCROLL_ID} aria-hidden="true" style={{ position: "fixed", left: -10000, top: 0, width: 794 }}>
+          <div id={PRINT_AREA_ID} style={{ position: "relative" }}>
+            <ResumeTemplate facts={download} templateId={draft.templateId} />
+            {passActive ? null : <PreviewWatermark />}
           </div>
         </div>
-      </div>
-      </>
-      )}
+      ) : null}
+      <style>{PRINT_CSS}</style>
+
+      <Dialog open={versions !== null} title="Versiones guardadas" onClose={() => setVersions(null)}>
+        <ul className="divide-y divide-foreground/5">
+          {(versions ?? []).map((v) => (
+            <li key={v.versionNo} className="flex items-center justify-between gap-2 py-2 text-sm">
+              <span>
+                <strong>v{v.versionNo}</strong> · {v.changeSummary} ·{" "}
+                <span className="text-muted-foreground">{new Date(v.createdAt).toLocaleString("es-CO")}</span>
+              </span>
+              {resume && v.versionNo !== resume.versionNo ? (
+                <button className="text-primary font-semibold" disabled={busy || !canSave} onClick={() => void restore(v.versionNo)}>
+                  Restaurar
+                </button>
+              ) : (
+                <span className="text-xs text-muted-foreground">actual</span>
+              )}
+            </li>
+          ))}
+        </ul>
+      </Dialog>
+      <Dialog open={consentOpen} title="Autorizaciones" wide onClose={() => setConsentOpen(false)}>
+        {consentForm(true)}
+      </Dialog>
+      {confirmElement}
     </div>
   );
+}
+
+// ---------- R4c: «Más opciones» --------------------------------------------
+
+type MenuItem = { divider: true } | { label: string; danger?: boolean; onSelect?: () => void; to?: string; divider?: false };
+
+function MoreMenu({ items }: { items: MenuItem[] }) {
+  const [open, setOpen] = useState(false);
+  const wrap = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const menuId = useId();
+
+  useEffect(() => {
+    if (!open) return;
+    const first = wrap.current?.querySelector<HTMLElement>("[data-menuitem]");
+    first?.focus();
+    const onDoc = (e: MouseEvent) => {
+      if (wrap.current && !wrap.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+
+  const close = (focusTrigger = true) => {
+    setOpen(false);
+    if (focusTrigger) trigger.current?.focus();
+  };
+  const onKey = (e: React.KeyboardEvent) => {
+    const nodes = [...(wrap.current?.querySelectorAll<HTMLElement>("[data-menuitem]") ?? [])];
+    const at = nodes.indexOf(document.activeElement as HTMLElement);
+    if (e.key === "Escape") {
+      e.preventDefault();
+      close();
+    } else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      nodes[(at + 1) % nodes.length]?.focus();
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      nodes[(at - 1 + nodes.length) % nodes.length]?.focus();
+    } else if (e.key === "Tab") setOpen(false);
+  };
+
+  return (
+    <div ref={wrap} style={{ position: "relative" }} onKeyDown={open ? onKey : undefined}>
+      <button
+        ref={trigger}
+        type="button"
+        className={buttonClass}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-controls={open ? menuId : undefined}
+        onClick={() => setOpen((v) => !v)}
+      >
+        Más opciones <span aria-hidden="true">▾</span>
+      </button>
+      {open ? (
+        <div id={menuId} role="menu" className="rs-menu" aria-label="Más opciones">
+          {items.map((item, i) =>
+            item.divider ? (
+              <hr key={`d${i}`} />
+            ) : item.to ? (
+              <Link key={item.label} to={item.to} role="menuitem" data-menuitem="" tabIndex={-1} onClick={() => close(false)}>
+                {item.label}
+              </Link>
+            ) : (
+              <button
+                key={item.label}
+                type="button"
+                role="menuitem"
+                data-menuitem=""
+                tabIndex={-1}
+                className={item.danger ? "rs-danger" : undefined}
+                onClick={() => {
+                  close(false);
+                  item.onSelect?.();
+                }}
+              >
+                {item.label}
+              </button>
+            )
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+// The adapted CV survives the trip to Wompi and back in THIS tab only.
+const PENDING_KEY = "bt:rs-pending-download";
+function writePendingDownload(facts: ResumeFacts): void {
+  try {
+    sessionStorage.setItem(PENDING_KEY, JSON.stringify(facts));
+  } catch {
+    /* storage blocked: the return shows the base instead */
+  }
+}
+function readPendingDownload(): ResumeFacts | null {
+  try {
+    const parsed = resumeFactsSchema.safeParse(JSON.parse(sessionStorage.getItem(PENDING_KEY) || "null"));
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+function clearPendingDownload(): void {
+  try {
+    sessionStorage.removeItem(PENDING_KEY);
+  } catch {
+    /* ignore */
+  }
 }
 
 function ConsentStep({
   consent,
   api,
   keepLocalCopy,
-  onDone
+  onDone,
+  confirm,
+  inDialog
 }: {
   consent: ConsentView;
   keepLocalCopy: () => void;
   api: (path: string, init?: RequestInit) => Promise<{ res: Response; data: { error?: string } | null }>;
   onDone: () => void;
+  confirm: (options: ConfirmOptions) => Promise<boolean>;
+  /** In the «Autorizaciones» dialog (change) or on the start screen (first time). */
+  inDialog: boolean;
 }) {
+  // Nothing comes marked (explicit consent); only «guardar» reflects its current state.
   const [checked, setChecked] = useState<Record<string, boolean>>(() => ({ cloud_storage: consent.storage }));
   const [open, setOpen] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -697,7 +943,12 @@ function ConsentStep({
   const submit = async () => {
     const storageOff = consent.storage && !checked.cloud_storage;
     if (storageOff) {
-      if (!window.confirm("Borraremos la copia guardada en tu cuenta y tu última versión quedará solo en este navegador. ¿Continuar?")) return;
+      const ok = await confirm({
+        title: "¿Dejar de guardar en tu cuenta?",
+        body: "Borraremos la copia guardada en tu cuenta y tu última versión quedará solo en este navegador.",
+        confirmLabel: "Sí, dejar de guardar"
+      });
+      if (!ok) return;
       keepLocalCopy();
     }
     setBusy(true);
@@ -713,10 +964,14 @@ function ConsentStep({
   };
 
   return (
-    <div className="max-w-xl mx-auto px-4 py-8 space-y-4">
-      <h1 className="text-2xl md:text-3xl font-bold">Tu hoja de vida</h1>
-      <p className="text-[#3d413e]">Antes de empezar, necesitamos tu autorización. Ninguna casilla viene marcada.</p>
-      <div className="ink-card-sm rounded-2xl bg-white p-4 md:p-5 space-y-3">
+    <section className={inDialog ? "space-y-3" : "ink-card-sm rounded-2xl bg-white p-4 md:p-5 space-y-3"} aria-label="Autorizaciones">
+      {inDialog ? null : (
+        <div>
+          <h2 className="text-lg font-bold" style={{ lineHeight: 1.25 }}>Antes de empezar</h2>
+          <p className="text-sm" style={{ color: "#3d413e" }}>Necesitamos tu autorización para leer tu hoja de vida y la vacante. Ninguna casilla viene marcada.</p>
+        </div>
+      )}
+      <div className="space-y-3">
         {consent.items.map((item) => (
           <div key={item.purpose}>
             <label className="flex items-start gap-2 text-sm">
@@ -739,10 +994,10 @@ function ConsentStep({
         <p className="text-xs text-muted-foreground">Versión del texto: {consent.policyVersion}</p>
         {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
         <button className={primaryButtonClass} disabled={!ready || busy} onClick={() => void submit()}>
-          Continuar
+          {inDialog ? "Guardar autorización" : "Aceptar y continuar"}
         </button>
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -985,7 +1240,15 @@ function Editor({
 
 const CV_MAX_BYTES = 2 * 1024 * 1024;
 
-function CvImport({ accessToken, onFacts }: { accessToken: string; onFacts: (facts: ResumeFacts) => void }) {
+function CvImport({
+  accessToken,
+  onFacts,
+  confirm
+}: {
+  accessToken: string;
+  onFacts: (facts: ResumeFacts) => void;
+  confirm: (options: ConfirmOptions) => Promise<boolean>;
+}) {
   const [text, setText] = useState("");
   const [note, setNote] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -1012,7 +1275,12 @@ function CvImport({ accessToken, onFacts }: { accessToken: string; onFacts: (fac
   };
 
   const fill = async () => {
-    if (!window.confirm("Los campos de abajo se reemplazarán con lo que se lea de este texto. Podrás revisarlos antes de guardar. ¿Continuar?")) return;
+    const ok = await confirm({
+      title: "¿Reemplazar los campos?",
+      body: "Los campos de abajo se reemplazarán con lo que se lea de este texto. Podrás revisarlos antes de guardar.",
+      confirmLabel: "Reemplazar"
+    });
+    if (!ok) return;
     setBusy(true);
     setNote(null);
     try {
@@ -1058,181 +1326,6 @@ function CvImport({ accessToken, onFacts }: { accessToken: string; onFacts: (fac
       </button>
       {busy && <p className="text-xs text-muted-foreground">Leyendo…</p>}
       {note && <p className={note.kind === "error" ? "text-sm text-destructive" : "text-sm text-muted-foreground"}>{note.text}</p>}
-    </Card>
-  );
-}
-
-interface JobSnapshotView {
-  via: string;
-  title: string;
-  company: string | null;
-  location: string | null;
-  description: string;
-  sourceUrl: string | null;
-}
-
-const PASTE_REASONS: Record<string, string> = {
-  linkedin: "LinkedIn no permite leer sus vacantes automáticamente.",
-  login_wall: "Ese sitio pide iniciar sesión o bloquea la lectura automática.",
-  anti_bot: "Ese sitio bloquea la lectura automática.",
-  robots: "Ese sitio pide no leer esa página automáticamente.",
-  no_structured_data: "No encontramos los datos de la vacante en esa página.",
-  not_found: "La vacante ya no está publicada o el link no existe.",
-  fetch_failed: "No pudimos abrir la página."
-};
-
-function JobLink({ accessToken, canSave, onTailor }: { accessToken: string; canSave: boolean; onTailor: (job: TailorJob) => void }) {
-  const [url, setUrl] = useState("");
-  const [paste, setPaste] = useState<{ reason: string; url: string } | null>(null);
-  const [title, setTitle] = useState("");
-  const [company, setCompany] = useState("");
-  const [text, setText] = useState("");
-  const [snapshot, setSnapshot] = useState<JobSnapshotView | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  // R4b: after opening the vacancy, «Marcar como postulé» (a status the
-  // user sets; nothing is sent to the employer).
-  const [opened, setOpened] = useState(false);
-  const [marked, setMarked] = useState<"idle" | "busy" | "done">("idle");
-
-  const post = async (path: string, body: unknown) => {
-    const res = await fetch(`/api/resume${path}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
-      body: JSON.stringify(body)
-    });
-    return { res, data: await res.json().catch(() => null) };
-  };
-
-  const read = async () => {
-    setBusy(true);
-    setError(null);
-    setSnapshot(null);
-    setPaste(null);
-    setOpened(false);
-    setMarked("idle");
-    try {
-      const { res, data } = await post("/job-link", { url });
-      if (!res.ok) return setError(data?.error ?? "No pudimos revisar ese link.");
-      if (data.status === "resolved") return setSnapshot(data.snapshot);
-      setPaste({ reason: data.reason, url });
-    } catch {
-      setError("No pudimos revisar ese link.");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const sendPaste = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      const { res, data } = await post("/job-link/paste", { url: paste?.url || null, title, company, text });
-      if (!res.ok) return setError(data?.error ?? "Revisa los datos de la vacante.");
-      setSnapshot(data.snapshot);
-      setPaste(null);
-    } catch {
-      setError("No pudimos usar esa descripción.");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const markApplied = async () => {
-    if (!snapshot?.sourceUrl) return;
-    setMarked("busy");
-    setError(null);
-    try {
-      const { res, data } = await post("/applications", {
-        job: { title: snapshot.title, company: snapshot.company, url: snapshot.sourceUrl },
-        status: "applied"
-      });
-      if (!res.ok) {
-        setMarked("idle");
-        return setError(data?.error ?? "No pudimos guardar la postulación.");
-      }
-      setMarked("done");
-    } catch {
-      setMarked("idle");
-      setError("No pudimos guardar la postulación.");
-    }
-  };
-
-  return (
-    <Card title="Vacante por link">
-      <p className="text-sm text-muted-foreground">Pega el link de la vacante. Si no la podemos leer, te pedimos copiar su descripción.</p>
-      <div className="flex flex-wrap gap-2 items-end">
-        <Field label="Link de la vacante">
-          <input className={inputClass} type="url" inputMode="url" value={url} onChange={(event) => setUrl(event.target.value)} placeholder="https://…" />
-        </Field>
-        <button className={primaryButtonClass} onClick={() => void read()} disabled={busy || !url.trim()}>
-          Leer vacante
-        </button>
-      </div>
-      {paste && (
-        <div className="rounded-xl border border-border p-3 space-y-2">
-          <p className="text-sm text-[#3d413e]">
-            {PASTE_REASONS[paste.reason] ?? "No pudimos leer esa página."} Copia la descripción de la vacante y pégala aquí
-            (en el celular: Compartir → Copiar). Guardamos el link para que puedas volver a la vacante.
-          </p>
-          <div className="grid sm:grid-cols-2 gap-2">
-            <Field label="Cargo">
-              <input className={inputClass} value={title} onChange={(event) => setTitle(event.target.value)} />
-            </Field>
-            <Field label="Empresa (opcional)">
-              <input className={inputClass} value={company} onChange={(event) => setCompany(event.target.value)} />
-            </Field>
-          </div>
-          <Field label="Descripción de la vacante">
-            <textarea className={inputClass} rows={6} value={text} onChange={(event) => setText(event.target.value)} autoFocus />
-          </Field>
-          <button className={primaryButtonClass} onClick={() => void sendPaste()} disabled={busy || !title.trim() || !text.trim()}>
-            Usar esta descripción
-          </button>
-        </div>
-      )}
-      {snapshot && (
-        <div className="rounded-xl border border-border p-3 space-y-2">
-          <p className="text-base font-bold">{snapshot.title}</p>
-          <p className="text-sm text-muted-foreground">{[snapshot.company, snapshot.location].filter(Boolean).join(" · ") || "Empresa no indicada"}</p>
-          <p className="text-xs text-muted-foreground">
-            {snapshot.description.slice(0, 400)}
-            {snapshot.description.length > 400 ? "…" : ""}
-          </p>
-          <div className="flex flex-wrap gap-3 items-center">
-            <button
-              className={primaryButtonClass}
-              onClick={() => onTailor({ title: snapshot.title, company: snapshot.company, description: snapshot.description, url: snapshot.sourceUrl })}
-            >
-              Adaptar mi hoja de vida a esta vacante
-            </button>
-            {snapshot.sourceUrl && (
-              <a className="underline text-primary" href={snapshot.sourceUrl} target="_blank" rel="noopener noreferrer nofollow" onClick={() => setOpened(true)}>
-                Ir a la vacante
-              </a>
-            )}
-          </div>
-          {opened && snapshot.sourceUrl ? (
-            <div className="flex flex-wrap gap-2 items-center text-sm" aria-live="polite">
-              {marked === "done" ? (
-                <span className="font-semibold text-green-deep">
-                  ✓ Marcada como «Postulé» en <Link className="underline" to="/hoja-de-vida/postulaciones">Mis postulaciones</Link>.
-                </span>
-              ) : canSave ? (
-                <>
-                  <span className="text-muted-foreground">¿Te postulaste?</span>
-                  <button className={buttonClass} disabled={marked === "busy"} onClick={() => void markApplied()}>
-                    Marcar como postulé
-                  </button>
-                </>
-              ) : (
-                <span className="text-xs text-muted-foreground">Activa «Guardar mi hoja de vida en mi cuenta» para llevar tus postulaciones.</span>
-              )}
-            </div>
-          ) : null}
-        </div>
-      )}
-      {error && <p className="text-sm text-destructive">{error}</p>}
     </Card>
   );
 }
