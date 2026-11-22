@@ -79,7 +79,15 @@ const suites: Record<string, string[]> = {
     "validate-auth-error-messages.test.ts",
     "validate-email-typo.test.ts",
     "validate-site-feedback.test.ts",
-    "validate-first-touch.test.ts"
+    "validate-first-touch.test.ts",
+    "validate-resume-studio.test.ts",
+    "validate-resume-studio-files.test.ts",
+    "validate-resume-studio-ssrf.test.ts",
+    "validate-resume-studio-job-link.test.ts",
+    "validate-resume-studio-tailor.test.ts",
+    "validate-resume-studio-ai.test.ts",
+    "validate-resume-studio-injection.test.ts",
+    "validate-resume-studio-evals.test.ts"
   ],
   integration: [
     "validate-isolated-database.ts",
@@ -105,7 +113,11 @@ const suites: Record<string, string[]> = {
     "validate-saved-jobs.ts",
     "validate-site-feedback.ts",
     "validate-job-modality.ts",
-    "validate-search-narrowing.ts"
+    "validate-search-narrowing.ts",
+    "validate-resume-studio.ts",
+    "validate-resume-studio-r2.ts",
+    "validate-resume-studio-r3.ts",
+    "validate-resume-studio-free.ts"
   ],
     direct: ["validate-direct-employers.test.ts", "validate-direct-discovery.test.ts", "validate-direct-d5.test.ts", "validate-direct-d5-workday.test.ts", "validate-direct-d5-phenom.test.ts", "validate-direct-d5-eightfold.test.ts", "validate-direct-d5-magneto.test.ts", "validate-direct-d5-google.test.ts", "validate-direct-tp.test.ts", "validate-direct-frisby.test.ts", "validate-direct-altipal.test.ts", "validate-direct-workeando.test.ts", "validate-direct-inventory.test.ts", "validate-direct-inventory-probe.test.ts", "validate-computrabajo-backlog.test.ts", "validate-source-focus.test.ts", "validate-direct-employers.ts", "validate-direct-discovery.ts", "validate-direct-projection.ts", "validate-direct-inventory.ts", "validate-direct-inventory-probe.ts"],
   "source-closure": ["validate-source-closure.test.ts", "validate-source-closure.ts"],
@@ -125,6 +137,20 @@ const suites: Record<string, string[]> = {
   "market-report": ["validate-market-report.test.ts", "validate-market-report.ts"],
   "saved-jobs": ["validate-saved-jobs.ts"],
   "site-feedback": ["validate-site-feedback.test.ts", "validate-site-feedback.ts"],
+  "resume-studio": [
+    "validate-resume-studio.test.ts",
+    "validate-resume-studio-files.test.ts",
+    "validate-resume-studio-ssrf.test.ts",
+    "validate-resume-studio-job-link.test.ts",
+    "validate-resume-studio-tailor.test.ts",
+    "validate-resume-studio-ai.test.ts",
+    "validate-resume-studio-injection.test.ts",
+    "validate-resume-studio-evals.test.ts",
+    "validate-resume-studio.ts",
+    "validate-resume-studio-r2.ts",
+    "validate-resume-studio-r3.ts",
+    "validate-resume-studio-free.ts"
+  ],
   baseline: ["validate-public-baseline.ts"],
   "agent-readiness": ["validate-agent-readiness.test.ts", "validate-agent-readiness.ts"],
   "job-seo": [
@@ -137,7 +163,7 @@ const selection = process.argv[2] || "unit";
 const offline = selection === "unit" || selection === "job-render";
 if (!Object.hasOwn(suites, selection) || process.argv.slice(3).some((arg) => arg !== "--dry-run")) {
   throw new Error(
-    "[P0] Suite inválida. Usa unit, integration, intent-bench, intent-drift, adsense-drift, job-render, sitemap, observability, pagination, modality, seo, companies, home, baseline, agent-readiness, job-seo, job-page-blocks, source-closure, job-freshness o direct; --dry-run es opcional."
+    "[P0] Suite inválida. Usa unit, integration, intent-bench, intent-drift, adsense-drift, job-render, sitemap, observability, pagination, modality, seo, companies, home, baseline, agent-readiness, job-seo, job-page-blocks, source-closure, job-freshness, resume-studio o direct; --dry-run es opcional."
   );
 }
 
