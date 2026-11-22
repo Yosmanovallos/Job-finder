@@ -64,6 +64,9 @@
     "db:migrate-site-feedback": "tsx scripts/migrate-site-feedback.ts",
     "db:migrate-purged-lookup": "tsx scripts/migrate-purged-lookup.ts",
     "db:migrate-signup-attribution": "tsx scripts/migrate-signup-attribution.ts",
+    "db:migrate-resume-studio": "tsx scripts/migrate-resume-studio.ts",
+    "dev:resume-studio": "tsx scripts/dev-resume-studio.ts",
+    "test:resume-studio": "tsx scripts/run-isolated-tests.ts resume-studio",
     "report:signups": "tsx scripts/report-signup-attribution.ts",
     "direct:seed": "tsx scripts/seed-direct-employers.ts",
     "direct:tick": "tsx scripts/run-direct-tick.ts",
@@ -77,6 +80,7 @@
     "test:direct": "tsx scripts/run-isolated-tests.ts direct"
   },
   "dependencies": {
+    "@napi-rs/canvas": "file:./vendor/napi-rs-canvas-stub",
     "@notionhq/client": "^5.1.0",
     "@phosphor-icons/react": "^2.1.10",
     "@radix-ui/react-accordion": "^1.2.18",
@@ -91,6 +95,7 @@
     "dotenv": "^16.4.5",
     "got-scraping": "^4.2.1",
     "lucide-react": "^1.26.0",
+    "pdfjs-dist": "6.5.438",
     "pg": "^8.22.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
@@ -114,5 +119,8 @@
     "tailwindcss-animate": "^1.0.7",
     "typescript": "^5.7.0",
     "vite": "^8.1.5"
+  },
+  "overrides": {
+    "@napi-rs/canvas": "$@napi-rs/canvas"
   }
 }

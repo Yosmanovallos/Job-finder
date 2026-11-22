@@ -1059,3 +1059,189 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS first_touch_utm_medium VARCHAR(100);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS first_touch_utm_campaign VARCHAR(100);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS first_touch_at TIMESTAMPTZ;
 -- END signup-attribution
+
+-- BEGIN resume-studio
+-- AI Resume Studio R1 (ADR 0017, docs/resume-studio/06 §4). Aditivo e
+-- idempotente; lo aplica scripts/migrate-resume-studio.ts SOLO contra una base
+-- local o el Postgres desechable de npm run test:integration. No se ejecuta
+-- en Supabase hasta R5 (merge único aprobado). No reutiliza las tablas
+-- viejas cv_* / llm_* / user_ai_credentials / cv_pii_vault (pendiente D6).
+--
+-- rs_consents: constancias de autorización, SOLO inserción (un trigger
+-- rechaza UPDATE y DELETE; revocar = fila nueva con granted = false). Sin FK
+-- a users a propósito: la constancia sobrevive al borrado de los datos.
+-- Sin IP ni texto: guarda la versión y el SHA-256 del texto mostrado.
+CREATE TABLE IF NOT EXISTS rs_consents (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id         UUID NOT NULL,
+    purpose         VARCHAR(32) NOT NULL CHECK (purpose IN ('cv_processing', 'terms', 'cloud_storage')),
+    policy_version  VARCHAR(32) NOT NULL,
+    granted         BOOLEAN NOT NULL,
+    text_hash       CHAR(64) NOT NULL,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
+);
+CREATE INDEX IF NOT EXISTS idx_rs_consents_user
+    ON rs_consents (user_id, policy_version, purpose, created_at DESC);
+
+CREATE OR REPLACE FUNCTION rs_consents_insert_only() RETURNS trigger
+LANGUAGE plpgsql AS $rs_consents$
+BEGIN
+  RAISE EXCEPTION 'rs_consents es solo de inserción';
+END
+$rs_consents$;
+DROP TRIGGER IF EXISTS rs_consents_no_update_delete ON rs_consents;
+CREATE TRIGGER rs_consents_no_update_delete
+    BEFORE UPDATE OR DELETE ON rs_consents
+    FOR EACH ROW EXECUTE FUNCTION rs_consents_insert_only();
+
+-- rs_resumes: la hoja de vida actual. R1 solo crea la base (una por
+-- usuario); las adaptadas llegan en R3. facts_json sigue el esquema Zod de
+-- src/lib/resume-studio.ts (objetos estrictos: sin foto, cédula ni estado
+-- civil). Cifrado de aplicación de facts_json: pendiente antes de R5.
+CREATE TABLE IF NOT EXISTS rs_resumes (
+    id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id      UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    kind         VARCHAR(16) NOT NULL DEFAULT 'base' CHECK (kind IN ('base')),
+    title        VARCHAR(80) NOT NULL,
+    template_id  VARCHAR(32) NOT NULL CHECK (template_id IN ('clasica', 'moderna', 'compacta')),
+    facts_json   JSONB NOT NULL,
+    version_no   INTEGER NOT NULL DEFAULT 1 CHECK (version_no >= 1),
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS rs_resumes_one_base_per_user
+    ON rs_resumes (user_id) WHERE kind = 'base';
+
+-- rs_resume_versions: historial para deshacer/restaurar en el servidor
+-- (máx. 50 por hoja de vida; se podan las más viejas). user_id repetido a
+-- propósito: toda consulta filtra por user_id Y resume_id.
+CREATE TABLE IF NOT EXISTS rs_resume_versions (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    resume_id       UUID NOT NULL REFERENCES rs_resumes(id) ON DELETE CASCADE,
+    user_id         UUID NOT NULL,
+    version_no      INTEGER NOT NULL CHECK (version_no >= 1),
+    title           VARCHAR(80) NOT NULL,
+    template_id     VARCHAR(32) NOT NULL,
+    facts_json      JSONB NOT NULL,
+    change_summary  VARCHAR(120) NOT NULL DEFAULT '',
+    created_by      VARCHAR(16) NOT NULL DEFAULT 'user' CHECK (created_by IN ('user', 'ai_accepted')),
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (resume_id, version_no)
+);
+CREATE INDEX IF NOT EXISTS idx_rs_resume_versions_user
+    ON rs_resume_versions (user_id, resume_id, version_no DESC);
+
+-- rs_job_snapshot_cache (R2, doc 11 §5.3): vacante leída de un link público
+-- o de nuestra base, por URL canónica, 24 h. Compartida entre usuarios y SIN
+-- user_id a propósito: nunca guarda texto que pegó un usuario, solo lo que
+-- cualquiera vería en la página pública. url_key = SHA-256 de la URL canónica.
+CREATE TABLE IF NOT EXISTS rs_job_snapshot_cache (
+    url_key        CHAR(64) PRIMARY KEY,
+    canonical_url  TEXT NOT NULL,
+    via            VARCHAR(24) NOT NULL,
+    snapshot_json  JSONB NOT NULL,
+    fetched_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    expires_at     TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_rs_job_snapshot_cache_expires
+    ON rs_job_snapshot_cache (expires_at);
+
+-- rs_ai_usage (R3, ADR 0017 §4): ledger de costo de IA. SIN contenido:
+-- nunca texto del CV, de la vacante ni de la respuesta; solo ids, prompt,
+-- modelo, tokens, costo (micro-USD) y estado. Cada llamada se reserva al
+-- peor costo antes de hacerse (topes duros por adaptación, usuario/día,
+-- global/día y global/mes). Al borrar todo o revocar, user_id/adaptation_id
+-- quedan NULL y el costo sigue contando para los topes globales.
+CREATE TABLE IF NOT EXISTS rs_ai_usage (
+    id             BIGSERIAL PRIMARY KEY,
+    user_id        UUID,
+    adaptation_id  UUID,
+    purpose        VARCHAR(30) NOT NULL CHECK (purpose ~ '^[a-z_]{1,30}$'),
+    prompt_id      VARCHAR(40) CHECK (prompt_id IS NULL OR prompt_id ~ '^[a-z_]{1,40}$'),
+    prompt_version SMALLINT,
+    alias          VARCHAR(20),
+    model          VARCHAR(64),
+    attempt        SMALLINT NOT NULL DEFAULT 0,
+    status         VARCHAR(16) NOT NULL
+                   CHECK (status IN ('start', 'reserved', 'ok', 'invalid_json', 'error', 'cache_hit')),
+    input_tokens   INTEGER NOT NULL DEFAULT 0 CHECK (input_tokens >= 0),
+    output_tokens  INTEGER NOT NULL DEFAULT 0 CHECK (output_tokens >= 0),
+    cached_tokens  INTEGER NOT NULL DEFAULT 0 CHECK (cached_tokens >= 0),
+    cost_micros    BIGINT NOT NULL DEFAULT 0 CHECK (cost_micros >= 0),
+    cache_hit      BOOLEAN NOT NULL DEFAULT FALSE,
+    latency_ms     INTEGER NOT NULL DEFAULT 0,
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_rs_ai_usage_adaptation ON rs_ai_usage (adaptation_id);
+CREATE INDEX IF NOT EXISTS idx_rs_ai_usage_user_time ON rs_ai_usage (user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_rs_ai_usage_time ON rs_ai_usage (created_at);
+
+-- R4 (ADR 0017 §5, doc 06 §7): pases de pago único con Wompi. La tabla
+-- `transactions` (existe) gana `product` aditivo: 'subscription' por defecto
+-- (toda fila anterior y el checkout de suscripción, sin tocarlos) o
+-- 'resume_pass'. El webhook ramifica por esta columna, así que en R5 este
+-- bloque se migra ANTES de desplegar. Condicional para que el bloque siga
+-- aplicándose en bases de prueba que no crean `transactions`.
+DO $rs_product$
+BEGIN
+  IF to_regclass('public.transactions') IS NOT NULL THEN
+    ALTER TABLE transactions ADD COLUMN IF NOT EXISTS product VARCHAR(20) NOT NULL DEFAULT 'subscription';
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'transactions_product_check') THEN
+      ALTER TABLE transactions ADD CONSTRAINT transactions_product_check CHECK (product IN ('subscription', 'resume_pass'));
+    END IF;
+  END IF;
+END
+$rs_product$;
+
+-- rs_entitlements: un pase pagado (webhook verificado o consulta a la API de
+-- Wompi). Se crea en la MISMA transacción que aprueba la fila de
+-- `transactions`; UNIQUE(transaction_reference) lo hace idempotente. Es
+-- registro de compra: «borrar todo» y «revocar» no lo tocan (sin contenido
+-- del CV). Sin FK a transactions a propósito, igual que rs_consents.
+CREATE TABLE IF NOT EXISTS rs_entitlements (
+    id                     UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id                UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    pass_id                VARCHAR(16) NOT NULL CHECK (pass_id IN ('pass_7d', 'pass_1m', 'pass_3m')),
+    transaction_reference  VARCHAR(255) NOT NULL UNIQUE,
+    amount_in_cents        BIGINT NOT NULL CHECK (amount_in_cents > 0),
+    starts_at              TIMESTAMPTZ NOT NULL,
+    expires_at             TIMESTAMPTZ NOT NULL,
+    adaptations_per_period INTEGER NOT NULL CHECK (adaptations_per_period > 0),
+    period_days            INTEGER NOT NULL CHECK (period_days > 0),
+    created_at             TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CHECK (expires_at > starts_at)
+);
+CREATE INDEX IF NOT EXISTS idx_rs_entitlements_user ON rs_entitlements (user_id, expires_at DESC);
+
+-- rs_adaptation_quota: adaptaciones usadas por periodo. bucket = id del pase
+-- o 'free:<user_id>' (cupo gratis por mes calendario de Colombia). Se
+-- consume con un INSERT … ON CONFLICT … WHERE used < límite (atómico). No
+-- se borra con «borrar todo»: si no, el cupo se reiniciaría borrando datos.
+CREATE TABLE IF NOT EXISTS rs_adaptation_quota (
+    bucket        VARCHAR(48) NOT NULL CHECK (bucket ~ '^(free:)?[0-9a-f-]{36}$'),
+    period_start  TIMESTAMPTZ NOT NULL,
+    used          INTEGER NOT NULL DEFAULT 0 CHECK (used >= 0),
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (bucket, period_start)
+);
+
+-- Mismo blindaje que el resto: solo el servidor (rol postgres) lee y
+-- escribe; la anon key pública no ve nada.
+ALTER TABLE rs_entitlements ENABLE ROW LEVEL SECURITY;
+ALTER TABLE rs_adaptation_quota ENABLE ROW LEVEL SECURITY;
+ALTER TABLE rs_ai_usage ENABLE ROW LEVEL SECURITY;
+ALTER TABLE rs_job_snapshot_cache ENABLE ROW LEVEL SECURITY;
+ALTER TABLE rs_consents ENABLE ROW LEVEL SECURITY;
+ALTER TABLE rs_resumes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE rs_resume_versions ENABLE ROW LEVEL SECURITY;
+DO $revoke$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon')
+     AND EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+    REVOKE ALL ON rs_consents, rs_resumes, rs_resume_versions, rs_job_snapshot_cache, rs_ai_usage, rs_entitlements, rs_adaptation_quota FROM anon, authenticated;
+    REVOKE ALL ON SEQUENCE rs_ai_usage_id_seq FROM anon, authenticated;
+    REVOKE ALL ON FUNCTION rs_consents_insert_only() FROM anon, authenticated;
+  END IF;
+END
+$revoke$;
+-- END resume-studio

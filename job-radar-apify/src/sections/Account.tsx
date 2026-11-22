@@ -19,7 +19,13 @@ interface TransactionRecord {
   createdAt: string;
 }
 
-const PLAN_LABEL: Record<string, string> = { pro: "Pro", pro_max: "Pro Max" };
+const PLAN_LABEL: Record<string, string> = {
+  pro: "Pro",
+  pro_max: "Pro Max",
+  pass_7d: "Pase hoja de vida 7 días",
+  pass_1m: "Pase hoja de vida 1 mes",
+  pass_3m: "Pase hoja de vida 3 meses"
+};
 
 const STATUS_LABEL: Record<string, { label: string; className: string }> = {
   approved: { label: "Aprobado", className: "bg-primary/10 text-primary border-primary/30" },
