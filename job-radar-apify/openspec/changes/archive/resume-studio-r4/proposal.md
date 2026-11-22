@@ -1,7 +1,8 @@
 # Resume Studio R4: pases Wompi, `rs_entitlements`, cupos y webhook H1/H2
 
-**Estado:** en curso (2026-11-21).
-**ADR:** [`docs/adr/0017-resume-studio-implementation.md`](../../../docs/adr/0017-resume-studio-implementation.md) §5 y §6.
+**Estado:** implementado y archivado (2026-11-21). La evidencia está en
+[`validation.md`](validation.md).
+**ADR:** [`docs/adr/0017-resume-studio-implementation.md`](../../../../docs/adr/0017-resume-studio-implementation.md) §5 y §6.
 **Rama:** `codex/resume-studio-r4`, cortada de `codex/resume-studio-r3`
 (PR #150). El PR va en borrador contra `codex/resume-studio`. Nada va a
 `main` ni a Supabase.
