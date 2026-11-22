@@ -207,7 +207,8 @@ export function cardSources(request: CardRequest): { sources: string[]; knownFac
 
 function judge(text: string, why: string, supportingFactIds: string[], request: CardRequest, byAi: boolean, reply?: string): CardResult {
   const { sources, knownFactIds } = cardSources(request);
-  const verdict = validateProposal({ after: text, sources, supportingFactIds, knownFactIds });
+  const headline = request.card === "headline" || (request.card === "chat" && request.cardType === "headline");
+  const verdict = validateProposal({ after: text, sources, supportingFactIds, knownFactIds, strictWords: headline });
   if (verdict.verdict === "accept") return { status: "proposal", text, why, supportingFactIds, byAi, ...(reply ? { reply } : {}) };
   if (verdict.verdict === "question") {
     const names = verdict.newClaims.map((c) => c.value);

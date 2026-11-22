@@ -11,18 +11,41 @@ const PHONE = /(?:\+?\d{1,3}[\s.-]?)?(?:\(?\d{3}\)?[\s.-]?)\d{3}[\s.-]?\d{4}\b/g
 export const INSTRUCTION_TO_AI =
   /(ignora|ignore|olvida|disregard|omite)\b.{0,40}\b(instrucci|instruction|reglas|rules|prompt|anteriores|previous)|nuevas instrucciones|new instructions|system prompt|eres ahora|you are now|<<<|>>>/i;
 
+// Label-style lines («Estado civil: …», «EPS: …») and unmistakable values
+// («C.C. 1.234.567», «Calle 12 # 34-56») only. A CV line that merely mentions
+// a word («Universidad Católica», «EPS Sura» as an employer, «diagnóstico de
+// redes», «barrio La Paz») is content and stays.
+const BULLET = String.raw`^\s*[-•*·]?\s*`;
+const label = (labels: string) => new RegExp(String.raw`${BULLET}(?:${labels})\s*[:=]`, "i");
+const any = (...res: RegExp[]) => new RegExp(res.map((r) => r.source).join("|"), "i");
+
 export const SENSITIVE_PATTERNS: { label: string; re: RegExp }[] = [
-  { label: "documento de identidad", re: /\b(c[ée]dula|c\.?\s?c\.?\s*(no\.?|n[°º])?\s*\d|documento de identidad|pasaporte|tarjeta de identidad|\bnit\b|\bdni\b)/i },
-  { label: "estado civil", re: /\b(estado civil|solter[oa]|casad[oa]|divorciad[oa]|viud[oa]|uni[óo]n libre)\b/i },
-  { label: "edad o fecha de nacimiento", re: /\b(edad\s*:|\d{2}\s*a[ñn]os de edad|fecha de nacimiento|nacid[oa] el|lugar de nacimiento)\b/i },
-  { label: "salud o EPS", re: /\b(eps\b|tipo de sangre|grupo sangu[íi]neo|rh\s*[+-]|discapacidad|diagn[óo]stico)/i },
-  { label: "religión", re: /\b(religi[óo]n|cat[óo]lic[oa]|cristian[oa]|evang[ée]lic[oa])\b/i },
-  { label: "afiliación política o sindical", re: /\b(partido pol[íi]tico|afiliaci[óo]n pol[íi]tica|sindicato)\b/i },
-  { label: "foto", re: /\b(foto(graf[íi]a)?\s*:)/i },
-  { label: "libreta militar", re: /\blibreta militar\b/i },
+  {
+    label: "documento de identidad",
+    re: any(
+      label(String.raw`c[ée]dula(?: de ciudadan[íi]a)?|c\.?\s?c\.?|documento(?: de identidad)?|pasaporte|tarjeta de identidad|n[úu]mero de identificaci[óo]n|dni`),
+      /\b(?:c[ée]dula|c\.\s?c\.)\s*(?:de ciudadan[íi]a\s*)?(?:no\.?|n[°º]|#)?\s*\d[\d.\s]{5,}/
+    )
+  },
+  { label: "estado civil", re: any(label("estado civil"), /^\s*(?:solter[oa]|casad[oa]|divorciad[oa]|viud[oa]|uni[óo]n libre)\s*[,.]?\s*$/) },
+  {
+    label: "edad o fecha de nacimiento",
+    re: any(label("edad|fecha de nacimiento|lugar de nacimiento|fecha y lugar de nacimiento"), /\b\d{2}\s*a[ñn]os de edad\b/, /\bnacid[oa] el\b/)
+  },
+  { label: "salud o EPS", re: label(String.raw`eps|tipo de sangre|grupo sangu[íi]neo|rh|discapacidad|salud|condici[óo]n m[ée]dica`) },
+  { label: "religión", re: label(String.raw`religi[óo]n|credo`) },
+  { label: "afiliación política o sindical", re: label(String.raw`partido(?: pol[íi]tico)?|afiliaci[óo]n pol[íi]tica|sindicato`) },
+  { label: "foto", re: label(String.raw`foto|fotograf[íi]a`) },
+  { label: "libreta militar", re: any(label("libreta militar"), /\blibreta militar\s*(?:no\.?|n[°º]|#)?\s*\d/) },
   // Text aimed at the AI inside a CV is not CV content (doc 09 §4 adversarial).
   { label: "texto dirigido a la IA", re: INSTRUCTION_TO_AI },
-  { label: "dirección de residencia", re: /\b(direcci[óo]n\s*:|calle\s+\d+|carrera\s+\d+|cra\.?\s*\d+|cl\.?\s*\d+\s*#|barrio\s+\w+)/i }
+  {
+    label: "dirección de residencia",
+    re: any(
+      label(String.raw`direcci[óo]n|domicilio|residencia|barrio`),
+      /\b(?:calle|carrera|cra\.?|cl\.?|avenida|av\.?|diagonal|dg\.?|transversal|tv\.?)\s*\d+\s*[a-z]?\s*(?:#|no\.?|n[°º])\s*\d+/
+    )
+  }
 ];
 
 export interface MinimizedCv {

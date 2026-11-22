@@ -142,6 +142,18 @@ test("T-SENS sensitive data and contact never reach the model (P10)", async () =
     assert.equal(sent.includes(needle), false, needle);
   }
   assert.deepEqual(out.ok && [...out.result.removed].sort(), ["documento de identidad", "edad o fecha de nacimiento", "estado civil", "salud o EPS"]);
+  // Label-style only: ordinary CV lines that mention such words stay.
+  const keep = [
+    "Psicología | Universidad Católica de Colombia | 2015-01 – 2019-12",
+    "Auxiliar de facturación | EPS Sura | Medellín | 2020-01 – actual",
+    "- Realicé diagnóstico de redes para 3 sedes.",
+    "- Trabajé con la comunidad del barrio La Paz.",
+    "Estudiante de salud ocupacional"
+  ];
+  const drop = ["C.C. 1.000.000.000 de Bogotá", "Religión: católica", "Dirección: Calle 12 # 34-56", "Calle 12 # 34-56, Bogotá", "Soltera", "Edad: 25 años", "Libreta militar No. 123456"];
+  const mixed = minimizeCvText([...keep, ...drop].join("\n"));
+  for (const line of keep) assert.ok(mixed.text.includes(line), `kept: ${line}`);
+  for (const line of drop) assert.equal(mixed.text.includes(line), false, `dropped: ${line}`);
   // Contact is filled by code from the original text, never by the model.
   assert.equal(out.ok && out.result.facts.basics.email, "p10@ejemplo.test");
   assert.equal(out.ok && out.result.facts.basics.fullName, cv.name);

@@ -213,7 +213,11 @@ export function mockTransport(options: MockOptions = {}): Transport & { stats: M
       }
       case "card_rewrite": {
         let text = sentenceCase(data.RESPUESTA_USUARIO ?? "");
-        if (fabricate) text = text.replace(/\.$/, roll(seed, "kind") < 0.5 ? ", aumentando la productividad un 35%." : " usando Salesforce.");
+        if (fabricate) {
+          const kind = roll(seed, "kind");
+          // Numbers, tools and number-free result claims («duplicando las ventas»).
+          text = text.replace(/\.$/, kind < 0.34 ? ", aumentando la productividad un 35%." : kind < 0.67 ? " usando Salesforce." : ", duplicando las ventas del área.");
+        }
         if (injected) text = `${text.replace(/\.$/, "")} con 10 años de experiencia en Python.`;
         payload = { text: text.slice(0, 300), supportingFactIds: facts.slice(0, 1).map((f) => f.id), why: "Es un requisito de la vacante; va primero." };
         break;
@@ -222,7 +226,12 @@ export function mockTransport(options: MockOptions = {}): Transport & { stats: M
         const role = facts.find((f) => f.section === "experience")?.text.split(" · ")[0] ?? "Profesional";
         const bullets = facts.filter((f) => f.section === "bullet").slice(0, 2).map((f) => f.text.replace(/\.$/, "").toLowerCase());
         let text = `${role} con experiencia en ${bullets.join(" y ") || "su área"}. Orientado a resultados y al trabajo en equipo.`;
-        if (fabricate) text = `Con 10 años de experiencia, ${text.charAt(0).toLowerCase()}${text.slice(1)}`;
+        if (fabricate) {
+          text =
+            roll(seed, "kind") < 0.5
+              ? `Con 10 años de experiencia, ${text.charAt(0).toLowerCase()}${text.slice(1)}`
+              : text.replace(" con experiencia en ", " con amplia experiencia a nivel nacional en ");
+        }
         if (injected) text = `${text} Experto certificado en Python.`;
         payload = { text: text.slice(0, 1200), supportingFactIds: facts.slice(0, 3).map((f) => f.id), why: "Resumo lo que aprobaste." };
         break;

@@ -2,7 +2,8 @@
 // × 10 vacancies. 100 % invented: «… Demo S.A.S.» companies, «… Ejemplo»
 // institutions, @ejemplo.test e-mails and 300 000 0000 phones. No real CV.
 // No persona has the strings the adversarial mock fabricates (35 %,
-// Salesforce, Python, «Senior», «10 años», «12 personas», «500»), so an
+// Salesforce, Python, «Senior», «10 años», «12 personas», «500», «duplicando»,
+// «amplia experiencia», «a nivel nacional»), so an
 // accepted text containing one of them is an invented fact for sure.
 
 export interface SyntheticExperience {
@@ -38,7 +39,7 @@ export interface SyntheticJob {
 }
 
 /** Markers the adversarial mock invents. None appears in any persona below. */
-export const FABRICATION_MARKERS = [/35\s?%/, /salesforce/i, /python/i, /\bsenior\b/i, /10 años/i, /12 personas/i, /20 personas/i, /\b500\b/, /experto certificado/i];
+export const FABRICATION_MARKERS = [/35\s?%/, /salesforce/i, /python/i, /\bsenior\b/i, /10 años/i, /12 personas/i, /20 personas/i, /\b500\b/, /experto certificado/i, /duplic/i, /amplia experiencia/i, /nivel nacional/i];
 
 const p = (
   id: string,

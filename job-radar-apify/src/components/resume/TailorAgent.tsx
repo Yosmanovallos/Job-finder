@@ -86,6 +86,8 @@ const CLAIM_LABEL: Record<Claim["kind"], string> = {
   skill: "una herramienta",
   proper_noun: "un nombre",
   title: "un cargo o nivel",
+  achievement: "un logro o alcance",
+  new_word: "una palabra",
   link: "un enlace"
 };
 

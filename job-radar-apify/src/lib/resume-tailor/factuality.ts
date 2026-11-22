@@ -1,5 +1,5 @@
 import { findSkills, textMentionsSkill } from "./skills.js";
-import { normalizeText } from "./text.js";
+import { contentTerms, normalizeText } from "./text.js";
 
 // AI Resume Studio R3 — factuality validator (doc 05 §5, ADR 0017 §2,
 // AGENTS.md rule 5). A proposal may only use what the cited facts or the
@@ -10,7 +10,7 @@ import { normalizeText } from "./text.js";
 //   - anything else      → the proposal is DISCARDED.
 // An unknown supporting fact id also discards it.
 
-export type ClaimKind = "number" | "month" | "skill" | "proper_noun" | "title" | "link";
+export type ClaimKind = "number" | "month" | "skill" | "proper_noun" | "title" | "achievement" | "new_word" | "link";
 
 export interface Claim {
   kind: ClaimKind;
@@ -40,6 +40,21 @@ const TITLE_WORDS = new Set(
   ).split(" ")
 );
 
+// Words that claim a result, a scope or leadership («duplicando», «lideré»,
+// «a nivel nacional», «amplia experiencia», «exitosas»). Prefix stems (≥ 5
+// chars) and exact words; supported only when a source word has the same stem.
+const ACHIEVEMENT_STEMS = [
+  "duplic", "tripli", "cuadrupl", "aument", "increment", "reduj", "reduc", "ahorr", "optimi", "maximi", "lider", "dirig", "dirij",
+  "encabe", "nacional", "internacional", "multinacional", "exitos", "extens", "premi", "galardon", "reconocim", "destaca", "sobresal",
+  "millon", "mejor"
+];
+const ACHIEVEMENT_WORDS = new Set(["amplia", "amplio", "solida", "solido", "global", "record", "top", "miles", "cientos", "exito"]);
+
+function achievementKey(word: string): string | null {
+  if (ACHIEVEMENT_WORDS.has(word)) return word;
+  return ACHIEVEMENT_STEMS.find((stem) => word.startsWith(stem)) ?? null;
+}
+
 function numbersIn(n: string): string[] {
   const out: string[] = [];
   for (const m of n.matchAll(/(?<![a-z0-9])\d+(?:[.,]\d+)?%?(?![a-z])/g)) out.push(m[0].replace(",", "."));
@@ -67,13 +82,14 @@ function properNouns(text: string): string[] {
       if (acronym || inner || mixed || (capital && !sentenceStart)) out.push(token);
       sentenceStart = false;
     }
-    if (/[.!?:;]["»)]*$/.test(raw) || raw === "·" || raw === "-" || raw === "–" || raw === "|") sentenceStart = true;
+    // Only a real sentence end resets: after «·», «|» or «-» a capital still names something.
+    if (/[.!?:;]["»)]*$/.test(raw)) sentenceStart = true;
   }
   return out;
 }
 
 /** The claims of `text` that its sources don't support. */
-export function newClaims(text: string, sources: string[]): Claim[] {
+export function newClaims(text: string, sources: string[], options: { strictWords?: boolean } = {}): Claim[] {
   const source = sources.join("\n");
   const ns = normalizeText(source);
   const nt = normalizeText(text);
@@ -96,6 +112,8 @@ export function newClaims(text: string, sources: string[]): Claim[] {
   for (const w of words(nt)) {
     if (MONTHS.has(w) && !sourceWords.has(w)) push("month", w);
     if (TITLE_WORDS.has(w) && !sourceWords.has(w)) push("title", w);
+    const key = achievementKey(w);
+    if (key && ![...sourceWords].some((sw) => achievementKey(sw) === key)) push("achievement", w);
   }
   for (const skill of findSkills(text)) {
     if (!textMentionsSkill(source, skill)) push("skill", skill);
@@ -108,6 +126,11 @@ export function newClaims(text: string, sources: string[]): Claim[] {
     if ([...skillsHere].some((s) => s.split(" ").includes(n))) continue;
     push("proper_noun", noun);
   }
+  // Headlines may only reuse words that are already in the CV (doc 11 prototype).
+  if (options.strictWords) {
+    const known = new Set(contentTerms(source));
+    for (const term of contentTerms(text)) if (!known.has(term)) push("new_word", term);
+  }
   return claims;
 }
 
@@ -116,13 +139,15 @@ export function validateProposal(input: {
   sources: string[];
   supportingFactIds?: string[];
   knownFactIds?: Iterable<string>;
+  /** Every content word must already be in the sources (headline). */
+  strictWords?: boolean;
 }): FactualityResult {
   if (!input.after.trim()) return { verdict: "discard", newClaims: [], reason: "empty" };
   if (input.supportingFactIds && input.knownFactIds) {
     const known = new Set(input.knownFactIds);
     if (input.supportingFactIds.some((id) => !known.has(id))) return { verdict: "discard", newClaims: [], reason: "unknown_fact" };
   }
-  const claims = newClaims(input.after, input.sources);
+  const claims = newClaims(input.after, input.sources, { strictWords: input.strictWords });
   if (!claims.length) return { verdict: "accept", newClaims: [], reason: "ok" };
   const onlySkills = claims.every((c) => c.kind === "skill");
   return { verdict: onlySkills ? "question" : "discard", newClaims: claims, reason: "new_data" };

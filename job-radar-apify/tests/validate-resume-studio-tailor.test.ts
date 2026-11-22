@@ -207,6 +207,30 @@ test("RS3-FACT 40 cases: new numbers, dates, names and titles discard; new tools
   }
 });
 
+test("RS3-FACT-2 number-free result, scope and leadership claims are discarded; headlines reuse CV words only", () => {
+  const src = ["Configuré 6 campañas pequeñas en Meta Ads y TikTok Ads con presupuesto limitado.", "Comunicadora social con experiencia en redes sociales y eventos."];
+  for (const after of [
+    "Configuré 6 campañas en Meta Ads, duplicando las ventas.",
+    "Lideré las campañas en Meta Ads.",
+    "Dirigí las campañas de Meta Ads.",
+    "Configuré campañas en Meta Ads para clientes a nivel nacional.",
+    "Configuré campañas en Meta Ads para clientes internacionales.",
+    "Comunicadora social con amplia experiencia en redes sociales.",
+    "Configuré campañas exitosas en Meta Ads.",
+    "Configuré campañas en Meta Ads y aumenté las ventas.",
+    "Comunicadora social · Marketing digital"
+  ]) {
+    assert.equal(validateProposal({ after, sources: src }).verdict, "discard", after);
+  }
+  // Supported when the source says it.
+  assert.equal(validateProposal({ after: "Lideré 6 campañas en Meta Ads.", sources: ["Lideré 6 campañas pequeñas en Meta Ads."] }).verdict, "accept");
+  // Headline: every content word must already be in the CV.
+  assert.equal(validateProposal({ after: "Comunicadora social · Redes sociales y eventos", sources: src, strictWords: true }).verdict, "accept");
+  const strict = validateProposal({ after: "Comunicadora social y analista de pauta digital", sources: src, strictWords: true });
+  assert.equal(strict.verdict, "discard");
+  assert.ok(strict.newClaims.some((c) => c.kind === "new_word"));
+});
+
 test("RS3-FACT unknown supporting fact ids discard the proposal", () => {
   const r = validateProposal({ after: "Configuré 6 campañas en Meta Ads.", sources: SRC, supportingFactIds: ["e1", "inventado"], knownFactIds: ["e1", "b1"] });
   assert.deepEqual(r, { verdict: "discard", newClaims: [], reason: "unknown_fact" });
