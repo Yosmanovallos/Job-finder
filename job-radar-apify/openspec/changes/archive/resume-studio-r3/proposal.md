@@ -1,7 +1,8 @@
 # Resume Studio R3 — gateway de IA, agente de tarjetas, factualidad y dos puntajes
 
-**Estado:** en curso (2026-11-21).
-**ADR:** [`docs/adr/0017-resume-studio-implementation.md`](../../../docs/adr/0017-resume-studio-implementation.md) §2 y §4.
+**Estado:** implementado y archivado (2026-11-21). Evidencia en
+[`validation.md`](validation.md).
+**ADR:** [`docs/adr/0017-resume-studio-implementation.md`](../../../../docs/adr/0017-resume-studio-implementation.md) §2 y §4.
 **Rama:** `codex/resume-studio-r3`, cortada de `codex/resume-studio-r2`
 (PR #149); PR en borrador contra `codex/resume-studio`. Nada a `main`, nada
 en Supabase.
@@ -26,8 +27,9 @@ acotado por código.
   `RESUME_AI_WORKSPACE_ID` solo admite `[a-z0-9-]` (no se puede inyectar otro
   host). La llave viene de `RESUME_AI_API_KEY` y nunca se registra.
 - `RESUME_AI_PROVIDER = none | mock | qwen` (por defecto `none`). Con `none`
-  no se llama a nadie: el agente queda en «solo edición manual» y las rutas
-  de IA responden 503 `ai_off`.
+  no se llama a nadie: `/extract` y las tarjetas que necesitan IA responden
+  503 `ai_off`. El análisis determinista (requisitos por reglas, puntajes,
+  habilidades y mapeo con las palabras del usuario) sigue funcionando.
 - **Alias**, nunca nombres de modelo en el código de producto:
   - `fast` → `RESUME_AI_MODEL_FAST`, por defecto `qwen3.7-flash`. Si no
     aparece en la consola us-east-1, el propietario pone `qwen3.8-flash`.
@@ -51,7 +53,8 @@ acotado por código.
      (`budget_exceeded`);
   3. si no, se inserta una fila `reserved` con ese costo. Al terminar, la
      fila pasa a `ok`, `invalid_json` o `error` con el costo real.
-  Topes por defecto (env): adaptación USD 0,05; usuario/día USD 0,25; global/día
+  Topes por defecto (env): adaptación USD 0,035 (≈ COP 140, por debajo del
+  criterio de COP 150 por construcción); usuario/día USD 0,25; global/día
   USD 5; global/mes USD 60.
 - **Ledger `rs_ai_usage` sin contenido.** Columnas: `user_id`,
   `adaptation_id`, `purpose`, `prompt_id`, `prompt_version`, `alias`,
@@ -202,5 +205,5 @@ opcional del doc 05 §5, y cualquier cambio en Supabase o `main`.
   costos siguen contando para los topes globales). Por eso el tope por
   usuario se reinicia tras un borrado. Lo acotan el tope global y el límite
   de frecuencia.
-- Topes por defecto (USD 0,05 por adaptación, 0,25 por usuario al día, 5
+- Topes por defecto (USD 0,035 por adaptación, 0,25 por usuario al día, 5
   global al día y 60 al mes).

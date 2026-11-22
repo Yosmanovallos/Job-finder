@@ -41,7 +41,8 @@ export const KNOWN_PRICES: Record<string, ModelPrice> = {
   "qwen3.7-plus": { input: 0.4, output: 1.6 }
 };
 
-export const DEFAULT_CAPS: AiCaps = { adaptationUsd: 0.05, userDailyUsd: 0.25, globalDailyUsd: 5, globalMonthlyUsd: 60 };
+// Adaptation cap ≈ COP 140 at TRM 4.000: below the R3 exit criterion (≤ COP 150) by construction.
+export const DEFAULT_CAPS: AiCaps = { adaptationUsd: 0.035, userDailyUsd: 0.25, globalDailyUsd: 5, globalMonthlyUsd: 60 };
 
 const WORKSPACE = /^[a-z0-9][a-z0-9-]{2,62}$/;
 const MODEL = /^[a-z0-9][a-z0-9.\-_]{1,60}$/;

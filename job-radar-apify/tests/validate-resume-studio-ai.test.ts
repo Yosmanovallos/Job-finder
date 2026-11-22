@@ -57,6 +57,8 @@ test("RS3-AI-CFG none by default; qwen fails closed without workspace, key or pr
   const fallback = parseResumeAiConfig({ RESUME_AI_PROVIDER: "qwen", RESUME_AI_WORKSPACE_ID: "ws-123", RESUME_AI_API_KEY: "k", RESUME_AI_MODEL_FAST: "qwen3.8-flash" });
   assert.deepEqual(fallback.prices.fast, { input: 0.15, output: 0.47 });
   assert.equal(costMicros({ input: 0.15, output: 0.47 }, 1_000_000, 0), 150_000);
+  // R3 exit criterion by construction: the default adaptation cap is ≤ COP 150.
+  assert.ok(ok.caps.adaptationUsd * ok.copPerUsd <= 150, `${ok.caps.adaptationUsd} USD × ${ok.copPerUsd}`);
 });
 
 test("RS3-AI-PROMPTS every prompt is versioned, budgeted, says JSON and declares data as data", () => {
