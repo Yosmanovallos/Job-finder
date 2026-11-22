@@ -6,6 +6,7 @@ import { COMPATIBILITY_DISCLAIMER } from "../../lib/resume-tailor/score.js";
 import type { GatewayFailure } from "../../resume-studio/ai/gateway.js";
 import { resumeAiRuntime } from "../../resume-studio/ai/runtime.js";
 import { extractCvFacts, proposeCard, startTailor, type CardRequest } from "../../resume-studio/ai/tailor-service.js";
+import { consumeAdaptation, releaseAdaptation, type QuotaGrant } from "../../db/resume-studio-pass-repository.js";
 
 // AI Resume Studio R3 — /api/resume/extract, /tailor/start, /tailor/card.
 // Loaded lazily by resume.ts after session, rate limit and the two required
@@ -84,12 +85,32 @@ export async function handleResumeAi(res: http.ServerResponse, route: string, us
   if (route === "/tailor/start") {
     const parsed = startBody.safeParse(value);
     if (!parsed.success) return json(res, 400, { error: "Faltan tu hoja de vida o la vacante." });
+    // R4 quota (doc 06 §7): one adaptation per start, only when the AI can
+    // actually help; the R3 cost caps still apply on top. Pass first, then
+    // the monthly free allowance; nothing left → 402 pointing to the pass.
+    let grant: QuotaGrant | null = null;
+    if (gateway.enabled) {
+      const quota = await consumeAdaptation(userId);
+      if (!quota.ok) {
+        return json(res, 402, {
+          error: quota.source === "pass" ? "Usaste las adaptaciones de tu pase en este periodo. Puedes seguir editando a mano." : "Usaste tus adaptaciones gratis de este mes. Con un pase tienes más.",
+          code: "quota_exhausted",
+          source: quota.source,
+          limit: quota.limit,
+          resetsAt: quota.resetsAt.toISOString()
+        });
+      }
+      grant = quota;
+    }
     const adaptationId = randomUUID();
     await ledger.startAdaptation(userId, adaptationId);
     const start = await startTailor(gateway, { userId, adaptationId }, { facts: parsed.data.facts, ...parsed.data.job });
+    // A cost cap stopped the AI before it helped: give the adaptation back.
+    if (grant && !start.aiAvailable) await releaseAdaptation(grant);
     return json(res, 200, {
       adaptationId,
       ...start,
+      quota: grant ? { source: grant.source, used: start.aiAvailable ? grant.used : grant.used - 1, limit: grant.limit } : null,
       aiMessage: start.aiNotice ? FAILURE_MESSAGES[start.aiNotice] : null,
       disclaimer: COMPATIBILITY_DISCLAIMER
     });

@@ -1176,8 +1176,59 @@ CREATE INDEX IF NOT EXISTS idx_rs_ai_usage_adaptation ON rs_ai_usage (adaptation
 CREATE INDEX IF NOT EXISTS idx_rs_ai_usage_user_time ON rs_ai_usage (user_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_rs_ai_usage_time ON rs_ai_usage (created_at);
 
+-- R4 (ADR 0017 §5, doc 06 §7): pases de pago único con Wompi. La tabla
+-- `transactions` (existe) gana `product` aditivo: 'subscription' por defecto
+-- (toda fila anterior y el checkout de suscripción, sin tocarlos) o
+-- 'resume_pass'. El webhook ramifica por esta columna, así que en R5 este
+-- bloque se migra ANTES de desplegar. Condicional para que el bloque siga
+-- aplicándose en bases de prueba que no crean `transactions`.
+DO $rs_product$
+BEGIN
+  IF to_regclass('public.transactions') IS NOT NULL THEN
+    ALTER TABLE transactions ADD COLUMN IF NOT EXISTS product VARCHAR(20) NOT NULL DEFAULT 'subscription';
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'transactions_product_check') THEN
+      ALTER TABLE transactions ADD CONSTRAINT transactions_product_check CHECK (product IN ('subscription', 'resume_pass'));
+    END IF;
+  END IF;
+END
+$rs_product$;
+
+-- rs_entitlements: un pase pagado (webhook verificado o consulta a la API de
+-- Wompi). Se crea en la MISMA transacción que aprueba la fila de
+-- `transactions`; UNIQUE(transaction_reference) lo hace idempotente. Es
+-- registro de compra: «borrar todo» y «revocar» no lo tocan (sin contenido
+-- del CV). Sin FK a transactions a propósito, igual que rs_consents.
+CREATE TABLE IF NOT EXISTS rs_entitlements (
+    id                     UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id                UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    pass_id                VARCHAR(16) NOT NULL CHECK (pass_id IN ('pass_7d', 'pass_1m', 'pass_3m')),
+    transaction_reference  VARCHAR(255) NOT NULL UNIQUE,
+    amount_in_cents        BIGINT NOT NULL CHECK (amount_in_cents > 0),
+    starts_at              TIMESTAMPTZ NOT NULL,
+    expires_at             TIMESTAMPTZ NOT NULL,
+    adaptations_per_period INTEGER NOT NULL CHECK (adaptations_per_period > 0),
+    period_days            INTEGER NOT NULL CHECK (period_days > 0),
+    created_at             TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CHECK (expires_at > starts_at)
+);
+CREATE INDEX IF NOT EXISTS idx_rs_entitlements_user ON rs_entitlements (user_id, expires_at DESC);
+
+-- rs_adaptation_quota: adaptaciones usadas por periodo. bucket = id del pase
+-- o 'free:<user_id>' (cupo gratis por mes calendario de Colombia). Se
+-- consume con un INSERT … ON CONFLICT … WHERE used < límite (atómico). No
+-- se borra con «borrar todo»: si no, el cupo se reiniciaría borrando datos.
+CREATE TABLE IF NOT EXISTS rs_adaptation_quota (
+    bucket        VARCHAR(48) NOT NULL CHECK (bucket ~ '^(free:)?[0-9a-f-]{36}$'),
+    period_start  TIMESTAMPTZ NOT NULL,
+    used          INTEGER NOT NULL DEFAULT 0 CHECK (used >= 0),
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (bucket, period_start)
+);
+
 -- Mismo blindaje que el resto: solo el servidor (rol postgres) lee y
 -- escribe; la anon key pública no ve nada.
+ALTER TABLE rs_entitlements ENABLE ROW LEVEL SECURITY;
+ALTER TABLE rs_adaptation_quota ENABLE ROW LEVEL SECURITY;
 ALTER TABLE rs_ai_usage ENABLE ROW LEVEL SECURITY;
 ALTER TABLE rs_job_snapshot_cache ENABLE ROW LEVEL SECURITY;
 ALTER TABLE rs_consents ENABLE ROW LEVEL SECURITY;
@@ -1187,7 +1238,7 @@ DO $revoke$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon')
      AND EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
-    REVOKE ALL ON rs_consents, rs_resumes, rs_resume_versions, rs_job_snapshot_cache, rs_ai_usage FROM anon, authenticated;
+    REVOKE ALL ON rs_consents, rs_resumes, rs_resume_versions, rs_job_snapshot_cache, rs_ai_usage, rs_entitlements, rs_adaptation_quota FROM anon, authenticated;
     REVOKE ALL ON SEQUENCE rs_ai_usage_id_seq FROM anon, authenticated;
     REVOKE ALL ON FUNCTION rs_consents_insert_only() FROM anon, authenticated;
   END IF;

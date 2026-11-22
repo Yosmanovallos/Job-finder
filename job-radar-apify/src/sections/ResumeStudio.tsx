@@ -4,6 +4,7 @@ import { Download, History, Plus, Save, ShieldCheck, ShieldOff, Trash2, Undo2, X
 import { useAuth } from "../auth/auth-provider.js";
 import { ResumeTemplate } from "../components/resume/ResumeTemplate.js";
 import { TailorAgent, type TailorJob } from "../components/resume/TailorAgent.js";
+import { ResumePass } from "../components/resume/ResumePass.js";
 import {
   RESUME_POLICY_VERSION,
   RESUME_TEMPLATES,
@@ -21,7 +22,9 @@ import {
 // inputs with no AI: CV file → text (or paste) and vacancy link → JobSnapshot
 // (or paste). R3 adds the AI: «Llenar los campos» (CV text → facts with
 // verified source spans) and the card agent that adapts the CV to the
-// vacancy (TailorAgent). No payments. Signed-in only (RequireAuth in App).
+// vacancy (TailorAgent). R4 adds the pass screen (ResumePass): one-time
+// Wompi passes, clean PDF/DOCX, watermark on the free preview. Signed-in
+// only (RequireAuth in App).
 // The server answers 404 for all of this while RESUME_STUDIO_ENABLED is off.
 
 interface ConsentItemView {
@@ -105,6 +108,36 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
+// R4: printing (PDF) shows only the CV; without an active pass it carries
+// the «Vista previa» watermark (doc 02 RS-US8). Scoped to this page, so the
+// global CSS is untouched. Removing the mark in the browser is the risk
+// doc 06 §6 already accepts; the DOCX is gated on the server.
+const PRINT_AREA_ID = "rs-print-area";
+const PRINT_CSS = `@media print {
+  body * { visibility: hidden !important; }
+  #${PRINT_AREA_ID}, #${PRINT_AREA_ID} * { visibility: visible !important; }
+  #${PRINT_AREA_ID} { position: absolute !important; left: 0; top: 0; width: 100%; }
+  @page { margin: 0; }
+}`;
+
+function PreviewWatermark() {
+  return (
+    <div
+      aria-hidden="true"
+      style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none", display: "grid", alignContent: "space-around", justifyItems: "center" }}
+    >
+      {[0, 1, 2, 3].map((n) => (
+        <span
+          key={n}
+          style={{ transform: "rotate(-28deg)", fontSize: 30, fontWeight: 700, letterSpacing: ".04em", color: "rgba(15, 107, 79, 0.14)", whiteSpace: "nowrap", WebkitPrintColorAdjust: "exact", printColorAdjust: "exact" }}
+        >
+          Vista previa — BuscoTrabajo
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function Card({ title, children, action }: { title: string; children: ReactNode; action?: ReactNode }) {
   return (
     <section className="ink-card-sm rounded-2xl bg-white p-4 md:p-5 space-y-3">
@@ -129,6 +162,7 @@ export default function ResumeStudio() {
   const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string; issues?: string[] } | null>(null);
   const [versions, setVersions] = useState<VersionView[] | null>(null);
   const [mobileTab, setMobileTab] = useState<"edit" | "preview">("edit");
+  const [passActive, setPassActive] = useState(false);
   const [tailorJob, setTailorJob] = useState<TailorJob | null>(null);
 
   useEffect(() => {
@@ -435,6 +469,7 @@ export default function ResumeStudio() {
               setDraft({ ...draft, facts });
               setDirty(true);
               setTailorJob(null);
+              setMobileTab("preview");
               setMessage({ kind: "ok", text: "La versión adaptada quedó en el editor. Revísala y guárdala si te sirve; tu base guardada no ha cambiado." });
             }}
           />
@@ -484,8 +519,19 @@ export default function ResumeStudio() {
               ))}
             </div>
             <div className="ink-card-sm rounded-2xl overflow-hidden bg-white max-h-[70vh] overflow-y-auto">
-              <ResumeTemplate facts={draft.facts} templateId={draft.templateId} />
+              <div id={PRINT_AREA_ID} style={{ position: "relative" }}>
+                <ResumeTemplate facts={draft.facts} templateId={draft.templateId} />
+                {passActive ? null : <PreviewWatermark />}
+              </div>
             </div>
+            <ResumePass
+              accessToken={accessToken ?? ""}
+              facts={draft.facts}
+              templateId={draft.templateId}
+              printAreaId={PRINT_AREA_ID}
+              onActiveChange={setPassActive}
+            />
+            <style>{PRINT_CSS}</style>
           </div>
         </div>
       </div>

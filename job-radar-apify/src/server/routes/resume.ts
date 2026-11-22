@@ -185,6 +185,21 @@ export async function handleResumeRoute(
       return json(res, 200, result);
     }
 
+    // Passes, checkout and the clean DOCX (R4, doc 06 §7) -----------------
+    if (route === "/pass" || route === "/checkout" || route === "/checkout/confirm" || route === "/download/docx") {
+      if (route !== "/pass" && !checkRateLimit(`resume-pay${route}:${userId}`, PAY_LIMIT, WRITE_WINDOW_MS, "resume-pay")) {
+        return json(res, 429, { error: "Muchas solicitudes seguidas. Intenta en unos minutos." }, { "Retry-After": "600" });
+      }
+      const pass = await import("./resume-pass.js");
+      const requireConsent = async (): Promise<boolean> => {
+        if (consentStatus(await getConsentState(userId)).required) return true;
+        json(res, 403, { error: "Primero acepta la autorización y los términos.", code: "consent_required" });
+        return false;
+      };
+      const readLimited = () => readBody(req, res, route === "/download/docx" ? RESUME_BODY_MAX_BYTES + 1024 : 4096);
+      return pass.handleResumePass(res, route, method, userId, readLimited, requireConsent, json);
+    }
+
     // AI (R3): CV → JSON and the card agent (doc 11 §5.2) ------------------
     if (route === "/extract" || route === "/tailor/start" || route === "/tailor/card") {
       if (method !== "POST") return json(res, 405, { error: "Método no permitido" });
@@ -362,6 +377,7 @@ const AI_CARD_LIMIT = 80;
 // CV facts (≤ 64 KB) + vacancy text (≤ 20.000 chars) + the card's own fields.
 const AI_BODY_MAX_BYTES = 160 * 1024;
 const JOB_LINK_LIMIT = 30;
+const PAY_LIMIT = 20;
 
 const UUID_IN_PATH = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
 

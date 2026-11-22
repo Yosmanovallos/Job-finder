@@ -1620,8 +1620,11 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
           res.end(JSON.stringify({ error: "Firma inválida" }));
           return;
         }
+        // H2 (doc 08): an amount that differs from the stored one unlocks
+        // nothing. 200 on purpose: the event will never become valid, so
+        // Wompi should not keep retrying it.
         res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ status: "ok" }));
+        res.end(JSON.stringify({ status: result.outcome === "amount_mismatch" ? "ignored" : "ok" }));
       } catch (e) {
         respondToUnexpectedError(res, e, "POST /api/webhooks/wompi", "Payload inválido.");
       }
