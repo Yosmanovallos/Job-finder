@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { Link } from "react-router-dom";
 import { ResumeTemplate } from "./ResumeTemplate.js";
 import type { ResumeFacts, ResumeTemplateId } from "../../lib/resume-studio.js";
 import { applyBullet, applyHeadline, applySkills, applySummary, MAX_CHAT_TURNS, type Card } from "../../lib/resume-tailor/cards.js";
@@ -19,6 +20,8 @@ export interface TailorJob {
   title: string;
   company: string | null;
   description: string;
+  /** Public link of the vacancy (R4b: the card in «Mis postulaciones»). */
+  url?: string | null;
 }
 
 interface StartResponse {
@@ -97,7 +100,8 @@ export function TailorAgent({
   templateId,
   job,
   onUse,
-  onClose
+  onClose,
+  tracker
 }: {
   accessToken: string;
   baseFacts: ResumeFacts;
@@ -105,6 +109,8 @@ export function TailorAgent({
   job: TailorJob;
   onUse: (facts: ResumeFacts) => void;
   onClose: () => void;
+  /** R4b: «Guardar en Mis postulaciones». canSave = «guardar en mi cuenta». */
+  tracker?: { canSave: boolean; resumeRef: { id: string; versionNo: number } | null };
 }) {
   const [start, setStart] = useState<StartResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -287,6 +293,21 @@ export function TailorAgent({
                     <button className={button} onClick={onClose}>Descartar adaptación</button>
                   </div>
                   <p className="text-xs text-muted-foreground">Tu hoja de vida base guardada no cambia hasta que guardes en el editor.</p>
+                  {tracker ? (
+                    <SaveToTracker
+                      canSave={tracker.canSave}
+                      post={post}
+                      body={{
+                        job: { title: job.title, company: job.company, url: job.url ?? null },
+                        adaptationId: start.adaptationId,
+                        resumeId: tracker.resumeRef?.id ?? null,
+                        resumeVersionNo: tracker.resumeRef?.versionNo ?? null,
+                        scoreBefore: initial,
+                        scoreAfter: score.compatibility.total,
+                        facts
+                      }}
+                    />
+                  ) : null}
                 </div>
               ) : (
                 <div className="flex justify-end">
@@ -309,6 +330,57 @@ export function TailorAgent({
           </div>
         </section>
       </div>
+    </div>
+  );
+}
+
+// R4b: the adapted CV goes to the board with its scores. Free; it needs
+// only «guardar en mi cuenta» (nothing stays on the server without it).
+function SaveToTracker({
+  canSave,
+  post,
+  body
+}: {
+  canSave: boolean;
+  post: (path: string, body: unknown) => Promise<{ res: Response; data: any }>;
+  body: Record<string, unknown>;
+}) {
+  const [state, setState] = useState<"idle" | "busy" | "saved">("idle");
+  const [error, setError] = useState<string | null>(null);
+  if (!canSave) {
+    return (
+      <p className="text-xs text-muted-foreground">
+        Para guardarla en Mis postulaciones activa «Guardar mi hoja de vida en mi cuenta» en Autorización.
+      </p>
+    );
+  }
+  const save = async () => {
+    setState("busy");
+    setError(null);
+    try {
+      const { res, data } = await post("/applications", body);
+      if (!res.ok) {
+        setState("idle");
+        return setError(data?.error ?? "No pudimos guardarla.");
+      }
+      setState("saved");
+    } catch {
+      setState("idle");
+      setError("No pudimos guardarla.");
+    }
+  };
+  return (
+    <div className="flex flex-wrap items-center gap-2" aria-live="polite">
+      {state === "saved" ? (
+        <p className="text-sm font-semibold text-green-deep">
+          ✓ Guardada en <Link className="underline" to="/hoja-de-vida/postulaciones">Mis postulaciones</Link>.
+        </p>
+      ) : (
+        <button className={button} onClick={() => void save()} disabled={state === "busy"}>
+          Guardar en Mis postulaciones
+        </button>
+      )}
+      {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
     </div>
   );
 }

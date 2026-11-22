@@ -115,11 +115,17 @@ export async function handleResumeRoute(
   if (!session) return json(res, 401, { error: "Inicia sesión para usar tu hoja de vida." });
   const userId = session.id;
   const isWrite = method !== "GET" && method !== "HEAD";
-  if (isWrite && !checkRateLimit(`resume:${userId}`, WRITE_LIMIT, WRITE_WINDOW_MS, "resume-write")) {
+  const route = pathname.slice("/api/resume".length) || "/";
+  // «Mis postulaciones» (R4b) has its own, larger bucket: moving cards on the
+  // board must not eat the editor's save budget.
+  const isApplications = route === "/applications" || route.startsWith("/applications/");
+  if (isWrite && !isApplications && !checkRateLimit(`resume:${userId}`, WRITE_LIMIT, WRITE_WINDOW_MS, "resume-write")) {
+    return json(res, 429, { error: "Demasiados cambios seguidos. Intenta en unos minutos." }, { "Retry-After": "600" });
+  }
+  if (isWrite && isApplications && !checkRateLimit(`resume-applications:${userId}`, APPLICATIONS_LIMIT, WRITE_WINDOW_MS, "resume-applications")) {
     return json(res, 429, { error: "Demasiados cambios seguidos. Intenta en unos minutos." }, { "Retry-After": "600" });
   }
 
-  const route = pathname.slice("/api/resume".length) || "/";
   try {
     // CV file → plain text (R2, doc 06 §5). Nothing is stored: the file
     // lives in memory for this request and only its text goes back.
@@ -215,6 +221,24 @@ export async function handleResumeRoute(
       }
       const ai = await import("./resume-ai.js");
       return ai.handleResumeAi(res, route, userId, body.value, json);
+    }
+
+    // «Mis postulaciones» (R4b, doc 11 §5.1): free, no pass ---------------
+    if (isApplications) {
+      const applications = await import("./resume-applications.js");
+      const requireStorageConsent = async (): Promise<boolean> => {
+        const status = consentStatus(await getConsentState(userId));
+        if (!status.required) {
+          json(res, 403, { error: "Primero acepta la autorización y los términos.", code: "consent_required" });
+          return false;
+        }
+        if (!status.storage) {
+          json(res, 403, { error: "Activa «Guardar mi hoja de vida en mi cuenta» para guardar tus postulaciones.", code: "storage_consent_required" });
+          return false;
+        }
+        return true;
+      };
+      return applications.handleResumeApplications(res, route, method, userId, () => readBody(req, res), requireStorageConsent, json);
     }
 
     // Consent ------------------------------------------------------------
@@ -378,6 +402,7 @@ const AI_CARD_LIMIT = 80;
 const AI_BODY_MAX_BYTES = 160 * 1024;
 const JOB_LINK_LIMIT = 30;
 const PAY_LIMIT = 20;
+const APPLICATIONS_LIMIT = 120;
 
 const UUID_IN_PATH = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
 

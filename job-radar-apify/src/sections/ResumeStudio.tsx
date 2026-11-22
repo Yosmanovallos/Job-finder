@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Download, History, Plus, Save, ShieldCheck, ShieldOff, Trash2, Undo2, X } from "lucide-react";
 import { useAuth } from "../auth/auth-provider.js";
 import { ResumeTemplate } from "../components/resume/ResumeTemplate.js";
 import { TailorAgent, type TailorJob } from "../components/resume/TailorAgent.js";
 import { ResumePass } from "../components/resume/ResumePass.js";
+import { ApplicationsBoard } from "../components/resume/ApplicationsBoard.js";
 import {
   RESUME_POLICY_VERSION,
   RESUME_TEMPLATES,
@@ -23,7 +24,9 @@ import {
 // (or paste). R3 adds the AI: «Llenar los campos» (CV text → facts with
 // verified source spans) and the card agent that adapts the CV to the
 // vacancy (TailorAgent). R4 adds the pass screen (ResumePass): one-time
-// Wompi passes, clean PDF/DOCX, watermark on the free preview. Signed-in
+// Wompi passes, clean PDF/DOCX, watermark on the free preview. R4b adds
+// «Mis postulaciones» (/hoja-de-vida/postulaciones, ApplicationsBoard): a
+// free tracker with the adapted CV per vacancy. Signed-in
 // only (RequireAuth in App).
 // The server answers 404 for all of this while RESUME_STUDIO_ENABLED is off.
 
@@ -166,10 +169,13 @@ export default function ResumeStudio() {
   const [mobileTab, setMobileTab] = useState<"edit" | "preview">("edit");
   const [passActive, setPassActive] = useState(false);
   const [tailorJob, setTailorJob] = useState<TailorJob | null>(null);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const onBoard = location.pathname.replace(/\/+$/, "") === "/hoja-de-vida/postulaciones";
 
   useEffect(() => {
-    document.title = "Mi hoja de vida | BuscoTrabajo";
-  }, []);
+    if (!onBoard) document.title = "Mi hoja de vida | BuscoTrabajo";
+  }, [onBoard]);
 
   const api = useCallback(
     async (path: string, init: RequestInit = {}) => {
@@ -318,7 +324,7 @@ export default function ResumeStudio() {
   };
 
   const deleteAll = async () => {
-    if (!window.confirm("Se borrarán tu hoja de vida y todas sus versiones. No se puede deshacer. ¿Continuar?")) return;
+    if (!window.confirm("Se borrarán tu hoja de vida, todas sus versiones y tus postulaciones. No se puede deshacer. ¿Continuar?")) return;
     setBusy(true);
     try {
       const { res, data } = await api("/data", { method: "DELETE" });
@@ -328,7 +334,7 @@ export default function ResumeStudio() {
       setVersions(null);
       setDraft(emptyDraft());
       setDirty(false);
-      setMessage({ kind: "ok", text: "Borramos tu hoja de vida y sus versiones." });
+      setMessage({ kind: "ok", text: "Borramos tu hoja de vida, sus versiones y tus postulaciones." });
     } finally {
       setBusy(false);
     }
@@ -337,7 +343,7 @@ export default function ResumeStudio() {
   const revoke = async () => {
     if (
       !window.confirm(
-        "Vas a revocar tu autorización: borraremos la hoja de vida guardada en tu cuenta y la copia de este navegador. ¿Continuar?"
+        "Vas a revocar tu autorización: borraremos la hoja de vida guardada en tu cuenta, tus postulaciones y la copia de este navegador. ¿Continuar?"
       )
     )
       return;
@@ -380,6 +386,29 @@ export default function ResumeStudio() {
 
   const canSave = Boolean(consent?.storage);
 
+  if (onBoard) {
+    return (
+      <ApplicationsBoard
+        accessToken={accessToken ?? ""}
+        canSave={canSave}
+        onChangeConsent={() => setPhase("consent")}
+        onUseCv={(facts) => {
+          setDraft({ ...draft, facts });
+          setDirty(true);
+          setMobileTab("preview");
+          setMessage({ kind: "ok", text: "La versión adaptada quedó en el editor. Revísala y guárdala si te sirve; tu base guardada no ha cambiado." });
+          navigate("/hoja-de-vida");
+        }}
+        renderPreview={(facts) => (
+          <div style={{ position: "relative" }}>
+            <ResumeTemplate facts={facts} templateId={draft.templateId} />
+            <PreviewWatermark />
+          </div>
+        )}
+      />
+    );
+  }
+
   return (
     <div className="max-w-7xl mx-auto px-4 py-6 md:py-8">
       <div className="flex flex-wrap items-end justify-between gap-3 mb-4">
@@ -400,6 +429,9 @@ export default function ResumeStudio() {
           <button className={buttonClass} onClick={() => void openVersions()} disabled={!resume}>
             <History className="h-4 w-4" /> Versiones
           </button>
+          <Link to="/hoja-de-vida/postulaciones" className={buttonClass}>
+            Mis postulaciones
+          </Link>
           <button className={buttonClass} onClick={() => void exportAll()}>
             <Download className="h-4 w-4" /> Exportar JSON
           </button>
@@ -466,6 +498,7 @@ export default function ResumeStudio() {
             baseFacts={draft.facts}
             templateId={draft.templateId}
             job={tailorJob}
+            tracker={{ canSave, resumeRef: resume && !dirty ? { id: resume.id, versionNo: resume.versionNo } : null }}
             onClose={() => setTailorJob(null)}
             onUse={(facts) => {
               setDraft({ ...draft, facts });
@@ -501,7 +534,7 @@ export default function ResumeStudio() {
               setDirty(true);
             }}
           />
-          <JobLink accessToken={accessToken ?? ""} onTailor={(job) => setTailorJob(job)} />
+          <JobLink accessToken={accessToken ?? ""} canSave={canSave} onTailor={(job) => setTailorJob(job)} />
           <Editor draft={draft} setDraft={(next) => { setDraft(next); setDirty(true); }} update={update} />
         </div>
         <div className={mobileTab === "preview" ? "" : "hidden md:block"}>
@@ -947,7 +980,7 @@ const PASTE_REASONS: Record<string, string> = {
   fetch_failed: "No pudimos abrir la página."
 };
 
-function JobLink({ accessToken, onTailor }: { accessToken: string; onTailor: (job: TailorJob) => void }) {
+function JobLink({ accessToken, canSave, onTailor }: { accessToken: string; canSave: boolean; onTailor: (job: TailorJob) => void }) {
   const [url, setUrl] = useState("");
   const [paste, setPaste] = useState<{ reason: string; url: string } | null>(null);
   const [title, setTitle] = useState("");
@@ -956,6 +989,10 @@ function JobLink({ accessToken, onTailor }: { accessToken: string; onTailor: (jo
   const [snapshot, setSnapshot] = useState<JobSnapshotView | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // R4b: after opening the vacancy, «Marcar como postulé» (a status the
+  // user sets; nothing is sent to the employer).
+  const [opened, setOpened] = useState(false);
+  const [marked, setMarked] = useState<"idle" | "busy" | "done">("idle");
 
   const post = async (path: string, body: unknown) => {
     const res = await fetch(`/api/resume${path}`, {
@@ -971,6 +1008,8 @@ function JobLink({ accessToken, onTailor }: { accessToken: string; onTailor: (jo
     setError(null);
     setSnapshot(null);
     setPaste(null);
+    setOpened(false);
+    setMarked("idle");
     try {
       const { res, data } = await post("/job-link", { url });
       if (!res.ok) return setError(data?.error ?? "No pudimos revisar ese link.");
@@ -995,6 +1034,26 @@ function JobLink({ accessToken, onTailor }: { accessToken: string; onTailor: (jo
       setError("No pudimos usar esa descripción.");
     } finally {
       setBusy(false);
+    }
+  };
+
+  const markApplied = async () => {
+    if (!snapshot?.sourceUrl) return;
+    setMarked("busy");
+    setError(null);
+    try {
+      const { res, data } = await post("/applications", {
+        job: { title: snapshot.title, company: snapshot.company, url: snapshot.sourceUrl },
+        status: "applied"
+      });
+      if (!res.ok) {
+        setMarked("idle");
+        return setError(data?.error ?? "No pudimos guardar la postulación.");
+      }
+      setMarked("done");
+    } catch {
+      setMarked("idle");
+      setError("No pudimos guardar la postulación.");
     }
   };
 
@@ -1040,15 +1099,36 @@ function JobLink({ accessToken, onTailor }: { accessToken: string; onTailor: (jo
             {snapshot.description.length > 400 ? "…" : ""}
           </p>
           <div className="flex flex-wrap gap-3 items-center">
-            <button className={primaryButtonClass} onClick={() => onTailor({ title: snapshot.title, company: snapshot.company, description: snapshot.description })}>
+            <button
+              className={primaryButtonClass}
+              onClick={() => onTailor({ title: snapshot.title, company: snapshot.company, description: snapshot.description, url: snapshot.sourceUrl })}
+            >
               Adaptar mi hoja de vida a esta vacante
             </button>
             {snapshot.sourceUrl && (
-              <a className="underline text-primary" href={snapshot.sourceUrl} target="_blank" rel="noopener noreferrer nofollow">
+              <a className="underline text-primary" href={snapshot.sourceUrl} target="_blank" rel="noopener noreferrer nofollow" onClick={() => setOpened(true)}>
                 Ir a la vacante
               </a>
             )}
           </div>
+          {opened && snapshot.sourceUrl ? (
+            <div className="flex flex-wrap gap-2 items-center text-sm" aria-live="polite">
+              {marked === "done" ? (
+                <span className="font-semibold text-green-deep">
+                  ✓ Marcada como «Postulé» en <Link className="underline" to="/hoja-de-vida/postulaciones">Mis postulaciones</Link>.
+                </span>
+              ) : canSave ? (
+                <>
+                  <span className="text-muted-foreground">¿Te postulaste?</span>
+                  <button className={buttonClass} disabled={marked === "busy"} onClick={() => void markApplied()}>
+                    Marcar como postulé
+                  </button>
+                </>
+              ) : (
+                <span className="text-xs text-muted-foreground">Activa «Guardar mi hoja de vida en mi cuenta» para llevar tus postulaciones.</span>
+              )}
+            </div>
+          ) : null}
         </div>
       )}
       {error && <p className="text-sm text-destructive">{error}</p>}

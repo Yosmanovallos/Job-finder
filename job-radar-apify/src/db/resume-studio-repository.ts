@@ -8,6 +8,7 @@ import {
   type ResumeInput,
   type ResumeTemplateId
 } from "../lib/resume-studio.js";
+import type { Application } from "../lib/resume-applications.js";
 
 // AI Resume Studio R1 (schema.sql's resume-studio block, ADR 0017).
 // Every function takes the user id that verifySession resolved from the JWT
@@ -163,6 +164,8 @@ export async function recordConsents(
       if (!deleteStoredData) return { deletedResumes: 0 };
       const deleted = await client.query(`DELETE FROM rs_resumes WHERE user_id = $1`, [userId]);
       await client.query(`DELETE FROM rs_resume_versions WHERE user_id = $1`, [userId]);
+      // R4b: «Mis postulaciones» is stored data too (and may hold an adapted CV).
+      await client.query(`DELETE FROM rs_applications WHERE user_id = $1`, [userId]);
       return { deletedResumes: deleted.rowCount ?? 0 };
     });
   } catch (error) {
@@ -373,16 +376,19 @@ export async function deleteResume(userId: string, resumeId: string): Promise<bo
 }
 
 /**
- * «Borrar todo» (doc 07 rights; doc 09 T-DEL): removes every resume and
- * version of the user. Consent records stay — they are the proof of what
+ * «Borrar todo» (doc 07 rights; doc 09 T-DEL): removes every resume,
+ * version and «Mis postulaciones» card of the user. Consent records stay — they are the proof of what
  * was authorized and when (insert-only by design).
  */
-export async function deleteAllResumeData(userId: string): Promise<{ resumes: number }> {
+export async function deleteAllResumeData(userId: string): Promise<{ resumes: number; applications: number }> {
   try {
-    const result = await pool.query(`DELETE FROM rs_resumes WHERE user_id = $1`, [userId]);
-    // Versions cascade with their resume; this also clears any orphan.
-    await pool.query(`DELETE FROM rs_resume_versions WHERE user_id = $1`, [userId]);
-    return { resumes: result.rowCount ?? 0 };
+    return await inTransaction(async (client) => {
+      const result = await client.query(`DELETE FROM rs_resumes WHERE user_id = $1`, [userId]);
+      // Versions cascade with their resume; this also clears any orphan.
+      await client.query(`DELETE FROM rs_resume_versions WHERE user_id = $1`, [userId]);
+      const applications = await client.query(`DELETE FROM rs_applications WHERE user_id = $1`, [userId]);
+      return { resumes: result.rowCount ?? 0, applications: applications.rowCount ?? 0 };
+    });
   } catch (error) {
     rethrow(error);
   }
@@ -393,6 +399,7 @@ export interface ResumeExport {
   policyVersion: string;
   resumes: (Resume & { versions: (ResumeVersionSummary & { facts: ResumeFacts })[] })[];
   consents: { purpose: string; policyVersion: string; granted: boolean; createdAt: string }[];
+  applications: Application[];
 }
 
 /** Everything stored about this user in the module (derecho de acceso). */
@@ -421,6 +428,8 @@ export async function exportResumeData(userId: string): Promise<ResumeExport> {
       `SELECT purpose, policy_version, granted, created_at FROM rs_consents WHERE user_id = $1 ORDER BY created_at, id`,
       [userId]
     );
+    const { exportApplications } = await import("./resume-studio-application-repository.js");
+    const fullApplications = await exportApplications(userId);
     return {
       exportedAt: new Date().toISOString(),
       policyVersion: RESUME_POLICY_VERSION,
@@ -443,7 +452,8 @@ export async function exportResumeData(userId: string): Promise<ResumeExport> {
         policyVersion: c.policy_version,
         granted: c.granted,
         createdAt: iso(c.created_at)
-      }))
+      })),
+      applications: fullApplications
     };
   } catch (error) {
     rethrow(error);

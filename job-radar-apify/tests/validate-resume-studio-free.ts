@@ -112,7 +112,9 @@ async function main() {
     ["/hoja-de-vida"],
     ["/hoja-de-vida/editar"],
     ["/api/resume/consent", "application/json"],
-    ["/api/resume/resumes", "application/json"]
+    ["/api/resume/resumes", "application/json"],
+    ["/hoja-de-vida/postulaciones"],
+    ["/api/resume/applications", "application/json"]
   ];
 
   const results: Record<string, Record<string, Snapshot>> = {};
@@ -156,6 +158,8 @@ async function main() {
 
   assert.equal(results.on["/api/resume/consent"].status, 401, "encendida, la API exige sesión");
   assert.equal(results.on["/api/resume/resumes"].status, 401);
+  assert.equal(results.on["/api/resume/applications"].status, 401, "R4b: postulaciones también piden sesión");
+  assert.notEqual(results.on["/hoja-de-vida/postulaciones"].status, 404, "R4b: el tablero existe con la bandera encendida");
   assert.notEqual(results.on["/hoja-de-vida"].status, 404, "encendida, la página existe");
   console.log("✅ [PASSED] Bandera encendida: la API pide sesión (401) y la página existe.");
   console.log("\nT-FREE: OK.");

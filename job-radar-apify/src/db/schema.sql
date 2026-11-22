@@ -1225,8 +1225,42 @@ CREATE TABLE IF NOT EXISTS rs_adaptation_quota (
     PRIMARY KEY (bucket, period_start)
 );
 
+-- rs_applications (R4b, doc 11 §5.1): «Mis postulaciones». Cada fila es una
+-- vacante que el usuario guardó, con su CV adaptado opcional y el estado que
+-- ÉL pone (nunca se postula ni se contacta a nadie). La vacante se copia
+-- (la caché de snapshots es compartida y vence); adaptation_id y resume_id
+-- son referencias sin FK para que anonimizar el ledger o borrar la base no
+-- rompa el tracker. «Borrar todo», «revocar» y quitar «guardar en mi
+-- cuenta» borran estas filas. adapted_facts_json: mismo pendiente de
+-- cifrado que rs_resumes.facts_json antes de R5.
+CREATE TABLE IF NOT EXISTS rs_applications (
+    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id             UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    job_title           VARCHAR(200) NOT NULL CHECK (length(btrim(job_title)) > 0),
+    job_company         VARCHAR(200),
+    job_url             VARCHAR(2000) CHECK (job_url IS NULL OR job_url ~* '^https?://'),
+    job_url_key         CHAR(64) CHECK (job_url_key IS NULL OR job_url_key ~ '^[0-9a-f]{64}$'),
+    adaptation_id       UUID,
+    resume_id           UUID,
+    resume_version_no   INTEGER CHECK (resume_version_no IS NULL OR resume_version_no >= 1),
+    adapted_facts_json  JSONB,
+    score_before        SMALLINT CHECK (score_before IS NULL OR score_before BETWEEN 0 AND 100),
+    score_after         SMALLINT CHECK (score_after IS NULL OR score_after BETWEEN 0 AND 100),
+    status              VARCHAR(12) NOT NULL DEFAULT 'saved'
+                        CHECK (status IN ('saved', 'applied', 'interview', 'offer', 'discarded')),
+    note                VARCHAR(280) NOT NULL DEFAULT '',
+    applied_at          TIMESTAMPTZ,
+    status_changed_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_rs_applications_user ON rs_applications (user_id, updated_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS rs_applications_one_per_job
+    ON rs_applications (user_id, job_url_key) WHERE job_url_key IS NOT NULL;
+
 -- Mismo blindaje que el resto: solo el servidor (rol postgres) lee y
 -- escribe; la anon key pública no ve nada.
+ALTER TABLE rs_applications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE rs_entitlements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE rs_adaptation_quota ENABLE ROW LEVEL SECURITY;
 ALTER TABLE rs_ai_usage ENABLE ROW LEVEL SECURITY;
@@ -1238,7 +1272,7 @@ DO $revoke$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon')
      AND EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
-    REVOKE ALL ON rs_consents, rs_resumes, rs_resume_versions, rs_job_snapshot_cache, rs_ai_usage, rs_entitlements, rs_adaptation_quota FROM anon, authenticated;
+    REVOKE ALL ON rs_consents, rs_resumes, rs_resume_versions, rs_job_snapshot_cache, rs_ai_usage, rs_entitlements, rs_adaptation_quota, rs_applications FROM anon, authenticated;
     REVOKE ALL ON SEQUENCE rs_ai_usage_id_seq FROM anon, authenticated;
     REVOKE ALL ON FUNCTION rs_consents_insert_only() FROM anon, authenticated;
   END IF;
