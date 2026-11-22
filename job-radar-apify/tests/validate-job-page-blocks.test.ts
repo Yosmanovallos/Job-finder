@@ -15,7 +15,16 @@ import {
   type CompanyJobsSnapshot
 } from "../src/lib/job-company-links.js";
 import { companyKey } from "../src/lib/company-key.js";
-import { boardJob, officialJob } from "./fixtures/job-page-blocks.js";
+import { FIXTURE_NOW, boardJob, officialJob } from "./fixtures/job-page-blocks.js";
+
+// buildJobPosting() reads the wall clock (job-freshness.ts); freeze it at
+// FIXTURE_NOW so the fixed-date fixtures never age out of the 30-day window.
+test.beforeEach(() => {
+  test.mock.timers.enable({ apis: ["Date"], now: FIXTURE_NOW });
+});
+test.afterEach(() => {
+  test.mock.timers.reset();
+});
 
 const sha = (value: string) => createHash("sha256").update(value).digest("hex");
 const descriptionSection = (html: string) => /<section data-job-description>[\s\S]*?<\/section>/.exec(html)?.[0] ?? "";
@@ -38,6 +47,11 @@ const BASELINE = {
     posting: "2347db29538edc10b6a56c3e750523257809c0e01934fd468e1449786735398d"
   }
 };
+
+test("JPD-000 the clock is frozen at FIXTURE_NOW, so the fixtures still emit JobPosting", () => {
+  assert.equal(Date.now(), FIXTURE_NOW.getTime());
+  for (const job of [boardJob, officialJob]) assert.ok(buildJobPosting(job), `${job.jobId}: JobPosting`);
+});
 
 test("JPD-001 description section and JobPosting are byte-identical to origin/main", () => {
   for (const job of [boardJob, officialJob]) {

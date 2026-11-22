@@ -1,0 +1,9 @@
+{
+  "name": "@napi-rs/canvas",
+  "version": "0.0.0-stub",
+  "description": "Empty stand-in for pdfjs-dist's optional native canvas (owner decision 2026-11-21: no native binaries, doc 06 §5). Requiring it throws, exactly as if it were not installed; pdf.js only needs it to draw, never to extract text.",
+  "private": true,
+  "license": "UNLICENSED",
+  "main": "index.js",
+  "files": ["index.js"]
+}

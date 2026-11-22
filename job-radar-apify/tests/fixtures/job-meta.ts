@@ -3,9 +3,9 @@
  * docs/GOOGLE-JOBS-INDEXING-PLAN-2026-11.md). Synthetic data only.
  */
 import type { SeoJob } from "../../src/lib/job-seo.js";
-import { boardJob, officialJob } from "./job-page-blocks.js";
+import { FIXTURE_NOW, boardJob, officialJob } from "./job-page-blocks.js";
 
-export { boardJob, officialJob };
+export { FIXTURE_NOW, boardJob, officialJob };
 
 /** Full vacancy: city, company, employment type, a description that opens with headers. */
 export const fullJob: SeoJob = {

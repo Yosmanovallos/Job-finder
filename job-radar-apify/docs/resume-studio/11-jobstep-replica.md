@@ -355,6 +355,10 @@ Referencias de conversión [3º RevenueCat 2026, apps móviles, no web]:
 | **R4b** | «Mis postulaciones» (tracker) | Flujo completo vacante → CV → postulé → entrevista |
 | **R5** | Un solo merge aprobado | — |
 
+> **R1 cerrada con alcance ajustado (2026-11-21):** CV base creado y editado a mano, sin subida ni extracción. Subir PDF/DOCX, extraer con `source_span` y T-FILE pasan a un cambio posterior (antes de R3); D6 sigue abierta. Ver [`openspec/changes/archive/resume-studio-r1/`](../../openspec/changes/archive/resume-studio-r1/proposal.md).
+
+> **R2 cerrada (2026-11-21):** subida PDF/DOCX → texto (T-FILE-1..8) y resolver de links (§5.3) con controles SSRF, `JobSnapshot` y caché de 24 h. Muestra de 30 links reales: **63,3 % sin LLM** en el peor caso (62,1 % sin el único link leído por la API de SmartRecruiters, que ahora va por la web; Elempleo 8/8, Magneto 6/6, portales oficiales 5/8, Computrabajo 0/8 registrado como muro de login). Ver [`openspec/changes/archive/resume-studio-r2/`](../../openspec/changes/archive/resume-studio-r2/validation.md).
+
 Decidido el 2026-11-21: **pases sin renovación automática**; se empieza R0.
 Pendiente del propietario: capturas del precio de la prueba de JobStep
 (las consigue él). Decisiones abiertas: D2 precio final (propuesta

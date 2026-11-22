@@ -1,10 +1,7 @@
-import crypto from "crypto";
 import dotenv from "dotenv";
-import {
-  markTransactionApproved,
-  upgradeUserToPro,
-  upgradeUserToProMax
-} from "../db/job-repository.js";
+import { upgradeUserToPro, upgradeUserToProMax } from "../db/job-repository.js";
+import { approveWompiTransaction } from "./approve.js";
+import { verifyWompiChecksum } from "./wompi-signature.js";
 
 dotenv.config();
 
@@ -22,6 +19,7 @@ export interface WompiEventPayload {
       status: string;
       reference: string;
       amount_in_cents: number;
+      currency?: string;
     };
   };
   signature: {
@@ -32,59 +30,74 @@ export interface WompiEventPayload {
   environment: string;
 }
 
-function getNestedValue(obj: unknown, path: string): string {
-  return (
-    (path
-      .split(".")
-      .reduce<unknown>((acc, key) => (acc == null ? acc : (acc as Record<string, unknown>)[key]), obj) as
-      | { toString(): string }
-      | null
-      | undefined)
-      ?.toString() ?? ""
-  );
-}
-
 /**
  * Verifies a Wompi webhook checksum: SHA256 of the `signature.properties`
  * values (concatenated, in order) + the event timestamp + the events secret,
- * per Wompi's event verification spec. A payload that fails this is never
- * trusted, no matter what it claims.
+ * per Wompi's event verification spec. Constant-time comparison (doc 08 H1).
+ * A payload that fails this is never trusted, no matter what it claims.
  */
 export function verifyWompiSignature(payload: WompiEventPayload): boolean {
-  if (!payload?.signature?.properties?.length || !payload.signature.checksum) return false;
-
-  const concatenated = payload.signature.properties
-    .map((prop) => getNestedValue(payload.data, prop))
-    .join("");
-  const raw = `${concatenated}${payload.timestamp}${WOMPI_EVENTS_SECRET}`;
-  const expected = crypto.createHash("sha256").update(raw).digest("hex");
-
-  return expected === payload.signature.checksum;
+  return verifyWompiChecksum(payload, WOMPI_EVENTS_SECRET);
 }
 
 const PRO_SUBSCRIPTION_DAYS = 30;
+const CLOSED_STATUSES = new Set(["DECLINED", "VOIDED", "ERROR"]);
+
+export type WebhookOutcome = "invalid_signature" | "ignored" | "closed" | "approved" | "already_approved" | "unknown_reference" | "amount_mismatch";
 
 /**
  * Handles a Wompi webhook event: verifies the signature, and on an APPROVED
- * transaction marks it approved idempotently (a retry that already succeeded
- * is a no-op) and upgrades the paying user to 'pro' for 30 days.
+ * transaction approves it through `approveWompiTransaction` (amount check,
+ * idempotent, one DB transaction), then branches by PRODUCT:
+ * - `subscription` (every row before R4): upgrades the paying user to the
+ *   plan stored on the row for 30 days, exactly as before;
+ * - `resume_pass` (AI Resume Studio R4): the pass was created inside the
+ *   approval transaction; the subscription tier is never touched.
  */
 export async function handleWompiWebhook(
   payload: WompiEventPayload
-): Promise<{ verified: boolean }> {
+): Promise<{ verified: boolean; outcome: WebhookOutcome }> {
   if (!verifyWompiSignature(payload)) {
     console.warn("[WompiWebhook] Firma inválida — evento rechazado.");
-    return { verified: false };
+    return { verified: false, outcome: "invalid_signature" };
   }
 
   const transaction = payload.data?.transaction;
-  if (!transaction || transaction.status !== "APPROVED") {
-    return { verified: true };
+  if (!transaction || typeof transaction.reference !== "string") {
+    return { verified: true, outcome: "ignored" };
   }
 
-  const result = await markTransactionApproved(transaction.reference, transaction.id);
-  if (!result) {
-    return { verified: true }; // Already processed or unknown reference — idempotent no-op.
+  if (transaction.status !== "APPROVED") {
+    // Only pass rows record the rejection (so the pass screen can say so);
+    // subscription rows stay as before: a non-approved event is a no-op.
+    if (CLOSED_STATUSES.has(transaction.status) && transaction.reference.startsWith("rs_pass_")) {
+      const { markResumePassClosed } = await import("../db/resume-studio-pass-repository.js");
+      await markResumePassClosed(transaction.reference, transaction.status);
+      return { verified: true, outcome: "closed" };
+    }
+    return { verified: true, outcome: "ignored" };
+  }
+
+  const result = await approveWompiTransaction({
+    reference: transaction.reference,
+    wompiTransactionId: String(transaction.id),
+    amountInCents: transaction.amount_in_cents,
+    currency: transaction.currency
+  });
+
+  if (result.outcome === "amount_mismatch") {
+    // H2: never unlock on an amount that is not the one we charged. No
+    // personal data in the log line.
+    console.warn("[WompiWebhook] Monto aprobado distinto del guardado — evento ignorado, nada se desbloquea.");
+    return { verified: true, outcome: result.outcome };
+  }
+  if (result.outcome !== "approved") {
+    return { verified: true, outcome: result.outcome }; // Already processed or unknown reference — idempotent no-op.
+  }
+
+  if (result.product === "resume_pass") {
+    console.log(`🎟️ [WompiWebhook] Pase ${result.plan} aprobado (referencia ${transaction.reference}).`);
+    return { verified: true, outcome: "approved" };
   }
 
   const until = new Date(Date.now() + PRO_SUBSCRIPTION_DAYS * 24 * 60 * 60 * 1000);
@@ -102,5 +115,5 @@ export async function handleWompiWebhook(
     `🎉 [WompiWebhook] Transacción ${transaction.reference} aprobada — usuario ${result.userId} promovido a ${result.plan} hasta ${until.toISOString()}.`
   );
 
-  return { verified: true };
+  return { verified: true, outcome: "approved" };
 }

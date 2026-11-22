@@ -2,19 +2,23 @@ import { createClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
 import type { IncomingMessage } from "http";
 import { getOrCreateUser } from "../db/job-repository.js";
+import { DEV_AUTH_USER, devAuthActive, devAuthAllowed, isDevToken, matchesDevToken } from "./dev-auth.js";
 
 dotenv.config();
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY;
 
-if (!supabaseUrl || !supabaseAnonKey) {
+// Missing Supabase settings still stop the server, except in the guarded
+// local dev-login mode (src/auth/dev-auth.ts), where only the fixed test
+// user can sign in and Supabase is never called.
+if ((!supabaseUrl || !supabaseAnonKey) && !devAuthActive()) {
   throw new Error(
     "[Auth] Faltan VITE_SUPABASE_URL o VITE_SUPABASE_ANON_KEY en job-radar-apify/.env"
   );
 }
 
-const supabaseServer = createClient(supabaseUrl, supabaseAnonKey);
+const supabaseServer = supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
 
 export interface VerifiedSession {
   id: string;
@@ -42,6 +46,24 @@ function extractBearerToken(req: IncomingMessage): string | null {
 export async function verifySession(req: IncomingMessage): Promise<VerifiedSession | null> {
   const token = extractBearerToken(req);
   if (!token) return null;
+
+  // Local dev login: never sent to Supabase. Valid only under every guard
+  // of dev-auth.ts (flag, loopback DB, non-production, Wompi sandbox,
+  // loopback request) and only with this process's own token.
+  if (isDevToken(token)) {
+    if (!devAuthAllowed(req) || !matchesDevToken(token)) return null;
+    const devUser = await getOrCreateUser(DEV_AUTH_USER.id, DEV_AUTH_USER.email, DEV_AUTH_USER.name);
+    return {
+      id: devUser.id,
+      email: devUser.email,
+      name: devUser.name,
+      tier: devUser.subscriptionTier,
+      subscriptionEnd: devUser.subscriptionEnd,
+      preferredRoles: devUser.preferredRoles,
+      authCreatedAt: null
+    };
+  }
+  if (!supabaseServer) return null;
 
   const { data, error } = await supabaseServer.auth.getUser(token);
   if (error || !data.user) return null;
