@@ -65,6 +65,7 @@
     "db:migrate-purged-lookup": "tsx scripts/migrate-purged-lookup.ts",
     "db:migrate-signup-attribution": "tsx scripts/migrate-signup-attribution.ts",
     "db:migrate-resume-studio": "tsx scripts/migrate-resume-studio.ts",
+    "dev:resume-studio": "tsx scripts/dev-resume-studio.ts",
     "test:resume-studio": "tsx scripts/run-isolated-tests.ts resume-studio",
     "report:signups": "tsx scripts/report-signup-attribution.ts",
     "direct:seed": "tsx scripts/seed-direct-employers.ts",

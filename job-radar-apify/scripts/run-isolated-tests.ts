@@ -88,7 +88,8 @@ const suites: Record<string, string[]> = {
     "validate-resume-studio-ai.test.ts",
     "validate-resume-studio-injection.test.ts",
     "validate-resume-studio-evals.test.ts",
-    "validate-resume-studio-pay.test.ts"
+    "validate-resume-studio-pay.test.ts",
+    "validate-resume-studio-dev-launcher.test.ts"
   ],
   integration: [
     "validate-isolated-database.ts",
@@ -149,6 +150,7 @@ const suites: Record<string, string[]> = {
     "validate-resume-studio-injection.test.ts",
     "validate-resume-studio-evals.test.ts",
     "validate-resume-studio-pay.test.ts",
+    "validate-resume-studio-dev-launcher.test.ts",
     "validate-resume-studio.ts",
     "validate-resume-studio-r2.ts",
     "validate-resume-studio-r3.ts",
