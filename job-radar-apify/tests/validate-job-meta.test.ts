@@ -29,6 +29,7 @@ import {
 } from "../src/lib/job-seo.js";
 import { ROUTE_META, companiesDirectoryMeta, dashboardDescription } from "../src/lib/page-meta.js";
 import {
+  FIXTURE_NOW,
   META_FIXTURES,
   bareJob,
   boardJob,
@@ -41,6 +42,15 @@ import {
   officialJob,
   remoteJob
 } from "./fixtures/job-meta.js";
+
+// buildJobPosting() reads the wall clock (job-freshness.ts); freeze it at
+// FIXTURE_NOW so the fixed-date fixtures never age out of the 30-day window.
+test.beforeEach(() => {
+  test.mock.timers.enable({ apis: ["Date"], now: FIXTURE_NOW });
+});
+test.afterEach(() => {
+  test.mock.timers.reset();
+});
 
 const sha = (value: unknown) =>
   createHash("sha256").update(typeof value === "string" ? value : JSON.stringify(value)).digest("hex");

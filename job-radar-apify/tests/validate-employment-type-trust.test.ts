@@ -14,7 +14,16 @@ import { trustedEmploymentType } from "../src/lib/employment-type-trust.js";
 import { extractJobPostingDetail } from "../src/lib/job-posting-jsonld.js";
 import { buildJobMetaDescription, buildJobPageBody, buildJobPagePayload, buildJobPosting, type SeoJob } from "../src/lib/job-seo.js";
 import { toPublicJob } from "../src/lib/public-jobs-api.js";
-import { boardJob } from "./fixtures/job-page-blocks.js";
+import { FIXTURE_NOW, boardJob } from "./fixtures/job-page-blocks.js";
+
+// buildJobPosting() reads the wall clock (job-freshness.ts); freeze it at
+// FIXTURE_NOW so the fixed-date fixtures never age out of the 30-day window.
+test.beforeEach(() => {
+  test.mock.timers.enable({ apis: ["Date"], now: FIXTURE_NOW });
+});
+test.afterEach(() => {
+  test.mock.timers.reset();
+});
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const fixture = (name: string) => fs.readFileSync(path.join(here, "fixtures", "detail", name), "utf8");
