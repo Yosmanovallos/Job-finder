@@ -111,6 +111,19 @@ export async function handleResumeRoute(
     return;
   }
 
+  // Local-only dev login (src/auth/dev-auth.ts). Outside its five guards
+  // both routes are the same 404 as any unknown path.
+  if (pathname === "/api/resume/dev-auth" || pathname === "/api/resume/dev-login") {
+    const { devAuthAllowed, issueDevToken, DEV_AUTH_USER } = await import("../../auth/dev-auth.js");
+    if (!devAuthAllowed(req)) return json(res, 404, { error: "No encontrado" });
+    if (pathname === "/api/resume/dev-auth") {
+      if (method !== "GET") return json(res, 405, { error: "Método no permitido" });
+      return json(res, 200, { active: true, userId: DEV_AUTH_USER.id, email: DEV_AUTH_USER.email });
+    }
+    if (method !== "POST") return json(res, 405, { error: "Método no permitido" });
+    return json(res, 200, { token: issueDevToken(), user: { id: DEV_AUTH_USER.id, email: DEV_AUTH_USER.email, name: DEV_AUTH_USER.name } });
+  }
+
   const session = await deps.getSession(req);
   if (!session) return json(res, 401, { error: "Inicia sesión para usar tu hoja de vida." });
   const userId = session.id;

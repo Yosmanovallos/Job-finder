@@ -46,3 +46,37 @@ página existe. Las 9 superficies de vacantes siguen idénticas.
   subir `RESUME_POLICY_VERSION`: decisión del propietario y del abogado
   (D4), no de esta fase.
 - `adapted_facts_json` hereda el pendiente de cifrado de R1 antes de R5.
+
+## Adenda (2026-11-22): login de desarrollo solo local
+
+Pedido de la sesión principal: el propietario no podía probar en local (sin
+cuenta de correo y contraseña; Google OAuth vuelve al dominio de producción).
+
+- `src/auth/dev-auth.ts`: usuario fijo `dev@localhost.test`
+  (`d0000000-0000-4000-8000-00000000de00`), solo en la base desechable.
+  Activo solo si se cumplen **todas** estas condiciones:
+  - `RESUME_STUDIO_DEV_AUTH=1`;
+  - `DATABASE_URL` es loopback;
+  - `NODE_ENV` no es `production`;
+  - `WOMPI_PUBLIC_KEY` empieza por `pub_test_`;
+  - la petición es loopback: socket local, `Host` localhost y sin `X-Forwarded-*`/`Forwarded`.
+
+  Si la variable está pero falla una condición, se ignora y se registra una vez. El token es aleatorio por proceso y se compara en tiempo constante.
+- `verifySession`: un token `rsdev_…` nunca va a Supabase. Sin `VITE_SUPABASE_*` el servidor arranca solo en ese modo.
+- `/api/resume/dev-auth` y `/api/resume/dev-login`: 404 fuera de las guardas.
+- UI: `/hoja-de-vida` se protege sola, igual que `RequireAuth`.
+  - El botón «Entrar como usuario de prueba (solo local)» existe solo en el build del lanzador (`__RS_DEV_LOGIN__`, `define` de Vite) y aparece solo si el servidor responde 200.
+  - El token vive en `sessionStorage`, así que sobrevive al retorno de Wompi.
+- `npm run dev:resume-studio`:
+  - pone las dos banderas;
+  - si `.env` no trae Supabase, usa marcadores que no apuntan a nada;
+  - rechaza `NODE_ENV=production`.
+- **Checkout:** `redirect-url` = `${window.location.origin}/hoja-de-vida?pase=retorno` (`ResumePass.tsx`), es decir, `http://localhost:<puerto>/…` en local.
+
+| Prueba | Resultado |
+|---|---|
+| `validate-resume-studio-dev-auth.test.ts` (unitaria) | ✅ guardas de proceso y de petición, token |
+| `validate-resume-studio-dev-launcher.test.ts` | ✅ banderas, marcadores de Supabase, `NODE_ENV` |
+| `validate-resume-studio-dev-auth.ts` (integración, `verifySession` real, sin Supabase) | ✅ build normal sin rastro del botón y build del lanzador con él; 7 guardas de proceso y 4 de petición → 401/404; tokens inventados 401; flujo completo: link → CV → tarjetas (IA mock) → checkout sandbox → confirmación → DOCX → postulación → Entrevista |
+| tsc, build (CSS `1d7ac096…c048`), `test:unit`, `test:integration`, `test:resume-studio` | ✅ |
+| Lanzador real (llaves sandbox sintéticas, Docker, :3100) | ✅ botón → autorización → tablero en 1024 px y 375 px; selector de estado mueve a «Oferta» y persiste; recargar conserva la sesión. **El pago real en el sandbox de Wompi no se probó** (requiere las llaves sandbox del propietario) |

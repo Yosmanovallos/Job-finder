@@ -208,9 +208,9 @@ function AppRoutes() {
       <Route
         path="/hoja-de-vida/*"
         element={
-          <RequireAuth>
-            <ResumeStudio />
-          </RequireAuth>
+          // ResumeStudio gates itself exactly like RequireAuth (spinner, then
+          // /login), plus the local-only dev login of the launcher's build.
+          <ResumeStudio />
         }
       />
     </Routes>

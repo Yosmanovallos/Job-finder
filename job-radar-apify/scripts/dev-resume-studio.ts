@@ -26,10 +26,13 @@
  *   RESUME_STUDIO_PAYMENTS_LIVE is set.
  * - Never prints a secret: only flags, key prefixes and the local port.
  *
- * Supabase Auth stays the REAL project (VITE_SUPABASE_URL/ANON_KEY): the
- * browser signs in against it and the server only calls auth.getUser
- * (read). The app row for that user (`users`), CVs, transactions and passes
- * are written to the disposable database, never to production tables.
+ * Sign-in: the button «Entrar como usuario de prueba (solo local)» on
+ * /hoja-de-vida (RESUME_STUDIO_DEV_AUTH, src/auth/dev-auth.ts) logs in a
+ * fixed user (dev@localhost.test) that only exists in the disposable
+ * database; Supabase is never called for it. If .env has the real
+ * VITE_SUPABASE_URL/ANON_KEY, Google/email login keeps working as before
+ * (read-only auth.getUser); without them, placeholders that point nowhere
+ * are used. Every app row is written to the disposable database only.
  */
 import { execFileSync, spawn, type ChildProcess } from "node:child_process";
 import { randomBytes } from "node:crypto";
@@ -104,6 +107,17 @@ export function buildChildEnv(dotenvValues: Record<string, string>, parent: Node
   env.PORT = port;
   env.NODE_ENV = "development";
   env.ENABLE_CRON = "false";
+  // Local dev login (src/auth/dev-auth.ts): the server re-checks every guard
+  // (loopback DB and request, non-production, Wompi sandbox) and the Vite
+  // flag only compiles the button into THIS local build.
+  env.RESUME_STUDIO_DEV_AUTH = "1";
+  env.VITE_RESUME_STUDIO_DEV_AUTH = "1";
+  // Without a Supabase project the build still needs the two values; these
+  // point nowhere (a closed loopback port), so only the dev login works.
+  if (!env.VITE_SUPABASE_URL || !env.VITE_SUPABASE_ANON_KEY) {
+    env.VITE_SUPABASE_URL = "http://127.0.0.1:9";
+    env.VITE_SUPABASE_ANON_KEY = "dev-local-placeholder";
+  }
   return env;
 }
 
@@ -123,7 +137,7 @@ export function safetyProblems(env: NodeJS.ProcessEnv): string[] {
     if (!(env.WOMPI_EVENTS_SECRET || "").startsWith("test_")) problems.push("WOMPI_EVENTS_SECRET no es de sandbox (test_…).");
   }
   if (env.RESUME_STUDIO_PAYMENTS_LIVE) problems.push("RESUME_STUDIO_PAYMENTS_LIVE no se permite en local.");
-  if (!env.VITE_SUPABASE_URL || !env.VITE_SUPABASE_ANON_KEY) problems.push("Faltan VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY (login real).");
+  if ((env.NODE_ENV || "").toLowerCase() === "production") problems.push("NODE_ENV=production no se permite en local.");
   return problems;
 }
 
@@ -237,7 +251,9 @@ async function main() {
       runChild([path.join(root, "node_modules", "vite", "bin", "vite.js"), "build", "--outDir", "public"], env, "Compilando el frontend");
     }
 
-    console.log(`\n[dev:resume-studio] Abre http://localhost:${port}/hoja-de-vida — Ctrl+C para detener y borrar la base.\n`);
+    console.log(
+      `\n[dev:resume-studio] Abre http://localhost:${port}/hoja-de-vida y pulsa «Entrar como usuario de prueba (solo local)» — Ctrl+C para detener y borrar la base.\n`
+    );
     server = spawn(process.execPath, [tsx, "src/server.ts"], { cwd: root, env, stdio: "inherit" });
     server.on("exit", (code) => stop(code ?? 0));
   } catch (error) {

@@ -54,3 +54,18 @@ test("refuses: production database, production Wompi keys, live flag", () => {
   const shell = buildChildEnv(DOTENV, { WOMPI_PUBLIC_KEY: "pub_prod_shell" }, LOCAL, "3000");
   assert.match(safetyProblems(shell).join(), /pub_test_/);
 });
+
+test("dev login: the launcher turns it on and no longer needs a Supabase project", async () => {
+  const env = buildChildEnv(DOTENV, {}, LOCAL, "3000");
+  assert.equal(env.RESUME_STUDIO_DEV_AUTH, "1");
+  assert.equal(env.VITE_RESUME_STUDIO_DEV_AUTH, "1");
+  assert.equal(env.VITE_SUPABASE_URL, "https://project.supabase.co", "un proyecto real se respeta");
+  const { VITE_SUPABASE_URL: _u, VITE_SUPABASE_ANON_KEY: _k, ...withoutSupabase } = DOTENV;
+  const bare = buildChildEnv(withoutSupabase, {}, LOCAL, "3000");
+  assert.equal(bare.VITE_SUPABASE_URL, "http://127.0.0.1:9", "marcador que no apunta a nada");
+  assert.ok(bare.VITE_SUPABASE_ANON_KEY);
+  assert.deepEqual(safetyProblems(bare), []);
+  assert.match(safetyProblems({ ...bare, NODE_ENV: "production" }).join(), /NODE_ENV/);
+  const { evaluateDevAuth } = await import("../src/auth/dev-auth.js");
+  assert.deepEqual(evaluateDevAuth(bare), { active: true, problems: [] }, "las guardas del servidor aceptan el entorno del lanzador");
+});

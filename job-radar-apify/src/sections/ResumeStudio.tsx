@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { Download, History, Plus, Save, ShieldCheck, ShieldOff, Trash2, Undo2, X } from "lucide-react";
 import { useAuth } from "../auth/auth-provider.js";
+import { AuthSpinner } from "../components/AuthShell.js";
 import { ResumeTemplate } from "../components/resume/ResumeTemplate.js";
 import { TailorAgent, type TailorJob } from "../components/resume/TailorAgent.js";
 import { ResumePass } from "../components/resume/ResumePass.js";
@@ -155,9 +156,109 @@ function Card({ title, children, action }: { title: string; children: ReactNode;
   );
 }
 
+// Local-only dev login (npm run dev:resume-studio, src/auth/dev-auth.ts).
+// __RS_DEV_LOGIN__ is the literal false in every build except the local
+// launcher's, so this branch is not in the production bundle; and even in
+// the local build the button only appears when the server confirms that all
+// of its guards hold (GET /api/resume/dev-auth = 200).
+const DEV_TOKEN_KEY = "bt:rs-dev-token";
+
+function readDevToken(): string | null {
+  try {
+    return sessionStorage.getItem(DEV_TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function DevLoginGate({ onSession }: { onSession: (session: { token: string; userId: string } | null) => void }) {
+  const [state, setState] = useState<"checking" | "available" | "off">("checking");
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const status = await fetch("/api/resume/dev-auth")
+        .then((r) => (r.ok ? r.json() : null))
+        .catch(() => null);
+      if (cancelled) return;
+      if (!status?.active) return setState("off");
+      // Survives the Wompi return reload; the server decides if it's still
+      // valid (a restarted server issues a new token).
+      const stored = readDevToken();
+      if (stored) {
+        const res = await fetch("/api/resume/consent", { headers: { Authorization: `Bearer ${stored}` } }).catch(() => null);
+        if (cancelled) return;
+        if (res?.ok) return onSession({ token: stored, userId: status.userId });
+        try {
+          sessionStorage.removeItem(DEV_TOKEN_KEY);
+        } catch {
+          /* ignore */
+        }
+      }
+      setState("available");
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (state === "checking") return <AuthSpinner />;
+  if (state === "off") return <Navigate to={`/login?return_to=${encodeURIComponent(window.location.pathname + window.location.search)}`} replace />;
+
+  const enter = async () => {
+    setError(null);
+    const data = await fetch("/api/resume/dev-login", { method: "POST" }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    if (!data?.token) return setError("El modo de prueba local no está activo en el servidor.");
+    try {
+      sessionStorage.setItem(DEV_TOKEN_KEY, data.token);
+    } catch {
+      /* the session just won't survive a reload */
+    }
+    onSession({ token: data.token, userId: data.user.id });
+  };
+
+  return (
+    <div className="max-w-xl mx-auto p-6 md:p-10 text-center space-y-3">
+      <h1 className="text-2xl font-bold">Hoja de vida</h1>
+      <p className="text-[#3d413e]">
+        Servidor local de prueba: base desechable y Wompi sandbox. Entra con un usuario ficticio (dev@localhost.test) que solo existe en
+        esta base.
+      </p>
+      <button className={primaryButtonClass} onClick={() => void enter()}>
+        Entrar como usuario de prueba (solo local)
+      </button>
+      <p>
+        <Link to={`/login?return_to=${encodeURIComponent("/hoja-de-vida")}`} className="text-primary font-semibold">
+          Usar mi cuenta
+        </Link>
+      </p>
+      {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
+    </div>
+  );
+}
+
+/**
+ * Same gate as RequireAuth (spinner, then /login), plus the local dev login
+ * when this is the launcher's build.
+ */
 export default function ResumeStudio() {
-  const { user, accessToken } = useAuth();
-  const userId = user?.id ?? "";
+  const { user, accessToken, isAuthenticated, loading } = useAuth();
+  const [devSession, setDevSession] = useState<{ token: string; userId: string } | null>(null);
+  const location = useLocation();
+
+  if (loading) return <AuthSpinner />;
+  if (isAuthenticated && accessToken && user) return <ResumeStudioApp userId={user.id} accessToken={accessToken} />;
+  if (__RS_DEV_LOGIN__) {
+    if (devSession) return <ResumeStudioApp userId={devSession.userId} accessToken={devSession.token} />;
+    return <DevLoginGate onSession={setDevSession} />;
+  }
+  if (isAuthenticated) return <AuthSpinner />;
+  return <Navigate to={`/login?return_to=${encodeURIComponent(location.pathname + location.search)}`} replace />;
+}
+
+function ResumeStudioApp({ userId, accessToken }: { userId: string; accessToken: string }) {
   const [phase, setPhase] = useState<Phase>("loading");
   const [consent, setConsent] = useState<ConsentView | null>(null);
   const [resume, setResume] = useState<ResumeView | null>(null);
