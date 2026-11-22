@@ -113,8 +113,10 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 // global CSS is untouched. Removing the mark in the browser is the risk
 // doc 06 §6 already accepts; the DOCX is gated on the server.
 const PRINT_AREA_ID = "rs-print-area";
+const PRINT_SCROLL_ID = "rs-print-scroll";
 const PRINT_CSS = `@media print {
   body * { visibility: hidden !important; }
+  #${PRINT_SCROLL_ID} { max-height: none !important; overflow: visible !important; box-shadow: none !important; border: 0 !important; }
   #${PRINT_AREA_ID}, #${PRINT_AREA_ID} * { visibility: visible !important; }
   #${PRINT_AREA_ID} { position: absolute !important; left: 0; top: 0; width: 100%; }
   @page { margin: 0; }
@@ -518,7 +520,7 @@ export default function ResumeStudio() {
                 </button>
               ))}
             </div>
-            <div className="ink-card-sm rounded-2xl overflow-hidden bg-white max-h-[70vh] overflow-y-auto">
+            <div id={PRINT_SCROLL_ID} className="ink-card-sm rounded-2xl overflow-hidden bg-white max-h-[70vh] overflow-y-auto">
               <div id={PRINT_AREA_ID} style={{ position: "relative" }}>
                 <ResumeTemplate facts={draft.facts} templateId={draft.templateId} />
                 {passActive ? null : <PreviewWatermark />}

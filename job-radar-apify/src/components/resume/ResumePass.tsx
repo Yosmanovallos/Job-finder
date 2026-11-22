@@ -101,14 +101,17 @@ export function ResumePass({
   // Coming back from Wompi: ask Wompi (through our server) what happened.
   // The id in the URL only says which transaction to look up.
   useEffect(() => {
+    // The session may arrive a render after the redirect: wait for it, and
+    // keep the id in the URL until the confirm has actually been answered.
+    if (!accessToken) return;
     const params = new URLSearchParams(window.location.search);
     const id = params.get("id");
     if (params.get("pase") !== "retorno") {
       void load();
       return;
     }
-    window.history.replaceState(null, "", "/hoja-de-vida");
     if (!id) {
+      window.history.replaceState(null, "", "/hoja-de-vida");
       void load();
       return;
     }
@@ -124,9 +127,10 @@ export function ResumePass({
       } catch {
         setMessage({ kind: "error", text: "No pudimos confirmar el pago todavía. Recarga en unos minutos." });
       }
+      window.history.replaceState(null, "", "/hoja-de-vida");
       await load();
     })();
-  }, [api, load]);
+  }, [accessToken, api, load]);
 
   const pay = async () => {
     setBusy(true);

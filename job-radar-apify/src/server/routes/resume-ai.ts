@@ -103,8 +103,14 @@ export async function handleResumeAi(res: http.ServerResponse, route: string, us
       grant = quota;
     }
     const adaptationId = randomUUID();
-    await ledger.startAdaptation(userId, adaptationId);
-    const start = await startTailor(gateway, { userId, adaptationId }, { facts: parsed.data.facts, ...parsed.data.job });
+    let start;
+    try {
+      await ledger.startAdaptation(userId, adaptationId);
+      start = await startTailor(gateway, { userId, adaptationId }, { facts: parsed.data.facts, ...parsed.data.job });
+    } catch (error) {
+      if (grant) await releaseAdaptation(grant).catch(() => undefined);
+      throw error;
+    }
     // A cost cap stopped the AI before it helped: give the adaptation back.
     if (grant && !start.aiAvailable) await releaseAdaptation(grant);
     return json(res, 200, {
