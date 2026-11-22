@@ -12,7 +12,7 @@ datos sintéticos; nada en Supabase ni en `main`.
 | `npm run build` | ✅. El CSS global queda **idéntico byte a byte** a R2 (`index-BeuqwIzT.css`, SHA-256 `1d7ac096…c048`). El agente vive solo en el chunk perezoso `ResumeStudio-*.js`. Ni el gateway, ni el endpoint de Alibaba, ni `enable_thinking`, ni pdf.js aparecen en el cliente. |
 | `npm run test:unit` | Se detiene en **JPD-001, heredado** (`validate-job-page-blocks.test.ts`: fixtures con fecha vieja; es el mismo fallo de la base, y lo arregla el PR #148). Como el runner corta ahí, las pruebas unitarias de R3 (al final de la lista) no corren en `test:unit` hasta que entre #148. Mientras tanto, su gate es `test:resume-studio`. Con #148 aplicado de forma temporal (`e7e49e1`, revertido después) sobre `f6b958a`: **685 pruebas, 0 fallos**. Las pruebas añadidas después (RS3-FACT-2 y los casos de T-SENS) pasan en `test:resume-studio`. |
 | `npm run test:integration` | ✅ exit 0. Incluye R1, R2, **R3** y T-FREE. |
-| `npm run test:resume-studio` | ✅ en el HEAD final: 73 pruebas unitarias del Studio y 29 comprobaciones de integración, 0 fallos. |
+| `npm run test:resume-studio` | ✅ en el HEAD final (tras los ajustes): 75 pruebas unitarias del Studio y 29 comprobaciones de integración, 0 fallos. |
 | T-INJ (`validate-resume-studio-injection.test.ts`) | ✅ 5/5: T-INJ-0..3 + T-SENS |
 | T-FREE (`validate-resume-studio-free.ts`) | ✅ «T-FREE: OK»: vacantes, `/api/v1/jobs` y el dashboard responden igual con la bandera apagada y encendida |
 
@@ -123,6 +123,53 @@ Lectura de los resultados:
   - 19 propuestas se descartaron, sobre todo títulos con palabras nuevas y resúmenes con logros o cargos;
   - 0 preguntas;
   - la compatibilidad sube poco, porque la eval solo responde los requisitos para los que la persona sintética tiene una respuesta escrita.
+
+## Ajustes tras la corrida real (`f8ba977`, sin aflojar el validador)
+
+Nada que antes se rechazaba se acepta ahora. Cambia la forma de rechazar y
+la tolerancia a la *forma* del JSON, no a su contenido.
+
+1. **JSON inválido (16 %).** Sin ver las respuestas reales (no se guardan), se atacan las causas probables:
+   - **Esquemas tolerantes en la forma:**
+     - las claves desconocidas se descartan;
+     - un `null` o un campo ausente pasa a `""` o `[]`;
+     - los textos y listas largos se recortan;
+     - un ítem de lista que no encaja se omite en vez de anular toda la respuesta.
+   - El parser extrae el objeto aunque venga con texto alrededor.
+   - Temperatura **0**, antes 0,2.
+   - **El reintento lleva una nota correctiva** con el tipo de fallo y los nombres de los campos, nunca contenido de la respuesta.
+   - Se registra `finish_reason` para detectar respuestas cortadas.
+   - **Diagnóstico nuevo, `invalidReasons`:** prompt, tipo (`parse`, `schema` o `truncated`) y rutas de campo, sin contenido. La próxima corrida dirá qué falla exactamente.
+   - `response_format` con `json_schema` no se activó: no está verificado que qwen3.7 lo soporte en modo no thinking. Queda abierto.
+2. **Descartes (19) y 0 preguntas.**
+   - **Prompts v2** (todos versionados):
+     - el título solo puede usar palabras que ya están en el CV;
+     - se prohíben palabras de resultado, alcance o nivel que los datos no digan;
+     - el resumen describe lo que la persona hizo, sin calificarla;
+     - cuando falta un dato, el modelo responde con **`question`** en vez de escribirlo.
+   - **Política del validador:**
+     - si las afirmaciones nuevas son solo cifras, fechas, herramientas o logros, la tarjeta pasa a **pregunta**: no se aplica nada y el usuario lo escribe con sus palabras;
+     - nombres propios, cargos, enlaces y palabras nuevas en el título se siguen **descartando**.
+   - La tabla de 40 casos se actualizó en consecuencia: 10 casos pasan de «descartar» a «pregunta» y ninguno a «aceptar».
+3. **Compatibilidad que sube poco.**
+   - La persona sintética ahora también responde los requisitos que su propio CV demuestra, citando su viñeta.
+   - Con `--answer-all`, la persona responde **todas** las tarjetas de requisito con una respuesta sintética, que pasa a ser la fuente del validador. Así se mide el flujo completo mapeo → reescritura.
+   - Con el mock: 373 reescrituras, compatibilidad **18 → 59**, 0 inventados y máximo COP 14,16 por adaptación. Queda como prueba de CI (RS3-EVAL-FULL).
+
+Gates tras los ajustes:
+- build ✅, con el CSS idéntico (`1d7ac096…c048`);
+- `test:resume-studio` ✅: 75 pruebas unitarias y 29 comprobaciones de integración, con T-INJ y T-FREE;
+- `test:integration` ✅.
+
+**Para volver a medir con Qwen real.** Lo corre el propietario en PowerShell, desde `job-radar-apify` en este worktree. El agente no carga el `.env`.
+
+```powershell
+$env:DATABASE_URL="postgres://unused@127.0.0.1:1/x"; $env:RESUME_AI_EVAL_LIVE="1"
+npx tsx --env-file="C:\Users\yosma.DESKTOP-RQ0SDF3\OneDrive\Job-finder\job-radar-apify\.env" scripts/eval-resume-tailor.ts --live --cvs P2,P3,P5,P10,P13,P20 --jobs V1,V2,V4,V7
+npx tsx --env-file="C:\Users\yosma.DESKTOP-RQ0SDF3\OneDrive\Job-finder\job-radar-apify\.env" scripts/eval-resume-tailor.ts --live --answer-all --cvs P2,P4,P11,P20 --jobs V1,V3,V8
+```
+
+El script impone un tope de USD 1 a cada corrida. El costo esperado es de unos pocos centavos de dólar.
 
 ## Revisión visual
 
