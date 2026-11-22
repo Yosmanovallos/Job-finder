@@ -171,6 +171,39 @@ npx tsx --env-file="C:\Users\yosma.DESKTOP-RQ0SDF3\OneDrive\Job-finder\job-radar
 
 El script impone un tope de USD 1 a cada corrida. El costo esperado es de unos pocos centavos de dólar.
 
+## Segunda medición real con Qwen (2026-11-22, `08697a0`)
+
+La corrió el propietario con los comandos de arriba. No hubo cambios de código después.
+
+| Métrica | 1) 6 CV × 4 vacantes (misma muestra que la 1.ª) | 2) `--answer-all`: P2, P4, P11, P20 × V1, V3, V8 |
+| --- | --- | --- |
+| Resultado | **PASS** | **PASS** |
+| **Hechos inventados aceptados** (tarjetas / extracción) | **0 / 0** | **0 / 0** |
+| Fugas de datos sensibles | 0 | 0 |
+| Propuestas mostradas | 38: título 15, chat 15, reescritura 4, resumen 4 | 41: título 6, chat 6, reescritura 24, resumen 5 |
+| Preguntas / descartadas / no disponibles | **29 / 0 / 0** | 22 / 3 / 0 |
+| Motivos de pregunta o descarte | título 9 y resumen 20, ambos por una pregunta del propio modelo | reescritura 12, título 5 y resumen 5 por pregunta del modelo; título con 2 palabras nuevas 1; resumen con un cargo 1; resumen con un logro 1 |
+| Compatibilidad media | 25 → 29 | **28 → 70** |
+| Llamadas / JSON inválido / errores / caché | 95 / **1** (`card_chat:schema:text`) / 0 / 3 | 82 / **1** (`card_summary:schema:(raíz)`) / 0 / 1 |
+| Latencia p50 | `cv_extract` 3.219 ms · `evidence_map` 1.122 · título 1.091 · chat 1.005 · reescritura 1.117 · resumen 1.176 | `cv_extract` 2.973 ms · `evidence_map` 1.242 · título 1.148 · chat 912 · reescritura 1.818 · resumen 1.458 |
+| Tokens medios por adaptación | 2.956 de entrada / 354 de salida | 5.119 de entrada / 604 de salida |
+| **Costo real por adaptación** | USD 0,000193 de media (≈ COP 0,77); máximo 0,001293 (≈ COP 5,17) | USD 0,001379 de media (≈ COP 5,52); máximo 0,001937 (≈ COP 7,75) |
+| Total de la corrida | USD 0,005237 en 126 s | USD 0,01694 en 132 s |
+
+Comparación con la primera corrida, sobre la misma muestra:
+
+| | 1.ª corrida | 2.ª corrida |
+| --- | --- | --- |
+| JSON inválido | 16 % | **≈ 1 %** |
+| Descartes | 19 | **0** |
+| Preguntas | 0 | **29** |
+
+Lo que faltaba ahora sale como pregunta al usuario, no como dato inventado.
+
+Con el flujo completo, la compatibilidad sube de **28 a 70**. El peor costo medido, COP 7,75 por adaptación, queda unas 19 veces por debajo del criterio de COP 150, que además está garantizado por el tope de código (USD 0,035, ≈ COP 140).
+
+Lectura de la medición 1: las 29 preguntas vinieron del propio modelo (resumen 20, título 9); el validador no tuvo que convertir ninguna propuesta. Pregunta más de lo necesario en los resúmenes, donde podría proponer una versión sin el dato que falta. Es un ajuste fino de prompt para una fase posterior, no un riesgo de factualidad.
+
 ## Revisión visual
 
 Se usó un arnés temporal de Vite con respuestas simuladas; no se subió.
