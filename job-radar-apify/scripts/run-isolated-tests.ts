@@ -87,7 +87,8 @@ const suites: Record<string, string[]> = {
     "validate-resume-studio-tailor.test.ts",
     "validate-resume-studio-ai.test.ts",
     "validate-resume-studio-injection.test.ts",
-    "validate-resume-studio-evals.test.ts"
+    "validate-resume-studio-evals.test.ts",
+    "validate-resume-studio-pay.test.ts"
   ],
   integration: [
     "validate-isolated-database.ts",
@@ -117,6 +118,7 @@ const suites: Record<string, string[]> = {
     "validate-resume-studio.ts",
     "validate-resume-studio-r2.ts",
     "validate-resume-studio-r3.ts",
+    "validate-resume-studio-r4.ts",
     "validate-resume-studio-free.ts"
   ],
     direct: ["validate-direct-employers.test.ts", "validate-direct-discovery.test.ts", "validate-direct-d5.test.ts", "validate-direct-d5-workday.test.ts", "validate-direct-d5-phenom.test.ts", "validate-direct-d5-eightfold.test.ts", "validate-direct-d5-magneto.test.ts", "validate-direct-d5-google.test.ts", "validate-direct-tp.test.ts", "validate-direct-frisby.test.ts", "validate-direct-altipal.test.ts", "validate-direct-workeando.test.ts", "validate-direct-inventory.test.ts", "validate-direct-inventory-probe.test.ts", "validate-computrabajo-backlog.test.ts", "validate-source-focus.test.ts", "validate-direct-employers.ts", "validate-direct-discovery.ts", "validate-direct-projection.ts", "validate-direct-inventory.ts", "validate-direct-inventory-probe.ts"],
@@ -146,9 +148,11 @@ const suites: Record<string, string[]> = {
     "validate-resume-studio-ai.test.ts",
     "validate-resume-studio-injection.test.ts",
     "validate-resume-studio-evals.test.ts",
+    "validate-resume-studio-pay.test.ts",
     "validate-resume-studio.ts",
     "validate-resume-studio-r2.ts",
     "validate-resume-studio-r3.ts",
+    "validate-resume-studio-r4.ts",
     "validate-resume-studio-free.ts"
   ],
   baseline: ["validate-public-baseline.ts"],
