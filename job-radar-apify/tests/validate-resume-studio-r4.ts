@@ -18,6 +18,7 @@ import { mockTransport } from "../src/resume-studio/ai/mock.js";
 import { setResumeAiRuntimeForTests } from "../src/resume-studio/ai/runtime.js";
 import { RESUME_FREE_ADAPTATIONS } from "../src/resume-studio/payments/passes.js";
 import { handleResumeRoute } from "../src/server/routes/resume.js";
+import { adaptationIdFor, clearStartMemoForTests } from "../src/server/routes/resume-ai.js";
 import { setWompiFetchForTests } from "../src/server/routes/resume-pass.js";
 import { SYNTHETIC_CVS, SYNTHETIC_JOBS } from "./fixtures/resume-tailor-synthetic.js";
 
@@ -361,6 +362,26 @@ async function main() {
     res = await call("POST", "/api/resume/tailor/start", "token-a", { facts: cvFacts, job: { title: job.title, description: job.description } });
     assert.equal(res.status, 200, JSON.stringify(res.data));
     assert.deepEqual(res.data.quota, { source: "pass", used: 1, limit: 30 });
+    // R4c: 5 concurrent starts with the SAME client key (double click, React
+    // double effect) → one adaptation id, quota consumed once; a later retry
+    // with that key answers the same id and still consumes nothing.
+    const clientKey = "c0000000-0000-4000-8000-0000000000c4";
+    const startBody = { facts: cvFacts, job: { title: job.title, description: job.description }, clientKey };
+    const quotaNow = async () => Number((await pool.query(`SELECT SUM(used) AS n FROM rs_adaptation_quota`)).rows[0].n);
+    const q0 = await quotaNow();
+    const burst = await Promise.all(Array.from({ length: 5 }, () => call("POST", "/api/resume/tailor/start", "token-a", startBody)));
+    assert.deepEqual(burst.map((r) => r.status), [200, 200, 200, 200, 200]);
+    assert.equal(new Set(burst.map((r) => r.data.adaptationId)).size, 1);
+    assert.equal(await quotaNow(), q0 + 1);
+    clearStartMemoForTests(); // as after a restart: the unique «start» row still guards the quota
+    const again = await call("POST", "/api/resume/tailor/start", "token-a", startBody);
+    assert.equal(again.status, 200);
+    assert.equal(again.data.adaptationId, burst[0].data.adaptationId);
+    assert.equal(await quotaNow(), q0 + 1);
+    // Another user with the same key gets a different id (the key is per user).
+    assert.notEqual(adaptationIdFor(USER_Q, clientKey), adaptationIdFor(USER_A, clientKey));
+    assert.equal(Number((await pool.query(`SELECT COUNT(*) AS n FROM rs_ai_usage WHERE adaptation_id = $1 AND status = 'start'`, [again.data.adaptationId])).rows[0].n), 1);
+    console.log("✅ [PASSED] R4c: 5 inicios simultáneos con la misma clave = una adaptación y un solo cupo; reintento tras reinicio sin cobro.");
     // Cards never consume.
     const usedBefore = Number((await pool.query(`SELECT SUM(used) AS n FROM rs_adaptation_quota`)).rows[0].n);
     await call("POST", "/api/resume/tailor/card", "token-a", { adaptationId: res.data.adaptationId, card: "headline", jobTitle: job.title, facts: cvFacts });

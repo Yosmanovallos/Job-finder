@@ -4,7 +4,7 @@ import { computeEvidence, factTexts, verifyCitations, type Citation, type FactTe
 import { newClaims, validateProposal, type Claim } from "../../lib/resume-tailor/factuality.js";
 import { acceptModelRequirements, analyzeJob, type JobAnalysis } from "../../lib/resume-tailor/requirements.js";
 import { compatibilityScore, qualityScore } from "../../lib/resume-tailor/score.js";
-import { findQuote } from "../../lib/resume-tailor/text.js";
+import { findQuote, sliceBetween } from "../../lib/resume-tailor/text.js";
 import { MAX_CHAT_TURNS } from "../../lib/resume-tailor/cards.js";
 import type { CallContext, GatewayFailure, ResumeAiGateway } from "./gateway.js";
 import { CARD_CHAT, CARD_HEADLINE, CARD_REWRITE, CARD_SUMMARY, CV_EXTRACT, EVIDENCE_MAP, JOB_REQUIREMENTS } from "./prompts.js";
@@ -40,80 +40,97 @@ export async function extractCvFacts(gateway: ResumeAiGateway, ctx: CallContext,
   facts.basics.phone = (minimized.phones[0] ?? "").replace(/[^0-9+()\-\s]/g, "").slice(0, 30);
   facts.basics.links = minimized.links.filter((l) => l.length <= 200).slice(0, 5);
 
-  // A field is kept only if its quote is in the ORIGINAL text, and its text
-  // says nothing its quote doesn't (else the quote itself is used).
-  const verified = (label: string, text: string, quote: string): { text: string; span: { start: number; end: number } } | null => {
-    const span = findQuote(original, quote);
-    if (!span) {
-      dropped.push(label);
-      return null;
-    }
-    const literal = original.slice(span.start, span.end);
-    return { text: newClaims(text, [literal]).length ? literal : text, span };
+  // cv_extract@3: every kept value is a fragment of the ORIGINAL text. Short
+  // fields must be in it as they are (ignoring case, accents and spaces);
+  // long texts are COPIED from it between two anchors, so the model can
+  // locate text but never write it (doc 05 §2 step 3).
+  const literal = (value: string) => {
+    const s = value ? findQuote(original, value) : null;
+    return s ? { text: original.slice(s.start, s.end).replace(/\s+/g, " ").trim(), span: s } : null;
+  };
+  const sliced = (label: string, anchors: { start: string; end: string }, maxChars: number) => {
+    const r = sliceBetween(original, anchors.start, anchors.end, maxChars);
+    if (!r) dropped.push(label);
+    return r;
+  };
+  // A heading-like field (role, degree…) that isn't in the CV is reported, never kept.
+  const short = (label: string, value: string) => {
+    const v = literal(value);
+    if (!v && value) dropped.push(label);
+    return v;
   };
 
   if (out.headline) {
-    const v = verified("Título del perfil", out.headline.text, out.headline.quote);
+    const v = short("Título del perfil", out.headline.text);
     if (v) facts.basics.headline = v.text.slice(0, 120);
   }
   if (out.summary) {
-    const v = verified("Perfil", out.summary.text, out.summary.quote);
-    if (v) facts.summary = v.text.slice(0, 1200);
+    const v = sliced("Perfil", out.summary, 1200);
+    if (v) facts.summary = v.text;
   }
   for (const e of out.experience) {
-    const v = verified(`Experiencia «${e.role || e.company}»`, `${e.role} ${e.company}`, e.quote);
-    if (!v) continue;
+    const role = literal(e.role);
+    const company = literal(e.company);
+    const head = role ?? company;
+    if (!head) {
+      if (e.role || e.company) dropped.push(`Experiencia «${e.role || e.company}»`);
+      continue;
+    }
     const bullets = e.bullets
       .map((b) => {
-        const bv = verified(`Viñeta de «${e.role}»`, b.text, b.quote);
-        return bv ? { id: newFactId("b"), source: "file" as const, sourceSpan: bv.span, text: bv.text.slice(0, 300) } : null;
+        const bv = sliced(`Viñeta de «${role?.text ?? company?.text}»`, b, 300);
+        return bv ? { id: newFactId("b"), source: "file" as const, sourceSpan: bv.span, text: bv.text } : null;
       })
       .filter((b): b is NonNullable<typeof b> => b !== null);
-    const sourced = (value: string) => (value && findQuote(original, value) ? value : "");
     facts.experience.push({
       id: newFactId("exp"),
       source: "file",
-      sourceSpan: v.span,
-      role: sourced(e.role).slice(0, 120),
-      company: sourced(e.company).slice(0, 120),
-      city: sourced(e.city).slice(0, 80),
+      sourceSpan: head.span,
+      role: (role?.text ?? "").slice(0, 120),
+      company: (company?.text ?? "").slice(0, 120),
+      city: (literal(e.city)?.text ?? "").slice(0, 80),
       // Dates must be literally in the CV; unreadable → empty, asked later.
-      startDate: original.includes(e.startDate) ? month(e.startDate) : "",
-      endDate: original.includes(e.endDate) ? month(e.endDate) : "",
+      startDate: e.startDate && original.includes(e.startDate) ? month(e.startDate) : "",
+      endDate: e.endDate && original.includes(e.endDate) ? month(e.endDate) : "",
       current: e.current,
       bullets: bullets.slice(0, 8)
     });
     if (facts.experience.length >= 15) break;
   }
   for (const ed of out.education) {
-    const v = verified(`Formación «${ed.degree}»`, `${ed.degree} ${ed.institution}`, ed.quote);
-    if (!v) continue;
-    const sourced = (value: string) => (value && findQuote(original, value) ? value : "");
+    const degree = short(`Formación «${ed.degree}»`, ed.degree);
+    const institution = literal(ed.institution);
+    const head = degree ?? institution;
+    if (!head) continue;
     facts.education.push({
       id: newFactId("edu"),
       source: "file",
-      sourceSpan: v.span,
-      degree: (sourced(ed.degree) || v.text).slice(0, 120),
-      institution: sourced(ed.institution).slice(0, 120),
+      sourceSpan: head.span,
+      degree: (degree?.text ?? institution?.text ?? "").slice(0, 120),
+      institution: degree ? (institution?.text ?? "").slice(0, 120) : "",
       city: "",
-      startDate: original.includes(ed.startDate) ? month(ed.startDate) : "",
-      endDate: original.includes(ed.endDate) ? month(ed.endDate) : ""
+      startDate: ed.startDate && original.includes(ed.startDate) ? month(ed.startDate) : "",
+      endDate: ed.endDate && original.includes(ed.endDate) ? month(ed.endDate) : ""
     });
     if (facts.education.length >= 10) break;
   }
   for (const c of out.certifications) {
-    const v = verified(`Certificación «${c.name}»`, c.name, c.quote);
-    if (v) facts.certifications.push({ id: newFactId("cert"), source: "file", sourceSpan: v.span, name: v.text.slice(0, 120), issuer: findQuote(original, c.issuer || "~~") ? c.issuer.slice(0, 120) : "", date: original.includes(c.date) ? month(c.date) : "" });
+    const v = short(`Certificación «${c.name}»`, c.name);
+    if (v) facts.certifications.push({ id: newFactId("cert"), source: "file", sourceSpan: v.span, name: v.text.slice(0, 120), issuer: (literal(c.issuer)?.text ?? "").slice(0, 120), date: c.date && original.includes(c.date) ? month(c.date) : "" });
     if (facts.certifications.length >= 15) break;
   }
+  const seenSkills = new Set<string>();
   for (const s of out.skills) {
-    const v = verified(`Habilidad «${s.name}»`, s.name, s.quote);
-    if (v) facts.skills.push({ id: newFactId("skill"), source: "file", sourceSpan: v.span, name: v.text.slice(0, 60) });
+    const v = short(`Habilidad «${s}»`, s);
+    if (v && !seenSkills.has(v.text.toLowerCase())) {
+      seenSkills.add(v.text.toLowerCase());
+      facts.skills.push({ id: newFactId("skill"), source: "file", sourceSpan: v.span, name: v.text.slice(0, 60) });
+    }
     if (facts.skills.length >= 40) break;
   }
   for (const l of out.languages) {
-    const v = verified(`Idioma «${l.name}»`, `${l.name} ${l.level}`, l.quote);
-    if (v) facts.languages.push({ id: newFactId("lang"), source: "file", sourceSpan: v.span, name: l.name.slice(0, 40), level: findQuote(original, l.level || "~~") ? l.level.slice(0, 40) : "" });
+    const v = short(`Idioma «${l.name}»`, l.name);
+    if (v) facts.languages.push({ id: newFactId("lang"), source: "file", sourceSpan: v.span, name: v.text.slice(0, 40), level: (literal(l.level)?.text ?? "").slice(0, 40) });
     if (facts.languages.length >= 8) break;
   }
   const parsed = resumeFactsSchema.safeParse(facts);

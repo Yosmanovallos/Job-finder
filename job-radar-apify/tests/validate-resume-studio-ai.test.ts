@@ -66,8 +66,13 @@ test("RS3-AI-PROMPTS every prompt is versioned, budgeted, says JSON and declares
   for (const spec of PROMPTS) {
     assert.ok(!ids.has(spec.id), spec.id);
     ids.add(spec.id);
-    assert.ok(spec.version >= 1 && spec.maxInputTokens > 0 && spec.maxOutputTokens > 0 && spec.maxOutputTokens <= 2500);
+    // R4c: cv_extract@3 may answer up to 4 000 tokens (anchors for a 4-page CV).
+    assert.ok(spec.version >= 1 && spec.maxInputTokens > 0 && spec.maxOutputTokens > 0 && spec.maxOutputTokens <= 4000);
     assert.ok(["fast", "rewrite"].includes(spec.alias));
+    // The worst case of any single call (full input + full output, both attempts) fits the default adaptation cap.
+    const cfg = parseResumeAiConfig({});
+    const worst = 2 * costMicros(cfg.prices[spec.alias], spec.maxInputTokens, spec.maxOutputTokens);
+    assert.ok(worst <= cfg.caps.adaptationUsd * 1_000_000, `${spec.id}: ${worst} µUSD`);
   }
   assert.equal(PROMPTS.length, 7);
 });

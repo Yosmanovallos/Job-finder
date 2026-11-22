@@ -1175,6 +1175,10 @@ CREATE TABLE IF NOT EXISTS rs_ai_usage (
 CREATE INDEX IF NOT EXISTS idx_rs_ai_usage_adaptation ON rs_ai_usage (adaptation_id);
 CREATE INDEX IF NOT EXISTS idx_rs_ai_usage_user_time ON rs_ai_usage (user_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_rs_ai_usage_time ON rs_ai_usage (created_at);
+-- R4c: one «start» row per adaptation id. /tailor/start derives the id from
+-- the browser's idempotency key, so a double click or a retry claims the
+-- same row and never consumes the adaptation quota twice. Additive.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_rs_ai_usage_start ON rs_ai_usage (adaptation_id) WHERE status = 'start';
 
 -- R4 (ADR 0017 §5, doc 06 §7): pases de pago único con Wompi. La tabla
 -- `transactions` (existe) gana `product` aditivo: 'subscription' por defecto

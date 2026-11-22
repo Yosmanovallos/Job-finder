@@ -21,7 +21,21 @@ export function resumeAiRuntime(): { gateway: ResumeAiGateway; ledger: UsageLedg
       : config.provider === "mock"
         ? mockTransport()
         : null;
-  instance = { gateway: createGateway({ config, ledger, transport }), ledger };
+  instance = {
+    gateway: createGateway({
+      config,
+      ledger,
+      transport,
+      // R4c diagnostics: one JSON line per call with sizes and codes only —
+      // never prompt, CV, vacancy or answer text (doc 08 §5).
+      onCall: (info) => {
+        const line = `[resume-ai] call ${JSON.stringify(info)}`;
+        if (info.outcome === "ok") console.log(line);
+        else console.warn(line);
+      }
+    }),
+    ledger
+  };
   return instance;
 }
 

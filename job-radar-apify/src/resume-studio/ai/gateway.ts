@@ -35,6 +35,22 @@ export interface InvalidInfo {
   paths: string[];
 }
 
+/** R4c: one line per model call for diagnostics. Sizes and codes only, never content. */
+export interface CallInfo {
+  promptId: string;
+  promptVersion: number;
+  attempt: number;
+  outcome: "ok" | "invalid" | "provider_error";
+  /** Provider's finish_reason («stop», «length»…), when it sends one. */
+  finishReason: string | null;
+  completionTokens: number | null;
+  maxOutputTokens: number;
+  /** Characters of the answer (not the answer). */
+  contentChars: number;
+  latencyMs: number;
+  invalidKind?: InvalidInfo["kind"];
+}
+
 export type Transport = (request: TransportRequest) => Promise<TransportResponse>;
 
 export class ProviderError extends Error {
@@ -72,6 +88,8 @@ export interface GatewayOptions {
   cacheTtlMs?: number;
   /** Diagnostics for invalid answers (evals). Receives no content. */
   onInvalid?: (info: InvalidInfo) => void;
+  /** R4c: called after every provider call (runtime logs it). Receives no content. */
+  onCall?: (info: CallInfo) => void;
 }
 
 export interface ResumeAiGateway {
@@ -158,7 +176,7 @@ export function createGateway(options: GatewayOptions): ResumeAiGateway {
             system: rendered.system + hint,
             user: rendered.user,
             maxTokens: spec.maxOutputTokens,
-            timeoutMs: config.timeoutMs
+            timeoutMs: Math.max(config.timeoutMs, spec.timeoutMs ?? 0)
           });
         } catch (error) {
           // Unknown whether the provider billed the input: count it.
@@ -172,6 +190,17 @@ export function createGateway(options: GatewayOptions): ResumeAiGateway {
             latencyMs: Date.now() - started
           });
           console.warn(`[resume-ai] ${spec.id}@${spec.version} falló: ${error instanceof ProviderError ? error.code : "unknown"}`);
+          options.onCall?.({
+            promptId: spec.id,
+            promptVersion: spec.version,
+            attempt,
+            outcome: "provider_error",
+            finishReason: null,
+            completionTokens: null,
+            maxOutputTokens: spec.maxOutputTokens,
+            contentChars: 0,
+            latencyMs: Date.now() - started
+          });
           return { ok: false, code: "provider_error" };
         }
 
@@ -191,13 +220,27 @@ export function createGateway(options: GatewayOptions): ResumeAiGateway {
           costMicros: cost,
           latencyMs: Date.now() - started
         });
+        const latencyMs = Date.now() - started;
+        const callInfo: CallInfo = {
+          promptId: spec.id,
+          promptVersion: spec.version,
+          attempt,
+          outcome: valid?.success ? "ok" : "invalid",
+          finishReason: response.finishReason ?? null,
+          completionTokens: response.usage?.completionTokens ?? null,
+          maxOutputTokens: spec.maxOutputTokens,
+          contentChars: response.content.length,
+          latencyMs
+        };
         if (valid?.success) {
+          options.onCall?.(callInfo);
           cacheSet(key, valid.data);
           return { ok: true, data: valid.data, cached: false, attempts: attempt, costMicros: spent };
         }
         const kind = response.finishReason === "length" ? "truncated" : parsed === undefined ? "parse" : "schema";
         const paths = valid && !valid.success ? [...new Set(valid.error.issues.map((i) => i.path.join(".") || "(raíz)"))].slice(0, 8) : [];
         options.onInvalid?.({ promptId: spec.id, attempt, kind, paths });
+        options.onCall?.({ ...callInfo, invalidKind: kind });
         // The retry says what was wrong (field names only, nothing from the answer).
         hint =
           "\n\nCORRECCIÓN: tu respuesta anterior no fue válida (" +

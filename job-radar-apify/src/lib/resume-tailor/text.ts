@@ -30,6 +30,47 @@ export function findQuote(original: string, quote: string): { start: number; end
   return { start, end };
 }
 
+/**
+ * cv_extract@3: the ORIGINAL text between a start anchor and an end anchor
+ * (both located with findQuote), with whitespace runs collapsed and a
+ * leading bullet mark removed. The model only says where a text is; the
+ * text itself is always a copy of the CV. If the end anchor is missing or
+ * not found within `maxChars`, the text runs to the end of the line where
+ * the start anchor ends. Null when the start anchor isn't in the CV.
+ */
+export function sliceBetween(
+  original: string,
+  start: string,
+  end: string,
+  maxChars: number
+): { text: string; span: { start: number; end: number } } | null {
+  const s = findQuote(original, start);
+  if (!s) return null;
+  const windowEnd = Math.min(original.length, s.start + maxChars + 40);
+  let stop = -1;
+  if (end.trim().length >= 2) {
+    const e = findQuote(original.slice(s.start, windowEnd), end);
+    if (e) stop = Math.max(s.end, s.start + e.end);
+  }
+  if (stop < 0) {
+    const nl = original.indexOf("\n", s.end);
+    stop = nl < 0 ? original.length : nl;
+  }
+  stop = Math.min(stop, s.start + maxChars);
+  let text = original
+    .slice(s.start, stop)
+    .replace(/\s+/g, " ")
+    .replace(/^[-•*▪●◦·–]\s*/, "")
+    .trim();
+  if (text.length > maxChars) text = text.slice(0, maxChars);
+  if (stop - s.start >= maxChars) {
+    // Cut by the cap: end on a whole word.
+    const space = text.lastIndexOf(" ");
+    if (space > maxChars * 0.6) text = text.slice(0, space);
+  }
+  return text.length >= 2 ? { text, span: { start: s.start, end: stop } } : null;
+}
+
 /** Folded text plus, for each folded char, its index in the source. */
 function foldChars(value: string): { text: string; map: number[] } {
   let text = "";

@@ -69,19 +69,28 @@ function sentenceCase(text: string): string {
 
 const MONTH_RANGE = /((?:19|20)\d{2}-(?:0[1-9]|1[0-2]))\s*[–-]\s*((?:19|20)\d{2}-(?:0[1-9]|1[0-2])|actual|presente)/i;
 
-/** Parses the synthetic/common CV layout: UPPERCASE headings, «a | b | c» entries, «- » bullets. */
+function lastWords(text: string, n: number): string {
+  return text.split(/\s+/).slice(-n).join(" ");
+}
+
+/**
+ * cv_extract@3 answer for the synthetic/common CV layout: UPPERCASE
+ * headings, «a | b | c» entries, «- » bullets. Long texts come back as
+ * start/end anchors; `fabricate` adds what a weak model would invent.
+ */
 function extractCv(text: string, fabricate: boolean) {
   const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
   const out = {
-    headline: null as null | { text: string; quote: string },
-    summary: null as null | { text: string; quote: string },
+    headline: null as null | { text: string },
+    summary: null as null | { start: string; end: string },
     experience: [] as any[],
     education: [] as any[],
     certifications: [] as any[],
-    skills: [] as any[],
+    skills: [] as string[],
     languages: [] as any[]
   };
   let section = "head";
+  let summaryLines: string[] = [];
   const heading = (l: string) => {
     const n = l.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase();
     if (l !== l.toUpperCase() || l.length > 40) return null;
@@ -101,17 +110,17 @@ function extractCv(text: string, fabricate: boolean) {
     }
     if (/\[(NOMBRE|CORREO|TELEFONO|ENLACE)\]/.test(line)) continue;
     if (section === "head") {
-      if (!out.headline) out.headline = { text: line.slice(0, 120), quote: line };
+      if (!out.headline) out.headline = { text: line.slice(0, 120) };
       continue;
     }
     if (section === "summary") {
-      out.summary = out.summary ? { text: `${out.summary.text} ${line}`.slice(0, 1200), quote: out.summary.quote } : { text: line, quote: line };
+      summaryLines.push(line);
       continue;
     }
     if (section === "experience") {
       if (/^[-•*]/.test(line) && out.experience.length) {
         const t = line.replace(/^[-•*]\s*/, "");
-        out.experience[out.experience.length - 1].bullets.push({ text: t, quote: t });
+        out.experience[out.experience.length - 1].bullets.push({ start: firstWords(t, 6), end: lastWords(t, 6) });
         continue;
       }
       const parts = line.split("|").map((p) => p.trim());
@@ -123,7 +132,6 @@ function extractCv(text: string, fabricate: boolean) {
         startDate: range?.[1] ?? "",
         endDate: range && /^\d/.test(range[2]) ? range[2] : "",
         current: Boolean(range && !/^\d/.test(range[2])),
-        quote: parts[0] || line,
         bullets: []
       });
       continue;
@@ -131,26 +139,38 @@ function extractCv(text: string, fabricate: boolean) {
     if (section === "education") {
       const parts = line.split("|").map((p) => p.trim());
       const range = MONTH_RANGE.exec(line);
-      out.education.push({ degree: parts[0] ?? line, institution: parts[1] ?? "", startDate: range?.[1] ?? "", endDate: range && /^\d/.test(range[2]) ? range[2] : "", quote: parts[0] || line });
+      out.education.push({ degree: parts[0] ?? line, institution: parts[1] ?? "", startDate: range?.[1] ?? "", endDate: range && /^\d/.test(range[2]) ? range[2] : "" });
       continue;
     }
     if (section === "certifications") {
       const parts = line.split("|").map((p) => p.trim());
-      out.certifications.push({ name: parts[0] ?? line, issuer: parts[1] ?? "", date: "", quote: parts[0] || line });
+      out.certifications.push({ name: parts[0] ?? line, issuer: parts[1] ?? "", date: "" });
       continue;
     }
     if (section === "skills") {
-      for (const s of line.split(/[,;·]/).map((x) => x.trim()).filter(Boolean)) out.skills.push({ name: s.slice(0, 60), quote: s });
+      for (const s of line.split(/[,;·]/).map((x) => x.trim()).filter(Boolean)) out.skills.push(s.slice(0, 60));
       continue;
     }
     if (section === "languages") {
       const [name, ...rest] = line.split(/\s+/);
-      out.languages.push({ name, level: rest.join(" "), quote: line });
+      out.languages.push({ name, level: rest.join(" ") });
     }
   }
+  if (summaryLines.length) {
+    const all = summaryLines.join(" ");
+    out.summary = { start: firstWords(all, 7), end: lastWords(all, 7) };
+  }
   if (fabricate) {
-    out.skills.push({ name: "Python", quote: "Python avanzado" });
-    if (out.experience[0]) out.experience[0].bullets.push({ text: "Lideró un equipo de 12 personas.", quote: "Lideró un equipo de 12 personas" });
+    out.skills.push("Python avanzado");
+    if (out.headline) out.headline = { text: `${out.headline.text} Senior` };
+    if (out.experience[0]) {
+      // Invented bullet, and a REAL start anchor with an invented end: the
+      // code copies the CV, so the invented end can't add anything.
+      out.experience[0].bullets.push({ start: "Lideró un equipo de 12 personas", end: "12 personas" });
+      const real = out.experience[0].bullets[0];
+      if (real) out.experience[0].bullets.push({ start: real.start, end: "aumentando las ventas un 40%" });
+    }
+    out.experience.push({ role: "Gerente general", company: "Empresa Inventada S.A.", city: "", startDate: "2015-01", endDate: "", current: true, bullets: [] });
   }
   return out;
 }

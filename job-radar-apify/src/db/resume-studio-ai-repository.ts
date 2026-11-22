@@ -31,6 +31,24 @@ export class PgUsageLedger implements UsageLedger {
     return (result.rowCount ?? 0) > 0;
   }
 
+  async claimAdaptation(userId: string, adaptationId: string, now = new Date()): Promise<boolean> {
+    // Atomic thanks to uq_rs_ai_usage_start: two concurrent claims, one row.
+    const result = await pool.query(
+      `INSERT INTO rs_ai_usage (user_id, adaptation_id, purpose, status, created_at) VALUES ($1, $2, 'start', 'start', $3)
+       ON CONFLICT (adaptation_id) WHERE status = 'start' DO NOTHING`,
+      [userId, adaptationId, now]
+    );
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async unclaimAdaptation(userId: string, adaptationId: string): Promise<void> {
+    await pool.query(
+      `DELETE FROM rs_ai_usage u WHERE u.adaptation_id = $1 AND u.user_id = $2 AND u.status = 'start'
+         AND NOT EXISTS (SELECT 1 FROM rs_ai_usage o WHERE o.adaptation_id = $1 AND o.status <> 'start')`,
+      [adaptationId, userId]
+    );
+  }
+
   async reserve(request: ReserveRequest): Promise<ReserveResult> {
     const now = request.now ?? new Date();
     const { dayStart, monthStart } = colombiaWindows(now);

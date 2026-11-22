@@ -25,6 +25,8 @@ export interface PromptSpec<I, O> {
   maxInputTokens: number;
   /** Sent as max_tokens; also the worst case used by the cost caps. */
   maxOutputTokens: number;
+  /** Per-call timeout floor for long answers (the config value applies if higher). */
+  timeoutMs?: number;
   schema: z.ZodType<O, z.ZodTypeDef, unknown>;
   render: (input: I) => RenderedPrompt;
 }
@@ -96,45 +98,70 @@ function list<T extends z.ZodTypeAny>(item: T, max: number) {
 const id = text(60, 1);
 const supporting = list(id, 12);
 
-// ---------- cv_extract@1 -------------------------------------------------
+// ---------- cv_extract@3 -------------------------------------------------
+//
+// v1/v2 asked for a literal «quote» next to EVERY field and bullet, so the
+// answer repeated the whole CV twice and a real 2-page CV (5.6 k chars)
+// hit max_tokens and came back as cut JSON (R4c, 2026-11-22). v3 asks for
+// ANCHORS instead of copies: long texts (summary, bullets) are located by
+// their first and last words («start»/«end», ≤ 80 chars each) and the
+// CODE copies the original between them, so the text is literal by
+// construction. Short fields (role, company, skill…) are themselves
+// fragments of the CV and are checked as substrings. Old-shape answers
+// ({text, quote}) still parse: the quote is used as the start anchor.
 
-const quoted = text(400, 2);
-export const cvExtractOutput = z
-  .object({
-    headline: z.object({ text: text(120), quote: quoted }).nullable().catch(null),
-    summary: z.object({ text: text(1200), quote: quoted }).nullable().catch(null),
-    experience: list(
-      z.object({
-        role: text(120),
-        company: text(120),
-        city: text(80),
-        startDate: text(7),
-        endDate: text(7),
-        current: z.boolean().catch(false),
-        quote: quoted,
-        bullets: list(z.object({ text: text(300), quote: quoted }), 8)
-      }),
-      15
-    ),
-    education: list(z.object({ degree: text(120), institution: text(120), startDate: text(7), endDate: text(7), quote: quoted }), 10),
-    certifications: list(z.object({ name: text(120), issuer: text(120), date: text(7), quote: quoted }), 15),
-    skills: list(z.object({ name: text(60), quote: quoted }), 40),
-    languages: list(z.object({ name: text(40), level: text(40), quote: quoted }), 8)
-  });
+const anchor = text(120);
+const span = z.preprocess(
+  (v) => {
+    if (!v || typeof v !== "object") return v;
+    const o = v as Record<string, unknown>;
+    if (o.start === undefined && typeof o.quote === "string") {
+      const words = typeof o.text === "string" ? o.text.trim().split(/\s+/) : [];
+      return { start: o.quote, end: words.slice(-6).join(" ") };
+    }
+    return o;
+  },
+  z.object({ start: text(120, 2), end: anchor })
+);
+export const cvExtractOutput = z.object({
+  headline: z.object({ text: text(120, 2) }).nullable().catch(null),
+  summary: span.nullable().catch(null),
+  experience: list(
+    z.object({
+      role: text(120),
+      company: text(120),
+      city: text(80),
+      startDate: text(7),
+      endDate: text(7),
+      current: z.boolean().catch(false),
+      bullets: list(span, 10)
+    }),
+    15
+  ),
+  education: list(z.object({ degree: text(120), institution: text(120), startDate: text(7), endDate: text(7) }), 10),
+  certifications: list(z.object({ name: text(120), issuer: text(120), date: text(7) }), 15),
+  skills: list(text(60, 2), 40),
+  languages: list(z.object({ name: text(40), level: text(40) }), 8)
+});
 export type CvExtractOutput = z.infer<typeof cvExtractOutput>;
 
 export const CV_EXTRACT: PromptSpec<{ cvText: string }, CvExtractOutput> = {
   id: "cv_extract",
-  version: 2,
+  version: 3,
   alias: "fast",
   maxInputTokens: 6000,
-  maxOutputTokens: 2500,
+  // Anchors instead of copies: ≈ ⅓ of the CV in tokens. 4 000 leaves room
+  // for a 4-page CV; the worst case is ≈ USD 0.0005 at qwen3.7-flash prices.
+  maxOutputTokens: 4000,
+  timeoutMs: 60000,
   schema: cvExtractOutput,
   render: ({ cvText }) => ({
     system: system(
-      "Separa la hoja de vida en campos. Cada campo lleva \"quote\": un fragmento COPIADO LITERALMENTE del CV del que sale el campo (sin cambiar palabras). " +
+      "Separa la hoja de vida en campos SIN copiar los textos largos. Para el perfil y para cada viñeta de experiencia devuelve solo dos anclas: " +
+        "\"start\" = las primeras 5 a 10 palabras y \"end\" = las últimas 5 a 10 palabras, COPIADAS LITERALMENTE del CV (máximo 80 caracteres cada una). " +
+        "Cargo, empresa, ciudad, título, institución, certificación, habilidad e idioma se escriben tal como aparecen en el CV. " +
         "Fechas como AAAA-MM; si no se pueden leer, cadena vacía. No completes nada que no esté. Los marcadores [CORREO], [TELEFONO], [ENLACE] y [NOMBRE] no se copian a ningún campo.",
-      '{"headline":{"text","quote"}|null,"summary":{"text","quote"}|null,"experience":[{"role","company","city","startDate","endDate","current","quote","bullets":[{"text","quote"}]}],"education":[{"degree","institution","startDate","endDate","quote"}],"certifications":[{"name","issuer","date","quote"}],"skills":[{"name","quote"}],"languages":[{"name","level","quote"}]}'
+      '{"headline":{"text"}|null,"summary":{"start","end"}|null,"experience":[{"role","company","city","startDate","endDate","current","bullets":[{"start","end"}]}],"education":[{"degree","institution","startDate","endDate"}],"certifications":[{"name","issuer","date"}],"skills":["nombre"],"languages":[{"name","level"}]}'
     ),
     user: `Hoja de vida a separar en campos (JSON):\n${fence("CV", clip(cvText, 14000))}`
   })

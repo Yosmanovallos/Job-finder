@@ -64,6 +64,10 @@ export interface UsageRow {
 export interface UsageLedger {
   startAdaptation(userId: string, adaptationId: string, now?: Date): Promise<void>;
   ownsAdaptation(userId: string, adaptationId: string): Promise<boolean>;
+  /** R4c: inserts the «start» row only if the id is new (atomic). True when this call created it. */
+  claimAdaptation(userId: string, adaptationId: string, now?: Date): Promise<boolean>;
+  /** R4c: undoes a claim that never started (quota refused). Only a bare «start» row is removed. */
+  unclaimAdaptation(userId: string, adaptationId: string): Promise<void>;
   reserve(request: ReserveRequest): Promise<ReserveResult>;
   settle(reservationId: string, usage: SettleUsage): Promise<void>;
   recordCacheHit(request: Omit<ReserveRequest, "maxCostMicros" | "caps" | "maxPurposeTurns">): Promise<void>;
@@ -113,6 +117,17 @@ export class MemoryLedger implements UsageLedger {
 
   async ownsAdaptation(userId: string, adaptationId: string): Promise<boolean> {
     return this.rows.some((r) => r.status === "start" && r.userId === userId && r.adaptationId === adaptationId);
+  }
+
+  async claimAdaptation(userId: string, adaptationId: string, now = new Date()): Promise<boolean> {
+    if (this.rows.some((r) => r.status === "start" && r.adaptationId === adaptationId)) return false;
+    await this.startAdaptation(userId, adaptationId, now);
+    return true;
+  }
+
+  async unclaimAdaptation(userId: string, adaptationId: string): Promise<void> {
+    if (this.rows.some((r) => r.adaptationId === adaptationId && r.status !== "start")) return;
+    this.rows = this.rows.filter((r) => !(r.status === "start" && r.userId === userId && r.adaptationId === adaptationId));
   }
 
   async reserve(request: ReserveRequest): Promise<ReserveResult> {
