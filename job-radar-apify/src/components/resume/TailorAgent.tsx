@@ -526,6 +526,7 @@ function SkillsCard({
           <label key={skill} className={`flex gap-2 items-center rounded-xl border-2 p-2 text-sm ${picked.includes(skill) ? "border-foreground" : "border-border"}`}>
             <input
               type="checkbox"
+              aria-label={skill}
               checked={picked.includes(skill)}
               onChange={(e) => setPicked((list) => (e.target.checked ? [...list, skill] : list.filter((s) => s !== skill)))}
               style={{ width: 18, height: 18, accentColor: "#0f6b4f" }}
@@ -606,7 +607,7 @@ function MappingCard({
       <div className="grid gap-2 mt-2" role="radiogroup" aria-label="Dónde lo hiciste">
         {[...card.options.map((o) => ({ id: o.experienceId, text: o.label, hint: "" })), { id: "none", text: "En ninguna", hint: "Queda como «no demostrado». No lo inventamos." }, { id: "elsewhere", text: "Lo hice en otro lugar", hint: "Proyecto, estudio, voluntariado…" }].map((o) => (
           <label key={o.id} className={`flex gap-2 items-start rounded-xl border-2 p-2 text-sm ${where === o.id ? "border-foreground" : "border-border"}`}>
-            <input type="radio" name={`map-${card.requirementId}`} checked={where === o.id} onChange={() => setWhere(o.id)} style={{ width: 18, height: 18, marginTop: 2, accentColor: "#0f6b4f" }} />
+            <input type="radio" aria-label={o.text} name={`map-${card.requirementId}`} checked={where === o.id} onChange={() => setWhere(o.id)} style={{ width: 18, height: 18, marginTop: 2, accentColor: "#0f6b4f" }} />
             <span>
               {o.text}
               {o.hint ? <span className="block text-xs text-muted-foreground">{o.hint}</span> : null}
