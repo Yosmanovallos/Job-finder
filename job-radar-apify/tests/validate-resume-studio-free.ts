@@ -74,18 +74,28 @@ interface Snapshot {
   status: number;
   contentType: string | null;
   bodySha: string;
+  /** R4c: header links «Hoja de vida» (flag on) that replaced «Preguntas». */
+  navSwaps: number;
 }
 const bodies = new Map<string, string>();
+// R4c: the ONE allowed difference with the flag on is the header's last link
+// («Preguntas» → «Hoja de vida», src/sections/Header.tsx). It is counted, then
+// masked back, so every other byte of the job surfaces must still be equal.
+const NAV_ON = /href="\/hoja-de-vida" data-discover="true">Hoja de vida<\/a>/g;
+const NAV_OFF = 'href="/preguntas" data-discover="true">Preguntas</a>';
 
 async function snapshot(url: string, accept = "text/html"): Promise<Snapshot> {
   const res = await fetch(`${BASE}${url}`, { headers: { Accept: accept } });
   // Per-process values are masked before comparing: the home SSR seed's
   // render time ("now") and the public API's random requestId.
-  const body = (await res.text())
+  const raw = await res.text();
+  const navSwaps = raw.match(NAV_ON)?.length ?? 0;
+  const body = raw
+    .replace(NAV_ON, NAV_OFF)
     .replace(/"now":"\d{4}-\d{2}-\d{2}T[\d:.]+Z"/g, '"now":"<masked>"')
     .replace(/"requestId":"[0-9a-f-]{36}"/g, '"requestId":"<masked>"');
   bodies.set(`${bodies.size}:${url}`, body);
-  return { status: res.status, contentType: res.headers.get("content-type"), bodySha: createHash("sha256").update(body).digest("hex") };
+  return { status: res.status, contentType: res.headers.get("content-type"), bodySha: createHash("sha256").update(body).digest("hex"), navSwaps };
 }
 
 async function main() {
@@ -135,9 +145,14 @@ async function main() {
       while (i < a.length && a[i] === b[i]) i++;
       console.error(`DIFF ${url} @${i}\nOFF: ${a.slice(Math.max(0, i - 150), i + 150)}\nON:  ${b.slice(Math.max(0, i - 150), i + 150)}`);
     }
-    assert.deepEqual(results.on[url], results.off[url], `T-FREE: ${url} cambió al encender la bandera`);
+    const { navSwaps: _on, ...on } = results.on[url];
+    const { navSwaps: offSwaps, ...off } = results.off[url];
+    assert.deepEqual(on, off, `T-FREE: ${url} cambió al encender la bandera`);
+    assert.equal(offSwaps, 0, `T-FREE: ${url} muestra «Hoja de vida» con la bandera apagada`);
     assert.notEqual(results.off[url].status, 0);
   }
+  // The server-rendered home shows «Hoja de vida» only with the flag on.
+  assert.ok(results.on["/"].navSwaps >= 1, "T-FREE: con la bandera encendida la home debe enlazar «Hoja de vida»");
   console.log(surfaces.map(([url]) => `   ${results.off[url].status} ${url}`).join("\n"));
   for (const url of ["/dashboard", "/", `/empleos/${jobId}`, "/api/jobs?limit=5", "/api/v1/jobs?limit=3"]) {
     assert.equal(results.off[url].status, 200, `${url} debe responder 200 en la prueba`);
