@@ -26,6 +26,33 @@ Fecha: 2026-11-23. Rama `codex/resume-studio-r4c`.
 - **Respuestas en los mapeos:** se usaron palabras del propio propietario, tomadas de una viñeta de su CV en esa experiencia. El script no inventa experiencia.
 - **«No literales»:** 9 textos de la extracción aparecen como «no literales» en el chequeo del script. Son exactamente las 2 formaciones, los 2 idiomas y las 5 certificaciones. `factTexts` las une como «título · institución», «idioma nivel» y «nombre · emisor», y esa unión no es una subcadena del CV. Cada parte por separado sí sale del CV (`literal()` en `extractCvFacts`).
 
+### 1.1 Tercera y cuarta corrida (servidor reiniciado, solo datos ciertos)
+
+- **Qué cambió en el script:**
+  - Marca una habilidad solo si el mismo verificador de la auditoría (`newClaims` contra el CV) no encuentra nada nuevo.
+  - Responde cada requisito con la viñeta del CV que más coincide.
+  - Si ninguna coincide, responde «En ninguna».
+- **Extracción:** 200 en 9,9 s, con los mismos conteos. Inicio duplicado: mismo id.
+- **Habilidades:**
+  - La vacante ofreció Java, Jenkins y Office; se marcaron 0, porque el CV no las respalda como habilidad.
+  - En la corrida 3, el script usó una comparación por subcadena y marcó 1. La auditoría final la detectó como 1 «skill» inventada.
+  - **El fallo era del script, no de la IA.** Se corrigió y la corrida 4 dio 0.
+- **Tarjetas (corrida 4):**
+
+| Tarjeta | Resultado |
+|---|---|
+| Título | `proposal` |
+| Mapeos 1/5 y 2/5 | `proposal` |
+| Mapeo 3/5 | `question` (el validador pidió el dato) |
+| Mapeo 4/5 | sin coincidencia en el CV → «En ninguna» |
+| Mapeo 5/5 | `discarded` |
+| Resumen | `proposal` |
+
+  - Total: 4 propuestas, 1 pregunta y 1 descartada; 4 preguntas respondidas.
+- **Datos inventados en el CV final:** **0**.
+- **Puntaje 45 → 45.** Las respuestas solo pueden reutilizar texto que ya estaba en el CV, así que no agregan evidencia para requisitos que no estaban cubiertos. El puntaje sube cuando la persona aporta información nueva y cierta: en la revisión con la IA mock, una respuesta nueva subió la compatibilidad de 88 a 97. Un agente no puede aportar esa información sin inventarla.
+- **Pendiente para el propietario:** hacer una adaptación desde el navegador en `/hoja-de-vida` con sus propias respuestas.
+
 ## 2. Revisión en el navegador (servidor local con IA mock)
 
 Hecha a 1280 px y 375 px, con datos sintéticos. Las capturas están en [`screens/`](screens/).
@@ -50,10 +77,15 @@ Hecha a 1280 px y 375 px, con datos sintéticos. Las capturas están en [`screen
 - **Hash del CSS global:** sin cambios, `1d7ac0969c32df8a…`.
   - Se quitaron 3 clases que se habían colado: `ease-out`/`ease-in-out` (texto del CSS propio), `max-h-[60vh]` y `md:text-left`.
 
-## 4. Gates
+## 4. Gates (2026-11-23, HEAD de la rama)
 
-Se llenan con la última corrida; ver la sección 5.
+| Gate | Resultado |
+|---|---|
+| `npx tsc --noEmit` | ✅ |
+| `npm run build` | ✅. CSS `index-BeuqwIzT.css`, hash `1d7ac0969c32df8a…` (igual que R4b). |
+| `npm run test:unit` | ✅ (exit 0) |
+| `npm run test:integration` | ✅ (exit 0) |
+| `npm run test:resume-studio` | ✅ 53 suites `PASSED`, incluidas R4c (5 inicios simultáneos = 1 cupo; reintento tras reinicio sin cobro) y T-FREE |
 
-## 5. Gates (última corrida)
-
-PENDIENTE
+- **Falso positivo de `validate-job-seo-v2`:** fallaba cuando `public/` venía del build del lanzador local (bandera y login de desarrollo). Con `npm run build` normal pasa, igual que en R4b.
+- **Orden para las gates:** correr siempre `npm run build` antes de las pruebas de integración.

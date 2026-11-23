@@ -1,7 +1,7 @@
 # Resume Studio R4c: el flujo como JobStep, y la IA con un CV real
 
-**Estado:** en curso (2026-11-22).
-**ADR:** [`docs/adr/0017-resume-studio-implementation.md`](../../../docs/adr/0017-resume-studio-implementation.md).
+**Estado:** implementado y archivado (2026-11-23). La evidencia está en [`validation.md`](validation.md).
+**ADR:** [`docs/adr/0017-resume-studio-implementation.md`](../../../../docs/adr/0017-resume-studio-implementation.md).
 **Rama:** `codex/resume-studio-r4c`, cortada de `codex/resume-studio-r4b`
 (PR #152, `ca8387a`), con `codex/resume-studio-r3` (`1751c8e`) integrada
 porque R4/R4b se cortaron antes del ajuste con Qwen real (prompts v2,

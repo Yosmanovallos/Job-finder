@@ -15,7 +15,9 @@ evidencia va en `validation.md`.
 - [x] Menú «Más opciones» (editor, versiones, exportar, borrar, autorización, revocar).
 - [x] Diálogos propios; 0 `window.confirm`/`alert`/`prompt`.
 - [x] Header «Hoja de vida» detrás de la bandera; HTML idéntico con la bandera apagada.
-- [ ] Prueba real: CV del propietario + vacante Workday de Amadeus (extracción, tarjetas, ≥ 1 respuesta, 0 inventos).
+- [x] Prueba real: CV del propietario + vacante Workday de Amadeus (extracción, tarjetas, ≥ 1 respuesta, 0 inventos).
 - [x] Capturas escritorio y 375 px.
-- [ ] Gates: tsc, build (hash CSS), test:unit, test:integration, test:resume-studio.
-- [ ] PR en borrador contra `codex/resume-studio`; archivar el cambio.
+- [x] Gates: tsc, build (hash CSS), test:unit, test:integration, test:resume-studio.
+- [x] PR en borrador contra `codex/resume-studio`; archivar el cambio.
+
+- [ ] Adaptación en el navegador hecha por el propietario con sus propias respuestas (el puntaje solo sube con información nueva y cierta; ver validation.md §1.1).
