@@ -73,6 +73,15 @@ const cardBody = z.discriminatedUnion("card", [
   z
     .object({
       adaptationId: z.string().regex(UUID),
+      card: z.literal("draft"),
+      requirement: text(220),
+      facts: resumeFactsSchema,
+      experienceId: z.string().min(1).max(60)
+    })
+    .strict(),
+  z
+    .object({
+      adaptationId: z.string().regex(UUID),
       card: z.literal("chat"),
       cardType: z.enum(["headline", "summary", "rewrite"]),
       current: z.string().min(1).max(1200),

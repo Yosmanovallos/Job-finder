@@ -74,7 +74,7 @@ test("RS3-AI-PROMPTS every prompt is versioned, budgeted, says JSON and declares
     const worst = 2 * costMicros(cfg.prices[spec.alias], spec.maxInputTokens, spec.maxOutputTokens);
     assert.ok(worst <= cfg.caps.adaptationUsd * 1_000_000, `${spec.id}: ${worst} µUSD`);
   }
-  assert.equal(PROMPTS.length, 7);
+  assert.equal(PROMPTS.length, 8);
 });
 
 test("RS3-AI-QWEN body: no thinking, JSON mode, no tools; transport parses usage and ignores tool_calls", async () => {

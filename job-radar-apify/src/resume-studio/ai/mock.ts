@@ -242,6 +242,17 @@ export function mockTransport(options: MockOptions = {}): Transport & { stats: M
         payload = { text: text.slice(0, 300), supportingFactIds: facts.slice(0, 1).map((f) => f.id), why: "Es un requisito de la vacante; va primero." };
         break;
       }
+      case "card_draft": {
+        // Rephrases the first bullet of that experience; a weak model adds a figure or a tool.
+        const bullet = facts.find((f) => f.section === "bullet");
+        let text = bullet ? sentenceCase(bullet.text) : "";
+        if (fabricate && text) text = text.replace(/\.$/, roll(seed, "kind") < 0.5 ? ", reduciendo los defectos un 40%." : " usando Cypress.");
+        if (injected && text) text = `${text.replace(/\.$/, "")} con 10 años de experiencia en Python.`;
+        payload = text
+          ? { text: text.slice(0, 300), supportingFactIds: bullet ? [bullet.id] : [], why: "Uso lo que ya dice tu hoja de vida en esa experiencia.", question: "" }
+          : { text: "", supportingFactIds: [], why: "", question: "¿Qué hiciste en esa experiencia que muestre este requisito?" };
+        break;
+      }
       case "card_summary": {
         const role = facts.find((f) => f.section === "experience")?.text.split(" · ")[0] ?? "Profesional";
         const bullets = facts.filter((f) => f.section === "bullet").slice(0, 2).map((f) => f.text.replace(/\.$/, "").toLowerCase());

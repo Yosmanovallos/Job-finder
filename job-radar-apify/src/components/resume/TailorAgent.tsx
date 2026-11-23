@@ -700,25 +700,64 @@ function MappingCard({
   const [where, setWhere] = useState<string>(card.suggested ?? card.options[0]?.experienceId ?? "elsewhere");
   const [place, setPlace] = useState("");
   const [answer, setAnswer] = useState("");
-  const [submitted, setSubmitted] = useState<string | null>(null);
+  // R4c: the user's own words («answer»), or «Que la IA lo redacte» («draft»)
+  // from what the CV already says about that experience.
+  const [submitted, setSubmitted] = useState<{ mode: "answer" | "draft"; text: string } | null>(null);
+  const [hint, setHint] = useState<string | null>(null);
+  const answerRef = useRef<HTMLTextAreaElement>(null);
   const step = `${card.n}/${card.m}`;
   const label = (id: string) => card.options.find((o) => o.experienceId === id)?.label ?? (place.trim() || "Otra experiencia");
+  const isExperience = where !== "none" && where !== "elsewhere";
+
+  const askFor = (message: string) => {
+    setHint(message);
+    answerRef.current?.focus();
+  };
+  const onContinue = () => {
+    if (where === "none") return onSkip(`«${card.requirement}»: no demostrado`);
+    const text = answer.trim();
+    if (where === "elsewhere" && !place.trim()) return setHint("Escribe dónde lo hiciste (por ejemplo, «Proyecto de grado»).");
+    if (text.length < 3) {
+      return askFor(
+        isExperience
+          ? "Falta contar qué hiciste. Escríbelo en pocas palabras, o pulsa «Que la IA lo redacte» para usar lo que ya dice tu hoja de vida."
+          : "Falta contar qué hiciste. Escríbelo en pocas palabras."
+      );
+    }
+    // An instruction to the AI isn't something you did: it would end up as a bullet.
+    if (text.length < 80 && /\b(escoge|elige|hazlo|redact\w*|escr[ií]be\w*|pon(lo|me)?|lo necesario|por m[ií]|t[uú] mism[oa])\b/i.test(text)) {
+      return askFor(
+        isExperience
+          ? "Eso parece una instrucción para la IA. Para que la escriba por ti, pulsa «Que la IA lo redacte»; aquí van solo tus palabras sobre lo que hiciste."
+          : "Eso parece una instrucción para la IA. Aquí van solo tus palabras sobre lo que hiciste."
+      );
+    }
+    setHint(null);
+    setSubmitted({ mode: "answer", text });
+  };
 
   if (submitted !== null) {
     const experienceId = where === "elsewhere" ? null : where;
+    const draft = submitted.mode === "draft";
     return (
       <>
         <div className="flex justify-end">
-          <p className="rounded-xl bg-foreground text-white px-3 py-2 text-sm" style={{ maxWidth: "85%" }}>{submitted}</p>
+          <p className="rounded-xl bg-foreground text-white px-3 py-2 text-sm" style={{ maxWidth: "85%" }}>
+            {draft ? `Redáctalo tú con lo que ya dice mi hoja de vida en ${label(where)}.` : submitted.text}
+          </p>
         </div>
         <ProposalCard
           kicker={`Experiencia · ${label(where)}`}
           step={step}
-          title="Nueva viñeta, primero en la lista"
+          title={draft ? "Propuesta con lo que ya dice tu hoja de vida" : "Nueva viñeta, primero en la lista"}
           before=""
           cardType="rewrite"
-          request={() => post("/tailor/card", { adaptationId: start.adaptationId, card: "rewrite", requirement: card.requirement, facts, experienceId, answer: submitted })}
-          chatContext={{ adaptationId: start.adaptationId, facts, experienceId, answer: submitted }}
+          request={() =>
+            draft && experienceId
+              ? post("/tailor/card", { adaptationId: start.adaptationId, card: "draft", requirement: card.requirement, facts, experienceId })
+              : post("/tailor/card", { adaptationId: start.adaptationId, card: "rewrite", requirement: card.requirement, facts, experienceId, answer: submitted.text })
+          }
+          chatContext={{ adaptationId: start.adaptationId, facts, experienceId, answer: draft ? "" : submitted.text }}
           post={post}
           turns={turns}
           onTurn={onTurn}
@@ -756,19 +795,50 @@ function MappingCard({
           <label className="block text-xs font-semibold text-muted-foreground mt-3 mb-1" htmlFor={`ans-${card.requirementId}`}>
             ¿Qué hiciste exactamente? (tus palabras, con cifras si las tienes)
           </label>
-          <textarea id={`ans-${card.requirementId}`} className={field} rows={2} maxLength={600} value={answer} onChange={(e) => setAnswer(e.target.value)} />
+          <textarea
+            ref={answerRef}
+            id={`ans-${card.requirementId}`}
+            className={field}
+            rows={2}
+            maxLength={600}
+            value={answer}
+            aria-invalid={hint ? true : undefined}
+            aria-describedby={hint ? `hint-${card.requirementId}` : undefined}
+            onChange={(e) => {
+              setAnswer(e.target.value);
+              if (hint) setHint(null);
+            }}
+          />
         </>
       ) : null}
+      {hint ? (
+        <p id={`hint-${card.requirementId}`} role="alert" className="text-sm mt-2" style={{ color: "#b42318" }}>
+          {hint}
+        </p>
+      ) : null}
       <div className="flex flex-wrap gap-2 mt-3">
-        <button
-          className={primary}
-          disabled={where !== "none" && answer.trim().length < 3}
-          onClick={() => (where === "none" ? onSkip(`«${card.requirement}»: no demostrado`) : setSubmitted(answer.trim()))}
-        >
-          Continuar
+        <button className={primary} onClick={onContinue}>
+          {where === "none" ? "Continuar sin este requisito" : "Continuar"}
         </button>
+        {isExperience ? (
+          <button
+            className={button}
+            onClick={() => {
+              setHint(null);
+              setSubmitted({ mode: "draft", text: "" });
+            }}
+            title="Usa solo lo que ya dice tu hoja de vida en esa experiencia. Lo revisas antes de aplicar."
+          >
+            ✨ Que la IA lo redacte
+          </button>
+        ) : null}
         <button className={ghost} onClick={() => onSkip(`«${card.requirement}»: omitido`)}>Omitir</button>
       </div>
+      {isExperience ? (
+        <p className="text-xs text-muted-foreground mt-2">
+          «Que la IA lo redacte» usa solo lo que ya dice tu hoja de vida en esa experiencia; si allí no aparece, te pregunta en vez de inventar.
+        </p>
+      ) : null}
     </CardBox>
   );
 }

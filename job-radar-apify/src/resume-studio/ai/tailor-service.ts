@@ -7,7 +7,7 @@ import { compatibilityScore, qualityScore } from "../../lib/resume-tailor/score.
 import { findQuote, sliceBetween } from "../../lib/resume-tailor/text.js";
 import { MAX_CHAT_TURNS } from "../../lib/resume-tailor/cards.js";
 import type { CallContext, GatewayFailure, ResumeAiGateway } from "./gateway.js";
-import { CARD_CHAT, CARD_HEADLINE, CARD_REWRITE, CARD_SUMMARY, CV_EXTRACT, EVIDENCE_MAP, JOB_REQUIREMENTS } from "./prompts.js";
+import { CARD_CHAT, CARD_DRAFT, CARD_HEADLINE, CARD_REWRITE, CARD_SUMMARY, CV_EXTRACT, EVIDENCE_MAP, JOB_REQUIREMENTS } from "./prompts.js";
 import { minimizeCvText } from "./sensitive.js";
 
 // AI Resume Studio R3 — the state machine's server steps (doc 11 §5.2):
@@ -203,6 +203,8 @@ export type CardRequest =
   | { card: "headline"; jobTitle: string; facts: ResumeFacts }
   | { card: "summary"; jobTitle: string; tasks: string[]; facts: ResumeFacts }
   | { card: "rewrite"; requirement: string; facts: ResumeFacts; experienceId: string | null; answer: string }
+  // R4c «Que la IA lo redacte»: no answer; only that experience's facts.
+  | { card: "draft"; requirement: string; facts: ResumeFacts; experienceId: string }
   | { card: "chat"; cardType: "headline" | "summary" | "rewrite"; current: string; instruction: string; facts: ResumeFacts; experienceId: string | null; answer: string };
 
 export type CardResult =
@@ -215,9 +217,10 @@ export type CardResult =
 export function cardSources(request: CardRequest): { sources: string[]; knownFactIds: string[] } {
   const all = factTexts(request.facts);
   const knownFactIds = all.map((f) => f.factId);
-  if (request.card === "rewrite" || (request.card === "chat" && request.cardType === "rewrite")) {
+  if (request.card === "rewrite" || request.card === "draft" || (request.card === "chat" && request.cardType === "rewrite")) {
     const scoped = request.experienceId ? all.filter((f) => f.factId === request.experienceId || f.parentId === request.experienceId) : [];
-    return { sources: [request.answer, ...scoped.map((f) => f.text)], knownFactIds };
+    const answer = request.card === "draft" ? [] : [request.answer];
+    return { sources: [...answer, ...scoped.map((f) => f.text)], knownFactIds };
   }
   return { sources: all.map((f) => f.text), knownFactIds };
 }
@@ -248,6 +251,17 @@ function judge(text: string, why: string, supportingFactIds: string[], request: 
 }
 
 export async function proposeCard(gateway: ResumeAiGateway, ctx: Omit<CallContext, "purpose" | "maxTurns">, request: CardRequest): Promise<CardResult> {
+  if (request.card === "draft") {
+    if (!gateway.enabled) return { status: "unavailable", code: "ai_off" };
+    const experience = factTexts(request.facts).filter((f) => f.factId === request.experienceId || f.parentId === request.experienceId);
+    // An experience with nothing written under it can't support a draft: ask, don't call.
+    if (experience.length < 2) {
+      return { status: "question", claims: [], question: "Esa experiencia no tiene viñetas en tu hoja de vida. Cuéntanos con tus palabras qué hiciste ahí.", discardedText: "" };
+    }
+    const r = await gateway.complete(CARD_DRAFT, { requirement: request.requirement, experience }, { ...ctx, purpose: "card_draft" });
+    if (!r.ok) return { status: "unavailable", code: r.code };
+    return judge(r.data.text, r.data.why, r.data.supportingFactIds, request, true, undefined, r.data.question);
+  }
   if (request.card === "rewrite") {
     if (!gateway.enabled) {
       // AI off: the user's own words, tidied mechanically (still validated).

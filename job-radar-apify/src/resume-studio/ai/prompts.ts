@@ -270,6 +270,29 @@ export const CARD_REWRITE: PromptSpec<{ requirement: string; experience: FactTex
   })
 };
 
+// R4c: «Que la IA lo redacte» — the user picked the experience but doesn't
+// want to type. The model may only rephrase what the CV ALREADY says about
+// that experience; if nothing there shows the requirement, it asks instead.
+// The validator checks the draft against that experience's facts only.
+export const CARD_DRAFT: PromptSpec<{ requirement: string; experience: FactText[] }, ProposalOutput> = {
+  id: "card_draft",
+  version: 1,
+  alias: "rewrite",
+  maxInputTokens: 2500,
+  maxOutputTokens: 300,
+  schema: proposalOutput,
+  render: ({ requirement, experience }) => ({
+    system: system(
+      "Redacta UNA viñeta de experiencia (máximo 200 caracteres) que empiece con un verbo en pasado y muestre el requisito de la vacante, usando SOLO lo que ya dicen los hechos de esa experiencia: " +
+        "conserva sus palabras, cifras y herramientas tal cual y no agregues otras. Escribe en el idioma de los hechos. " +
+        "Si los hechos de esa experiencia no muestran nada del requisito, deja \"text\" vacío y escribe en \"question\" qué tendría que contar el usuario. " +
+        "\"supportingFactIds\" son los ids de los hechos que usaste.",
+      '{"text":"","supportingFactIds":[],"why":"","question":""}'
+    ),
+    user: `Requisito de la vacante:\n${fence("VACANTE", requirement)}\n\nHechos de la experiencia:\n${fence("CV", factLines(experience))}\n\nDevuelve el JSON.`
+  })
+};
+
 export const CARD_SUMMARY: PromptSpec<{ jobTitle: string; tasks: string[]; facts: FactText[] }, ProposalOutput> = {
   id: "card_summary",
   version: 2,
@@ -312,4 +335,4 @@ export const CARD_CHAT: PromptSpec<{ cardType: string; current: string; instruct
   })
 };
 
-export const PROMPTS = [CV_EXTRACT, JOB_REQUIREMENTS, EVIDENCE_MAP, CARD_HEADLINE, CARD_REWRITE, CARD_SUMMARY, CARD_CHAT] as const;
+export const PROMPTS = [CV_EXTRACT, JOB_REQUIREMENTS, EVIDENCE_MAP, CARD_HEADLINE, CARD_REWRITE, CARD_DRAFT, CARD_SUMMARY, CARD_CHAT] as const;

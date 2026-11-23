@@ -35,9 +35,14 @@ export function findQuote(original: string, quote: string): { start: number; end
  * (both located with findQuote), with whitespace runs collapsed and a
  * leading bullet mark removed. The model only says where a text is; the
  * text itself is always a copy of the CV. If the end anchor is missing or
- * not found within `maxChars`, the text runs to the end of the line where
- * the start anchor ends. Null when the start anchor isn't in the CV.
+ * not found within `maxChars`, the text runs to the end of the sentence:
+ * PDF lines that wrap mid-sentence are followed (R4c: «…definition of
+ * done while» was cut at the line break). Either way the text never runs
+ * into the NEXT bullet (a bullet mark or a «- » line ends it). Null when
+ * the start anchor isn't in the CV.
  */
+const BULLET_MARK = /[•▪●◦]|\n\s*[-*–·]\s/;
+
 export function sliceBetween(
   original: string,
   start: string,
@@ -53,9 +58,24 @@ export function sliceBetween(
     if (e) stop = Math.max(s.end, s.start + e.end);
   }
   if (stop < 0) {
-    const nl = original.indexOf("\n", s.end);
+    // Follow wrapped lines while the sentence hasn't ended and the next line
+    // isn't empty or a new bullet.
+    let nl = original.indexOf("\n", s.end);
     stop = nl < 0 ? original.length : nl;
+    while (nl >= 0 && stop - s.start < maxChars) {
+      const line = original.slice(s.start, stop).trimEnd();
+      if (/[.!?;:]$/.test(line)) break;
+      const nextEnd = original.indexOf("\n", nl + 1);
+      const next = original.slice(nl + 1, nextEnd < 0 ? original.length : nextEnd);
+      if (!next.trim() || /^\s*[-*–·•▪●◦]/.test(next) || next.includes("|")) break;
+      stop = nextEnd < 0 ? original.length : nextEnd;
+      nl = nextEnd;
+    }
   }
+  // Never run into the next bullet.
+  const tail = original.slice(s.end, stop);
+  const mark = tail.search(BULLET_MARK);
+  if (mark >= 0) stop = s.end + mark;
   stop = Math.min(stop, s.start + maxChars);
   let text = original
     .slice(s.start, stop)

@@ -211,3 +211,58 @@ test("R4C-START the ledger claim is once per id; a refused start can be undone",
   assert.equal(await ledger.ownsAdaptation(USER, id), false);
   assert.equal(await ledger.claimAdaptation(USER, id), true);
 });
+
+test("R4C-SLICE wrapped PDF lines are followed to the end of the sentence; the next bullet is never swallowed", () => {
+  const pdf = [
+    "QA Specialist (Hybrid) | Provana",
+    "● Collaborate with cross-functional teams on testability, defect triage, user stories",
+    "and the definition of done while improving release quality.",
+    "● Apply artificial intelligence to test design.",
+    "Executed functional and automated testing using Python. ● Performed API testing with Postman."
+  ].join("\n");
+  // End anchor the model got slightly wrong → follow the wrapped line to the period.
+  assert.equal(
+    sliceBetween(pdf, "Collaborate with cross-functional teams", "release quality!!", 300)?.text,
+    "Collaborate with cross-functional teams on testability, defect triage, user stories and the definition of done while improving release quality."
+  );
+  // End anchor found but PAST the next bullet mark (inline ●) → cut at the mark.
+  assert.equal(
+    sliceBetween(pdf, "Executed functional and automated testing", "API testing with Postman.", 300)?.text,
+    "Executed functional and automated testing using Python."
+  );
+  // A line-start bullet also ends the text.
+  assert.equal(sliceBetween(pdf, "and the definition of done", "Apply artificial intelligence to test design.", 300)?.text, "and the definition of done while improving release quality.");
+});
+
+test("R4C-DRAFT «Que la IA lo redacte» only rephrases that experience's facts; anything new is not applied", async () => {
+  const facts = {
+    schemaVersion: 1 as const,
+    basics: { fullName: "", headline: "", email: "", phone: "", city: "", links: [] },
+    summary: "",
+    experience: [
+      { id: "e1", source: "user" as const, sourceSpan: null, role: "Analista QA", company: "Empresa Demo", city: "", startDate: "", endDate: "", current: true,
+        bullets: [{ id: "b1", source: "user" as const, sourceSpan: null, text: "Automaticé pruebas de regresión con Selenium y Java." }] },
+      { id: "e2", source: "user" as const, sourceSpan: null, role: "Auxiliar", company: "Otra", city: "", startDate: "", endDate: "", current: false, bullets: [] }
+    ],
+    education: [], certifications: [], skills: [], languages: []
+  };
+  const { proposeCard } = await import("../src/resume-studio/ai/tailor-service.js");
+  const honest = gatewayWith(mockTransport({ fabricationRate: 0, invalidJsonRate: 0 }));
+  const ok = await proposeCard(honest, ctx, { card: "draft", requirement: "Automatización de pruebas con Selenium", facts, experienceId: "e1" });
+  assert.equal(ok.status, "proposal", JSON.stringify(ok));
+  // A model that adds a figure or a tool never gets applied.
+  for (let i = 0; i < 6; i++) {
+    const g = gatewayWith(mockTransport({ fabricationRate: 1, invalidJsonRate: 0 }));
+    const r = await proposeCard(g, ctx, { card: "draft", requirement: `Automatización ${i}`, facts, experienceId: "e1" });
+    assert.notEqual(r.status, "proposal", JSON.stringify(r));
+  }
+  // An experience with no bullets can't support a draft: a question, and no model call.
+  let calls = 0;
+  const counting = gatewayWith(async (req) => {
+    calls++;
+    return mockTransport({ fabricationRate: 0, invalidJsonRate: 0 })(req);
+  });
+  const empty = await proposeCard(counting, ctx, { card: "draft", requirement: "Soporte", facts, experienceId: "e2" });
+  assert.equal(empty.status, "question");
+  assert.equal(calls, 0);
+});
