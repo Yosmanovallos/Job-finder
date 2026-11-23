@@ -201,7 +201,7 @@ export function TailorStart({
 
   return (
     <div className="max-w-2xl mx-auto space-y-4">
-      <div className="text-center md:text-left">
+      <div>
         <p className="font-mono text-xs font-semibold uppercase tracking-wide" style={{ color: "#0f6b4f" }}>
           Hoja de vida con IA
         </p>

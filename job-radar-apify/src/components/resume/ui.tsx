@@ -14,7 +14,7 @@ export const RS_CSS = `
 .rs-dialog{border:2px solid var(--rs-ink,#0e1011);border-radius:22px;padding:0;width:min(560px,calc(100vw - 32px));max-height:calc(100dvh - 48px);background:#fff;color:#0e1011;box-shadow:6px 6px 0 #0e1011}
 .rs-dialog.rs-wide{width:min(860px,calc(100vw - 32px))}
 .rs-dialog::backdrop{background:rgba(14,16,17,.45)}
-.rs-dialog[open]{display:flex;flex-direction:column;animation:rs-pop .16s ease-out}
+.rs-dialog[open]{display:flex;flex-direction:column;animation:rs-pop .16s cubic-bezier(0,0,.2,1)}
 .rs-dialog-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:18px 20px 10px}
 .rs-dialog-body{padding:4px 20px 16px;overflow-y:auto}
 .rs-dialog-foot{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;padding:12px 20px 18px;border-top:1px solid #e5e8e1}
@@ -22,7 +22,7 @@ export const RS_CSS = `
 .rs-x:hover{background:#f4f5f2}
 @media (max-width:640px){
   .rs-dialog,.rs-dialog.rs-wide{width:100vw;max-width:100vw;margin:auto 0 0;border-radius:22px 22px 0 0;border-width:2px 0 0;box-shadow:none;max-height:92dvh}
-  .rs-dialog[open]{animation:rs-up .2s ease-out}
+  .rs-dialog[open]{animation:rs-up .2s cubic-bezier(0,0,.2,1)}
   .rs-dialog-foot{flex-direction:column-reverse}
   .rs-dialog-foot>*{width:100%;justify-content:center}
 }
@@ -37,7 +37,7 @@ export const RS_CSS = `
 .rs-steps li[data-state=done]{color:#074a3a}
 .rs-dot{width:18px;height:18px;border-radius:999px;border:2px solid #cfd6cc;flex:none;display:grid;place-items:center;font-size:11px;font-weight:800}
 .rs-steps li[data-state=done] .rs-dot{background:#0f6b4f;border-color:#0f6b4f;color:#fff}
-.rs-skel{background:#eef0ec;border-radius:8px;animation:rs-pulse 1.4s ease-in-out infinite}
+.rs-skel{background:#eef0ec;border-radius:8px;animation:rs-pulse 1.4s cubic-bezier(.4,0,.6,1) infinite}
 .rs-tabs{display:inline-flex;background:#fff;border:2px solid #0e1011;border-radius:999px;padding:3px;gap:2px}
 .rs-tabs button{padding:6px 14px;border-radius:999px;font-size:13.5px;font-weight:700;color:#3d413e}
 .rs-tabs button[aria-selected=true]{background:#0e1011;color:#fff}

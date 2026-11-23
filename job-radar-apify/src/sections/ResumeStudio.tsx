@@ -752,7 +752,7 @@ function ResumeStudioApp({ userId, accessToken }: { userId: string; accessToken:
       >
         {download ? (
           <div className="grid gap-4 md:grid-cols-2 items-start">
-            <div className="ink-card-sm rounded-2xl overflow-hidden bg-white max-h-[60vh] overflow-y-auto" aria-label="Vista previa">
+            <div className="ink-card-sm rounded-2xl overflow-hidden bg-white overflow-y-auto" style={{ maxHeight: "60vh" }} aria-label="Vista previa">
               <div style={{ position: "relative", zoom: 0.8 }}>
                 <ResumeTemplate facts={download} templateId={draft.templateId} />
                 {passActive ? null : <PreviewWatermark />}
