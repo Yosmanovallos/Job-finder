@@ -283,7 +283,7 @@ export function TailorStart({
       <Section n={2} title="Tu hoja de vida" hint="La usamos como base. Tu archivo no se guarda: solo leemos el texto.">
         <div className="grid gap-2" role="radiogroup" aria-label="Hoja de vida base">
           {saved ? (
-            <button type="button" role="radio" aria-checked={cvChoice === "saved"} data-on={cvChoice === "saved"} className="rs-option" onClick={() => setCvChoice("saved")}>
+            <button type="button" role="radio" aria-checked={cvChoice === "saved"} aria-label={`${saved.title || "Mi hoja de vida"}: ${saved.note}`} data-on={cvChoice === "saved"} className="rs-option" onClick={() => setCvChoice("saved")}>
               <Radio on={cvChoice === "saved"} />
               <span>
                 <b className="block">{saved.title || "Mi hoja de vida"}</b>
@@ -306,7 +306,7 @@ export function TailorStart({
             }}
           >
             {file ? (
-              <button type="button" role="radio" aria-checked={cvChoice === "file"} data-on={cvChoice === "file"} className="rs-option" onClick={() => setCvChoice("file")}>
+              <button type="button" role="radio" aria-checked={cvChoice === "file"} aria-label={`Archivo ${file.name}`} data-on={cvChoice === "file"} className="rs-option" onClick={() => setCvChoice("file")}>
                 <Radio on={cvChoice === "file"} />
                 <span style={{ minWidth: 0 }}>
                   <b className="block" style={{ overflowWrap: "anywhere" }}>{file.name}</b>

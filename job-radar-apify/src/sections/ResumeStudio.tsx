@@ -287,6 +287,11 @@ function ResumeStudioApp({ userId, accessToken }: { userId: string; accessToken:
     if (!onBoard) document.title = "Mi hoja de vida | BuscoTrabajo";
   }, [onBoard]);
 
+  // Each step (start → agent → editor) opens at the top, not where the last one was scrolled.
+  useEffect(() => {
+    window.scrollTo({ top: 0 });
+  }, [view]);
+
   const api = useCallback(
     async (path: string, init: RequestInit = {}) => {
       const res = await fetch(`/api/resume${path}`, {
@@ -592,12 +597,12 @@ function ResumeStudioApp({ userId, accessToken }: { userId: string; accessToken:
   return (
     <div className="rs-root max-w-7xl mx-auto px-4 py-5 md:py-8">
       <RsStyle />
-      <div className="flex items-center justify-between gap-3 mb-5">
+      <div className={`flex items-center justify-between gap-3 mb-5 ${view === "start" || needsConsent ? "max-w-2xl mx-auto" : ""}`}>
         {view === "start" ? (
           <span className="font-heading text-base font-bold">Hoja de vida</span>
         ) : (
           <button className={btnGhost} onClick={() => setView("start")}>
-            ← Empezar otra adaptación
+            ← Nueva adaptación
           </button>
         )}
         {needsConsent ? null : (
@@ -752,7 +757,7 @@ function ResumeStudioApp({ userId, accessToken }: { userId: string; accessToken:
       >
         {download ? (
           <div className="grid gap-4 md:grid-cols-2 items-start">
-            <div className="ink-card-sm rounded-2xl overflow-hidden bg-white overflow-y-auto" style={{ maxHeight: "60vh" }} aria-label="Vista previa">
+            <div className="ink-card-sm rounded-2xl overflow-hidden bg-white overflow-y-auto" style={{ maxHeight: "48vh" }} aria-label="Vista previa">
               <div style={{ position: "relative", zoom: 0.8 }}>
                 <ResumeTemplate facts={download} templateId={draft.templateId} />
                 {passActive ? null : <PreviewWatermark />}
