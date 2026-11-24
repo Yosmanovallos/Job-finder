@@ -222,7 +222,10 @@ export function cardSources(request: CardRequest): { sources: string[]; knownFac
     const answer = request.card === "draft" ? [] : [request.answer];
     return { sources: [...answer, ...scoped.map((f) => f.text)], knownFactIds };
   }
-  return { sources: all.map((f) => f.text), knownFactIds };
+  // R4c: a chat on the headline/summary may use a fact the USER confirmed
+  // (e.g. «~4 años», computed from the CV's dates and approved by them).
+  const confirmed = request.card === "chat" && request.answer.trim() ? [request.answer] : [];
+  return { sources: [...confirmed, ...all.map((f) => f.text)], knownFactIds };
 }
 
 function judge(text: string, why: string, supportingFactIds: string[], request: CardRequest, byAi: boolean, reply?: string, modelQuestion = ""): CardResult {

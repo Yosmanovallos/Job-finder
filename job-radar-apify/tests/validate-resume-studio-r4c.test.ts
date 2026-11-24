@@ -266,3 +266,47 @@ test("R4C-DRAFT «Que la IA lo redacte» only rephrases that experience's facts;
   assert.equal(empty.status, "question");
   assert.equal(calls, 0);
 });
+
+test("R4C-ASSIST «no», «nada», «-» never reach the CV; a real sentence does", async () => {
+  const { answerProblem } = await import("../src/lib/resume-tailor/assist.js");
+  for (const t of ["no", "No.", "nada", "Ninguna", "-", "—", "...", "n/a", "no tengo", "NO SÉ", "x"]) assert.equal(answerProblem(t), "negative", t);
+  for (const t of ["", "  ", "sí", "Selenium", "lo hice"]) assert.equal(answerProblem(t), "too_short", t);
+  assert.equal(answerProblem("Automaticé pruebas de regresión con Selenium y Java."), null);
+  assert.equal(answerProblem("No solo probé la API: automaticé los casos en Postman."), null, "a sentence that starts with «No» is fine");
+});
+
+test("R4C-ASSIST years of experience come from the CV's own dates (overlaps merged, focused on the role)", async () => {
+  const { yearsFromCv, formatYears } = await import("../src/lib/resume-tailor/assist.js");
+  const exp = (role: string, startDate: string, endDate: string, current = false) => ({ id: role, source: "user" as const, sourceSpan: null, role, company: "X", city: "", startDate, endDate, current, bullets: [] });
+  const facts = {
+    schemaVersion: 1 as const,
+    basics: { fullName: "", headline: "", email: "", phone: "", city: "", links: [] },
+    summary: "",
+    experience: [exp("QA Engineer", "2021-01", "2022-12"), exp("QA Analyst", "2022-07", "", true), exp("Cajero", "2015-01", "2016-12"), exp("Sin fechas", "", "")],
+    education: [], certifications: [], skills: [], languages: []
+  };
+  const now = new Date("2026-11-23T12:00:00Z");
+  // QA: 2021-01 … 2026-11 merged = 71 months ≈ 6 years (cashier not counted).
+  assert.deepEqual(yearsFromCv(facts, "QA Engineer", now), { years: 6, count: 2, focused: true });
+  // Nothing matches the focus → every dated experience counts.
+  assert.equal(yearsFromCv(facts, "Contador", now)?.focused, false);
+  assert.equal(yearsFromCv({ ...facts, experience: [exp("QA", "", "")] }, "QA", now), null);
+  assert.equal(formatYears(4.5), "~4,5 años");
+});
+
+test("R4C-ASSIST evidence: the cited CV bullet with its experience, else the closest one", async () => {
+  const { evidenceFor, bestBullet } = await import("../src/lib/resume-tailor/assist.js");
+  const facts = {
+    schemaVersion: 1 as const,
+    basics: { fullName: "", headline: "", email: "", phone: "", city: "", links: [] },
+    summary: "",
+    experience: [
+      { id: "e1", source: "user" as const, sourceSpan: null, role: "QA Engineer", company: "Demo", city: "", startDate: "", endDate: "", current: true,
+        bullets: [{ id: "b1", source: "user" as const, sourceSpan: null, text: "Automaticé pruebas de regresión con Selenium." }, { id: "b2", source: "user" as const, sourceSpan: null, text: "Reporté defectos en Jira." }] }
+    ],
+    education: [], certifications: [], skills: [], languages: []
+  };
+  assert.deepEqual(evidenceFor(facts, "x", ["b2"]).map((e) => [e.text, e.where]), [["Reporté defectos en Jira.", "QA Engineer · Demo"]]);
+  assert.equal(evidenceFor(facts, "Pruebas de regresión automatizadas con Selenium")[0]?.factId, "b1");
+  assert.equal(bestBullet(facts, "Gestión de defectos en Jira", "e1")?.factId, "b2");
+});
