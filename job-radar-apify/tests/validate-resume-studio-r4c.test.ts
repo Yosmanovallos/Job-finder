@@ -310,3 +310,34 @@ test("R4C-ASSIST evidence: the cited CV bullet with its experience, else the clo
   assert.equal(evidenceFor(facts, "Pruebas de regresión automatizadas con Selenium")[0]?.factId, "b1");
   assert.equal(bestBullet(facts, "Gestión de defectos en Jira", "e1")?.factId, "b2");
 });
+
+test("R4C-CHAT a chat answer with no text (nothing in the CV serves) is an honest question, not an AI error", async () => {
+  const { proposeCard } = await import("../src/resume-studio/ai/tailor-service.js");
+  const facts = {
+    schemaVersion: 1 as const,
+    basics: { fullName: "", headline: "", email: "", phone: "", city: "", links: [] },
+    summary: "",
+    experience: [{ id: "e1", source: "user" as const, sourceSpan: null, role: "QA", company: "Demo", city: "", startDate: "", endDate: "", current: true, bullets: [{ id: "b1", source: "user" as const, sourceSpan: null, text: "Probé la app móvil." }] }],
+    education: [], certifications: [], skills: [], languages: []
+  };
+  const g = gatewayWith(async () => ({ content: JSON.stringify({ text: "", supportingFactIds: [], reply: "Tu CV no menciona sistemas distribuidos en esa experiencia." }), usage: null }));
+  const r = await proposeCard(g, ctx, { card: "chat", cardType: "rewrite", current: "Sistemas distribuidos", instruction: "Redáctalo solo con datos de mi hoja de vida.", facts, experienceId: "e1", answer: "" });
+  assert.equal(r.status, "question");
+  assert.ok(r.status === "question" && r.question.includes("sistemas distribuidos"));
+});
+
+test("R4C-APPLY a bullet the experience already has moves up instead of being duplicated", async () => {
+  const { applyBullet } = await import("../src/lib/resume-tailor/cards.js");
+  const facts = {
+    schemaVersion: 1 as const,
+    basics: { fullName: "", headline: "", email: "", phone: "", city: "", links: [] },
+    summary: "",
+    experience: [{ id: "e1", source: "user" as const, sourceSpan: null, role: "QA", company: "Demo", city: "", startDate: "", endDate: "", current: true,
+      bullets: [{ id: "b1", source: "user" as const, sourceSpan: null, text: "Probé la app." }, { id: "b2", source: "user" as const, sourceSpan: null, text: "Analyzed system logs on AWS EC2." }] }],
+    education: [], certifications: [], skills: [], languages: []
+  };
+  const next = applyBullet(facts, { experienceId: "e1" }, "analyzed system logs on AWS EC2");
+  assert.deepEqual(next.experience[0].bullets.map((b) => b.id), ["b2", "b1"]);
+  const added = applyBullet(facts, { experienceId: "e1" }, "Automaticé pruebas con Selenium.");
+  assert.equal(added.experience[0].bullets.length, 3);
+});

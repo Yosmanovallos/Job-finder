@@ -8,6 +8,7 @@ import type { Claim } from "../../lib/resume-tailor/factuality.js";
 import type { JobAnalysis } from "../../lib/resume-tailor/requirements.js";
 import { compatibilityScore, qualityScore } from "../../lib/resume-tailor/score.js";
 import { btnPrimary, newKey, once, Steps, useStagedSteps } from "./ui.js";
+import { normalizeText } from "../../lib/resume-tailor/text.js";
 import { answerProblem, bestBullet, evidenceFor, formatYears, yearsFromCv, type EvidenceItem } from "../../lib/resume-tailor/assist.js";
 
 // AI Resume Studio R3 — the card agent (doc 11 §1.1 and §5.1, prototype
@@ -525,13 +526,13 @@ function Verdict({ ok, children }: { ok: boolean; children: ReactNode }) {
   );
 }
 
-function BeforeAfter({ before, after, target }: { before: string; after: string; target: string }) {
+function BeforeAfter({ before, after, target, strike = true }: { before: string; after: string; target: string; strike?: boolean }) {
   return (
     <div className="grid gap-2 mt-2" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
       <div className="rounded-xl border border-border p-2">
         <p className="font-mono text-xs font-semibold uppercase tracking-wide text-muted-foreground">Antes</p>
         <p className="text-sm mt-1" style={{ color: before ? "#3d413e" : "#8a918b" }}>
-          {before ? <del style={delStyle}>{before}</del> : "— (no había nada para este punto)"}
+          {before ? strike ? <del style={delStyle}>{before}</del> : before : "— (no había nada para este punto)"}
         </p>
       </div>
       <div className="rounded-xl p-2" style={{ border: "2px solid #0f6b4f", background: "#f3fbf7" }}>
@@ -595,7 +596,9 @@ function ProposalCard({
   scoreOf,
   apply,
   onApplied,
-  onSkip
+  onSkip,
+  onBack,
+  beforeFor
 }: {
   kicker: string;
   step?: string;
@@ -620,6 +623,10 @@ function ProposalCard({
   apply: (text: string) => ResumeFacts;
   onApplied: (next: ResumeFacts, text: string) => void;
   onSkip: (why?: string) => void;
+  /** Mapping cards: go back and pick another experience. */
+  onBack?: () => void;
+  /** When the proposal is a bullet the CV already has, what «antes» and «dónde» really are. */
+  beforeFor?: (text: string) => { before: string; target: string } | null;
 }) {
   const [proposal, setProposal] = useState<(Proposal & { supportingFactIds?: string[]; discardedText?: string; question?: string }) | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
@@ -679,8 +686,10 @@ function ProposalCard({
         setEditing(null);
         setEditError(null);
         setReply(data.reply || "Listo: revisa el antes y después.");
+      } else if (data.claims?.length) {
+        setReply(`No lo apliqué: agregaba ${describeClaims(data.claims)}, que no está en tu hoja de vida.`);
       } else {
-        setReply(`No lo apliqué: agregaba ${describeClaims(data.claims ?? [])} que no está en tu hoja de vida.`);
+        setReply(`${data.question || "Tu hoja de vida no muestra esto."} No se aplicó nada: elige otra experiencia, cuéntalo tú o no cambies nada.`);
       }
     } catch {
       setReply("Se perdió la conexión. Inténtalo de nuevo.");
@@ -734,7 +743,15 @@ function ProposalCard({
           <div className="mt-2">
             <Verdict ok>{fromAnswerOnly ? "✓ Verificado con lo que contaste" : "✓ Verificado con tu CV: no agrega datos nuevos"}</Verdict>
           </div>
-          <BeforeAfter before={before} after={proposal.text} target={target} />
+          {(() => {
+            const moved = beforeFor?.(proposal.text) ?? null;
+            return (
+              <>
+                <BeforeAfter before={moved?.before ?? before} after={proposal.text} target={moved?.target ?? target} strike={!moved} />
+                {moved ? <p className="text-xs mt-1" style={{ color: "#074a3a" }}>Ya está en tu CV: no se duplica, solo sube al primer lugar de esa experiencia.</p> : null}
+              </>
+            );
+          })()}
           <EvidenceList items={evidence} answer={answer} />
           {proposal.why ? <p className="text-xs mt-2" style={{ color: "#3d413e" }}>Por qué: {proposal.why}</p> : null}
           <ScoreDelta from={now} to={scoreOf(apply(proposal.text))} />
@@ -853,6 +870,7 @@ function ProposalCard({
               >
                 {busy ? <span className="rs-spin" aria-hidden="true" /> : null}✨ Redactar solo con mi CV
               </button>
+              {onBack ? <button className={button} onClick={onBack}>← Elegir otra experiencia</button> : null}
               <button className={button} onClick={startEdit}>Editar</button>
               <button className={ghost} onClick={() => onSkip()} title="Tu hoja de vida queda como estaba en este punto.">No cambiar nada</button>
             </>
@@ -1002,6 +1020,14 @@ function MappingCard({
           apply={(text) => (experienceId ? applyBullet(facts, { experienceId }, text) : applyBullet(facts, { elsewhere: place.trim() || "Otra experiencia" }, text))}
           onApplied={(next, text) => onApply(next, `Agregado en ${label(where)} (primera viñeta): «${snip(text)}»`)}
           onSkip={(why) => onSkip(why ?? `«${shortReq}»: no se cambió nada`)}
+          onBack={() => setSubmitted(null)}
+          beforeFor={(text) => {
+            const exp = experienceId ? facts.experience.find((e) => e.id === experienceId) : null;
+            const norm = (v: string) => normalizeText(v).replace(/[.;]$/, "");
+            const i = exp ? exp.bullets.findIndex((b) => norm(b.text) === norm(text)) : -1;
+            if (!exp || i < 0) return null;
+            return { before: `${exp.bullets[i].text} (viñeta ${i + 1} de ${exp.bullets.length})`, target: `${label(where)} · sube a la primera viñeta` };
+          }}
         />
       </>
     );

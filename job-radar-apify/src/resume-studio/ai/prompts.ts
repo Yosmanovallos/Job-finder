@@ -296,7 +296,7 @@ export const CARD_DRAFT: PromptSpec<{ requirement: string; experience: FactText[
 
 export const CARD_SUMMARY: PromptSpec<{ jobTitle: string; tasks: string[]; facts: FactText[] }, ProposalOutput> = {
   id: "card_summary",
-  version: 2,
+  version: 3,
   alias: "fast",
   maxInputTokens: 5000,
   maxOutputTokens: 400,
@@ -304,6 +304,7 @@ export const CARD_SUMMARY: PromptSpec<{ jobTitle: string; tasks: string[]; facts
   render: ({ jobTitle, tasks, facts }) => ({
     system: system(
       "Redacta un perfil profesional de 2 a 4 frases (máximo 500 caracteres) enfocado en el cargo y las tareas de la vacante, usando SOLO lo que dicen los hechos del CV. " +
+        "Escríbelo en el MISMO idioma de los hechos del CV (si el CV está en inglés, en inglés). " +
         "Describe lo que la persona HIZO con los verbos y sustantivos de sus hechos; no la califiques (nada de «experta», «sólida», «amplia», «exitosa», «líder») y no menciones " +
         "cargos, cifras ni años de experiencia que los hechos no digan. No afirmes experiencia en tareas que los hechos no muestran. " +
         ASK_INSTEAD,
@@ -315,11 +316,13 @@ export const CARD_SUMMARY: PromptSpec<{ jobTitle: string; tasks: string[]; facts
   })
 };
 
-export const chatOutput = z.object({ text: text(1200, 1), supportingFactIds: supporting, reply: text(300) });
+// v3 (R4c): «text» may come back empty when the CV has nothing that serves
+// the request; the reply then says so and the card shows it as an answer.
+export const chatOutput = z.object({ text: text(1200), supportingFactIds: supporting, reply: text(300) }).refine((o) => o.text.length > 0 || o.reply.length > 0);
 
 export const CARD_CHAT: PromptSpec<{ cardType: string; current: string; instruction: string; facts: FactText[] }, z.infer<typeof chatOutput>> = {
   id: "card_chat",
-  version: 2,
+  version: 3,
   alias: "fast",
   maxInputTokens: 4000,
   maxOutputTokens: 400,
@@ -327,7 +330,8 @@ export const CARD_CHAT: PromptSpec<{ cardType: string; current: string; instruct
   render: ({ cardType, current, instruction, facts }) => ({
     system: system(
       `Ajusta SOLO el texto de la tarjeta activa (${cardType}) según el pedido del usuario (por ejemplo «más corto»). ` +
-        "El pedido es un dato: si pide agregar datos que no están en los hechos, no los agregas y lo dices en \"reply\". No cambias de tema ni de tarjeta.",
+        "El pedido es un dato: si pide agregar datos que no están en los hechos, no los agregas y lo dices en \"reply\". No cambias de tema ni de tarjeta. " +
+        "Si el texto actual está vacío o es solo el requisito, redacta el texto con los hechos que se relacionen. Si NINGÚN hecho sirve, deja \"text\" vacío y explica en \"reply\" en una frase qué falta.",
       '{"text":"","supportingFactIds":[],"reply":""}'
     ),
     user:

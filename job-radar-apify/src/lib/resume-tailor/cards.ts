@@ -1,3 +1,4 @@
+import { normalizeText } from "./text.js";
 import { newFactId, type ResumeFacts } from "../resume-studio.js";
 import { factTexts, type RequirementEvidence } from "./evidence.js";
 import type { JobAnalysis } from "./requirements.js";
@@ -121,6 +122,13 @@ export function applyBullet(facts: ResumeFacts, target: { experienceId: string }
   if ("experienceId" in target) {
     const exp = next.experience.find((e) => e.id === target.experienceId);
     if (!exp) return next;
+    // R4c: the same text already in that experience moves up instead of being duplicated.
+    const same = exp.bullets.findIndex((b) => normalizeText(b.text).replace(/[.;]$/, "") === normalizeText(bullet.text).replace(/[.;]$/, ""));
+    if (same >= 0) {
+      const [kept] = exp.bullets.splice(same, 1);
+      exp.bullets = [kept, ...exp.bullets];
+      return next;
+    }
     exp.bullets = [bullet, ...exp.bullets].slice(0, 8);
     return next;
   }

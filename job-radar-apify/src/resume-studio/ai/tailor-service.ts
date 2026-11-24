@@ -293,5 +293,5 @@ export async function proposeCard(gateway: ResumeAiGateway, ctx: Omit<CallContex
     { ...ctx, purpose: "card_chat", maxTurns: MAX_CHAT_TURNS }
   );
   if (!r.ok) return { status: "unavailable", code: r.code };
-  return judge(r.data.text, "", r.data.supportingFactIds, request, true, r.data.reply);
+  return r.data.text.trim() ? judge(r.data.text, "", r.data.supportingFactIds, request, true, r.data.reply) : judge("", "", [], request, true, undefined, r.data.reply);
 }
