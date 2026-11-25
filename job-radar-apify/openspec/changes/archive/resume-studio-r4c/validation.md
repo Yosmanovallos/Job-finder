@@ -89,3 +89,58 @@ Hecha a 1280 px y 375 px, con datos sintéticos. Las capturas están en [`screen
 
 - **Falso positivo de `validate-job-seo-v2`:** fallaba cuando `public/` venía del build del lanzador local (bandera y login de desarrollo). Con `npm run build` normal pasa, igual que en R4b.
 - **Orden para las gates:** correr siempre `npm run build` antes de las pruebas de integración.
+
+## 6. Tarjetas: «la IA propone, tú apruebas» (2026-11-24/25)
+
+Lo pidió el propietario tras probar las tarjetas: nunca una caja vacía, y cada propuesta debe estar sustentada.
+
+### Qué cambió
+
+| Pedido | Implementación |
+|---|---|
+| Antes/después, requisito, evidencia, por qué | Cada propuesta muestra el requisito de la vacante, «Antes» frente a «Después · dónde va», «Se apoya en» con la viñeta exacta del CV y su experiencia (o tu respuesta), «Por qué» y el cambio de compatibilidad. |
+| «Editar» precargado | Se abre con la propuesta, el borrador descartado, el texto actual o la mejor viñeta del CV. Nunca vacío. |
+| «no», «nada», «-» | `answerProblem`: lo negativo cuenta como «sin esa experiencia» y no se escribe nada; lo demasiado corto pide una frase. La confirmación aparece en el feed. |
+| «Descartar» | Ahora se llama «No cambiar nada». Tiene explicación y confirmación no bloqueante en el feed; 0 `window.confirm`. |
+| «✨ Mejorar con IA» / datos precalculados | Está en toda edición. Las tarjetas sin evidencia ofrecen «✨ Redactar solo con mi CV» y «← Elegir otra experiencia». Además, «Según las fechas de tu CV: ~X años» con «Usar este dato» (`yearsFromCv`). |
+| Verificado o sin evidencia + puntaje | El sello «✓ Verificado con tu CV» o «Sin evidencia en tu CV: no se aplica nada», más «Compatibilidad: A → B» en cada propuesta y en las habilidades marcadas. |
+| «¿Dónde hiciste esto?» | La acción principal es «✨ Que la IA lo redacte» (`card_draft@2`: solo con los hechos de esa experiencia). «Lo cuento yo» abre con la viñeta del CV que más coincide. |
+
+### Defectos hallados con Qwen real y corregidos
+
+1. **`card_chat` daba 502 cuando el CV no tenía nada que sirviera.** El texto vacío no pasaba el esquema. Desde v3 vale `text` vacío con `reply`, y se muestra como respuesta honesta.
+2. **El borrador repetía una viñeta que ya existía, y aplicarlo la duplicaba.** Ahora `applyBullet` la sube al primer lugar, y la tarjeta dice «Ya está en tu CV: no se duplica, solo sube».
+3. **El perfil salía en español con un CV en inglés.** `card_summary@4` escribe en el idioma del CV y puede usar las cifras del propio perfil.
+4. **Una pregunta del modelo filtró jerga interna** («hechos [experience]», «instrucción»). Esas preguntas se reemplazan por una pregunta clara.
+5. **Las fechas se perdían.** Solo se aceptaba «2023-01» literal, y los CV escriben «Jan 2023». `sourcedMonth` acepta la fecha si el CV muestra ese año con ese mes (nombre, abreviatura o número); si no, la deja vacía. Resultado: 6 de 6 experiencias con fecha, y «~5 años» calculado.
+6. **El resumen usaba 381 de 400 tokens.** El tope sube a 600.
+
+### Prueba en el navegador con Qwen real (CV del propietario, vacante de Amadeus, 1280 y 375 px)
+
+- **Extracción:** 200; 6 experiencias (las 6 con fecha), 25 viñetas, 36 habilidades; 0 descartados.
+- **Recorrido completo sin escribir en ninguna caja vacía:**
+  - Título: verificado.
+  - Habilidades: «No tengo ninguna» (el agente no marca nada por el usuario).
+  - 5 requisitos: 3 verificados con la IA y aplicados; 2 sin evidencia, que se redactaron solo con el CV y siguieron sin evidencia, así que quedaron con «No cambiar nada».
+  - Resumen: sin evidencia → «Según las fechas de tu CV: ~5 años» → «Usar este dato» → verificado y aplicado.
+  - Total: 5 cambios aplicados y 3 sin cambio.
+- **«no» escrito en «Editar»:** no entró al CV. El feed dice «Sin esa experiencia: no se escribió nada».
+- **Hoja de vida final:** 0 líneas «no», «nada» o «-»; 0 líneas duplicadas.
+- **Puntaje 50 → 50:** los borradores reutilizan lo que el CV ya probaba. El inicio pasó de 47 a 50 porque ahora cuentan las fechas.
+- **Capturas:** las de esta prueba tienen datos del propietario. Se guardaron FUERA del repo, en la carpeta de notas compartida de la sesión. Las del repo usan datos sintéticos.
+
+### Hallazgo extra en la revisión con mock (corregido)
+
+En una tarjeta «sin evidencia», «Editar» se abría con el borrador DESCARTADO, que traía la cifra inventada del mock («reduciendo los defectos un 40%»). Un clic en «Aplicar mi texto» lo habría metido al CV. Ahora la edición solo se precarga con texto verificado: la propuesta aceptada, el texto actual o la viñeta del CV (captura `desktop-11-editar-precargado.jpg`).
+
+Capturas con datos sintéticos de estas tarjetas: `screens/desktop-8` … `desktop-11`.
+
+### Gates (2026-11-25)
+
+- tsc ✅
+- build ✅ (CSS `1d7ac0969c32df8a…`, igual)
+- test:unit ✅
+- test:resume-studio ✅ (53)
+- test:integration ✅
+  - Primera corrida: `validate-sitemap-streaming` falló por el tope de memoria (heap +69 MB con el servidor y Docker cargados); solo pasó con +55 MB.
+  - Segunda corrida completa: ✅.

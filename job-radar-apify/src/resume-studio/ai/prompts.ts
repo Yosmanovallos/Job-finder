@@ -299,7 +299,7 @@ export const CARD_SUMMARY: PromptSpec<{ jobTitle: string; tasks: string[]; facts
   version: 4,
   alias: "fast",
   maxInputTokens: 5000,
-  maxOutputTokens: 400,
+  maxOutputTokens: 600,
   schema: proposalOutput,
   render: ({ jobTitle, tasks, facts }) => ({
     system: system(

@@ -699,10 +699,11 @@ function ProposalCard({
   };
 
   const startEdit = () => {
-    // Never an empty box: the proposal, the discarded draft, the current text or the best CV bullet.
+    // Never an empty box — but only with VERIFIED text: the proposal, the current
+    // text or the best CV bullet. A discarded draft (it had data the CV doesn't
+    // show, e.g. «40%») is never prefilled: one click would put it in the CV.
     const seed =
       (proposal?.status === "proposal" && proposal.text) ||
-      (proposal?.status === "question" && proposal.discardedText) ||
       before ||
       bestBullet(facts, requirement, scopeExperienceId)?.text ||
       "";
