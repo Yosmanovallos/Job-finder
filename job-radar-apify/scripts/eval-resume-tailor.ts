@@ -51,7 +51,7 @@ async function main() {
       const gateway = createGateway({ config, ledger, transport });
       const r = await gateway.complete(
         CARD_HEADLINE,
-        { jobTitle: "Analista de datos", facts: [{ factId: "e1", section: "experience", text: "Practicante de analítica · Banco Demo S.A.S." }] },
+        { jobTitle: "Analista de datos", facts: [{ factId: "e1", section: "experience", text: "Practicante de analítica · Banco Demo S.A.S." }], language: { lang: "es" } },
         { userId: "00000000-0000-4000-8000-000000000001", adaptationId: "00000000-0000-4000-8000-000000000002", purpose: "smoke" }
       );
       const row = ledger.rows.find((x) => x.status === "ok" || x.status === "invalid_json" || x.status === "error");

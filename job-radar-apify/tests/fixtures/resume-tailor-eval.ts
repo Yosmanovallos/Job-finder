@@ -169,10 +169,10 @@ export async function runTailorEval(options: { transport?: Transport; env?: Reco
             count(chat.status, "chat", "claims" in chat ? chat.claims : []);
             if (chat.status === "proposal") check("chat", chat.text, groundTruth());
           }
-        } else if (card.type === "skills") {
-          // The persona ticks only what it really has: skills named in its truth.
-          const real = card.options.filter((s) => Object.keys(cv.truth).some((k) => s.toLowerCase().includes(k)));
-          facts = applySkills(facts, real, card.options);
+        } else if (card.type === "tool") {
+          // R4d: one question per missing tool. The persona says «Sí» only to
+          // what it really has (named in its truth); «No» writes nothing.
+          if (Object.keys(cv.truth).some((k) => card.skill.toLowerCase().includes(k))) facts = applySkills(facts, [card.skill], [card.skill]);
         } else if (card.type === "requirement_mapping") {
           // answerAll: the fictional persona says it did every requirement, in its
           // own words (a synthetic answer). That answer becomes the source the

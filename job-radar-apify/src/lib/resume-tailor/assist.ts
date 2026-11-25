@@ -16,6 +16,8 @@ export interface EvidenceItem {
   text: string;
   /** «Rol · Empresa» of the experience it belongs to, or the section. */
   where: string;
+  /** R4d: true when the proposal CITED this fact (by id); false = only shares words with it (a guess, never a badge). */
+  cited?: boolean;
 }
 
 const SECTION_LABEL: Record<string, string> = {
@@ -43,7 +45,7 @@ export function evidenceFor(facts: ResumeFacts, text: string, supportingFactIds:
     where: f.section === "bullet" ? expLabel(facts, f.parentId) : f.section === "experience" ? f.text : SECTION_LABEL[f.section] ?? ""
   });
   const cited = supportingFactIds.map((id) => all.find((f) => f.factId === id)).filter((f): f is (typeof all)[number] => Boolean(f));
-  if (cited.length) return cited.slice(0, max).map(toItem);
+  if (cited.length) return cited.slice(0, max).map((f) => ({ ...toItem(f), cited: true }));
   const want = new Set(contentTerms(text));
   return all
     .filter((f) => f.section !== "headline" && f.section !== "summary")
@@ -51,7 +53,7 @@ export function evidenceFor(facts: ResumeFacts, text: string, supportingFactIds:
     .filter((x) => x.hits > 0)
     .sort((a, b) => b.hits - a.hits)
     .slice(0, max)
-    .map((x) => toItem(x.f));
+    .map((x) => ({ ...toItem(x.f), cited: false }));
 }
 
 /** The CV bullet (in that experience, or anywhere) that best matches a requirement: the default answer, in the user's own words. */
@@ -101,6 +103,8 @@ export function yearsFromCv(facts: ResumeFacts, focus: string, now = new Date())
   // Role words, short ones included («QA», «BI»): contentTerms drops words under 3 letters.
   const words = (v: string) => normalizeText(v).split(/[^a-z0-9+#]+/).filter((w) => w.length >= 2 && !ROLE_STOP.has(w));
   const terms = new Set(words(focus));
+  // R4d: «Quality Assurance or Software Testing» names the same area as a «QA» role.
+  if (/quality assurance|aseguramiento de (la )?calidad|software testing|pruebas de software|\btest(ing|er)?\b/.test(normalizeText(focus))) terms.add("qa");
   const dated = facts.experience
     .map((e) => ({ e, s: toMonths(e.startDate), end: e.current ? nowM : toMonths(e.endDate) }))
     .filter((x): x is { e: (typeof facts.experience)[number]; s: number; end: number } => x.s !== null && x.end !== null && x.end >= x.s);
@@ -119,6 +123,68 @@ export function yearsFromCv(facts: ResumeFacts, focus: string, now = new Date())
   }
   total += ce - cs;
   return { years: Math.round((total / 12) * 2) / 2, count: use.length, focused: focused.length > 0 };
+}
+
+// ---------- R4d: computed figures only when they answer the card ----------
+
+const YEARS_ASKED =
+  /\b\d+(?:[.,]\d+)?\s*\+?\s*(?:anos|years?|yrs)\b|\b(?:anos|years?)\s+(?:de|of)\s+(?:experiencia|experience)\b|\b(?:cuantos|how many)\s+(?:anos|years)\b/;
+const GENERIC_YEARS = new Set(
+  "experiencia experience years year anos ano yrs minimo minima minimum least laboral profesional professional relevante relevant tienes have cuantos many como menos more mas requerida required preferible preferred".split(" ")
+);
+
+/** The text asks for a NUMBER OF YEARS («2+ years of experience», «¿cuántos años…?»), not just «experiencia». */
+export function asksForYears(text: string | null | undefined): boolean {
+  return Boolean(text) && YEARS_ASKED.test(normalizeText(text as string));
+}
+
+/** Content words of a years question other than «years of experience» itself (its domain: «QA», «Java»…). */
+export function yearsDomain(text: string): string[] {
+  return normalizeText(text)
+    .split(/[^a-z0-9+#]+/)
+    .filter((w) => w.length >= 2 && !/^\d/.test(w) && !GENERIC_YEARS.has(w) && !ROLE_STOP.has(w) && !YEARS_FILLER.has(w));
+}
+const YEARS_FILLER = new Set("at to with con tu your un una an is es are son tiene has como such".split(" "));
+
+/**
+ * Report P0 «ocultar datos calculados que no vienen al caso»: the «~X años
+ * según tu CV» figure is offered only when the card's requirement (or, on
+ * the profile cards, the AI's question) asks for a number of years, and the
+ * computed figure answers THAT: either it was computed from experiences in
+ * that area (`focused`) or the question names no area. «Distributed
+ * systems», «¿Tienes experiencia con X?» → never.
+ */
+export function yearsFit(input: { requirement: string; question: string; allowQuestion: boolean; focused: boolean }): boolean {
+  const texts = [input.requirement, ...(input.allowQuestion ? [input.question] : [])];
+  return texts.some((t) => asksForYears(t) && (input.focused || yearsDomain(t).length === 0));
+}
+
+// ---------- R4d: «qué falta, por qué importa y qué puedes hacer» ----------
+
+const REQ_LEAD =
+  /^(?:experience (?:with|in)|hands-on experience (?:with|in)|understanding of|knowledge of|familiarity with|ability to|experiencia (?:en|con)|conocimientos? (?:de|en)|manejo de|dominio de)\s+/i;
+
+/** The requirement's topic, short: «Understanding of distributed systems.» → «distributed systems». */
+export function requirementTopic(requirement: string): string {
+  const t = requirement.replace(/\s*\((?:obligatorio|deseable)\)\s*$/, "").replace(/[.;:]+$/, "").trim().replace(REQ_LEAD, "");
+  return t.length > 70 ? `${t.slice(0, 70).replace(/\s+\S*$/, "")}…` : t;
+}
+
+/**
+ * The three parts the report asks for (copy is a PROPOSAL, not yet tested
+ * with users): what is missing, that we don't invent it, and a question
+ * that leads to an action. `claims` are the validator's new data.
+ */
+export function missingNotice(input: { claims: { kind: string; value: string }[]; requirement: string; question?: string }): { missing: string; ask: string } {
+  const values = [...new Set(input.claims.map((c) => c.value))].slice(0, 4);
+  const missing = values.length ? values.join(", ") : requirementTopic(input.requirement);
+  const figures = values.length > 0 && input.claims.every((c) => c.kind === "number" || c.kind === "month" || c.kind === "achievement");
+  const ask = figures
+    ? "¿Es un dato real de tu trabajo? Si lo es, cuéntalo con tus palabras."
+    : !values.length && input.question?.trim()
+      ? input.question.trim()
+      : "¿Trabajaste con eso en algún empleo?";
+  return { missing, ask };
 }
 
 /** «~4,5 años» */

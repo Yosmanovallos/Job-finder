@@ -1,4 +1,5 @@
-import { formatResumeMonth, formatResumeRange, type ResumeFacts, type ResumeTemplateId } from "../lib/resume-studio.js";
+import { formatResumeMonth, formatResumeRange, resumeSectionTitles, type ResumeFacts, type ResumeTemplateId } from "../lib/resume-studio.js";
+import { cvLanguage } from "../lib/resume-tailor/language.js";
 
 // AI Resume Studio R4: clean DOCX for pass holders (doc 06 §6). Built on the
 // server with no new dependency (R2 blocked native modules): a STORED zip
@@ -53,6 +54,9 @@ export function buildResumeDocumentXml(facts: ResumeFacts, templateId: ResumeTem
   const center = templateId === "clasica";
   const accent = templateId === "moderna" ? "1F7A4D" : undefined;
   const body: string[] = [];
+  // R4d: same headings and dates as the preview, in the CV's own language.
+  const lang = cvLanguage(facts) ?? "es";
+  const t = resumeSectionTitles(lang);
   const section = (title: string) => body.push(paragraph([{ text: title.toUpperCase(), bold: true, color: accent }], { before: 240, after: 80, rule: templateId === "clasica" }));
 
   const b = facts.basics;
@@ -62,41 +66,41 @@ export function buildResumeDocumentXml(facts: ResumeFacts, templateId: ResumeTem
   if (contact) body.push(paragraph([{ text: contact, size: size - 2 }], { center }));
 
   if (facts.summary.trim()) {
-    section("Perfil");
+    section(t.summary);
     for (const line of facts.summary.split(/\r?\n/).filter((l) => l.trim())) body.push(paragraph([{ text: line }]));
   }
   if (facts.experience.length) {
-    section("Experiencia");
+    section(t.experience);
     for (const item of facts.experience) {
       body.push(paragraph([{ text: item.role || "Cargo", bold: true }, { text: item.company ? ` · ${item.company}` : "" }], { before: 80 }));
-      const meta = joined(formatResumeRange(item.startDate, item.endDate, item.current), item.city);
+      const meta = joined(formatResumeRange(item.startDate, item.endDate, item.current, lang), item.city);
       if (meta) body.push(paragraph([{ text: meta, size: size - 2 }]));
       for (const bullet of item.bullets.filter((x) => x.text.trim())) body.push(paragraph([{ text: `•  ${bullet.text}` }], { indent: 360 }));
     }
   }
   if (facts.education.length) {
-    section("Formación");
+    section(t.education);
     for (const item of facts.education) {
       body.push(paragraph([{ text: item.degree || "Título", bold: true }, { text: item.institution ? ` · ${item.institution}` : "" }], { before: 60 }));
-      const meta = joined(formatResumeRange(item.startDate, item.endDate), item.city);
+      const meta = joined(formatResumeRange(item.startDate, item.endDate, false, lang), item.city);
       if (meta) body.push(paragraph([{ text: meta, size: size - 2 }]));
     }
   }
   if (facts.certifications.length) {
-    section("Cursos y certificaciones");
+    section(t.certifications);
     for (const item of facts.certifications) {
-      const meta = joined(item.issuer, formatResumeMonth(item.date));
+      const meta = joined(item.issuer, formatResumeMonth(item.date, lang));
       body.push(paragraph([{ text: item.name, bold: true }, { text: meta ? ` · ${meta}` : "", size: size - 2 }]));
     }
   }
   const skills = facts.skills.map((s) => s.name.trim()).filter(Boolean);
   if (skills.length) {
-    section("Habilidades");
+    section(t.skills);
     body.push(paragraph([{ text: skills.join(" · ") }]));
   }
   const languages = facts.languages.filter((l) => l.name.trim());
   if (languages.length) {
-    section("Idiomas");
+    section(t.languages);
     body.push(paragraph([{ text: languages.map((l) => joined(l.name, l.level)).join(" — ") }]));
   }
 

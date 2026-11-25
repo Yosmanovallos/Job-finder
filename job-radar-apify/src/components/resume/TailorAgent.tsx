@@ -2,14 +2,16 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, 
 import { Link } from "react-router-dom";
 import { ResumeTemplate } from "./ResumeTemplate.js";
 import type { ResumeFacts, ResumeTemplateId } from "../../lib/resume-studio.js";
-import { applyBullet, applyHeadline, applySkills, applySummary, MAX_CHAT_TURNS, type Card } from "../../lib/resume-tailor/cards.js";
+import { applyBullet, applyHeadline, applySummary, confirmSkill, MAX_CHAT_TURNS, requirementGaps, toolAnswer, type Card } from "../../lib/resume-tailor/cards.js";
 import { computeEvidence, type Citation } from "../../lib/resume-tailor/evidence.js";
 import type { Claim } from "../../lib/resume-tailor/factuality.js";
 import type { JobAnalysis } from "../../lib/resume-tailor/requirements.js";
 import { compatibilityScore, qualityScore } from "../../lib/resume-tailor/score.js";
 import { btnPrimary, newKey, once, Steps, useStagedSteps } from "./ui.js";
 import { normalizeText } from "../../lib/resume-tailor/text.js";
-import { answerProblem, bestBullet, evidenceFor, formatYears, yearsFromCv, type EvidenceItem } from "../../lib/resume-tailor/assist.js";
+import { answerProblem, bestBullet, evidenceFor, formatYears, yearsFit, yearsFromCv, type EvidenceItem } from "../../lib/resume-tailor/assist.js";
+import { actionReducer, IDLE, outcomeFor, SLOW_AFTER_MS, type ActionState, type CardAnswer, type NextStep } from "../../lib/resume-tailor/action-state.js";
+import { languageMismatch, LANGUAGE_NAME, type CvLanguage } from "../../lib/resume-tailor/language.js";
 
 // AI Resume Studio R3 — the card agent (doc 11 §1.1 and §5.1, prototype
 // docs/resume-studio/mockups/resume-tailor-link-prototype.html). The code
@@ -35,18 +37,22 @@ interface StartResponse {
   aiAvailable: boolean;
   aiMessage: string | null;
   disclaimer: string;
+  /** R4d: every change goes in the CV's language (detected by code). */
+  language?: { cv: CvLanguage | null; job: CvLanguage | null };
 }
 
 type Proposal =
   | { status: "proposal"; text: string; why: string; byAi: boolean; reply?: string; ask?: string }
   | { status: "question"; claims: Claim[]; question: string }
-  | { status: "discarded"; claims: Claim[] }
+  | { status: "discarded"; claims: Claim[]; reason?: string; language?: CvLanguage | null }
   | { status: "error"; error: string };
 
 interface Closed {
   key: string;
   ok: boolean;
   label: string;
+  /** R4d: something the vacancy asks for that the user said they don't have («Jenkins»). */
+  gap?: string;
 }
 
 const button =
@@ -85,17 +91,6 @@ function CardBox({ kicker, step, title, children }: { kicker: string; step?: str
     </div>
   );
 }
-
-const CLAIM_LABEL: Record<Claim["kind"], string> = {
-  number: "una cifra",
-  month: "una fecha",
-  skill: "una herramienta",
-  proper_noun: "un nombre",
-  title: "un cargo o nivel",
-  achievement: "un logro o alcance",
-  new_word: "una palabra",
-  link: "un enlace"
-};
 
 export function TailorAgent({
   accessToken,
@@ -137,11 +132,12 @@ export function TailorAgent({
   const feedRef = useRef<HTMLDivElement>(null);
 
   const post = useCallback(
-    async (path: string, body: unknown) => {
+    async (path: string, body: unknown, signal?: AbortSignal) => {
       const res = await fetch(`/api/resume${path}`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
-        body: JSON.stringify(body)
+        body: JSON.stringify(body),
+        signal
       });
       return { res, data: await res.json().catch(() => null) };
     },
@@ -192,10 +188,14 @@ export function TailorAgent({
     feedRef.current?.scrollTo({ top: feedRef.current.scrollHeight, behavior: "smooth" });
   }, [cursor, closed.length]);
 
-  const close = (card: Card, ok: boolean, label: string) => {
-    setClosed((list) => [...list, { key: `${card.id}-${list.length}`, ok, label }]);
+  const close = (card: Card, ok: boolean, label: string, gap?: string) => {
+    setClosed((list) => [...list, { key: `${card.id}-${list.length}`, ok, label, ...(gap ? { gap } : {}) }]);
     setCursor((c) => c + 1);
   };
+  const baseIds = useMemo(
+    () => new Set([...baseFacts.experience.flatMap((e) => [e.id, ...e.bullets.map((b) => b.id)]), ...baseFacts.skills.map((x) => x.id), "headline", "summary"]),
+    [baseFacts]
+  );
 
   if (error) {
     return (
@@ -294,6 +294,13 @@ export function TailorAgent({
                   : "No encontré requisitos claros en la vacante: revisamos tu hoja de vida en general."}{" "}
                 Vamos uno por uno: tú apruebas cada cambio.
               </p>
+              {start.language?.cv ? (
+                <p className="text-sm text-[#3d413e]">
+                  {start.language.job && start.language.job !== start.language.cv
+                    ? `La vacante está en ${LANGUAGE_NAME[start.language.job]} y tu hoja de vida en ${LANGUAGE_NAME[start.language.cv]}: haremos todos los cambios en ${LANGUAGE_NAME[start.language.cv]}, para que no se mezclen idiomas.`
+                    : `Tu hoja de vida está en ${LANGUAGE_NAME[start.language.cv]}: haremos todos los cambios en ${LANGUAGE_NAME[start.language.cv]}.`}
+                </p>
+              ) : null}
               {cvNotes.map((note) => (
                 <p key={note} className="text-xs text-muted-foreground">{note}</p>
               ))}
@@ -326,8 +333,10 @@ export function TailorAgent({
                     setFacts(next);
                     close(card, true, label);
                   }}
-                  onSkip={(label) => close(card, false, label)}
+                  onSkip={(label, gap) => close(card, false, label, gap)}
                   scoreOf={scoreOf}
+                  baseIds={baseIds}
+                  cvLang={start.language?.cv ?? null}
                 />
               ) : null}
 
@@ -343,6 +352,12 @@ export function TailorAgent({
                     </button>
                     <button className={button} onClick={() => onUse(facts)}>Editar a mano</button>
                   </div>
+                  {closed.some((c) => c.gap) ? (
+                    <p className="text-sm" style={{ color: "#3d413e" }}>
+                      <b>Lo que la vacante pide y tu hoja de vida no muestra:</b> {closed.filter((c) => c.gap).map((c) => c.gap).join(", ")}. No lo
+                      agregamos. Si lo estás aprendiendo, puedes contarlo en la entrevista.
+                    </p>
+                  ) : null}
                   <p className="text-xs text-muted-foreground">
                     Tu hoja de vida base no cambia. La versión adaptada queda en este navegador hasta que la descargues o la guardes.
                   </p>
@@ -438,14 +453,19 @@ function SaveToTracker({
   );
 }
 
-// ---------- R4c cards: the AI proposes, the user approves ----------------
+// ---------- R4c/R4d cards: the AI proposes, the user approves ------------
 // Owner's rule: never an empty box to fill. Every proposal shows the
 // vacancy requirement it serves, BEFORE → AFTER, the CV evidence it stands
 // on, the validator's verdict and how the score moves. Edits open with the
 // proposal already written, «✨ Mejorar con IA» is always there, and «no»,
 // «nada» or «-» never reach the CV.
+// R4d (report «Adaptación de CV con IA», P0): missing tools are asked one by
+// one; every AI button shows it is working on the button itself, offers
+// Cancelar after 10 s and answers IN PLACE of the button; «no evidence» says
+// what is missing, that we don't invent it and what to do. The copy is the
+// report's PROPOSAL: not yet tested with users.
 
-type Post = (path: string, body: unknown) => Promise<{ res: Response; data: any }>;
+type Post = (path: string, body: unknown, signal?: AbortSignal) => Promise<{ res: Response; data: any }>;
 type ScoreOf = (facts: ResumeFacts) => number;
 
 function ActiveCard({
@@ -458,7 +478,9 @@ function ActiveCard({
   onTurn,
   onApply,
   onSkip,
-  scoreOf
+  scoreOf,
+  baseIds,
+  cvLang
 }: {
   card: Card;
   facts: ResumeFacts;
@@ -468,13 +490,14 @@ function ActiveCard({
   turns: number;
   onTurn: () => void;
   onApply: (next: ResumeFacts, label: string) => void;
-  onSkip: (label: string) => void;
+  onSkip: (label: string, gap?: string) => void;
   scoreOf: ScoreOf;
+  baseIds: Set<string>;
+  cvLang: CvLanguage | null;
 }) {
-  if (card.type === "skills") return <SkillsCard card={card} facts={facts} scoreOf={scoreOf} onApply={onApply} onSkip={onSkip} />;
-  if (card.type === "requirement_mapping") {
-    return <MappingCard card={card} facts={facts} start={start} post={post} turns={turns} onTurn={onTurn} onApply={onApply} onSkip={onSkip} scoreOf={scoreOf} />;
-  }
+  const shared = { facts, start, post, turns, onTurn, onApply, onSkip, scoreOf, baseIds, cvLang };
+  if (card.type === "tool") return <ToolCard card={card} {...shared} />;
+  if (card.type === "requirement_mapping") return <MappingCard card={card} {...shared} />;
   const isHeadline = card.type === "headline";
   return (
     <ProposalCard
@@ -484,12 +507,13 @@ function ActiveCard({
       target={isHeadline ? "Título del perfil (debajo de tu nombre)" : "Perfil (primer párrafo de tu hoja de vida)"}
       before={isHeadline ? facts.basics.headline : facts.summary}
       cardType={isHeadline ? "headline" : "summary"}
-      request={() =>
+      request={(signal) =>
         post(
           "/tailor/card",
           isHeadline
             ? { adaptationId: start.adaptationId, card: "headline", jobTitle: job.title, facts }
-            : { adaptationId: start.adaptationId, card: "summary", jobTitle: job.title, tasks: start.job.tasks, facts }
+            : { adaptationId: start.adaptationId, card: "summary", jobTitle: job.title, tasks: start.job.tasks, facts },
+          signal
         )
       }
       chatContext={{ adaptationId: start.adaptationId, facts, experienceId: null, answer: "" }}
@@ -500,15 +524,13 @@ function ActiveCard({
       turns={turns}
       onTurn={onTurn}
       scoreOf={scoreOf}
+      baseIds={baseIds}
+      cvLang={cvLang}
       apply={(text) => (isHeadline ? applyHeadline(facts, text) : applySummary(facts, text))}
       onApplied={(next, text) => onApply(next, `${isHeadline ? "Título del perfil" : "Perfil"} actualizado: «${snip(text)}»`)}
-      onSkip={(why) => onSkip(why ?? `${isHeadline ? "Título del perfil" : "Perfil"}: no se cambió nada`)}
+      onSkip={(why) => onSkip(why ?? `${isHeadline ? "Título del perfil" : "Perfil"}: dejamos esta parte como estaba`)}
     />
   );
-}
-
-function describeClaims(claims: Claim[]): string {
-  return claims.map((c) => `${CLAIM_LABEL[c.kind]} («${c.value}»)`).join(", ");
 }
 
 const snip = (text: string, n = 70) => (text.length > n ? `${text.slice(0, n).trimEnd()}…` : text);
@@ -545,20 +567,28 @@ function BeforeAfter({ before, after, target, strike = true }: { before: string;
   );
 }
 
-function EvidenceList({ items, answer }: { items: EvidenceItem[]; answer?: string }) {
+/**
+ * R4d provenance (report P1, done with P0-3): a line of the CV the user
+ * started with is «Basado en tu hoja de vida», shown literally; anything
+ * added in this adaptation (a tool they confirmed, their own words) is «Lo
+ * que nos contaste». Facts found only by shared words are a guess: listed
+ * as «Se parece a», never as backing.
+ */
+function EvidenceList({ items, answer, baseIds }: { items: EvidenceItem[]; answer?: string; baseIds: Set<string> }) {
   if (!items.length && !answer) return null;
+  const cited = items.some((e) => e.cited);
   return (
     <div className="mt-2 text-xs" style={{ color: "#3d413e" }}>
-      <p className="font-semibold">Se apoya en:</p>
+      <p className="font-semibold">{cited || answer ? "Se apoya en:" : "Se parece a estas líneas de tu hoja de vida:"}</p>
       <ul className="mt-1 space-y-1" style={{ paddingLeft: 0, listStyle: "none" }}>
         {answer ? (
           <li>
-            💬 Lo que contaste: <q>{snip(answer, 160)}</q>
+            💬 Basado en lo que nos contaste: <q>{snip(answer, 160)}</q>
           </li>
         ) : null}
         {items.map((e) => (
           <li key={e.factId}>
-            📄 Tu CV{e.where ? ` · ${e.where}` : ""}: <q>{snip(e.text, 160)}</q>
+            {baseIds.has(e.factId) ? `📄 Basado en tu hoja de vida${e.where ? ` (${e.where})` : ""}` : "💬 Basado en lo que nos contaste"}: <q>{snip(e.text, 160)}</q>
           </li>
         ))}
       </ul>
@@ -573,6 +603,45 @@ function ScoreDelta({ from, to }: { from: number; to: number }) {
       Compatibilidad: <b className="rs-num">{from} → {to}</b>
       {d > 0 ? ` (+${d})` : d < 0 ? ` (${d})` : " (igual: mejora cómo se lee, no el puntaje)"}
     </p>
+  );
+}
+
+/** The button while its AI call runs: spinner and verb on the button itself; after 10 s, a notice and Cancelar. */
+function Working({ label, slow, onCancel }: { label: string; slow: boolean; onCancel: () => void }) {
+  return (
+    <div className="flex flex-wrap items-center gap-2" role="status" aria-live="polite">
+      <button className={primary} disabled aria-busy="true" style={{ opacity: 1, cursor: "progress" }}>
+        <span className="rs-spin" aria-hidden="true" />
+        {label}
+      </button>
+      {slow ? (
+        <>
+          <span className="text-sm" style={{ color: "#3d413e" }}>Esto está tardando más de lo normal.</span>
+          <button className={button} onClick={onCancel}>Cancelar</button>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+const NEXT_LABEL: Record<NextStep, string> = { back: "Elegir otra experiencia", tell: "Contarlo yo", skip: "Saltar", retry: "Intentar de nuevo" };
+
+/** An AI button's answer, shown where the button was: normal size, with what to do next. */
+function Outcome({ state, onNext, can }: { state: Extract<ActionState, { kind: "result" }>; onNext: (step: NextStep) => void; can: (step: NextStep) => boolean }) {
+  const color = state.tone === "error" ? "#b42318" : "#3d413e";
+  return (
+    <div className="rounded-xl p-3 space-y-2" role="status" aria-live="polite" style={{ border: "2px solid #e8d9a6", background: "#fffaf0" }}>
+      <p className="text-sm" style={{ color }}>
+        <b>{state.title}.</b> {state.text}
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {state.next.filter(can).map((step, i) => (
+          <button key={step} className={i === 0 ? primary : step === "skip" ? ghost : button} onClick={() => onNext(step)}>
+            {NEXT_LABEL[step]}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -594,10 +663,14 @@ function ProposalCard({
   turns,
   onTurn,
   scoreOf,
+  baseIds,
+  cvLang,
+  gaps = [],
   apply,
   onApplied,
   onSkip,
   onBack,
+  onTell,
   beforeFor
 }: {
   kicker: string;
@@ -609,7 +682,7 @@ function ProposalCard({
   target: string;
   before: string;
   cardType: "headline" | "summary" | "rewrite";
-  request: () => Promise<{ res: Response; data: any }>;
+  request: (signal?: AbortSignal) => Promise<{ res: Response; data: any }>;
   chatContext: { adaptationId: string; facts: ResumeFacts; experienceId: string | null; answer: string };
   facts: ResumeFacts;
   jobTitle: string;
@@ -620,11 +693,18 @@ function ProposalCard({
   turns: number;
   onTurn: () => void;
   scoreOf: ScoreOf;
+  /** Ids of the facts of the CV the user started with (provenance). */
+  baseIds: Set<string>;
+  cvLang: CvLanguage | null;
+  /** R4d: tools this requirement names that the CV doesn't show (said, never written). */
+  gaps?: string[];
   apply: (text: string) => ResumeFacts;
   onApplied: (next: ResumeFacts, text: string) => void;
   onSkip: (why?: string) => void;
   /** Mapping cards: go back and pick another experience. */
   onBack?: () => void;
+  /** «Contarlo yo»: the user's own words (mapping cards go back to their answer box). */
+  onTell?: () => void;
   /** When the proposal is a bullet the CV already has, what «antes» and «dónde» really are. */
   beforeFor?: (text: string) => { before: string; target: string } | null;
 }) {
@@ -632,70 +712,100 @@ function ProposalCard({
   const [editing, setEditing] = useState<string | null>(null);
   const [editError, setEditError] = useState<string | null>(null);
   const [chat, setChat] = useState("");
-  const [reply, setReply] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [flash, setFlash] = useState<string | null>(null);
+  const [act, setAct] = useState<ActionState>(IDLE);
+  const dispatch = useCallback((event: Parameters<typeof actionReducer>[1]) => setAct((s) => actionReducer(s, event)), []);
   const [cardKey] = useState(() => newKey());
   const [attempt, setAttempt] = useState(0);
+  const [loadSlow, setLoadSlow] = useState(false);
   const editRef = useRef<HTMLTextAreaElement>(null);
+  const callRef = useRef<AbortController | null>(null);
+  const lastRun = useRef<(() => void) | null>(null);
+  const loadRef = useRef<{ attempt: number; ctrl: AbortController } | null>(null);
   const now = useMemo(() => scoreOf(facts), [facts, scoreOf]);
+  const busy = act.kind === "working";
 
   useEffect(() => {
     let cancelled = false;
     setProposal(null);
+    setLoadSlow(false);
+    // One controller per attempt, shared by React's double effect (once() shares the request too).
+    if (loadRef.current?.attempt !== attempt) loadRef.current = { attempt, ctrl: new AbortController() };
+    const ctrl = loadRef.current.ctrl;
+    const slow = setTimeout(() => setLoadSlow(true), SLOW_AFTER_MS);
     void (async () => {
       try {
-        const { res, data } = await once(`card:${cardKey}:${attempt}`, request);
-        if (cancelled) return;
+        const { res, data } = await once(`card:${cardKey}:${attempt}`, () => request(ctrl.signal));
+        if (cancelled || ctrl.signal.aborted) return;
         setProposal(res.ok ? data : { status: "error", error: data?.error ?? "No pudimos preparar la propuesta." });
       } catch {
-        if (!cancelled) setProposal({ status: "error", error: "Se perdió la conexión al preparar la propuesta." });
+        if (!cancelled && !ctrl.signal.aborted) setProposal({ status: "error", error: "Se perdió la conexión al preparar la propuesta." });
       }
     })();
     return () => {
       cancelled = true;
+      clearTimeout(slow);
     };
-    // One request per card (and per «Reintentar»).
+    // One request per card (and per «Intentar de nuevo»).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [attempt]);
 
-  // Figures the CV itself can answer (owner: «Según tu CV: ~X años»).
-  const asked = proposal?.status === "question" ? proposal.question : proposal?.status === "proposal" ? proposal.ask ?? "" : "";
-  const years = /años|years|experiencia/i.test(asked) ? yearsFromCv(facts, jobTitle) : null;
+  // 10 s into an AI turn: progress notice and Cancelar.
+  useEffect(() => {
+    if (act.kind !== "working") return;
+    const t = setTimeout(() => dispatch({ type: "tick", at: Date.now() }), Math.max(0, act.startedAt + SLOW_AFTER_MS - Date.now()));
+    return () => clearTimeout(t);
+  }, [act, dispatch]);
 
-  /** One AI turn on the active card (chat): improve, redraft without a missing fact, or add a confirmed fact. */
-  const runAi = async (current: string, instruction: string, confirmed = "") => {
+  // Figures the CV itself can answer («Según tu CV: ~X años») — only when the card asks for a number of years.
+  const asked = proposal?.status === "question" ? proposal.question : proposal?.status === "proposal" ? proposal.ask ?? "" : "";
+  const computed = useMemo(() => yearsFromCv(facts, jobTitle), [facts, jobTitle]);
+  const years = computed && yearsFit({ requirement, question: asked, allowQuestion: cardType !== "rewrite", focused: computed.focused }) ? computed : null;
+  const yearsFact = years ? `Tengo ${formatYears(years.years)} de experiencia${years.focused ? ` como ${jobTitle}` : ""}, según las fechas de mi hoja de vida.` : "";
+
+  /** One AI turn on the active card: improve, redraft without a missing fact, or add a confirmed fact. */
+  const runAi = async (action: string, current: string, instruction: string, confirmed = "") => {
+    lastRun.current = () => void runAi(action, current, instruction, confirmed);
+    dispatch({ type: "start", action, at: Date.now() });
+    setFlash(null);
     if (turns >= MAX_CHAT_TURNS) {
-      setReply(`Ya usaste los ${MAX_CHAT_TURNS} ajustes con IA de esta adaptación. Puedes editar el texto a mano.`);
+      dispatch({ type: "done", outcome: { tone: "info", title: "Sin ajustes con IA", text: `Ya usaste los ${MAX_CHAT_TURNS} ajustes con IA de esta adaptación. Puedes escribirlo tú.`, next: ["tell", "skip"] } });
       return;
     }
-    setBusy(true);
-    setReply(null);
+    const ctrl = new AbortController();
+    callRef.current = ctrl;
     try {
-      const { res, data } = await post("/tailor/card", {
-        ...chatContext,
-        answer: confirmed || chatContext.answer,
-        card: "chat",
-        cardType,
-        current: (current || before || requirement).slice(0, 1200),
-        instruction: instruction.slice(0, 300)
-      });
+      const { res, data } = await post(
+        "/tailor/card",
+        {
+          ...chatContext,
+          answer: confirmed || chatContext.answer,
+          card: "chat",
+          cardType,
+          current: (current || before || requirement).slice(0, 1200),
+          instruction: instruction.slice(0, 300)
+        },
+        ctrl.signal
+      );
+      if (ctrl.signal.aborted) return;
       onTurn();
-      if (!res.ok) return setReply(data?.error ?? "No pudimos ajustar la tarjeta.");
+      if (!res.ok) return dispatch({ type: "done", outcome: outcomeFor({ status: "error", error: data?.error ?? "No pudimos ajustar la tarjeta." }, requirement) });
       if (data.status === "proposal") {
         setProposal(data);
         setEditing(null);
         setEditError(null);
-        setReply(data.reply || "Listo: revisa el antes y después.");
-      } else if (data.claims?.length) {
-        setReply(`No lo apliqué: agregaba ${describeClaims(data.claims)}, que no está en tu hoja de vida.`);
-      } else {
-        setReply(`${data.question || "Tu hoja de vida no muestra esto."} No se aplicó nada: elige otra experiencia, cuéntalo tú o no cambies nada.`);
+        setFlash(data.reply || "Listo: revisa el antes y el después.");
+        dispatch({ type: "done", outcome: null });
+        return;
       }
+      dispatch({ type: "done", outcome: outcomeFor(data as CardAnswer, requirement) });
     } catch {
-      setReply("Se perdió la conexión. Inténtalo de nuevo.");
-    } finally {
-      setBusy(false);
+      if (!ctrl.signal.aborted) dispatch({ type: "done", outcome: outcomeFor({ status: "error", error: "Se perdió la conexión. Inténtalo de nuevo." }, requirement) });
     }
+  };
+  const cancel = () => {
+    callRef.current?.abort();
+    dispatch({ type: "cancel" });
   };
 
   const startEdit = () => {
@@ -707,10 +817,34 @@ function ProposalCard({
       before ||
       bestBullet(facts, requirement, scopeExperienceId)?.text ||
       "";
+    dispatch({ type: "clear" });
     setEditing(seed);
     setEditError(null);
     setTimeout(() => editRef.current?.focus(), 0);
   };
+  const tell = onTell ?? startEdit;
+  const skipHere = () => onSkip(`«${snip(requirement, 60)}»: dejamos esta parte como estaba`);
+  const next = (step: NextStep) => {
+    if (step === "back") onBack?.();
+    else if (step === "tell") tell();
+    else if (step === "skip") skipHere();
+    else if (lastRun.current) lastRun.current();
+    else {
+      dispatch({ type: "clear" });
+      setAttempt((a) => a + 1);
+    }
+  };
+  const canNext = (step: NextStep) => step !== "back" || Boolean(onBack);
+
+  /** The button, or — while its call runs or once it answered — the work/answer in its place. */
+  const slot = (id: string, workingLabel: string, node: ReactNode) =>
+    act.kind === "working" && act.action === id ? (
+      <Working label={workingLabel} slow={act.slow} onCancel={cancel} />
+    ) : act.kind === "result" && act.action === id ? (
+      <Outcome state={act} onNext={next} can={canNext} />
+    ) : (
+      node
+    );
 
   const applyOwn = () => {
     const text = (editing ?? "").trim();
@@ -721,28 +855,69 @@ function ProposalCard({
       editRef.current?.focus();
       return;
     }
+    // R4d: one language per CV. Their own words in the other language don't go in as they are.
+    if (cvLang && languageMismatch(text, cvLang)) {
+      setEditError(`Tu hoja de vida está en ${LANGUAGE_NAME[cvLang]}. Escríbelo en ${LANGUAGE_NAME[cvLang]} o usa «✨ Mejorar con IA» para pasarlo a ${LANGUAGE_NAME[cvLang]} sin agregar datos.`);
+      editRef.current?.focus();
+      return;
+    }
     onApplied(apply(text), text);
   };
 
   const evidence = proposal?.status === "proposal" ? evidenceFor(facts, proposal.text, proposal.supportingFactIds ?? [], scopeExperienceId) : [];
-  const fromAnswerOnly = proposal?.status === "proposal" && !evidence.length && Boolean(answer);
+  const toldByUser = Boolean(answer) || evidence.some((e) => e.cited && !baseIds.has(e.factId));
+  const fromCv = evidence.some((e) => e.cited && baseIds.has(e.factId));
+  const verdictText = toldByUser
+    ? fromCv
+      ? "✓ Basado en lo que nos contaste y en tu hoja de vida"
+      : "✓ Basado en lo que nos contaste"
+    : fromCv
+      ? "✓ Basado en tu hoja de vida: no agrega datos nuevos"
+      : "Reformulado con tus palabras: no agrega datos nuevos";
+  const notice = proposal && (proposal.status === "question" || proposal.status === "discarded") ? outcomeFor(proposal as CardAnswer, requirement) : null;
 
   return (
     <CardBox kicker={kicker} step={step} title={title}>
       <p className="text-xs" style={{ color: "#5a605b" }}>
         <b>Requisito de la vacante:</b> {requirement}
       </p>
+      {gaps.length ? (
+        <p className="text-xs mt-1" style={{ color: "#6b4e00" }}>
+          Esta parte también pide <b>{gaps.join(", ")}</b>, que tu hoja de vida no muestra: esta viñeta no {gaps.length === 1 ? "lo" : "los"} agrega.
+        </p>
+      ) : null}
 
       {!proposal ? (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground mt-2" role="status">
-          <span className="rs-spin" aria-hidden="true" /> Preparando la propuesta con tu hoja de vida…
+        <div className="mt-2 space-y-2" role="status" aria-live="polite">
+          <div className="flex items-center gap-2 text-sm" style={{ color: "#3d413e" }}>
+            <span className="rs-spin" aria-hidden="true" /> Preparando la propuesta con tu hoja de vida…
+          </div>
+          {loadSlow ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm" style={{ color: "#3d413e" }}>Esto está tardando más de lo normal.</span>
+              <button
+                className={button}
+                onClick={() => {
+                  loadRef.current?.ctrl.abort();
+                  setProposal({ status: "error", error: "Cancelado: no se cambió nada." });
+                }}
+              >
+                Cancelar
+              </button>
+            </div>
+          ) : null}
         </div>
       ) : null}
 
       {proposal?.status === "proposal" && editing === null ? (
         <>
+          {flash ? (
+            <p className="text-sm mt-2 font-semibold" role="status" style={{ color: "#074a3a" }}>
+              ✓ {flash}
+            </p>
+          ) : null}
           <div className="mt-2">
-            <Verdict ok>{fromAnswerOnly ? "✓ Verificado con lo que contaste" : "✓ Verificado con tu CV: no agrega datos nuevos"}</Verdict>
+            <Verdict ok={toldByUser || fromCv}>{verdictText}</Verdict>
           </div>
           {(() => {
             const moved = beforeFor?.(proposal.text) ?? null;
@@ -753,58 +928,61 @@ function ProposalCard({
               </>
             );
           })()}
-          <EvidenceList items={evidence} answer={answer} />
+          <EvidenceList items={evidence} answer={answer} baseIds={baseIds} />
           {proposal.why ? <p className="text-xs mt-2" style={{ color: "#3d413e" }}>Por qué: {proposal.why}</p> : null}
           <ScoreDelta from={now} to={scoreOf(apply(proposal.text))} />
-          {proposal.ask ? (
-            <p className="text-xs mt-1">
-              Dato que podría sumar: {proposal.ask}
-              {years ? (
-                <>
-                  {" "}Según tu CV: <b>{formatYears(years.years)}</b>{" "}
-                  <button
-                    className="underline font-semibold"
-                    disabled={busy}
-                    onClick={() =>
-                      void runAi(proposal.text, `Incluye este dato que confirmo: tengo ${formatYears(years.years)} de experiencia${years.focused ? ` como ${jobTitle}` : ""}.`, `Tengo ${formatYears(years.years)} de experiencia${years.focused ? ` como ${jobTitle}` : ""}, según las fechas de mi hoja de vida.`)
-                    }
-                  >
-                    Agregarlo
-                  </button>
-                </>
-              ) : null}
-            </p>
+          {proposal.ask && years ? (
+            <div className="mt-2 text-sm flex flex-wrap items-center gap-2">
+              <span>
+                Dato que podría sumar: {proposal.ask} Según tu CV: <b>{formatYears(years.years)}</b>
+              </span>
+              {slot(
+                "years-add",
+                "Agregando el dato…",
+                <button
+                  className={button}
+                  disabled={busy}
+                  onClick={() => void runAi("years-add", proposal.text, `Incluye este dato que confirmo: tengo ${formatYears(years.years)} de experiencia${years.focused ? ` como ${jobTitle}` : ""}. No agregues otros datos.`, yearsFact)}
+                >
+                  Agregarlo
+                </button>
+              )}
+            </div>
           ) : null}
           {!proposal.byAi ? <p className="text-xs text-muted-foreground mt-1">IA apagada: es tu texto, con mayúscula y punto.</p> : null}
         </>
       ) : null}
 
-      {(proposal?.status === "question" || proposal?.status === "discarded") && editing === null ? (
+      {notice && editing === null ? (
         <div className="mt-2 space-y-2">
-          <Verdict ok={false}>Sin evidencia en tu CV: no se aplica nada</Verdict>
-          <p className="text-sm" style={{ color: "#3d413e" }}>
-            {proposal.status === "question"
-              ? proposal.question
-              : `La propuesta agregaba ${describeClaims(proposal.claims)}, que no está en tu hoja de vida.`}
-          </p>
+          <div className="rounded-xl p-3" style={{ border: "2px solid #e8d9a6", background: "#fffaf0" }}>
+            <p className="text-sm" style={{ color: "#3d413e" }}>
+              <b>{notice.title}.</b> {notice.text}
+            </p>
+          </div>
           {years ? (
             <div className="rounded-xl border border-border p-2 text-sm flex flex-wrap items-center gap-2">
               <span>
-                Según las fechas de tu CV{years.focused ? ` (${years.count} experiencia${years.count === 1 ? "" : "s"} como ${jobTitle})` : ""}: <b>{formatYears(years.years)}</b>
+                Según las fechas de tu CV{years.focused ? ` (${years.count} experiencia${years.count === 1 ? "" : "s"} en esa área)` : ""}: <b>{formatYears(years.years)}</b>
               </span>
-              <button
-                className={btnPrimary}
-                disabled={busy}
-                onClick={() =>
-                  void runAi(
-                    (proposal.status === "question" && proposal.discardedText) || before,
-                    `Incluye este dato que confirmo: tengo ${formatYears(years.years)} de experiencia${years.focused ? ` como ${jobTitle}` : ""}. No agregues otros datos.`,
-                    `Tengo ${formatYears(years.years)} de experiencia${years.focused ? ` como ${jobTitle}` : ""}, según las fechas de mi hoja de vida.`
-                  )
-                }
-              >
-                Usar este dato
-              </button>
+              {slot(
+                "years",
+                "Redactando con ese dato…",
+                <button
+                  className={btnPrimary}
+                  disabled={busy}
+                  onClick={() =>
+                    void runAi(
+                      "years",
+                      (proposal?.status === "question" && proposal.discardedText) || before,
+                      `Incluye este dato que confirmo: tengo ${formatYears(years.years)} de experiencia${years.focused ? ` como ${jobTitle}` : ""}. No agregues otros datos.`,
+                      yearsFact
+                    )
+                  }
+                >
+                  Usar este dato
+                </button>
+              )}
             </div>
           ) : null}
         </div>
@@ -813,7 +991,8 @@ function ProposalCard({
       {proposal?.status === "error" ? (
         <div className="flex flex-wrap items-center gap-2 mt-2">
           <p role="alert" className="text-sm" style={{ color: "#b42318" }}>{proposal.error}</p>
-          <button className={button} onClick={() => setAttempt((a) => a + 1)}>Reintentar</button>
+          <button className={button} onClick={() => setAttempt((a) => a + 1)}>Intentar de nuevo</button>
+          <button className={ghost} onClick={skipHere}>Saltar</button>
         </div>
       ) : null}
 
@@ -847,109 +1026,331 @@ function ProposalCard({
           {editing !== null ? (
             <>
               <button className={primary} disabled={busy} onClick={applyOwn}>Aplicar mi texto</button>
-              <button
-                className={button}
-                disabled={busy || !editing.trim()}
-                onClick={() => void runAi(editing, `Mejora la redacción de este texto para el requisito «${requirement.slice(0, 120)}», sin agregar datos que no estén en mi hoja de vida ni en este texto.`, editing)}
-              >
-                {busy ? <span className="rs-spin" aria-hidden="true" /> : null}✨ Mejorar con IA
-              </button>
+              {slot(
+                "improve",
+                "Mejorando la redacción…",
+                <button
+                  className={button}
+                  disabled={busy || !editing.trim()}
+                  onClick={() => void runAi("improve", editing, `Mejora la redacción de este texto para el requisito «${requirement.slice(0, 120)}», sin agregar datos que no estén en mi hoja de vida ni en este texto.`, editing)}
+                >
+                  ✨ Mejorar con IA
+                </button>
+              )}
               <button className={ghost} disabled={busy} onClick={() => setEditing(null)}>Cancelar</button>
             </>
           ) : proposal.status === "proposal" ? (
             <>
-              <button className={primary} onClick={() => onApplied(apply(proposal.text), proposal.text)}>Aplicar</button>
-              <button className={button} onClick={startEdit}>Editar</button>
-              <button className={ghost} onClick={() => onSkip()} title="Tu hoja de vida queda como estaba en este punto.">No cambiar nada</button>
+              <button className={primary} disabled={busy} onClick={() => onApplied(apply(proposal.text), proposal.text)}>Aplicar</button>
+              <button className={button} disabled={busy} onClick={startEdit}>Editar</button>
+              <button className={ghost} disabled={busy} onClick={() => onSkip()} title="Tu hoja de vida queda como estaba en este punto.">No cambiar nada</button>
             </>
           ) : (
             <>
-              <button
-                className={primary}
-                disabled={busy}
-                onClick={() => void runAi((proposal.status === "question" && proposal.discardedText) || before, "Redáctalo solo con datos de mi hoja de vida; quita lo que no esté en ella.")}
-              >
-                {busy ? <span className="rs-spin" aria-hidden="true" /> : null}✨ Redactar solo con mi CV
-              </button>
-              {onBack ? <button className={button} onClick={onBack}>← Elegir otra experiencia</button> : null}
-              <button className={button} onClick={startEdit}>Editar</button>
-              <button className={ghost} onClick={() => onSkip()} title="Tu hoja de vida queda como estaba en este punto.">No cambiar nada</button>
+              {slot(
+                "redraft",
+                "Redactando con tu experiencia…",
+                <button
+                  className={primary}
+                  disabled={busy}
+                  onClick={() => void runAi("redraft", (proposal.status === "question" && proposal.discardedText) || before, "Redáctalo solo con datos de mi hoja de vida; quita lo que no esté en ella.")}
+                >
+                  ✨ Redactar solo con mi CV
+                </button>
+              )}
+              <button className={button} disabled={busy} onClick={tell}>Sí, te cuento</button>
+              {onBack ? <button className={button} disabled={busy} onClick={onBack}>← Elegir otra experiencia</button> : null}
+              <button className={ghost} disabled={busy} onClick={skipHere} title="Tu hoja de vida queda como estaba en este punto.">No, saltar</button>
             </>
           )}
         </div>
       ) : null}
 
       {proposal?.status === "proposal" && editing === null ? (
-        <form
-          className="flex gap-2 mt-3 pt-3 border-t border-border"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (!chat.trim()) return;
-            void runAi(proposal.text, chat.trim()).then(() => setChat(""));
-          }}
-        >
-          <input
-            className={field}
-            value={chat}
-            maxLength={300}
-            onChange={(e) => setChat(e.target.value)}
-            placeholder={turns >= MAX_CHAT_TURNS ? `Ya usaste los ${MAX_CHAT_TURNS} ajustes` : "Pídele un ajuste (p. ej. «más corto»)"}
-            aria-label="Ajuste para esta tarjeta"
-            disabled={busy || turns >= MAX_CHAT_TURNS}
-          />
-          <button className={primary} disabled={busy || !chat.trim() || turns >= MAX_CHAT_TURNS}>Enviar</button>
-        </form>
+        <div className="mt-3 pt-3 border-t border-border">
+          {act.kind !== "idle" && act.action === "chat" ? (
+            slot("chat", "Ajustando…", null)
+          ) : (
+            <form
+              className="flex gap-2"
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!chat.trim()) return;
+                const ask = chat.trim();
+                setChat("");
+                void runAi("chat", proposal.text, ask);
+              }}
+            >
+              <input
+                className={field}
+                value={chat}
+                maxLength={300}
+                onChange={(e) => setChat(e.target.value)}
+                placeholder={turns >= MAX_CHAT_TURNS ? `Ya usaste los ${MAX_CHAT_TURNS} ajustes` : "Pídele un ajuste (p. ej. «más corto»)"}
+                aria-label="Ajuste para esta tarjeta"
+                disabled={busy || turns >= MAX_CHAT_TURNS}
+              />
+              <button className={primary} disabled={busy || !chat.trim() || turns >= MAX_CHAT_TURNS}>Enviar</button>
+            </form>
+          )}
+        </div>
       ) : null}
-      {reply ? <p className="text-xs text-muted-foreground mt-2" role="status">{reply}</p> : null}
     </CardBox>
   );
 }
 
-function SkillsCard({
+/**
+ * R4d (report P0 1): ONE tool the vacancy asks for and the CV doesn't show.
+ * «Sí» → where (a job, a project, a course) and, optionally, one short
+ * phrase; only then a bullet is drafted, from that phrase alone. «No» →
+ * nothing is written, it goes to the list of things to work on. «Algo
+ * parecido» → tools of the same family the CV already shows; the missing
+ * tool's name is never written.
+ */
+function ToolCard({
   card,
   facts,
-  scoreOf,
+  start,
+  post,
+  turns,
+  onTurn,
   onApply,
-  onSkip
+  onSkip,
+  scoreOf,
+  baseIds,
+  cvLang
 }: {
-  card: Extract<Card, { type: "skills" }>;
+  card: Extract<Card, { type: "tool" }>;
   facts: ResumeFacts;
-  scoreOf: ScoreOf;
+  start: StartResponse;
+  post: Post;
+  turns: number;
+  onTurn: () => void;
   onApply: (next: ResumeFacts, label: string) => void;
-  onSkip: (label: string) => void;
+  onSkip: (label: string, gap?: string) => void;
+  scoreOf: ScoreOf;
+  baseIds: Set<string>;
+  cvLang: CvLanguage | null;
 }) {
-  const [picked, setPicked] = useState<string[]>([]);
+  const [mode, setMode] = useState<"ask" | "yes" | "similar">("ask");
+  const [where, setWhere] = useState<string | null>(null);
+  const [phrase, setPhrase] = useState("");
+  const [similar, setSimilar] = useState<string | null>(card.related[0] ?? null);
+  const [other, setOther] = useState("");
+  const [hint, setHint] = useState<string | null>(null);
+  const [draft, setDraft] = useState<{ experienceId: string; answer: string } | null>(null);
   const now = useMemo(() => scoreOf(facts), [facts, scoreOf]);
-  const next = useMemo(() => (picked.length ? applySkills(facts, picked, card.options) : facts), [facts, picked, card.options]);
+  const skill = card.skill;
+  const step = `${card.n}/${card.m}`;
+  const label = (id: string | null) =>
+    id === "project" ? "un proyecto" : id === "course" ? "un curso" : card.options.find((o) => o.experienceId === id)?.label ?? "";
+  const inSkills = (name: string) => facts.skills.some((x) => x.name.trim().toLowerCase() === name.toLowerCase());
+  const withSkill = useMemo(() => confirmSkill(facts, skill), [facts, skill]);
+  const skillsLine = facts.skills.map((x) => x.name).filter(Boolean).join(" · ");
+
+  if (draft) {
+    const place = label(draft.experienceId);
+    return (
+      <>
+        <div className="flex justify-end">
+          <p className="rounded-xl bg-foreground text-white px-3 py-2 text-sm" style={{ maxWidth: "85%" }}>
+            Sí, usé {skill} en {place}: {phrase.trim()}
+          </p>
+        </div>
+        <ProposalCard
+          kicker={`${skill} · ${place}`}
+          step={step}
+          title="Tu respuesta, como viñeta"
+          requirement={card.requirement ?? `La vacante pide ${skill}`}
+          target={`${place} · primera viñeta (y ${skill} en Habilidades)`}
+          before=""
+          cardType="rewrite"
+          request={(signal) =>
+            post("/tailor/card", { adaptationId: start.adaptationId, card: "rewrite", requirement: card.requirement ?? skill, facts, experienceId: draft.experienceId, answer: draft.answer }, signal)
+          }
+          chatContext={{ adaptationId: start.adaptationId, facts, experienceId: draft.experienceId, answer: draft.answer }}
+          facts={facts}
+          jobTitle={card.requirement ?? skill}
+          scopeExperienceId={draft.experienceId}
+          answer={draft.answer}
+          post={post}
+          turns={turns}
+          onTurn={onTurn}
+          scoreOf={scoreOf}
+          baseIds={baseIds}
+          cvLang={cvLang}
+          apply={(text) => confirmSkill(applyBullet(facts, { experienceId: draft.experienceId }, text), skill)}
+          onApplied={(next, text) => onApply(next, `${skill}: viñeta en ${place} y en Habilidades, con lo que nos contaste: «${snip(text)}»`)}
+          onSkip={() => onSkip(`${skill}: dejamos tu hoja de vida como estaba`)}
+          onBack={() => setDraft(null)}
+          onTell={() => setDraft(null)}
+        />
+      </>
+    );
+  }
+
+  const yesLabel = card.kind === "tool" ? "Sí, lo he usado" : "Sí";
+  const sayNo = () => onSkip(`${skill}: no lo agregamos. Lo verás en tu lista de cosas por reforzar`, skill);
+
+  const addYes = () => {
+    if (!where) return setHint(`Elige dónde usaste ${skill}.`);
+    const text = phrase.trim();
+    if (!text) {
+      return onApply(withSkill, `${skill} agregado a Habilidades (lo confirmaste tú${where ? `, en ${label(where)}` : ""})`);
+    }
+    const problem = answerProblem(text);
+    if (problem === "negative") return sayNo();
+    if (problem === "too_short") return setHint("Escribe una frase corta de qué hiciste (por ejemplo, con qué y para qué), o deja el campo vacío para agregarlo solo a Habilidades.");
+    if (where === "project" || where === "course") {
+      return onApply(withSkill, `${skill} agregado a Habilidades (lo usaste en ${label(where)}, según nos contaste)`);
+    }
+    setHint(null);
+    setDraft({ experienceId: where, answer: toolAnswer(skill, text) });
+  };
+
   return (
-    <CardBox kicker="Habilidades" title="Habilidades que pide la vacante">
-      <p className="text-sm text-[#3d413e]">
-        {card.present.length ? `${card.present.join(", ")} ya está en tu hoja de vida. ` : ""}La vacante también pide estas.{" "}
-        <b>Marca solo las que hayas usado de verdad</b>: no agregamos ninguna por ti.
+    <CardBox kicker="Lo que pide la vacante" step={step} title={card.question}>
+      <p className="text-sm" style={{ color: "#3d413e" }}>
+        La vacante pide <b>{skill}</b> y no aparece en tu hoja de vida.
+        {card.requirement ? <span className="block text-xs mt-1" style={{ color: "#5a605b" }}>En la vacante: «{snip(card.requirement, 140)}»</span> : null}
       </p>
-      <div className="grid gap-2 mt-2">
-        {card.options.map((skill) => (
-          <label key={skill} className={`flex gap-2 items-center rounded-xl border-2 p-2 text-sm ${picked.includes(skill) ? "border-foreground" : "border-border"}`}>
-            <input
-              type="checkbox"
-              aria-label={skill}
-              checked={picked.includes(skill)}
-              onChange={(e) => setPicked((list) => (e.target.checked ? [...list, skill] : list.filter((s) => s !== skill)))}
-              style={{ width: 18, height: 18, accentColor: "#0f6b4f" }}
-            />
-            <span>{skill}</span>
+
+      {mode === "ask" ? (
+        <>
+          <div className="flex flex-wrap gap-2 mt-3">
+            <button className={primary} onClick={() => setMode("yes")}>{yesLabel}</button>
+            {card.kind === "tool" ? <button className={button} onClick={() => setMode("similar")}>Algo parecido</button> : null}
+            <button className={button} onClick={sayNo}>No</button>
+          </div>
+          <p className="text-xs text-muted-foreground mt-2">Solo agregamos lo que confirmes. Si respondes «No», no se escribe nada.</p>
+        </>
+      ) : null}
+
+      {mode === "yes" ? (
+        <div className="mt-3 space-y-2">
+          <p className="text-sm font-semibold">¿Dónde lo usaste?</p>
+          <div className="flex flex-wrap gap-2" role="radiogroup" aria-label={`Dónde usaste ${skill}`}>
+            {[...card.options.map((o) => ({ id: o.experienceId, text: o.label })), { id: "project", text: "En un proyecto" }, { id: "course", text: "En un curso" }].map((o) => (
+              <button
+                key={o.id}
+                role="radio"
+                aria-checked={where === o.id}
+                className={`rounded-xl border-2 px-3 py-1.5 text-sm font-semibold ${where === o.id ? "border-foreground bg-foreground text-white" : "border-border bg-white"}`}
+                onClick={() => {
+                  setWhere(o.id);
+                  setHint(null);
+                }}
+              >
+                {o.text}
+              </button>
+            ))}
+          </div>
+          <label className="block text-xs font-semibold text-muted-foreground" htmlFor={`tool-${card.id}`}>
+            ¿Qué hiciste con {skill}? (opcional, una frase con tus palabras)
           </label>
-        ))}
-      </div>
-      {picked.length ? <ScoreDelta from={now} to={scoreOf(next)} /> : null}
-      <div className="flex flex-wrap gap-2 mt-3">
-        <button className={primary} disabled={!picked.length} onClick={() => onApply(next, `Habilidades agregadas: ${picked.join(", ")}`)}>
-          Agregar las marcadas
-        </button>
-        <button className={ghost} onClick={() => onSkip("Habilidades: no se agregó ninguna")}>No tengo ninguna</button>
-      </div>
+          <input
+            id={`tool-${card.id}`}
+            className={field}
+            value={phrase}
+            maxLength={300}
+            onChange={(e) => {
+              setPhrase(e.target.value);
+              if (hint) setHint(null);
+            }}
+            placeholder={cvLang === "en" ? `E.g.: ran the regression suite with ${skill} on every release.` : `Ej.: ejecuté la suite de regresión con ${skill} en cada entrega.`}
+          />
+          <BeforeAfter before={skillsLine} after={[skillsLine, skill].filter(Boolean).join(" · ")} target="Habilidades" strike={false} />
+          <ScoreDelta from={now} to={scoreOf(withSkill)} />
+          {hint ? (
+            <p role="alert" className="text-sm" style={{ color: "#b42318" }}>
+              {hint}
+            </p>
+          ) : null}
+          <div className="flex flex-wrap gap-2">
+            <button className={primary} onClick={addYes}>
+              {phrase.trim() && where && where !== "project" && where !== "course" ? "✨ Redactar la viñeta con esto" : `Agregar ${skill} a Habilidades`}
+            </button>
+            <button className={ghost} onClick={() => setMode("ask")}>← Volver</button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Con una frase en un trabajo, la IA redacta una viñeta solo con lo que escribiste. Sin frase, solo se agrega a Habilidades.
+          </p>
+        </div>
+      ) : null}
+
+      {mode === "similar" ? (
+        <div className="mt-3 space-y-2">
+          {card.related.length ? (
+            <>
+              <p className="text-sm">
+                Tu hoja de vida ya muestra estas, parecidas a {skill}. ¿Cuál usaste? <b>No escribimos {skill}.</b>
+              </p>
+              <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Herramienta parecida">
+                {card.related.map((r) => (
+                  <button
+                    key={r}
+                    role="radio"
+                    aria-checked={similar === r}
+                    className={`rounded-xl border-2 px-3 py-1.5 text-sm font-semibold ${similar === r ? "border-foreground bg-foreground text-white" : "border-border bg-white"}`}
+                    onClick={() => setSimilar(r)}
+                  >
+                    {r}
+                  </button>
+                ))}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {similar && !inSkills(similar) ? (
+                  <button
+                    className={primary}
+                    onClick={() => onApply(applySkillName(facts, similar), `${similar} destacado en Habilidades (ya estaba en tu hoja de vida; ${skill} no se agregó)`)}
+                  >
+                    Destacar {similar} en Habilidades
+                  </button>
+                ) : (
+                  <button className={primary} disabled={!similar} onClick={() => onSkip(`${skill}: no lo agregamos; tu hoja de vida ya muestra ${similar}, que es parecido`, `${skill} (tienes ${similar})`)}>
+                    Continuar
+                  </button>
+                )}
+                <button className={ghost} onClick={() => setMode("ask")}>← Volver</button>
+              </div>
+            </>
+          ) : (
+            <>
+              <label className="block text-sm" htmlFor={`similar-${card.id}`}>
+                ¿Cuál usaste en lugar de {skill}? <b>No escribimos {skill}</b>; agregamos la que nos digas a Habilidades.
+              </label>
+              <input id={`similar-${card.id}`} className={field} value={other} maxLength={40} onChange={(e) => setOther(e.target.value)} placeholder="Nombre de la herramienta" />
+              {hint ? (
+                <p role="alert" className="text-sm" style={{ color: "#b42318" }}>
+                  {hint}
+                </p>
+              ) : null}
+              <div className="flex flex-wrap gap-2">
+                <button
+                  className={primary}
+                  onClick={() => {
+                    const name = other.trim();
+                    if (name.length < 2 || answerProblem(`${name} herramienta usada`) === "negative" || /^(no|nada|ninguna?)$/i.test(name)) {
+                      return setHint("Escribe el nombre de la herramienta, o vuelve y responde «No».");
+                    }
+                    onApply(applySkillName(facts, name), `${name} agregado a Habilidades (lo contaste tú; ${skill} no se agregó)`);
+                  }}
+                >
+                  Agregar a Habilidades
+                </button>
+                <button className={ghost} onClick={() => setMode("ask")}>← Volver</button>
+              </div>
+            </>
+          )}
+        </div>
+      ) : null}
     </CardBox>
   );
+}
+
+/** A skill the user named (or one the CV already shows), added to the Skills list only. */
+function applySkillName(facts: ResumeFacts, name: string): ResumeFacts {
+  return confirmSkill(facts, name.trim().slice(0, 60));
 }
 
 function MappingCard({
@@ -961,7 +1362,9 @@ function MappingCard({
   onTurn,
   onApply,
   onSkip,
-  scoreOf
+  scoreOf,
+  baseIds,
+  cvLang
 }: {
   card: Extract<Card, { type: "requirement_mapping" }>;
   facts: ResumeFacts;
@@ -970,8 +1373,10 @@ function MappingCard({
   turns: number;
   onTurn: () => void;
   onApply: (next: ResumeFacts, label: string) => void;
-  onSkip: (label: string) => void;
+  onSkip: (label: string, gap?: string) => void;
   scoreOf: ScoreOf;
+  baseIds: Set<string>;
+  cvLang: CvLanguage | null;
 }) {
   const [where, setWhere] = useState<string>(card.suggested ?? card.options[0]?.experienceId ?? "elsewhere");
   const [place, setPlace] = useState("");
@@ -985,6 +1390,8 @@ function MappingCard({
   const label = (id: string) => card.options.find((o) => o.experienceId === id)?.label ?? (place.trim() || "Otra experiencia");
   const best = isExperience ? bestBullet(facts, card.requirement, where) : null;
   const shortReq = snip(card.requirement, 60);
+  // R4d: tools this requirement names that the CV still doesn't show — said, never written.
+  const gaps = useMemo(() => requirementGaps(card.requirement, facts), [card.requirement, facts]);
 
   if (submitted !== null) {
     const experienceId = isExperience ? where : null;
@@ -1004,10 +1411,10 @@ function MappingCard({
           target={`${label(where)} · primera viñeta`}
           before=""
           cardType="rewrite"
-          request={() =>
+          request={(signal) =>
             draft && experienceId
-              ? post("/tailor/card", { adaptationId: start.adaptationId, card: "draft", requirement: card.requirement, facts, experienceId })
-              : post("/tailor/card", { adaptationId: start.adaptationId, card: "rewrite", requirement: card.requirement, facts, experienceId, answer: submitted.text })
+              ? post("/tailor/card", { adaptationId: start.adaptationId, card: "draft", requirement: card.requirement, facts, experienceId }, signal)
+              : post("/tailor/card", { adaptationId: start.adaptationId, card: "rewrite", requirement: card.requirement, facts, experienceId, answer: submitted.text }, signal)
           }
           chatContext={{ adaptationId: start.adaptationId, facts, experienceId, answer: draft ? "" : submitted.text }}
           facts={facts}
@@ -1018,10 +1425,20 @@ function MappingCard({
           turns={turns}
           onTurn={onTurn}
           scoreOf={scoreOf}
+          baseIds={baseIds}
+          cvLang={cvLang}
+          gaps={gaps}
           apply={(text) => (experienceId ? applyBullet(facts, { experienceId }, text) : applyBullet(facts, { elsewhere: place.trim() || "Otra experiencia" }, text))}
           onApplied={(next, text) => onApply(next, `Agregado en ${label(where)} (primera viñeta): «${snip(text)}»`)}
-          onSkip={(why) => onSkip(why ?? `«${shortReq}»: no se cambió nada`)}
+          onSkip={(why) => onSkip(why ?? `«${shortReq}»: dejamos esta parte como estaba`)}
           onBack={() => setSubmitted(null)}
+          onTell={() => {
+            // (openWriting is declared below this early return: inline it.)
+            setSubmitted(null);
+            setWriting(best?.text ?? "");
+            setHint(null);
+            setTimeout(() => answerRef.current?.focus(), 0);
+          }}
           beforeFor={(text) => {
             const exp = experienceId ? facts.experience.find((e) => e.id === experienceId) : null;
             const norm = (v: string) => normalizeText(v).replace(/[.;]$/, "");
@@ -1065,6 +1482,11 @@ function MappingCard({
       <p className="text-xs text-muted-foreground">
         Requisito {card.kind === "must" ? "obligatorio" : "deseable"} de la vacante. {card.suggested ? "Marqué la experiencia donde más se ve en tu hoja de vida; cámbiala si hace falta." : "Elige dónde lo hiciste."}
       </p>
+      {gaps.length ? (
+        <p className="text-xs mt-1" style={{ color: "#6b4e00" }}>
+          Pide <b>{gaps.join(", ")}</b>, que tu hoja de vida no muestra. No {gaps.length === 1 ? "lo" : "los"} escribimos por ti: la viñeta usa solo lo que ya hiciste.
+        </p>
+      ) : null}
       <div className="grid gap-2 mt-2" role="radiogroup" aria-label="Dónde lo hiciste">
         {[
           ...card.options.map((o) => ({ id: o.experienceId, text: o.label, hint: "" })),

@@ -245,7 +245,10 @@ test("RS3-CARDS queue order is fixed by code; max 5 mappings; AI off drops AI ca
   const job = analyzeJob({ title: "Analista de Marketing Digital Jr.", description: VACANCY });
   const ev = computeEvidence(job.requirements, facts);
   const queue = buildQueue({ job, evidence: ev, facts, aiEnabled: true });
-  assert.deepEqual(queue.map((c) => c.type), ["headline", "skills", "requirement_mapping", "requirement_mapping", "requirement_mapping", "requirement_mapping", "summary"]);
+  // R4d: the «skills» checklist became one «tool» card per missing skill, asked first.
+  const tools = queue.filter((c) => c.type === "tool").length;
+  assert.ok(tools >= 1);
+  assert.deepEqual(queue.slice(tools).map((c) => c.type), ["headline", "requirement_mapping", "requirement_mapping", "requirement_mapping", "requirement_mapping", "summary"]);
   const maps = queue.filter((c) => c.type === "requirement_mapping");
   assert.deepEqual(maps.map((c) => (c.type === "requirement_mapping" ? `${c.n}/${c.m}` : "")), ["1/4", "2/4", "3/4", "4/4"]);
   const off = buildQueue({ job, evidence: ev, facts, aiEnabled: false });

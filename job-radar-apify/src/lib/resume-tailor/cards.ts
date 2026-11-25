@@ -2,7 +2,8 @@ import { normalizeText } from "./text.js";
 import { newFactId, type ResumeFacts } from "../resume-studio.js";
 import { factTexts, type RequirementEvidence } from "./evidence.js";
 import type { JobAnalysis } from "./requirements.js";
-import { findSkills } from "./skills.js";
+import { cvLanguage } from "./language.js";
+import { findSkills, relatedSkills, skillKind, skillQuestion, textMentionsSkill } from "./skills.js";
 
 // AI Resume Studio R3 — S4 «guion»: the card queue (doc 11 §1.1 and §5.2).
 // The CODE decides the steps and their order:
@@ -21,7 +22,22 @@ export interface ExperienceOption {
 
 export type Card =
   | { id: "headline"; type: "headline"; needsAi: true }
-  | { id: "skills"; type: "skills"; needsAi: false; options: string[]; present: string[] }
+  | {
+      id: string;
+      type: "tool";
+      needsAi: false;
+      /** R4d: ONE tool/skill the vacancy asks for and the CV doesn't show («¿Has usado Jenkins?»). */
+      skill: string;
+      question: string;
+      kind: "tool" | "language" | "area";
+      /** The vacancy line that names it (null when it comes from the whole text). */
+      requirement: string | null;
+      /** Same-family tools the CV already shows, for «Algo parecido». */
+      related: string[];
+      n: number;
+      m: number;
+      options: ExperienceOption[];
+    }
   | {
       id: string;
       type: "requirement_mapping";
@@ -44,19 +60,66 @@ export function experienceOptions(facts: ResumeFacts): ExperienceOption[] {
   }));
 }
 
-/** Skills the vacancy names that the CV doesn't show yet (offered one by one, never «añadir todo»). */
+export const MAX_TOOL_CARDS = 6;
+
+/** Canonical skills the CV shows anywhere (skills list, bullets, roles, studies). */
+export function cvSkills(facts: ResumeFacts): string[] {
+  return findSkills(factTexts(facts).map((f) => f.text).join("\n"));
+}
+
+/**
+ * Skills the vacancy asks for that the CV doesn't show yet, in the order they
+ * are asked: «must» requirements first, then «nice». When there are
+ * requirements, only skills named IN them count — the whole text also has
+ * benefits and company prose («our Bogotá office»). Without requirements,
+ * the whole vacancy's skills.
+ */
 export function missingSkills(job: JobAnalysis, facts: ResumeFacts): { missing: string[]; present: string[] } {
-  const cv = new Set(findSkills(factTexts(facts).map((f) => f.text).join("\n")));
-  return { missing: job.skills.filter((s) => !cv.has(s)), present: job.skills.filter((s) => cv.has(s)) };
+  const cv = new Set(cvSkills(facts));
+  const ordered = job.requirements.length
+    ? [...job.requirements.filter((r) => r.kind === "must"), ...job.requirements.filter((r) => r.kind === "nice")].flatMap((r) => inTextOrder(r.text, r.skills))
+    : job.skills;
+  const asked = [...new Set(ordered)];
+  return { missing: asked.filter((s) => !cv.has(s)), present: asked.filter((s) => cv.has(s)) };
+}
+
+/** A requirement's skills in the order its text names them («Robot Framework, Python, Java»). */
+function inTextOrder(text: string, skills: string[]): string[] {
+  const n = normalizeText(text);
+  const at = (s: string) => {
+    const i = n.indexOf(normalizeText(s));
+    return i < 0 ? Number.MAX_SAFE_INTEGER : i;
+  };
+  return [...skills].sort((a, b) => at(a) - at(b));
+}
+
+/** R4d: one «¿Has usado X?» card per missing skill, before any card that writes. */
+export function toolCards(job: JobAnalysis, facts: ResumeFacts): Extract<Card, { type: "tool" }>[] {
+  const { missing } = missingSkills(job, facts);
+  const have = cvSkills(facts);
+  const options = experienceOptions(facts);
+  const picked = missing.slice(0, MAX_TOOL_CARDS);
+  return picked.map((skill, i) => ({
+    id: `tool-${normalizeText(skill).replace(/[^a-z0-9]+/g, "-")}`,
+    type: "tool",
+    needsAi: false,
+    skill,
+    question: skillQuestion(skill),
+    kind: skillKind(skill),
+    requirement: job.requirements.find((r) => r.skills.includes(skill))?.text ?? null,
+    related: relatedSkills(skill, have),
+    n: i + 1,
+    m: picked.length,
+    options
+  }));
 }
 
 export function buildQueue(input: { job: JobAnalysis; evidence: RequirementEvidence[]; facts: ResumeFacts; aiEnabled: boolean }): Card[] {
   const { job, evidence, facts, aiEnabled } = input;
-  const queue: Card[] = [];
+  // R4d (report P0): the missing tools are ASKED first, one by one, so a
+  // confirmed tool is a fact before any card drafts text.
+  const queue: Card[] = [...toolCards(job, facts)];
   if (aiEnabled) queue.push({ id: "headline", type: "headline", needsAi: true });
-
-  const skills = missingSkills(job, facts);
-  if (skills.missing.length) queue.push({ id: "skills", type: "skills", needsAi: false, options: skills.missing.slice(0, 12), present: skills.present });
 
   const level = new Map(evidence.map((e) => [e.requirementId, e]));
   const pending = job.requirements.filter((r) => level.get(r.id)?.level !== "full").slice(0, MAX_MAPPING_CARDS);
@@ -82,6 +145,27 @@ export function buildQueue(input: { job: JobAnalysis; evidence: RequirementEvide
 
   if (aiEnabled) queue.push({ id: "summary", type: "summary", needsAi: true });
   return queue;
+}
+
+/** Skills a requirement names that the CV (as it is now) doesn't show: said on the card, never written. */
+export function requirementGaps(requirement: string, facts: ResumeFacts): string[] {
+  const text = factTexts(facts).map((f) => f.text).join("\n");
+  return findSkills(requirement).filter((s) => !textMentionsSkill(text, s));
+}
+
+/**
+ * The user's confirmation, as the ONLY source for a bullet about a tool
+ * («Sí, lo usé» + where + their own short phrase). The tool's name is put in
+ * when their phrase doesn't say it, because they did confirm it.
+ */
+export function toolAnswer(skill: string, phrase: string): string {
+  const p = phrase.replace(/\s+/g, " ").trim().slice(0, 400);
+  return textMentionsSkill(p, skill) ? p : `${skill}: ${p}`;
+}
+
+/** «Sí, lo he usado» without a phrase: only the Skills section changes. */
+export function confirmSkill(facts: ResumeFacts, skill: string): ResumeFacts {
+  return applySkills(facts, [skill], [skill]);
 }
 
 // ---------- applying approved changes (never to the stored base) ----------
@@ -137,7 +221,8 @@ export function applyBullet(facts: ResumeFacts, target: { experienceId: string }
     id: newFactId("exp"),
     source: "user",
     sourceSpan: null,
-    role: target.elsewhere.trim().slice(0, 120) || "Otra experiencia",
+    // R4d: the fallback label goes in the CV's own language.
+    role: target.elsewhere.trim().slice(0, 120) || (cvLanguage(facts) === "en" ? "Other experience" : "Otra experiencia"),
     company: "",
     city: "",
     startDate: "",
