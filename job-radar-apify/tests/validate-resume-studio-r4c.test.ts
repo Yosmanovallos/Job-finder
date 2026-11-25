@@ -341,3 +341,28 @@ test("R4C-APPLY a bullet the experience already has moves up instead of being du
   const added = applyBullet(facts, { experienceId: "e1" }, "Automaticé pruebas con Selenium.");
   assert.equal(added.experience[0].bullets.length, 3);
 });
+
+test("R4C-DATES «Jan 2023», «enero de 2023», «01/2023» back a model date; an unbacked month stays empty", async () => {
+  const { sourcedMonth } = await import("../src/resume-studio/ai/tailor-service.js");
+  const cv = "QA Engineer | Demo | Jan 2023 – Present\nAnalista | Otra | enero de 2019 - 03/2021\nPracticante 2017";
+  assert.equal(sourcedMonth(cv, "2023-01"), "2023-01");
+  assert.equal(sourcedMonth(cv, "2019-01"), "2019-01");
+  assert.equal(sourcedMonth(cv, "2021-03"), "2021-03");
+  assert.equal(sourcedMonth(cv, "2023-02"), "", "February 2023 isn't in the CV");
+  assert.equal(sourcedMonth(cv, "2017-06"), "", "only the year is there: the month is never guessed");
+  assert.equal(sourcedMonth(cv, "2023-1"), "");
+});
+
+test("R4C-QUESTION a model question that leaks the prompt's words is replaced by a plain one", async () => {
+  const { proposeCard } = await import("../src/resume-studio/ai/tailor-service.js");
+  const facts = {
+    schemaVersion: 1 as const,
+    basics: { fullName: "", headline: "QA Engineer", email: "", phone: "", city: "", links: [] },
+    summary: "QA Engineer with over 4 years of experience.",
+    experience: [], education: [], certifications: [], skills: [], languages: []
+  };
+  const g = gatewayWith(async () => ({ content: JSON.stringify({ text: "", supportingFactIds: [], why: "", question: "¿Puedo incluir 'más de 4 años' o debo basarme solo en los hechos [experience]?" }), usage: null }));
+  const r = await proposeCard(g, ctx, { card: "summary", jobTitle: "QA Engineer", tasks: [], facts });
+  assert.equal(r.status, "question");
+  assert.ok(r.status === "question" && !/hechos|\[experience\]/.test(r.question), r.status === "question" ? r.question : "");
+});

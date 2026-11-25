@@ -296,7 +296,7 @@ export const CARD_DRAFT: PromptSpec<{ requirement: string; experience: FactText[
 
 export const CARD_SUMMARY: PromptSpec<{ jobTitle: string; tasks: string[]; facts: FactText[] }, ProposalOutput> = {
   id: "card_summary",
-  version: 3,
+  version: 4,
   alias: "fast",
   maxInputTokens: 5000,
   maxOutputTokens: 400,
@@ -305,6 +305,8 @@ export const CARD_SUMMARY: PromptSpec<{ jobTitle: string; tasks: string[]; facts
     system: system(
       "Redacta un perfil profesional de 2 a 4 frases (máximo 500 caracteres) enfocado en el cargo y las tareas de la vacante, usando SOLO lo que dicen los hechos del CV. " +
         "Escríbelo en el MISMO idioma de los hechos del CV (si el CV está en inglés, en inglés). " +
+        "Los hechos incluyen el perfil actual del CV: sus cifras (por ejemplo, años de experiencia) SÍ se pueden usar tal cual. " +
+        "Si preguntas algo, hazlo como a una persona que busca empleo, sin mencionar «hechos», «instrucciones» ni el formato. " +
         "Describe lo que la persona HIZO con los verbos y sustantivos de sus hechos; no la califiques (nada de «experta», «sólida», «amplia», «exitosa», «líder») y no menciones " +
         "cargos, cifras ni años de experiencia que los hechos no digan. No afirmes experiencia en tareas que los hechos no muestran. " +
         ASK_INSTEAD,

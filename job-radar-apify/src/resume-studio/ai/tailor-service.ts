@@ -18,6 +18,41 @@ import { minimizeCvText } from "./sensitive.js";
 const MONTH = /^(19|20)\d{2}-(0[1-9]|1[0-2])$/;
 const month = (v: string) => (MONTH.test(v) ? v : "");
 
+// R4c: CVs write «Jan 2023», «enero de 2023», «01/2023» — almost never
+// «2023-01». A model date «AAAA-MM» is kept only if the CV shows that same
+// year with that same month (name, abbreviation or number) next to it;
+// otherwise it stays empty (never guessed). This is what lets «~X años»
+// be computed from the CV's own dates.
+const MONTH_NAMES: string[][] = [
+  ["enero", "ene", "january", "jan"],
+  ["febrero", "feb", "february"],
+  ["marzo", "mar", "march"],
+  ["abril", "abr", "april", "apr"],
+  ["mayo", "may"],
+  ["junio", "jun", "june"],
+  ["julio", "jul", "july"],
+  ["agosto", "ago", "august", "aug"],
+  ["septiembre", "setiembre", "sep", "sept", "september"],
+  ["octubre", "oct", "october"],
+  ["noviembre", "nov", "november"],
+  ["diciembre", "dic", "december", "dec"]
+];
+export function sourcedMonth(original: string, value: string): string {
+  if (!MONTH.test(value)) return "";
+  if (original.includes(value)) return value;
+  const [year, mm] = value.split("-");
+  const m = Number(mm);
+  const text = original.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  const names = MONTH_NAMES[m - 1].join("|");
+  const nums = `0?${m}`;
+  const patterns = [
+    new RegExp(`\\b(${names})\\.?\\s*(de\\s+|del\\s+|,\\s*)?${year}\\b`),
+    new RegExp(`\\b${nums}\\s*[/.-]\\s*${year}\\b`),
+    new RegExp(`\\b${year}\\s*[/.-]\\s*${nums}\\b`)
+  ];
+  return patterns.some((re) => re.test(text)) ? value : "";
+}
+
 // ---------- CV extraction (doc 05 §2) ----------------------------------
 
 export interface ExtractResult {
@@ -90,8 +125,8 @@ export async function extractCvFacts(gateway: ResumeAiGateway, ctx: CallContext,
       company: (company?.text ?? "").slice(0, 120),
       city: (literal(e.city)?.text ?? "").slice(0, 80),
       // Dates must be literally in the CV; unreadable → empty, asked later.
-      startDate: e.startDate && original.includes(e.startDate) ? month(e.startDate) : "",
-      endDate: e.endDate && original.includes(e.endDate) ? month(e.endDate) : "",
+      startDate: sourcedMonth(original, e.startDate),
+      endDate: sourcedMonth(original, e.endDate),
       current: e.current,
       bullets: bullets.slice(0, 8)
     });
@@ -109,14 +144,14 @@ export async function extractCvFacts(gateway: ResumeAiGateway, ctx: CallContext,
       degree: (degree?.text ?? institution?.text ?? "").slice(0, 120),
       institution: degree ? (institution?.text ?? "").slice(0, 120) : "",
       city: "",
-      startDate: ed.startDate && original.includes(ed.startDate) ? month(ed.startDate) : "",
-      endDate: ed.endDate && original.includes(ed.endDate) ? month(ed.endDate) : ""
+      startDate: sourcedMonth(original, ed.startDate),
+      endDate: sourcedMonth(original, ed.endDate)
     });
     if (facts.education.length >= 10) break;
   }
   for (const c of out.certifications) {
     const v = short(`Certificación «${c.name}»`, c.name);
-    if (v) facts.certifications.push({ id: newFactId("cert"), source: "file", sourceSpan: v.span, name: v.text.slice(0, 120), issuer: (literal(c.issuer)?.text ?? "").slice(0, 120), date: c.date && original.includes(c.date) ? month(c.date) : "" });
+    if (v) facts.certifications.push({ id: newFactId("cert"), source: "file", sourceSpan: v.span, name: v.text.slice(0, 120), issuer: (literal(c.issuer)?.text ?? "").slice(0, 120), date: sourcedMonth(original, c.date) });
     if (facts.certifications.length >= 15) break;
   }
   const seenSkills = new Set<string>();
@@ -232,7 +267,15 @@ function judge(text: string, why: string, supportingFactIds: string[], request: 
   const { sources, knownFactIds } = cardSources(request);
   // The model's own question is shown as a question, never applied. A question
   // with a link/HTML or other new data is replaced by a neutral one.
-  const ask = modelQuestion && newClaims(modelQuestion, []).every((c) => c.kind !== "link") ? modelQuestion : "";
+  // R4c: a question that leaks the prompt's own words («hechos», «instrucción»,
+  // «[experience]», JSON…) is replaced by a plain one for the person.
+  const internal = /\b(hechos?|instrucci[oó]n(es)?|prompt|json|formato|supportingFactIds)\b|\[[a-z_]+\]/i;
+  const ask =
+    modelQuestion && newClaims(modelQuestion, []).every((c) => c.kind !== "link")
+      ? internal.test(modelQuestion)
+        ? "Falta un dato que tu hoja de vida no dice. Puedes redactarlo solo con tu CV, escribirlo tú o dejar esto como está."
+        : modelQuestion
+      : "";
   if (!text.trim()) {
     return { status: "question", claims: [], question: ask || "Falta un dato para esta tarjeta. Escríbelo con tus palabras o sáltala.", discardedText: "" };
   }
