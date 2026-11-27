@@ -92,3 +92,24 @@ JSON-LD, que era lo único que se leía.
 - Pruebas: `R4D-LINK-MICRODATA`, `R4D-LINK-TEXT`, `R4D-LINK-ORDER`. Gates:
   tsc 0; build con hash CSS sin cambios; unit 743/0; resume-studio 53 ✅ 0 ❌
   (+130 unitarias); integration 286 ✅ 0 ❌.
+
+## 7. Medición de cobertura de links (2026-11-27)
+
+- Tabla `rs_job_link_outcomes` (bloque `resume-studio`, aditiva, RLS + REVOKE):
+  por día, **solo el dominio** del link y el resultado (`resolved_microdata`,
+  `paste_no_structured_data`, `pasted`…), con un contador. Sin usuario, sin
+  ruta ni parámetros, sin texto. Llega a Supabase solo con la migración de R5.
+- Se cuenta en `/api/resume/job-link` (cada lectura, sin frenarla nunca) y en
+  `/job-link/paste` (cuando la persona termina pegando el texto).
+- Reporte: `npm run resume-studio:link-report -- --days 7` (o `--json`):
+  % de links leídos solos, cuántas veces se pegó el texto y los sitios que más
+  fallan, con el motivo. Solo lectura; rechaza una base remota salvo
+  `--allow-remote-db` a propósito.
+- Pruebas: `R4D-COVERAGE` (unitaria) y la integración R2 «Cobertura de links»
+  (Postgres desechable: filas por dominio y resultado, columnas exactas
+  day/host/outcome/hits).
+- Gates: tsc 0; build con hash CSS sin cambios; unit 744/0; resume-studio
+  54 ✅ 0 ❌ (+131 unitarias); integration 287 ✅ 0 ❌. Una corrida intermedia
+  de integración falló en `validate-sitemap-streaming.ts` («El heap creció
+  69 MB»), prueba de memoria que este cambio no toca; la siguiente corrida
+  pasó completa.

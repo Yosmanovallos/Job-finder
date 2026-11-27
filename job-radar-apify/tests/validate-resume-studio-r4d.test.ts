@@ -17,6 +17,7 @@ import { CARD_CHAT, CARD_DRAFT, CARD_HEADLINE, CARD_REWRITE, CARD_SUMMARY, CV_EX
 import { citedIds, extractCvFacts, proposeCard } from "../src/resume-studio/ai/tailor-service.js";
 import { buildResumeDocumentXml } from "../src/resume-studio/docx.js";
 import { jobPostingFromMicrodata } from "../src/resume-studio/job-link/microdata.js";
+import { coverageReport, linkHost, linkOutcome } from "../src/resume-studio/job-link/coverage.js";
 import { jobPostingFromPageText } from "../src/resume-studio/job-link/page-text.js";
 import { resolveJobLink } from "../src/resume-studio/job-link/resolve.js";
 import { jobSnapshotSchema } from "../src/resume-studio/job-link/job-snapshot.js";
@@ -491,4 +492,35 @@ test("R4D-LINK-ORDER JSON-LD → microdata → visible text → paste; an anti-b
   assert.equal(await via(`${TEXT_PAGE}<script src="/cdn-cgi/challenge-platform/x"></script>`), "anti_bot");
   const ok = await resolveJobLink("https://empleos.example/job/qa/123/", serve(MICRODATA_PAGE));
   assert.ok(ok.status === "resolved" && jobSnapshotSchema.safeParse(ok.snapshot).success && ok.snapshot.untrusted === true);
+});
+
+test("R4D-COVERAGE link reads are counted by site host and outcome only; the report ranks what to fix", () => {
+  assert.equal(linkHost("https://www.Jobs.Scotiabank.com/job/Bogota-QA/608234217/?utm=x#y"), "jobs.scotiabank.com");
+  assert.equal(linkHost("javascript:alert(1)"), "invalid");
+  assert.equal(linkHost("not a url"), "invalid");
+  assert.equal(linkHost("http://192.168.0.10/job"), "other", "no IPs");
+  assert.equal(linkHost(""), "none");
+  const snap = { via: "microdata" } as never;
+  assert.equal(linkOutcome({ status: "resolved", snapshot: snap, cached: false }), "resolved_microdata");
+  assert.equal(linkOutcome({ status: "resolved", snapshot: snap, cached: true }), "resolved_cache");
+  assert.equal(linkOutcome({ status: "paste_required", reason: "no_structured_data", sourceUrl: "x", canonicalUrl: null }), "paste_no_structured_data");
+  assert.equal(linkOutcome({ status: "invalid", reason: "not_public" }), "invalid_not_public");
+  assert.equal(linkOutcome({ status: "error" }), "error");
+  const r = coverageReport([
+    { host: "amadeus.wd502.myworkdayjobs.com", outcome: "resolved_jsonld", hits: 6 },
+    { host: "jobs.scotiabank.com", outcome: "resolved_microdata", hits: 2 },
+    { host: "linkedin.com", outcome: "paste_linkedin", hits: 5 },
+    { host: "empresa.example", outcome: "paste_no_structured_data", hits: 2 },
+    { host: "empresa.example", outcome: "paste_fetch_failed", hits: 1 },
+    { host: "linkedin.com", outcome: "pasted", hits: 4 }
+  ]);
+  assert.equal(r.total, 16, "pastes are not reads");
+  assert.equal(r.resolved, 8);
+  assert.equal(r.resolvedPct, 50);
+  assert.equal(r.pasted, 4);
+  assert.deepEqual(r.topFailing, [
+    { host: "linkedin.com", hits: 5, reasons: ["paste_linkedin"] },
+    { host: "empresa.example", hits: 3, reasons: ["paste_no_structured_data", "paste_fetch_failed"] }
+  ]);
+  assert.equal(coverageReport([]).resolvedPct, 0);
 });
