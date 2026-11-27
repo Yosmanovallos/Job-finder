@@ -63,9 +63,9 @@ export function outcomeFor(
   if (answer.status === "proposal") return null;
   if ((options.userRequest || options.retried) && answer.status !== "error" && !answer.claims.length && !(answer.status === "discarded" && answer.reason === "language")) {
     const why = answer.status === "question" && answer.question.trim() ? answer.question.trim() : "Tu hoja de vida no muestra ese dato.";
-    // «Redactar solo con mi CV» after a «no evidence» card: the card already said what's missing; say only the new part.
+    // «Redactar solo con mi CV» after a «no evidence» card: the card already said what's missing. The report's copy.
     return options.retried
-      ? { tone: "info", title: "Tampoco con tu CV", text: `${why} No escribimos nada que tu hoja de vida no diga.`, next: ["back", "tell", "skip"] }
+      ? { tone: "info", title: "Tampoco con tu CV", text: "No encontramos en tu hoja de vida algo que respalde esto. Elige otra experiencia o cuéntalo tú.", next: ["back", "tell", "skip"] }
       : { tone: "info", title: "No lo agregamos", text: `${why} No escribimos nada que tu hoja de vida no diga.`, next: ["tell", "skip"] };
   }
   if (answer.status === "error") return { tone: "error", title: "No se pudo esta vez", text: answer.error, next: ["retry", "tell", "skip"] };

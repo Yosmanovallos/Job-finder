@@ -11,7 +11,7 @@ import { btnPrimary, newKey, once, Steps, useStagedSteps } from "./ui.js";
 import { normalizeText } from "../../lib/resume-tailor/text.js";
 import { answerProblem, bestBullet, evidenceFor, formatYears, yearsFit, yearsFromCv, type EvidenceItem } from "../../lib/resume-tailor/assist.js";
 import { actionReducer, IDLE, outcomeFor, SLOW_AFTER_MS, type ActionState, type CardAnswer, type NextStep } from "../../lib/resume-tailor/action-state.js";
-import { languageMismatch, LANGUAGE_NAME, type CvLanguage } from "../../lib/resume-tailor/language.js";
+import { languageMismatch, LANGUAGE_NAME, readsAsSpanish, type CvLanguage } from "../../lib/resume-tailor/language.js";
 
 // AI Resume Studio R3 — the card agent (doc 11 §1.1 and §5.1, prototype
 // docs/resume-studio/mockups/resume-tailor-link-prototype.html). The code
@@ -932,7 +932,7 @@ function ProposalCard({
           })()}
           <EvidenceList items={evidence} answer={answer} baseIds={baseIds} />
           {/* The app speaks Spanish: a «why» the model wrote in another language isn't shown. */}
-          {proposal.why && !languageMismatch(proposal.why, "es") ? <p className="text-xs mt-2" style={{ color: "#3d413e" }}>Por qué: {proposal.why}</p> : null}
+          {proposal.why && readsAsSpanish(proposal.why) ? <p className="text-xs mt-2" style={{ color: "#3d413e" }}>Por qué: {proposal.why}</p> : null}
           <ScoreDelta from={now} to={scoreOf(apply(proposal.text))} />
           {proposal.ask && years ? (
             <div className="mt-2 text-sm flex flex-wrap items-center gap-2">
@@ -1263,7 +1263,7 @@ function ToolCard({
               setPhrase(e.target.value);
               if (hint) setHint(null);
             }}
-            placeholder={cvLang === "en" ? `E.g.: what you used ${skill} for, in a few words` : `Ej.: para qué usaste ${skill}, en pocas palabras`}
+            placeholder={`Ej.: para qué usaste ${skill}, en pocas palabras${cvLang === "en" ? " (puedes escribir en español: va en inglés)" : ""}`}
           />
           <BeforeAfter before={skillsLine} after={[skillsLine, skill].filter(Boolean).join(" · ")} target="Habilidades" strike={false} />
           <ScoreDelta from={now} to={scoreOf(withSkill)} />

@@ -5,7 +5,7 @@ import { emptyResumeFacts, formatResumeRange, resumeSectionTitles, type ResumeFa
 import { applyBullet, buildQueue, confirmSkill, MAX_TOOL_CARDS, missingSkills, requirementGaps, toolAnswer, toolCards } from "../src/lib/resume-tailor/cards.js";
 import { asksForYears, evidenceFor, missingNotice, requirementTopic, yearsFit, yearsFromCv } from "../src/lib/resume-tailor/assist.js";
 import { actionReducer, IDLE, outcomeFor, SLOW_AFTER_MS, type ActionState } from "../src/lib/resume-tailor/action-state.js";
-import { cvLanguage, detectLanguage, languageMismatch } from "../src/lib/resume-tailor/language.js";
+import { cvLanguage, detectLanguage, languageMismatch, readsAsSpanish } from "../src/lib/resume-tailor/language.js";
 import { computeEvidence } from "../src/lib/resume-tailor/evidence.js";
 import { acceptModelRequirements, analyzeJob, type JobAnalysis } from "../src/lib/resume-tailor/requirements.js";
 import { findSkills, relatedSkills, skillKind, skillQuestion } from "../src/lib/resume-tailor/skills.js";
@@ -14,7 +14,7 @@ import { createGateway, type Transport } from "../src/resume-studio/ai/gateway.j
 import { MemoryLedger } from "../src/resume-studio/ai/ledger.js";
 import { mockTransport } from "../src/resume-studio/ai/mock.js";
 import { CARD_CHAT, CARD_DRAFT, CARD_HEADLINE, CARD_REWRITE, CARD_SUMMARY, CV_EXTRACT, EVIDENCE_MAP, JOB_REQUIREMENTS } from "../src/resume-studio/ai/prompts.js";
-import { extractCvFacts, proposeCard } from "../src/resume-studio/ai/tailor-service.js";
+import { citedIds, extractCvFacts, proposeCard } from "../src/resume-studio/ai/tailor-service.js";
 import { buildResumeDocumentXml } from "../src/resume-studio/docx.js";
 
 // AI Resume Studio R4d — the five P0 changes of the report «Adaptación de CV
@@ -287,6 +287,9 @@ test("R4D-LANG detector: English/Spanish prose; tools and short headlines don't 
   assert.equal(languageMismatch("Designed and executed the test cases of the mobile app for the customers.", "en"), false);
   assert.equal(languageMismatch("QA Automation Engineer", "es"), false, "unknown never blocks");
   assert.equal(languageMismatch("anything at all in any language", null), false);
+  // The app's own «Por qué» line: shown only when it reads as Spanish.
+  assert.equal(readsAsSpanish("Validating API contracts demonstrates understanding of backend flows."), false);
+  assert.equal(readsAsSpanish("Muestra la validación de contratos de API."), true);
 });
 
 test("R4D-PROMPTS the five writing prompts carry the CV's language from code and were bumped; the others are untouched", () => {
@@ -390,4 +393,24 @@ test("R4D-TEMPLATE an English CV gets English headings and dates (preview and DO
   // A new experience entry without a name is labeled in the CV's language.
   const next = applyBullet(englishCv(), { elsewhere: "" }, "Built a small test harness with Pytest.");
   assert.equal(next.experience.at(-1)?.role, "Other experience");
+});
+
+test("R4D-CITED profile/title drop a cited id that doesn't exist (the text is still validated); bullets stay strict", async () => {
+  const cv = englishCv();
+  const known = ["headline", "summary", "exp-1", "b-1"];
+  assert.deepEqual(citedIds(["[b-1]", " exp-1 ", "b-zzz"], { card: "summary", jobTitle: "x", tasks: [], facts: cv }, known), { ids: ["b-1", "exp-1"], dropped: 1 });
+  assert.deepEqual(citedIds(["b-zzz"], { card: "draft", requirement: "x", facts: cv, experienceId: "exp-1" }, known), { ids: ["b-zzz"], dropped: 0 });
+  const summary = "QA engineer with experience in functional and regression testing of web applications and the automation of test suites.";
+  const ok = gatewayWith(async () => answer(summary, ["summary", "b-invented"]));
+  const r = await proposeCard(ok.gateway, ctx, { card: "summary", jobTitle: "QA Engineer", tasks: [], facts: cv });
+  assert.equal(r.status, "proposal");
+  assert.deepEqual(r.status === "proposal" && r.supportingFactIds, ["summary"]);
+  // An invented figure is still caught, whatever the ids.
+  const bad = gatewayWith(async () => answer(`${summary} Led a team of 12 testers.`, ["summary"]));
+  const b = await proposeCard(bad.gateway, ctx, { card: "summary", jobTitle: "QA Engineer", tasks: [], facts: cv });
+  assert.notEqual(b.status, "proposal");
+  // Bullets: an unknown id still discards.
+  const strict = gatewayWith(async () => answer("Automated end-to-end regression tests with Playwright and TypeScript for the customer web app.", ["b-invented"]));
+  const s = await proposeCard(strict.gateway, ctx, { card: "draft", requirement: "test automation", facts: cv, experienceId: "exp-1" });
+  assert.deepEqual(s, { status: "discarded", claims: [], reason: "unknown_fact" });
 });

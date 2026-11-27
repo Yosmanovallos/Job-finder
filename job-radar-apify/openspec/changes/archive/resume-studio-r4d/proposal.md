@@ -1,7 +1,7 @@
 # Resume Studio R4d: los 5 P0 del informe «Adaptación de CV con IA»
 
-**Estado:** en curso.
-**ADR:** [`docs/adr/0017-resume-studio-implementation.md`](../../../docs/adr/0017-resume-studio-implementation.md).
+**Estado:** implementado y archivado (2026-11-27). La evidencia está en [`validation.md`](validation.md).
+**ADR:** [`docs/adr/0017-resume-studio-implementation.md`](../../../../docs/adr/0017-resume-studio-implementation.md).
 **Rama:** `codex/resume-studio-r4d`, cortada de `codex/resume-studio-r4c`
 (`5473cc6`, PR #153). El PR va en borrador contra `codex/resume-studio-r4c`.
 Nada va a `main` ni a Supabase.

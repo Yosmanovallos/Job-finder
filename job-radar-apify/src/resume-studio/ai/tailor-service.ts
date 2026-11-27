@@ -273,8 +273,29 @@ export function cardSources(request: CardRequest): { sources: string[]; knownFac
   return { sources: [...confirmed, ...all.map((f) => f.text)], knownFactIds };
 }
 
-function judge(text: string, why: string, supportingFactIds: string[], request: CardRequest, byAi: boolean, reply?: string, modelQuestion = ""): CardResult {
+/**
+ * R4d: the ids a proposal cites. «[b-x1]» is read as «b-x1». On the title and
+ * profile cards the sources are the WHOLE CV whatever the model cites (the
+ * ids only pick the CV line shown as evidence), so an id that doesn't exist
+ * is dropped instead of discarding the profile — the real run cited one in
+ * every profile. Every word of the text is still checked by the validator.
+ * Bullet cards keep the strict rule: an unknown id discards the proposal.
+ */
+export function citedIds(ids: string[], request: CardRequest, known: string[]): { ids: string[]; dropped: number } {
+  const clean = ids.map((id) => id.trim().replace(/^\[+|\]+$/g, "").trim()).filter(Boolean);
+  const wholeCv = request.card === "headline" || request.card === "summary" || (request.card === "chat" && request.cardType !== "rewrite");
+  if (!wholeCv) return { ids: clean, dropped: 0 };
+  const set = new Set(known);
+  const kept = clean.filter((id) => set.has(id));
+  return { ids: kept, dropped: clean.length - kept.length };
+}
+
+function judge(text: string, why: string, rawFactIds: string[], request: CardRequest, byAi: boolean, reply?: string, modelQuestion = ""): CardResult {
   const { sources, knownFactIds } = cardSources(request);
+  const cited = citedIds(rawFactIds, request, knownFactIds);
+  // Content-free diagnostic: how many cited ids didn't exist (never the ids or the text).
+  if (cited.dropped) console.info("[resume-ai] cited", JSON.stringify({ card: request.card, unknownIdsDropped: cited.dropped }));
+  const supportingFactIds = cited.ids;
   // R4d: a text clearly in the other language never reaches the CV (tool names don't count).
   const lang = cvLanguage(request.facts);
   // With the AI off it is the user's own text: same answer, they rewrite it in the CV's language.
@@ -287,7 +308,7 @@ function judge(text: string, why: string, supportingFactIds: string[], request: 
   const ask =
     modelQuestion && newClaims(modelQuestion, []).every((c) => c.kind !== "link")
       ? internal.test(modelQuestion)
-        ? "Falta un dato que tu hoja de vida no dice. Puedes redactarlo solo con tu CV, escribirlo tú o dejar esto como está."
+        ? "¿Trabajaste con eso en algún empleo?"
         : modelQuestion
       : "";
   if (!text.trim()) {

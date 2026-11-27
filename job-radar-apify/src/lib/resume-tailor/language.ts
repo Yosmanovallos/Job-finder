@@ -71,4 +71,12 @@ export function languageMismatch(text: string, expected: CvLanguage | null): boo
   return found !== null && found !== expected;
 }
 
+/** For the app's own Spanish UI: true only when a short text clearly reads as Spanish (unknown → false). */
+export function readsAsSpanish(text: string): boolean {
+  const found = detectLanguage(text);
+  if (found) return found === "es";
+  const plain = text.toLowerCase();
+  return /[áéíóúñ¿¡]/.test(plain) || /\b(de|la|el|que|con|para|en|los|las|del|tu)\b/.test(plain);
+}
+
 export const LANGUAGE_NAME: Record<CvLanguage, string> = { es: "español", en: "inglés" };
