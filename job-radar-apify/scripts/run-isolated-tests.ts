@@ -80,7 +80,8 @@ const suites: Record<string, string[]> = {
     "validate-email-typo.test.ts",
     "validate-site-feedback.test.ts",
     "validate-first-touch.test.ts",
-    "validate-phase1-seo-hygiene.test.ts"
+    "validate-phase1-seo-hygiene.test.ts",
+    "validate-phase2-seo-growth.test.ts"
   ],
   integration: [
     "validate-isolated-database.ts",

@@ -58,3 +58,11 @@ hubs de Bogotá y Medellín. Los demás satélites siguen fuera.
 `EMPLEOS_COVERAGE_ENABLED=false`: `/empleos` y `/ve/empleos` responden 404,
 los hubs con guarda 410, y ninguno aparece en el sitemap. Para retirar una
 sola ciudad se borra su entrada de `GUARDED_CITY_HUBS`.
+
+## Enmienda (2026-11-27): segunda ola de hubs con guarda verificados por solapamiento
+
+Auditoría en producción (`2026-11-27`) sobre inventarios activos y solapamiento Top-40 entre hubs vecinos:
+
+- **Añadidos a `GUARDED_CITY_HUBS` (4):** `Chía` (`CO`, 228 vacantes, 0 % de solapamiento con Bogotá), `Sincelejo` (`CO`, 34 vacantes, 0 % con Bogotá), `Anzoátegui` (`VE`, 136 vacantes, 10 % con Lechería y 0 % con Caracas) y `San Cristóbal` (`VE`, 39 vacantes, 0 % con Caracas; demanda 1,3 K–5,5 K). `Palmira` ya existe en `COUNTRIES.CO.cities` como hub activo sin guarda. `INTENT_PAGE_CACHE_ENTRIES` escala automáticamente con `GUARDED_CITY_HUBS.length`.
+- **Diferidos por riesgo doorway:** los satélites del Valle de Aburrá `Itagüí` (392), `Envigado` (340) y `Bello` (344) presentan **55,0 %–62,5 %** de vacantes compartidas en Top-40 entre sí, por lo que permanecen fuera hasta separar listados multipunto.
+- `/empleos/puerto-ordaz` se mantiene como **404** (requisito `SIW-020/052`); «Puerto Ordaz» sigue cubierto dentro de `/empleos/ciudad-guayana` vía `CITY_HUB_LOCATION_ALIASES`.

@@ -419,3 +419,13 @@ pasar 12 h sin lectura.
   crecimiento depende de D3 y D5 (§7).
 - Dos corpus en la base; **una sola vacante en el sitio**: la oficial
   reemplaza a sus copias de bolsas (§8, D4).
+
+### 15. Enmienda (2026-11-27): prioridad de vacantes oficiales en la Indexing API (cuota gratuita de 200/día)
+
+**Enmienda a §9 y §10.7.** En lugar de gastar `USD > 0` aumentando la cuota de Google Cloud, las proyecciones oficiales (`Portal oficial`, `direct_job_id IS NOT NULL`) que aprueban el gate `evaluateGoogleJobReadiness()` (`seo_ready = true`) pasan a priorizarse dentro de la cuota gratuita existente de **200 envíos/día**:
+
+- `syncProjections()` invoca `refreshGoogleReadiness(id, { contentObtained: true, notify: directIndexingEnabled() })` para encolar `URL_UPDATED` (prioridad `2` / carril `new`) cuando la bandera está activa.
+- `scripts/backfill-indexing-queue.ts` incluye vacantes oficiales aptas dentro de la ventana de 7 días (prioridad `2`) cuando `directIndexingEnabled()` es verdadero.
+- `getPendingIndexingLanesWith()` (`src/db/indexing-repository.ts`) ordena dentro del carril `new` primero las vacantes oficiales (`jobs.direct_job_id IS NOT NULL`) más recientes y después las vacantes de bolsas más recientes.
+- Se conservan sin cambios la división `50/50` entre `new` y `delete` (`DEFAULT_SCHEDULER`), la política de retiros D2 de [ADR 0004](0004-indexing-api-notification-policy.md) (`deleteClosedJobs` solo encola `URL_DELETED` si Google recibió un `URL_UPDATED`) y la cuota gratuita de 200/día (`USD 0`).
+- **Rollback sin despliegue de código:** definir `DIRECT_INDEXING_ENABLED=false` (o `0`/`off`) detiene de inmediato nuevas notificaciones oficiales y devuelve el orden cronológico puro en el carril `new`.

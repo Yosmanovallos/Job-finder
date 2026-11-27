@@ -132,3 +132,10 @@ Si no se cumplen, se desactiva el trabajo en cron-job.org (paso 6 de la guía). 
 - **Positiva:** las fuentes sanas reciben hasta ~5–9 veces más ticks, sin costo y sin aumentar la presión sobre los hosts que limitan.
 - **Negativa:** depende de un tercero (cron-job.org) que guarda un token con Actions: write sobre este repositorio. Ese token puede disparar **cualquier** workflow con `workflow_dispatch`, entre ellos `scrape-browser-tick.yml` (Indeed y Glassdoor), `indexing-tick.yml` (cuota de Indexing API) y `social-publish.yml`. También puede cancelar o volver a lanzar corridas. Por eso: vencimiento ≤ 90 días, rotación y revocación inmediata si hay sospecha (pasos 2 y 7 de la guía).
 - **Reversible:** apagar el trabajo externo devuelve el sistema exactamente a como está hoy.
+
+## Enmienda (2026-11-27): piso de respaldo específico para Venezuela (`PACED_FALLBACK_MS_VE = 4,5 h`)
+
+Medición en `scrape-jobs-ve.yml` (`2026-11-25` → `2026-11-27`, últimas 24 corridas): 22 disparos por `workflow_dispatch` y solo 2 por `schedule` (`00:07Z`, `08:50Z`). A diferencia de Colombia (que tiene fuentes no frenadas en `GLOBAL_SOURCE_CADENCE_MS`), `VE` solo consulta `LinkedIn-VE` (cadencia 4 h) y `Computrabajo-VE` (cadencia 6 h), ambas en `PACED_SOURCES.VE`. Con `PACED_FALLBACK_MS = 7 h` en ambos países, VE quedaba restringido a ~3 ticks/día (`< 1` barrido completo diario de los 35 roles), violando el criterio de «sin hambre (≥ 5 veces al día)».
+
+- `PACED_FALLBACK_MS` se mantiene sin cambios en **7 h** para `CO`.
+- `PACED_FALLBACK_MS_VE` fija el respaldo de `VE` en **4,5 h** (`pacedFallbackMsFor(country)`), restaurando la línea base de este ADR (`p50 = 4,85 h`, ~5 ticks/día) mientras las cadencias por rol (4 h / 6 h) y los circuit breakers siguen acotando la presión hacia los hosts.

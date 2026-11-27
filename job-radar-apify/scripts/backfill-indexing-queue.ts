@@ -38,6 +38,7 @@ import {
   API_WINDOW_EXPIRED,
   DELETE_NOT_API_NOTIFIED,
   DELETE_WINDOW_EXPIRED,
+  directIndexingEnabled,
   enqueueIndexingNotifications,
   expiredDeleteIdsSql,
   INDEXING_PRIORITY,
@@ -138,13 +139,20 @@ async function main() {
     `🔧 [reconcile] ${unevaluated.rows.length} fila(s) nuevas sin evaluar${DRY_RUN ? " (dry-run, sin escribir)" : ` → ${evaluated} evaluadas`}.`
   );
 
-  const missing = await pool.query<{ id: string; title: string; location: string | null; content_hash: string | null }>(
-    `SELECT j.id, j.title, j.location, j.content_hash
+  const includeOfficial = directIndexingEnabled();
+  const missing = await pool.query<{
+    id: string;
+    title: string;
+    location: string | null;
+    content_hash: string | null;
+    is_official: boolean;
+  }>(
+    `SELECT j.id, j.title, j.location, j.content_hash, (j.direct_job_id IS NOT NULL) AS is_official
      FROM jobs j
      WHERE ${seoReadySql("j")}
        AND ${withinApiWindowSql("j")}
-       -- ADR 0006 §9/§10.7: official projections take no Indexing API quota.
-       AND j.direct_job_id IS NULL
+       -- ADR 0006 §15: include official projections within 7d when enabled, ordered first.
+       AND ($2::boolean OR j.direct_job_id IS NULL)
        AND NOT EXISTS (
          SELECT 1 FROM indexing_queue q
          WHERE q.notification_type = 'URL_UPDATED'
@@ -152,16 +160,16 @@ async function main() {
            AND q.job_id = j.id
            AND q.content_hash IS NOT DISTINCT FROM j.content_hash
        )
-     ORDER BY j.published_at DESC, j.id DESC
+     ORDER BY (j.direct_job_id IS NOT NULL) DESC, j.published_at DESC, j.id DESC
      LIMIT $1`,
-    [RECONCILE_ENQUEUE_LIMIT]
+    [RECONCILE_ENQUEUE_LIMIT, includeOfficial]
   );
   if (!DRY_RUN && missing.rows.length > 0) {
     await enqueueIndexingNotifications(
       missing.rows.map((row) => ({
         url: buildJobUrl({ jobId: row.id, title: row.title, location: row.location }),
         type: "URL_UPDATED" as const,
-        priority: INDEXING_PRIORITY.reconcile,
+        priority: row.is_official ? INDEXING_PRIORITY.newlyReady : INDEXING_PRIORITY.reconcile,
         jobId: row.id,
         contentHash: row.content_hash
       }))

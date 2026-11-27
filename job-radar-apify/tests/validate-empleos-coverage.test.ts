@@ -78,7 +78,7 @@ test("SEC-003 guarded slugs collide with no city, role, intent or retired role",
 
 test("SEC-004 an unknown slug is still not a category, and a second segment adds nothing", () => {
   assert.equal(resolveCategorySlug("ciudad-que-no-existe"), null);
-  assert.equal(resolveCategorySlug("sincelejo"), null);
+  assert.equal(resolveCategorySlug("quimbaya"), null);
   const withSegment = resolveCategoryPath(["soacha", "sin-experiencia"], "CO");
   assert.deepEqual(withSegment, { kind: "ciudad", label: "Soacha", country: "CO" });
 });

@@ -176,12 +176,17 @@ async function readRows(
     if (page > 0) await pause();
     const request = () =>
       http(`${base}/jobs`, {
-        json: { appliedFacets, limit: PAGE_SIZE, offset: page * PAGE_SIZE, searchText: "" }
+        json: { appliedFacets, limit: PAGE_SIZE, offset: page * PAGE_SIZE, searchText: "" },
+        noRetryOn429: true
       });
     let response = await request();
     let parsed = ListPage.safeParse(safeJson(response.body));
     if (response.status === 429 || response.status >= 500 || (response.status === 200 && !parsed.success)) {
-      await new Promise((resolve) => setTimeout(resolve, RETRY_PAUSE_MS));
+      const waitMs =
+        response.status === 429 && response.retryAfterMs != null && response.retryAfterMs > 0
+          ? Math.min(Math.max(response.retryAfterMs, RETRY_PAUSE_MS), 10_000)
+          : RETRY_PAUSE_MS;
+      await new Promise((resolve) => setTimeout(resolve, waitMs));
       response = await request();
       parsed = ListPage.safeParse(safeJson(response.body));
     }

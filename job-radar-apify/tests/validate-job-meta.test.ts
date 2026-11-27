@@ -127,7 +127,12 @@ test("JMT-003 a missing city or company is left out, never filled", () => {
 });
 
 test("JMT-004 the job title is never cut; the rest is dropped to fit about 60 characters", () => {
-  assert.equal(buildJobMeta(longTitleJob).title, longTitleJob.title);
+  // 2026-11-15 (Ubersuggest duplicate titles): the city is kept even past the
+  // limit. This was the bare title before; the long title without a city
+  // still is.
+  assert.equal(buildJobMeta(longTitleJob).title, `${longTitleJob.title} en Bogota`);
+  assert.equal(buildJobMeta({ ...longTitleJob, location: "" }).title, longTitleJob.title);
+  assert.equal(buildJobMeta({ ...longTitleJob, company: "" }).title, `${longTitleJob.title} en Bogota`);
   // Brand before city or employer.
   assert.equal(buildJobMeta(boardJob).title, "Analista de Riesgo <Crédito> & Cartera en Bogotá");
   assert.equal(
@@ -141,10 +146,36 @@ test("JMT-004 the job title is never cut; the rest is dropped to fit about 60 ch
   for (const job of META_FIXTURES) {
     const { title, description } = buildJobMeta(job);
     assert.ok(title.includes(job.title), job.jobId);
-    assert.ok(length(title) <= JOB_TITLE_TAG_MAX || title === job.title, `${job.jobId}: ${title}`);
+    // Over the limit only as the bare title, or the title plus its city.
+    assert.ok(length(title) <= JOB_TITLE_TAG_MAX || /^ en [^–|]+$/u.test(title.slice(job.title.length)), `${job.jobId}: ${title}`);
     assert.ok(description.startsWith(job.title), job.jobId);
     assert.ok(length(description) <= JOB_META_DESCRIPTION_MAX || !description.includes(". "), `${job.jobId}: ${description}`);
   }
+});
+
+test("JMT-011 the same vacancy in several cities gets one <title> per city (Ubersuggest audit 2026-11-15)", () => {
+  // Real public title, cities and employer of the five pages the audit found
+  // sharing one <title>. "{title} en {city}" is 69-71 characters: before, the
+  // city was dropped and all five read the bare job title.
+  const title = "Gestor(a) comercial - colocación de productos financieros";
+  const cities = ["Medellín", "Bucaramanga", "Zipaquirá", "Ibagué", "Manizales"];
+  const titles = cities.map(
+    (location, index) =>
+      buildJobMeta({ ...fullJob, jobId: `0000000${index}-aaaa-4aaa-8aaa-aaaaaaaaaaaa`, title, company: "JOBANDTALENT CO SAS", location }).title
+  );
+  assert.deepEqual(titles, cities.map((city) => `${title} en ${city}`));
+  assert.equal(new Set(titles).size, cities.length);
+  // The brand goes before the company, the company before the city.
+  const medium = { ...fullJob, title: "Asesor comercial de ventas", company: "Ejemplo SAS", location: "Bucaramanga" };
+  assert.equal(buildJobMeta(medium).title, "Asesor comercial de ventas en Bucaramanga – Ejemplo SAS");
+  assert.equal(
+    buildJobMeta({ ...medium, company: "Empresa de Servicios Temporales Ejemplo" }).title,
+    "Asesor comercial de ventas en Bucaramanga | BuscoTrabajo"
+  );
+  assert.equal(
+    buildJobMeta({ ...medium, title: "Asesor comercial de ventas de productos de consumo", company: "" }).title,
+    "Asesor comercial de ventas de productos de consumo en Bucaramanga"
+  );
 });
 
 test("JMT-005 description with markup, emoji, a repeated title and abbreviations", () => {

@@ -33,6 +33,19 @@ export const PACED_SOURCES: Readonly<Record<string, readonly string[]>> = {
  */
 export const PACED_FALLBACK_MS = 7 * 60 * 60 * 1000;
 
+/**
+ * VE has zero unpaced sources (only LinkedIn-VE and Computrabajo-VE). When
+ * GitHub drops schedule runs to ~2/day, a 7 h fallback starves VE to ~3
+ * ticks/day (< 1 sweep across 35 roles). 4.5 h restores the ADR 0010
+ * baseline (~5 ticks/day, matching the measured p50 of 4.85 h) while per-role
+ * cadences (4 h / 6 h) and circuit breakers still bound request volume.
+ */
+export const PACED_FALLBACK_MS_VE = 4.5 * 60 * 60 * 1000;
+
+export function pacedFallbackMsFor(country: string): number {
+  return country === "VE" ? PACED_FALLBACK_MS_VE : PACED_FALLBACK_MS;
+}
+
 /** role_source_runs sentinel row: (role_name, source_name) = (__paced__, country). */
 export const PACED_ROLE_SENTINEL = "__paced__";
 
@@ -62,7 +75,9 @@ export function decidePacing(input: {
   // into extra requests against a host that is already rate-limiting us.
   if (input.lastParticipationMs === undefined) return { allowed: false, reason: "history_unavailable", sources };
   if (input.lastParticipationMs === null) return { allowed: true, reason: "never_ran", sources };
-  if (input.nowMs - input.lastParticipationMs >= PACED_FALLBACK_MS) return { allowed: true, reason: "fallback_gap", sources };
+  if (input.nowMs - input.lastParticipationMs >= pacedFallbackMsFor(input.country)) {
+    return { allowed: true, reason: "fallback_gap", sources };
+  }
   return { allowed: false, reason: "held_for_schedule", sources };
 }
 
