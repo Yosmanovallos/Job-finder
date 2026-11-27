@@ -189,7 +189,17 @@ export async function handleResumeRoute(
       const { resolveJobLink, resolvePastedJob } = await import("../../resume-studio/job-link/resolve.js");
       if (route === "/job-link") {
         if (typeof value.url !== "string" || !value.url.trim() || value.url.length > 2000) return json(res, 400, { error: "Pega el link de la vacante." });
-        const result = await resolveJobLink(value.url, jobLinkDeps());
+        // R4d: aggregated coverage (day, site host, outcome); never the URL path, the user or the text.
+        const { linkHost, linkOutcome } = await import("../../resume-studio/job-link/coverage.js");
+        const { recordLinkOutcome } = await import("../../db/resume-studio-job-repository.js");
+        let result: Awaited<ReturnType<typeof resolveJobLink>>;
+        try {
+          result = await resolveJobLink(value.url, jobLinkDeps());
+        } catch (error) {
+          void recordLinkOutcome(linkHost(value.url), linkOutcome({ status: "error" }));
+          throw error;
+        }
+        void recordLinkOutcome(linkHost(value.url), linkOutcome(result));
         if (result.status === "invalid") {
           return json(res, 400, { ...result, error: result.reason === "not_public" ? "Ese link no es una página pública." : "Ese link no es válido." });
         }
@@ -200,6 +210,12 @@ export async function handleResumeRoute(
       if (result.status === "invalid") {
         const error = result.reason === "title_required" ? "Escribe el cargo de la vacante." : result.reason === "invalid_url" ? "Ese link no es válido." : "Pega la descripción completa de la vacante.";
         return json(res, 400, { ...result, error });
+      }
+      // R4d: the user pasted the text (counted per site, to see which links make people paste).
+      if (text("url")) {
+        const { linkHost, OUTCOME_PASTED } = await import("../../resume-studio/job-link/coverage.js");
+        const { recordLinkOutcome } = await import("../../db/resume-studio-job-repository.js");
+        void recordLinkOutcome(linkHost(text("url")), OUTCOME_PASTED);
       }
       return json(res, 200, result);
     }

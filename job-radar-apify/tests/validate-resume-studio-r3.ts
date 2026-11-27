@@ -171,7 +171,9 @@ async function main() {
     const start = res.data;
     assert.match(start.adaptationId, /^[0-9a-f-]{36}$/);
     assert.equal(start.aiAvailable, true);
-    assert.deepEqual(start.queue.map((c: { type: string }) => c.type)[0], "headline");
+    // R4d: missing tools are asked first («¿Has usado X?»), then the headline.
+    assert.deepEqual(start.queue.map((c: { type: string }) => c.type).filter((t: string) => t !== "tool")[0], "headline");
+    assert.ok(start.queue.findIndex((c: { type: string }) => c.type !== "tool") === start.queue.filter((c: { type: string }) => c.type === "tool").length, "tool cards come first");
     assert.match(start.disclaimer, /No es el puntaje de ningún ATS/);
     const card = (token: string, body: Record<string, unknown>) => call("POST", "/api/resume/tailor/card", token, { adaptationId: start.adaptationId, ...body });
     res = await card("token-a", { card: "headline", jobTitle: job.title, facts });

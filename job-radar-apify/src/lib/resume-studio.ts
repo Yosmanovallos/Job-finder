@@ -181,18 +181,28 @@ export function newFactId(prefix: string): string {
 }
 
 /** "2024-03" → "mar. 2024"; "" → "". */
-export function formatResumeMonth(value: string): string {
+export function formatResumeMonth(value: string, lang: "es" | "en" = "es"): string {
   if (!MONTH.test(value) || !value) return "";
   const [year, monthNo] = value.split("-").map(Number);
-  const names = ["ene.", "feb.", "mar.", "abr.", "may.", "jun.", "jul.", "ago.", "sep.", "oct.", "nov.", "dic."];
+  const names =
+    lang === "en"
+      ? ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+      : ["ene.", "feb.", "mar.", "abr.", "may.", "jun.", "jul.", "ago.", "sep.", "oct.", "nov.", "dic."];
   return `${names[monthNo - 1]} ${year}`;
 }
 
-export function formatResumeRange(start: string, end: string, current = false): string {
-  const from = formatResumeMonth(start);
-  const to = current ? "actual" : formatResumeMonth(end);
+export function formatResumeRange(start: string, end: string, current = false, lang: "es" | "en" = "es"): string {
+  const from = formatResumeMonth(start, lang);
+  const to = current ? (lang === "en" ? "Present" : "actual") : formatResumeMonth(end, lang);
   if (from && to) return `${from} – ${to}`;
   return from || to;
+}
+
+/** R4d: the CV's section titles in its own language (the downloaded file never mixes languages). */
+export function resumeSectionTitles(lang: "es" | "en" | null) {
+  return lang === "en"
+    ? { summary: "Profile", experience: "Experience", education: "Education", certifications: "Courses and certifications", skills: "Skills", languages: "Languages" }
+    : { summary: "Perfil", experience: "Experiencia", education: "Formación", certifications: "Cursos y certificaciones", skills: "Habilidades", languages: "Idiomas" };
 }
 
 /** Strict on/off: only the literal string "true" turns the module on. */

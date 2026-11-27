@@ -112,3 +112,29 @@ export async function putCachedSnapshot(key: string, snapshot: JobSnapshot, now 
     throw error;
   }
 }
+
+// ---------- R4d: link-reader coverage (aggregated, no personal data) ----------
+
+/** +1 for (today, host, outcome). Never throws: a metric must not break reading a link. */
+export async function recordLinkOutcome(host: string, outcome: string, now = new Date()): Promise<void> {
+  if (!/^[a-z_]{2,48}$/.test(outcome)) return;
+  try {
+    await pool.query(
+      `INSERT INTO rs_job_link_outcomes (day, host, outcome, hits) VALUES ($1::date, $2, $3, 1)
+       ON CONFLICT (day, host, outcome) DO UPDATE SET hits = rs_job_link_outcomes.hits + 1`,
+      [now.toISOString().slice(0, 10), host.slice(0, 253), outcome]
+    );
+  } catch {
+    // Missing table (before R5's migration) or a transient error: the read itself already succeeded.
+  }
+}
+
+/** Aggregated rows of the last `days` days, for the coverage report. */
+export async function linkOutcomeRows(days: number, now = new Date()): Promise<{ host: string; outcome: string; hits: number }[]> {
+  const since = new Date(now.getTime() - days * 86_400_000).toISOString().slice(0, 10);
+  const result = await pool.query<{ host: string; outcome: string; hits: string }>(
+    `SELECT host, outcome, SUM(hits)::text AS hits FROM rs_job_link_outcomes WHERE day >= $1::date GROUP BY host, outcome`,
+    [since]
+  );
+  return result.rows.map((r) => ({ host: r.host, outcome: r.outcome, hits: Number(r.hits) }));
+}

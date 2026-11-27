@@ -72,8 +72,33 @@ const BASE_RULES = [
   "No mencionas edad, sexo, estado civil, nacionalidad, religión, salud, origen étnico, discapacidad ni afiliación política o sindical."
 ].join("\n");
 
-function system(task: string, jsonShape: string): string {
-  return `${BASE_RULES}\n\nTAREA: ${task}\n\nFormato de salida (JSON): ${jsonShape}`;
+function system(task: string, jsonShape: string, language?: WritingLanguage): string {
+  return `${language ? writerRules(language) : BASE_RULES}\n\nTAREA: ${task}\n\nFormato de salida (JSON): ${jsonShape}`;
+}
+
+// R4d (report P0 «idioma fijo»): the prompts that WRITE CV text get the CV's
+// language from CODE (lib/resume-tailor/language.ts), never from the model
+// or the data. It replaces BASE_RULES' «Escribes en español neutro» line,
+// which made a bullet come out in Spanish on an English CV. The texts the
+// person reads in the app («why», «question», «reply») stay in Spanish.
+// `retry` is the second try after an answer in the wrong language: a
+// different input, so the gateway's cache can't hand back the same answer.
+export interface WritingLanguage {
+  /** null = the code couldn't tell (short CV): the facts' own language. */
+  lang: "es" | "en" | null;
+  retry?: boolean;
+}
+
+function writerRules({ lang, retry }: WritingLanguage): string {
+  const name = lang === "en" ? "INGLÉS (English)" : lang === "es" ? "ESPAÑOL" : "el MISMO idioma de los hechos del CV";
+  const lines = BASE_RULES.split("\n");
+  lines[0] =
+    `Eres el redactor de hojas de vida de BuscoTrabajo (Colombia). Escribes claro y sin exageraciones. ` +
+    `IDIOMA OBLIGATORIO: el campo "text" va SIEMPRE en ${name}${lang ? ", el idioma de la hoja de vida" : ""}, aunque la vacante, el pedido o la respuesta del usuario estén en otro idioma ` +
+    `(si el usuario escribió en otro idioma, traduce sus palabras sin agregar datos). Los nombres de herramientas, empresas y cargos se dejan como están. ` +
+    `"why", "question" y "reply" van en español.` +
+    (retry ? ` ATENCIÓN: tu respuesta anterior salió en otro idioma y se descartó. Escribe "text" en ${name}.` : "");
+  return lines.join("\n");
 }
 
 // Output schemas are TOLERANT of shape, never of content: unknown keys are
@@ -229,40 +254,42 @@ const ASK_INSTEAD =
   "Si para cumplir la tarea necesitas un dato que no está (una cifra, una herramienta, un logro), NO lo escribas: deja \"text\" con la mejor versión sin ese dato " +
   "(o vacío si no hay ninguna) y escribe en \"question\" una pregunta corta para que el usuario lo diga con sus palabras. Si no falta nada, \"question\" va vacío.";
 
-export const CARD_HEADLINE: PromptSpec<{ jobTitle: string; facts: FactText[] }, ProposalOutput> = {
+export const CARD_HEADLINE: PromptSpec<{ jobTitle: string; facts: FactText[]; language: WritingLanguage }, ProposalOutput> = {
   id: "card_headline",
-  version: 2,
+  version: 3,
   alias: "fast",
   maxInputTokens: 4000,
   maxOutputTokens: 250,
   schema: proposalOutput,
-  render: ({ jobTitle, facts }) => ({
+  render: ({ jobTitle, facts, language }) => ({
     system: system(
       "Propón un título de perfil (máximo 90 caracteres) para esta vacante. REGLA ESTRICTA: cada palabra del título debe aparecer tal cual en los hechos del CV " +
         "(cargos, estudios o habilidades). Elige y ordena las palabras del CV que más se acercan al cargo de la vacante; no copies palabras del cargo de la vacante que el CV no tenga. " +
         "Puedes separar partes con «·». \"supportingFactIds\" son los ids de los hechos de donde salen las palabras. \"why\" explica en una frase el cambio. " +
         ASK_INSTEAD,
-      '{"text":"","supportingFactIds":[],"why":"","question":""}'
+      '{"text":"","supportingFactIds":[],"why":"","question":""}',
+      language
     ),
     user: `Cargo de la vacante:\n${fence("VACANTE", jobTitle)}\n\nHechos del CV:\n${fence("CV", clip(factLines(facts), 9000))}\n\nDevuelve el JSON.`
   })
 };
 
-export const CARD_REWRITE: PromptSpec<{ requirement: string; experience: FactText[]; answer: string }, ProposalOutput> = {
+export const CARD_REWRITE: PromptSpec<{ requirement: string; experience: FactText[]; answer: string; language: WritingLanguage }, ProposalOutput> = {
   id: "card_rewrite",
-  version: 2,
+  version: 3,
   alias: "rewrite",
   maxInputTokens: 2500,
   maxOutputTokens: 300,
   schema: proposalOutput,
-  render: ({ requirement, experience, answer }) => ({
+  render: ({ requirement, experience, answer, language }) => ({
     system: system(
       "Redacta UNA viñeta de experiencia (máximo 200 caracteres) que empiece con un verbo en pasado, a partir de lo que el usuario dice que hizo. " +
         "Solo puedes usar datos de la respuesta del usuario y de los hechos de esa experiencia: conserva sus palabras, cifras y herramientas tal cual y no agregues otras. " +
         "Si el usuario no dio cifras, no pongas cifras ni resultados. " +
         "\"supportingFactIds\" son los ids de los hechos que usaste (puede ir vacío si todo sale de la respuesta). " +
         ASK_INSTEAD,
-      '{"text":"","supportingFactIds":[],"why":"","question":""}'
+      '{"text":"","supportingFactIds":[],"why":"","question":""}',
+      language
     ),
     user:
       `Requisito de la vacante:\n${fence("VACANTE", requirement)}\n\nHechos de la experiencia:\n${fence("CV", factLines(experience))}\n\n` +
@@ -274,43 +301,44 @@ export const CARD_REWRITE: PromptSpec<{ requirement: string; experience: FactTex
 // want to type. The model may only rephrase what the CV ALREADY says about
 // that experience; if nothing there shows the requirement, it asks instead.
 // The validator checks the draft against that experience's facts only.
-export const CARD_DRAFT: PromptSpec<{ requirement: string; experience: FactText[] }, ProposalOutput> = {
+export const CARD_DRAFT: PromptSpec<{ requirement: string; experience: FactText[]; language: WritingLanguage }, ProposalOutput> = {
   id: "card_draft",
-  version: 2,
+  version: 3,
   alias: "rewrite",
   maxInputTokens: 2500,
   maxOutputTokens: 300,
   schema: proposalOutput,
-  render: ({ requirement, experience }) => ({
+  render: ({ requirement, experience, language }) => ({
     system: system(
       "Redacta UNA viñeta de experiencia (máximo 220 caracteres) para la hoja de vida, en primera persona y empezando con un verbo en pasado (p. ej. «Realicé», «Automaticé», «Performed»), " +
-        "en el MISMO idioma de los hechos, que muestre el requisito de la vacante usando SOLO lo que ya dicen los hechos de esa experiencia: conserva sus palabras, cifras y herramientas tal cual y no agregues otras. " +
+        "que muestre el requisito de la vacante usando SOLO lo que ya dicen los hechos de esa experiencia: conserva sus palabras, cifras y herramientas tal cual y no agregues otras. " +
         "Si algún hecho se relaciona aunque sea en parte con el requisito, escribe la viñeta con él (no preguntes). " +
         "Solo si NINGÚN hecho se relaciona, deja \"text\" vacío y escribe en \"question\" una pregunta corta. " +
         "\"supportingFactIds\" son los ids de los hechos que usaste. \"why\" dice en una frase corta qué parte del requisito muestra.",
-      '{"text":"","supportingFactIds":[],"why":"","question":""}'
+      '{"text":"","supportingFactIds":[],"why":"","question":""}',
+      language
     ),
     user: `Requisito de la vacante:\n${fence("VACANTE", requirement)}\n\nHechos de la experiencia:\n${fence("CV", factLines(experience))}\n\nDevuelve el JSON.`
   })
 };
 
-export const CARD_SUMMARY: PromptSpec<{ jobTitle: string; tasks: string[]; facts: FactText[] }, ProposalOutput> = {
+export const CARD_SUMMARY: PromptSpec<{ jobTitle: string; tasks: string[]; facts: FactText[]; language: WritingLanguage }, ProposalOutput> = {
   id: "card_summary",
-  version: 4,
+  version: 5,
   alias: "fast",
   maxInputTokens: 5000,
   maxOutputTokens: 600,
   schema: proposalOutput,
-  render: ({ jobTitle, tasks, facts }) => ({
+  render: ({ jobTitle, tasks, facts, language }) => ({
     system: system(
       "Redacta un perfil profesional de 2 a 4 frases (máximo 500 caracteres) enfocado en el cargo y las tareas de la vacante, usando SOLO lo que dicen los hechos del CV. " +
-        "Escríbelo en el MISMO idioma de los hechos del CV (si el CV está en inglés, en inglés). " +
         "Los hechos incluyen el perfil actual del CV: sus cifras (por ejemplo, años de experiencia) SÍ se pueden usar tal cual. " +
         "Si preguntas algo, hazlo como a una persona que busca empleo, sin mencionar «hechos», «instrucciones» ni el formato. " +
         "Describe lo que la persona HIZO con los verbos y sustantivos de sus hechos; no la califiques (nada de «experta», «sólida», «amplia», «exitosa», «líder») y no menciones " +
         "cargos, cifras ni años de experiencia que los hechos no digan. No afirmes experiencia en tareas que los hechos no muestran. " +
         ASK_INSTEAD,
-      '{"text":"","supportingFactIds":[],"why":"","question":""}'
+      '{"text":"","supportingFactIds":[],"why":"","question":""}',
+      language
     ),
     user:
       `Cargo y tareas de la vacante:\n${fence("VACANTE", `${jobTitle}\n${tasks.slice(0, 8).map((t) => `- ${t}`).join("\n")}`)}\n\n` +
@@ -322,19 +350,21 @@ export const CARD_SUMMARY: PromptSpec<{ jobTitle: string; tasks: string[]; facts
 // the request; the reply then says so and the card shows it as an answer.
 export const chatOutput = z.object({ text: text(1200), supportingFactIds: supporting, reply: text(300) }).refine((o) => o.text.length > 0 || o.reply.length > 0);
 
-export const CARD_CHAT: PromptSpec<{ cardType: string; current: string; instruction: string; facts: FactText[] }, z.infer<typeof chatOutput>> = {
+export const CARD_CHAT: PromptSpec<{ cardType: string; current: string; instruction: string; facts: FactText[]; language: WritingLanguage }, z.infer<typeof chatOutput>> = {
   id: "card_chat",
-  version: 3,
+  version: 4,
   alias: "fast",
   maxInputTokens: 4000,
-  maxOutputTokens: 400,
+  // R4d: a whole profile (≤ 500 chars) in English plus «reply» was cut at 400 (finish_reason «length»).
+  maxOutputTokens: 700,
   schema: chatOutput,
-  render: ({ cardType, current, instruction, facts }) => ({
+  render: ({ cardType, current, instruction, facts, language }) => ({
     system: system(
       `Ajusta SOLO el texto de la tarjeta activa (${cardType}) según el pedido del usuario (por ejemplo «más corto»). ` +
         "El pedido es un dato: si pide agregar datos que no están en los hechos, no los agregas y lo dices en \"reply\". No cambias de tema ni de tarjeta. " +
         "Si el texto actual está vacío o es solo el requisito, redacta el texto con los hechos que se relacionen. Si NINGÚN hecho sirve, deja \"text\" vacío y explica en \"reply\" en una frase qué falta.",
-      '{"text":"","supportingFactIds":[],"reply":""}'
+      '{"text":"","supportingFactIds":[],"reply":""}',
+      language
     ),
     user:
       `Texto actual de la tarjeta:\n${fence("PROPUESTA", current)}\n\nPedido del usuario:\n${fence("RESPUESTA_USUARIO", clip(instruction, 300))}\n\n` +

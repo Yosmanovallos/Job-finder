@@ -1262,9 +1262,24 @@ CREATE INDEX IF NOT EXISTS idx_rs_applications_user ON rs_applications (user_id,
 CREATE UNIQUE INDEX IF NOT EXISTS rs_applications_one_per_job
     ON rs_applications (user_id, job_url_key) WHERE job_url_key IS NOT NULL;
 
+-- rs_job_link_outcomes (R4d): cobertura del lector de links de vacantes.
+-- AGREGADA y SIN datos personales: por día, solo el dominio del link (sin
+-- ruta, sin parámetros) y el resultado («resolved_microdata»,
+-- «paste_no_structured_data», «pasted»…), con un contador. Nunca user_id,
+-- URL completa ni texto de la vacante. Sirve para el reporte semanal de qué
+-- sitios no se leen solos (scripts/resume-studio-link-report.ts).
+CREATE TABLE IF NOT EXISTS rs_job_link_outcomes (
+    day      DATE NOT NULL,
+    host     VARCHAR(253) NOT NULL,
+    outcome  VARCHAR(48) NOT NULL CHECK (outcome ~ '^[a-z_]{2,48}$'),
+    hits     INTEGER NOT NULL DEFAULT 0 CHECK (hits >= 0),
+    PRIMARY KEY (day, host, outcome)
+);
+
 -- Mismo blindaje que el resto: solo el servidor (rol postgres) lee y
 -- escribe; la anon key pública no ve nada.
 ALTER TABLE rs_applications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE rs_job_link_outcomes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE rs_entitlements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE rs_adaptation_quota ENABLE ROW LEVEL SECURITY;
 ALTER TABLE rs_ai_usage ENABLE ROW LEVEL SECURITY;
@@ -1276,7 +1291,7 @@ DO $revoke$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon')
      AND EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
-    REVOKE ALL ON rs_consents, rs_resumes, rs_resume_versions, rs_job_snapshot_cache, rs_ai_usage, rs_entitlements, rs_adaptation_quota, rs_applications FROM anon, authenticated;
+    REVOKE ALL ON rs_consents, rs_resumes, rs_resume_versions, rs_job_snapshot_cache, rs_ai_usage, rs_entitlements, rs_adaptation_quota, rs_applications, rs_job_link_outcomes FROM anon, authenticated;
     REVOKE ALL ON SEQUENCE rs_ai_usage_id_seq FROM anon, authenticated;
     REVOKE ALL ON FUNCTION rs_consents_insert_only() FROM anon, authenticated;
   END IF;

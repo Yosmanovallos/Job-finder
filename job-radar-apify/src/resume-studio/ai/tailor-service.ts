@@ -4,11 +4,13 @@ import { computeEvidence, factTexts, verifyCitations, type Citation, type FactTe
 import { newClaims, validateProposal, type Claim } from "../../lib/resume-tailor/factuality.js";
 import { acceptModelRequirements, analyzeJob, type JobAnalysis } from "../../lib/resume-tailor/requirements.js";
 import { compatibilityScore, qualityScore } from "../../lib/resume-tailor/score.js";
-import { findQuote, sliceBetween } from "../../lib/resume-tailor/text.js";
+import { bulletsInRange, findQuote, sectionEnd, sliceBetween } from "../../lib/resume-tailor/text.js";
 import { MAX_CHAT_TURNS } from "../../lib/resume-tailor/cards.js";
 import type { CallContext, GatewayFailure, ResumeAiGateway } from "./gateway.js";
 import { CARD_CHAT, CARD_DRAFT, CARD_HEADLINE, CARD_REWRITE, CARD_SUMMARY, CV_EXTRACT, EVIDENCE_MAP, JOB_REQUIREMENTS } from "./prompts.js";
 import { minimizeCvText } from "./sensitive.js";
+import { cvLanguage, detectLanguage, languageMismatch, type CvLanguage } from "../../lib/resume-tailor/language.js";
+import type { PromptSpec } from "./prompts.js";
 
 // AI Resume Studio R3 — the state machine's server steps (doc 11 §5.2):
 // S1 requirements → S2 evidence → S3 score → S4 queue at start, then one
@@ -53,6 +55,47 @@ export function sourcedMonth(original: string, value: string): string {
   return patterns.some((re) => re.test(text)) ? value : "";
 }
 
+// ---------- R4d: bullets the model merged or skipped -----------------------
+//
+// A real CV (bullets marked «●», wrapped over two lines) came back with ONE
+// bullet per job: the model gave one pair of anchors per job (first bullet's
+// start, last bullet's end) and the literal copy never crosses into the next
+// bullet, so 30 bullets became 7. The code now also splits each job's own
+// region of the CV text by its bullet marks; when that finds MORE bullets
+// than the model, those are used. Literal by construction: nothing is
+// written, only copied. Each region starts at the line of that job's role or
+// company (searched in CV order, so two jobs with the same role don't mix)
+// and ends at the next job or the next section heading.
+
+export function recoverBullets(original: string, facts: ResumeFacts, modelCounts: number[] = []): void {
+  let cursor = 0;
+  const starts = facts.experience.map((e) => {
+    for (const probe of [e.company, e.role].filter((p) => p.trim().length >= 2)) {
+      const q = findQuote(original.slice(cursor), probe);
+      if (q) {
+        const at = cursor + q.start;
+        cursor = cursor + q.end;
+        return original.lastIndexOf("\n", at) + 1;
+      }
+    }
+    return -1;
+  });
+  const found: number[] = [];
+  facts.experience.forEach((exp, i) => {
+    const from = starts[i];
+    if (from < 0) return found.push(-1);
+    const nextStart = starts.slice(i + 1).find((s) => s > from);
+    const to = Math.min(nextStart ?? original.length, sectionEnd(original, from));
+    const split = bulletsInRange(original, from, to);
+    found.push(split.length);
+    if (split.length > exp.bullets.length) {
+      exp.bullets = split.slice(0, 8).map((b) => ({ id: newFactId("b"), source: "file" as const, sourceSpan: b.span, text: b.text }));
+    }
+  });
+  // Content-free diagnostic: bullets per job from the model vs found in the text.
+  console.info("[resume-ai] extract-bullets", JSON.stringify({ model: modelCounts, text: found, kept: facts.experience.map((e) => e.bullets.length) }));
+}
+
 // ---------- CV extraction (doc 05 §2) ----------------------------------
 
 export interface ExtractResult {
@@ -61,6 +104,8 @@ export interface ExtractResult {
   dropped: string[];
   /** Sensitive data found and left out (T-SENS). */
   removed: string[];
+  /** R4d: the CV's language, detected by code (null = couldn't tell). */
+  language: CvLanguage | null;
 }
 
 export async function extractCvFacts(gateway: ResumeAiGateway, ctx: CallContext, original: string): Promise<{ ok: true; result: ExtractResult } | { ok: false; code: GatewayFailure }> {
@@ -132,6 +177,7 @@ export async function extractCvFacts(gateway: ResumeAiGateway, ctx: CallContext,
     });
     if (facts.experience.length >= 15) break;
   }
+  recoverBullets(original, facts, out.experience.map((e) => e.bullets.length));
   for (const ed of out.education) {
     const degree = short(`Formación «${ed.degree}»`, ed.degree);
     const institution = literal(ed.institution);
@@ -169,7 +215,10 @@ export async function extractCvFacts(gateway: ResumeAiGateway, ctx: CallContext,
     if (facts.languages.length >= 8) break;
   }
   const parsed = resumeFactsSchema.safeParse(facts);
-  return { ok: true, result: { facts: parsed.success ? parsed.data : emptyResumeFacts(), dropped: dropped.slice(0, 30), removed: minimized.removed } };
+  const kept = parsed.success ? parsed.data : emptyResumeFacts();
+  // R4d: decided on the CV's own text (the original, or the kept prose if that's undecidable).
+  const language = detectLanguage(original) ?? cvLanguage(kept);
+  return { ok: true, result: { facts: kept, dropped: dropped.slice(0, 30), removed: minimized.removed, language } };
 }
 
 // ---------- start: S1–S4 --------------------------------------------------
@@ -183,6 +232,8 @@ export interface TailorStart {
   aiAvailable: boolean;
   /** Why the AI isn't helping (off, budget), if so. */
   aiNotice: GatewayFailure | null;
+  /** R4d: every change is written in the CV's language; the vacancy's is shown for context. */
+  language: { cv: CvLanguage | null; job: CvLanguage | null };
 }
 
 export async function startTailor(gateway: ResumeAiGateway, ctx: Omit<CallContext, "purpose">, input: { facts: ResumeFacts; title: string; description: string }): Promise<TailorStart> {
@@ -223,7 +274,8 @@ export async function startTailor(gateway: ResumeAiGateway, ctx: Omit<CallContex
     queue: buildQueue({ job, evidence, facts: input.facts, aiEnabled: aiAvailable }),
     scores: { compatibility: compatibilityScore(job, evidence, input.facts), quality: qualityScore(input.facts) },
     aiAvailable,
-    aiNotice
+    aiNotice,
+    language: { cv: cvLanguage(input.facts), job: detectLanguage(input.description) }
   };
 }
 
@@ -245,7 +297,7 @@ export type CardRequest =
 export type CardResult =
   | { status: "proposal"; text: string; why: string; supportingFactIds: string[]; byAi: boolean; reply?: string; ask?: string }
   | { status: "question"; claims: Claim[]; question: string; discardedText: string }
-  | { status: "discarded"; claims: Claim[]; reason: "new_data" | "unknown_fact" | "empty" }
+  | { status: "discarded"; claims: Claim[]; reason: "new_data" | "unknown_fact" | "empty" | "language"; language?: CvLanguage | null }
   | { status: "unavailable"; code: GatewayFailure };
 
 /** The texts a card may draw from (doc 05 §5): cited facts and the user's own answer. */
@@ -263,8 +315,33 @@ export function cardSources(request: CardRequest): { sources: string[]; knownFac
   return { sources: [...confirmed, ...all.map((f) => f.text)], knownFactIds };
 }
 
-function judge(text: string, why: string, supportingFactIds: string[], request: CardRequest, byAi: boolean, reply?: string, modelQuestion = ""): CardResult {
+/**
+ * R4d: the ids a proposal cites. «[b-x1]» is read as «b-x1». On the title and
+ * profile cards the sources are the WHOLE CV whatever the model cites (the
+ * ids only pick the CV line shown as evidence), so an id that doesn't exist
+ * is dropped instead of discarding the profile — the real run cited one in
+ * every profile. Every word of the text is still checked by the validator.
+ * Bullet cards keep the strict rule: an unknown id discards the proposal.
+ */
+export function citedIds(ids: string[], request: CardRequest, known: string[]): { ids: string[]; dropped: number } {
+  const clean = ids.map((id) => id.trim().replace(/^\[+|\]+$/g, "").trim()).filter(Boolean);
+  const wholeCv = request.card === "headline" || request.card === "summary" || (request.card === "chat" && request.cardType !== "rewrite");
+  if (!wholeCv) return { ids: clean, dropped: 0 };
+  const set = new Set(known);
+  const kept = clean.filter((id) => set.has(id));
+  return { ids: kept, dropped: clean.length - kept.length };
+}
+
+function judge(text: string, why: string, rawFactIds: string[], request: CardRequest, byAi: boolean, reply?: string, modelQuestion = ""): CardResult {
   const { sources, knownFactIds } = cardSources(request);
+  const cited = citedIds(rawFactIds, request, knownFactIds);
+  // Content-free diagnostic: how many cited ids didn't exist (never the ids or the text).
+  if (cited.dropped) console.info("[resume-ai] cited", JSON.stringify({ card: request.card, unknownIdsDropped: cited.dropped }));
+  const supportingFactIds = cited.ids;
+  // R4d: a text clearly in the other language never reaches the CV (tool names don't count).
+  const lang = cvLanguage(request.facts);
+  // With the AI off it is the user's own text: same answer, they rewrite it in the CV's language.
+  if (text.trim() && languageMismatch(text, lang)) return { status: "discarded", claims: [], reason: "language", language: lang };
   // The model's own question is shown as a question, never applied. A question
   // with a link/HTML or other new data is replaced by a neutral one.
   // R4c: a question that leaks the prompt's own words («hechos», «instrucción»,
@@ -273,7 +350,7 @@ function judge(text: string, why: string, supportingFactIds: string[], request: 
   const ask =
     modelQuestion && newClaims(modelQuestion, []).every((c) => c.kind !== "link")
       ? internal.test(modelQuestion)
-        ? "Falta un dato que tu hoja de vida no dice. Puedes redactarlo solo con tu CV, escribirlo tú o dejar esto como está."
+        ? "¿Trabajaste con eso en algún empleo?"
         : modelQuestion
       : "";
   if (!text.trim()) {
@@ -296,7 +373,27 @@ function judge(text: string, why: string, supportingFactIds: string[], request: 
   return { status: "discarded", claims: verdict.newClaims, reason: verdict.reason === "ok" ? "new_data" : verdict.reason };
 }
 
+/**
+ * R4d: one writing call in the CV's language. If the text comes back clearly
+ * in the other language, ONE retry with a stronger line (a different input,
+ * so the cache can't return the same answer; its own purpose, so it doesn't
+ * use up the user's chat turns). `judge` then rejects it if it's still wrong.
+ */
+async function writeInCvLanguage<I extends object, O extends { text: string }>(
+  gateway: ResumeAiGateway,
+  spec: PromptSpec<I & { language: { lang: CvLanguage | null; retry?: boolean } }, O>,
+  input: I,
+  lang: CvLanguage | null,
+  ctx: CallContext
+) {
+  const first = await gateway.complete(spec, { ...input, language: { lang } }, ctx);
+  if (!first.ok || !first.data.text.trim() || !languageMismatch(first.data.text, lang)) return first;
+  const again = await gateway.complete(spec, { ...input, language: { lang, retry: true } }, { ...ctx, purpose: `${ctx.purpose}_lang`, maxTurns: undefined });
+  return again.ok ? again : first;
+}
+
 export async function proposeCard(gateway: ResumeAiGateway, ctx: Omit<CallContext, "purpose" | "maxTurns">, request: CardRequest): Promise<CardResult> {
+  const lang = cvLanguage(request.facts);
   if (request.card === "draft") {
     if (!gateway.enabled) return { status: "unavailable", code: "ai_off" };
     const experience = factTexts(request.facts).filter((f) => f.factId === request.experienceId || f.parentId === request.experienceId);
@@ -304,7 +401,7 @@ export async function proposeCard(gateway: ResumeAiGateway, ctx: Omit<CallContex
     if (experience.length < 2) {
       return { status: "question", claims: [], question: "Esa experiencia no tiene viñetas en tu hoja de vida. Cuéntanos con tus palabras qué hiciste ahí.", discardedText: "" };
     }
-    const r = await gateway.complete(CARD_DRAFT, { requirement: request.requirement, experience }, { ...ctx, purpose: "card_draft" });
+    const r = await writeInCvLanguage(gateway, CARD_DRAFT, { requirement: request.requirement, experience }, lang, { ...ctx, purpose: "card_draft" });
     if (!r.ok) return { status: "unavailable", code: r.code };
     return judge(r.data.text, r.data.why, r.data.supportingFactIds, request, true, undefined, r.data.question);
   }
@@ -314,25 +411,27 @@ export async function proposeCard(gateway: ResumeAiGateway, ctx: Omit<CallContex
       return judge(tidyUserBullet(request.answer), "Tus palabras, con mayúscula inicial y punto final.", [], request, false);
     }
     const experience = request.experienceId ? factTexts(request.facts).filter((f) => f.factId === request.experienceId || f.parentId === request.experienceId) : [];
-    const r = await gateway.complete(CARD_REWRITE, { requirement: request.requirement, experience, answer: request.answer }, { ...ctx, purpose: "card_rewrite" });
+    const r = await writeInCvLanguage(gateway, CARD_REWRITE, { requirement: request.requirement, experience, answer: request.answer }, lang, { ...ctx, purpose: "card_rewrite" });
     if (!r.ok) return { status: "unavailable", code: r.code };
     return judge(r.data.text, r.data.why, r.data.supportingFactIds, request, true, undefined, r.data.question);
   }
   if (!gateway.enabled) return { status: "unavailable", code: "ai_off" };
   if (request.card === "headline") {
-    const r = await gateway.complete(CARD_HEADLINE, { jobTitle: request.jobTitle, facts: citableFacts(request.facts) }, { ...ctx, purpose: "card_headline" });
+    const r = await writeInCvLanguage(gateway, CARD_HEADLINE, { jobTitle: request.jobTitle, facts: citableFacts(request.facts) }, lang, { ...ctx, purpose: "card_headline" });
     if (!r.ok) return { status: "unavailable", code: r.code };
     return judge(r.data.text, r.data.why, r.data.supportingFactIds, request, true, undefined, r.data.question);
   }
   if (request.card === "summary") {
-    const r = await gateway.complete(CARD_SUMMARY, { jobTitle: request.jobTitle, tasks: request.tasks, facts: citableFacts(request.facts) }, { ...ctx, purpose: "card_summary" });
+    const r = await writeInCvLanguage(gateway, CARD_SUMMARY, { jobTitle: request.jobTitle, tasks: request.tasks, facts: citableFacts(request.facts) }, lang, { ...ctx, purpose: "card_summary" });
     if (!r.ok) return { status: "unavailable", code: r.code };
     return judge(r.data.text, r.data.why, r.data.supportingFactIds, request, true, undefined, r.data.question);
   }
   const { sources } = cardSources(request);
-  const r = await gateway.complete(
+  const r = await writeInCvLanguage(
+    gateway,
     CARD_CHAT,
     { cardType: request.cardType, current: request.current, instruction: request.instruction, facts: citableFacts(request.facts).filter((f) => sources.includes(f.text)) },
+    lang,
     { ...ctx, purpose: "card_chat", maxTurns: MAX_CHAT_TURNS }
   );
   if (!r.ok) return { status: "unavailable", code: r.code };

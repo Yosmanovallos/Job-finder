@@ -161,6 +161,11 @@ for (const entry of TECH_CATALOG) {
   }
 }
 
+/** True when `name` is a canonical name of the catalog (AI Resume Studio R4d: «¿Has usado X?»). */
+export function isCatalogTechnology(name: string): boolean {
+  return TECH_CATALOG.some((entry) => entry.name === name);
+}
+
 // For sources that hand back a flat tag array instead of prose (RemoteOK's
 // `tags` — confirmed live 2026-08-12: it mixes real skills with unrelated
 // site-wide category tags like "customer support"/"marketing"/"exec"/

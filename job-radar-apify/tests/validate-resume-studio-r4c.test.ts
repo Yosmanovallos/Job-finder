@@ -136,7 +136,11 @@ test("R4C-EXTRACT old-shape answers ({text, quote}) still parse; the text comes 
   const g = gatewayWith(async () => ({ content: JSON.stringify(old), usage: null }));
   const out = await extractCvFacts(g, ctx, CV);
   assert.ok(out.ok);
-  assert.deepEqual(out.ok && out.result.facts.experience[0].bullets.map((b) => b.text), ["Automaticé pruebas de regresión con Selenium y Java."]);
+  // R4d: the job's OTHER bullet, which the model skipped, is recovered from the CV text too.
+  assert.deepEqual(out.ok && out.result.facts.experience[0].bullets.map((b) => b.text), [
+    "Diseñé y ejecuté casos de prueba funcionales para la aplicación móvil de clientes, con reporte de defectos en Jira.",
+    "Automaticé pruebas de regresión con Selenium y Java."
+  ]);
 });
 
 test("R4C-SIZE a long CV fits: the v3 answer is a fraction of the CV, under max_tokens", async () => {

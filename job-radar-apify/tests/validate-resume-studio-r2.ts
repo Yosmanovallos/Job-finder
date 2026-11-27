@@ -212,6 +212,20 @@ async function main() {
     assert.equal(res.status, 200);
     assert.equal(res.data.matched, true, "misma vacante por empresa + cargo");
     assert.equal(res.data.snapshot.sourceUrl, "https://www.linkedin.com/jobs/view/4100000000/");
+    // R4d: coverage is counted per (day, host, outcome) — no user, no path, no text.
+    await new Promise((r) => setTimeout(r, 200));
+    const coverage = await pool.query(`SELECT host, outcome, hits FROM rs_job_link_outcomes ORDER BY host, outcome`);
+    const got = new Map(coverage.rows.map((r: { host: string; outcome: string; hits: number }) => [`${r.host} ${r.outcome}`, Number(r.hits)]));
+    assert.equal(got.get("linkedin.com paste_linkedin"), 1);
+    assert.equal(got.get("linkedin.com pasted"), 1, "the paste that followed is counted too");
+    assert.equal(got.get("buscotrabajo.co resolved_buscotrabajo"), 1);
+    assert.equal(got.get("co.computrabajo.com resolved_our_index"), 1);
+    assert.equal(got.get("co.computrabajo.com resolved_cache"), 1);
+    assert.deepEqual(Object.keys(coverage.rows[0]).sort(), ["hits", "host", "outcome"]);
+    const columns = await pool.query(`SELECT column_name FROM information_schema.columns WHERE table_name = 'rs_job_link_outcomes' ORDER BY column_name`);
+    assert.deepEqual(columns.rows.map((r: { column_name: string }) => r.column_name), ["day", "hits", "host", "outcome"], "no user_id, no URL, no text");
+    assert.ok(coverage.rows.every((r: { host: string }) => !r.host.includes("/")), "host only, never the path");
+    console.log("✅ [PASSED] Cobertura de links: agregada por día, sitio y resultado; sin usuario, ruta ni texto.");
     res = await call("POST", "/api/resume/job-link/paste", "token-a", { title: "Mesero", company: "Restaurante Sintético", text: pasteText });
     assert.equal(res.data.matched, false);
     assert.equal(res.data.snapshot.via, "pasted");
