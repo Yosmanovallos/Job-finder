@@ -1,0 +1,638 @@
+<title>Hoja de vida con IA · BuscoTrabajo</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&family=Space+Grotesk:wght@500;600;700&display=swap">
+<style>
+/* Layout: same 4-view flow, dressed in buscotrabajo.co's own system:
+   ink cards (2px border + hard offset shadow), green-soft hero, TINTS, gold CTA, Space Grotesk.
+   Single light look on purpose, like the site. Values from src/index.css and src/lib/brand-tints.ts. */
+:root{
+  color-scheme:light;
+  --background:#fafafa; --foreground:#0e1011; --body:#3d413e; --muted:#5a605b; --hover:#f4f5f2;
+  --primary:#0f6b4f; --green-deep:#074a3a; --green-soft:#e2f4ec; --gold-1:#f3dfa2; --gold-2:#d4a537; --gold-ink:#2a1d06;
+  --border:#e5e8e1; --bad:#d92d2d;
+  --t1:#fdf1d3; --t1-fg:#2a1d06; --t1-sub:#7a5a0f;
+  --t2:#e8f1fb; --t2-fg:#082f5c; --t2-sub:#0a4f96;
+  --t3:#fde8dc; --t3-fg:#4a1c05; --t3-sub:#9a3d0c;
+  --t4:#e4f6f5; --t4-fg:#063d3b; --t4-sub:#0b6f6b;
+  --t5:#efe9fd; --t5-fg:#2e1065; --t5-sub:#6d28d9;
+  --f-head:'Space Grotesk','Segoe UI',system-ui,sans-serif;
+  --f-body:'Inter','Segoe UI',system-ui,sans-serif;
+  --f-mono:'JetBrains Mono',ui-monospace,Consolas,monospace;
+  --f-doc:Calibri,Carlito,'Helvetica Neue',Arial,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{background:var(--background);color:var(--foreground)}
+body{font-family:var(--f-body);font-size:15px;line-height:1.5;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:12px 32px}
+h1,h2,h3,p{margin:0}
+h1,h2,h3{font-family:var(--f-head);font-weight:700;letter-spacing:-.03em;text-wrap:balance}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer;background:none;border:0;padding:0}
+a{color:inherit}
+:focus-visible{outline:none;box-shadow:0 0 0 4px rgba(243,223,162,.8)!important}
+.muted{color:var(--muted)}
+.small{font-size:13px}
+.num{font-variant-numeric:tabular-nums}
+.ink-card{border:2px solid var(--foreground);box-shadow:4px 4px 0 var(--foreground)}
+.ink-card-sm{border:2px solid var(--foreground);box-shadow:3px 3px 0 var(--foreground)}
+.ink-lift{transition:transform .15s ease,box-shadow .15s ease}
+.ink-lift:hover{transform:translate(-2px,-2px);box-shadow:6px 6px 0 var(--foreground)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ---------- prototype chrome ---------- */
+.chrome{max-width:1180px;margin:0 auto 12px;display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;justify-content:space-between}
+.chrome .t{font-size:13px;color:var(--muted)}
+.chrome .t b{color:var(--foreground);font-family:var(--f-head);font-size:15px}
+.seg{display:inline-flex;background:#fff;border:2px solid var(--foreground);border-radius:999px;padding:2px}
+.seg button{padding:5px 13px;border-radius:999px;font-size:13px;font-weight:700;color:var(--body)}
+.seg button[aria-pressed="true"]{background:var(--foreground);color:#fff}
+.chip-btn{padding:7px 14px;border-radius:12px;font-size:13px;font-weight:700;background:#fff;border:2px solid var(--foreground);box-shadow:3px 3px 0 var(--foreground)}
+.chip-btn.dark{background:var(--gold-2);color:var(--gold-ink)}
+.stage{display:flex;justify-content:center}
+.frame{width:100%;max-width:1180px;background:#fff;border-radius:24px;border:2px solid var(--foreground);box-shadow:4px 4px 0 var(--foreground);overflow:hidden;container-type:inline-size;min-height:560px;display:flex;flex-direction:column}
+.frame.mobile{max-width:392px;border-radius:36px;border-width:3px;box-shadow:6px 6px 0 var(--foreground);min-height:780px}
+
+/* ---------- site header ---------- */
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;height:64px;padding:0 22px;border-bottom:2px solid var(--foreground);background:rgba(255,255,255,.92)}
+.brand{display:flex;align-items:center;gap:8px;font-family:var(--f-head);font-weight:700;font-size:20px;letter-spacing:-.03em}
+.brand svg{width:28px;height:24px}
+.steps{display:flex;align-items:center;gap:6px}
+.steps>span{display:flex;align-items:center;gap:6px;height:30px;padding:0 11px;border-radius:999px;font-family:var(--f-mono);font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.steps i{width:8px;height:8px;border-radius:50%;background:var(--border);display:block}
+.steps .on{background:var(--t1);border:2px solid var(--foreground);color:var(--foreground)}
+.steps .on i,.steps .done i{background:var(--primary)}
+@container (max-width:640px){.steps>span:not(.on){padding:0 3px}.steps>span:not(.on) .lb{display:none}.top{padding:0 14px}.brand span{display:none}}
+.view{flex:1;display:flex;flex-direction:column;animation:in .35s ease}
+@keyframes in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.pad{padding:40px 28px 48px}
+@container (max-width:640px){.pad{padding:24px 16px 32px}}
+.narrow{max-width:680px;margin:0 auto;width:100%}
+.hero{background:linear-gradient(to bottom,var(--green-soft),#fff)}
+
+/* ---------- buttons ---------- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:48px;padding:0 20px;border-radius:12px;font-weight:700;font-size:15px;border:2px solid var(--foreground);box-shadow:3px 3px 0 var(--foreground);background:#fff;color:var(--foreground);text-decoration:none;transition:transform .15s,box-shadow .15s}
+.btn:hover{transform:translate(-2px,-2px);box-shadow:5px 5px 0 var(--foreground)}
+.btn.ink{background:var(--primary);color:#fff}
+.btn.gold{background:var(--gold-2);color:var(--gold-ink)}
+.btn.green{background:var(--primary);color:#fff}
+.btn.sm{height:36px;padding:0 13px;font-size:13px;border-radius:10px;box-shadow:2px 2px 0 var(--foreground)}
+.btn[disabled]{opacity:.45;cursor:not-allowed;transform:none;box-shadow:3px 3px 0 var(--foreground)}
+.btn-ai{display:inline-flex;align-items:center;gap:10px;height:48px;padding:0 20px;border-radius:12px;font-weight:700;background:var(--green-soft);border:2px solid var(--foreground);box-shadow:3px 3px 0 var(--foreground);position:relative;overflow:hidden;transition:transform .15s,box-shadow .15s}
+.btn-ai:hover{transform:translate(-2px,-2px);box-shadow:5px 5px 0 var(--foreground)}
+.btn-ai::after{content:"";position:absolute;inset:0;background:linear-gradient(110deg,transparent 35%,rgba(255,255,255,.75) 50%,transparent 65%);transform:translateX(-100%);animation:shine 3.2s ease-in-out infinite}
+@keyframes shine{60%,100%{transform:translateX(100%)}}
+.spark{width:18px;height:18px;color:var(--primary)}
+
+/* ---------- job view ---------- */
+.co{width:52px;height:52px;border-radius:14px;background:var(--foreground);color:#fff;display:grid;place-items:center;font-family:var(--f-head);font-weight:700;border:2px solid var(--foreground)}
+.eyebrow{display:inline-flex;align-items:center;gap:8px;border-radius:999px;background:var(--t1);border:2px solid var(--foreground);padding:3px 12px 3px 8px;font-family:var(--f-mono);font-size:11.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--foreground)}
+.eyebrow::before{content:"";width:10px;height:10px;border-radius:50%;background:var(--primary)}
+.job-title{font-size:clamp(30px,5cqi,52px);line-height:1.04;letter-spacing:-.04em;margin:16px 0 10px}
+.job-title em{font-style:normal;color:var(--primary)}
+.meta{display:flex;flex-wrap:wrap;gap:8px}
+.meta span{font-size:13.5px;font-weight:600;color:var(--body);background:#fff;border:2px solid var(--foreground);border-radius:999px;padding:3px 12px}
+.reqs{margin-top:28px;border-radius:20px;background:var(--t4);color:var(--t4-fg);padding:16px 18px}
+.reqs summary{cursor:pointer;font-family:var(--f-head);font-weight:700;list-style:none;display:flex;justify-content:space-between}
+.reqs summary::-webkit-details-marker{display:none}
+.reqs ul{margin:12px 0 0;padding-left:18px;font-size:14px;display:grid;gap:6px}
+
+/* ---------- upload view ---------- */
+.jobchip{display:inline-flex;align-items:center;gap:10px;padding:5px 14px 5px 5px;border-radius:999px;background:#fff;border:2px solid var(--foreground);box-shadow:3px 3px 0 var(--foreground);font-size:13px;max-width:100%}
+.jobchip .co{width:28px;height:28px;border-radius:9px;font-size:11px;border-width:0}
+.jobchip span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.h1{font-size:clamp(30px,4.6cqi,46px);line-height:1.05;letter-spacing:-.04em;margin:20px 0 8px}
+.lead{color:var(--body);font-size:17px}
+.drop{margin-top:22px;border-radius:24px;background:var(--t4);border:2px solid var(--foreground);box-shadow:4px 4px 0 var(--foreground);padding:12px}
+.drop-in{border:2px dashed rgba(6,61,59,.35);border-radius:16px;padding:30px 18px;text-align:center;display:grid;gap:8px;justify-items:center;color:var(--t4-fg)}
+.drop .ico{width:52px;height:52px;border-radius:14px;background:#fff;border:2px solid var(--foreground);display:grid;place-items:center;color:var(--foreground)}
+.drop b{font-family:var(--f-head);font-size:19px}
+.consent{margin-top:22px;display:grid;gap:12px}
+.ck{display:flex;gap:12px;align-items:flex-start;font-size:14.5px;line-height:1.45;color:var(--body)}
+.ck input{appearance:none;width:22px;height:22px;flex:0 0 22px;margin:0;border:2px solid var(--foreground);border-radius:6px;display:grid;place-items:center;cursor:pointer;background:#fff;box-shadow:2px 2px 0 var(--foreground)}
+.ck input:checked{background:var(--primary)}
+.ck input:checked::after{content:"";width:10px;height:6px;border-left:2.5px solid #fff;border-bottom:2.5px solid #fff;transform:rotate(-45deg) translate(1px,-1px)}
+.ck a{font-weight:700;color:var(--primary);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.opt{color:var(--muted)}
+
+/* ---------- workspace ---------- */
+.ws{flex:1;min-height:660px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:18px;padding:18px;min-height:0;background:var(--background)}
+@container (max-width:820px){.ws{grid-template-columns:minmax(0,1fr);padding:12px}.ws[data-tab="agent"] .doc,.ws[data-tab="doc"] .agent{display:none}}
+.wtabs{display:none;padding:12px 12px 0;background:var(--background)}
+@container (max-width:820px){.wtabs{display:flex}}
+.agent{display:flex;flex-direction:column;min-height:0;min-width:0;background:#fff;border:2px solid var(--foreground);box-shadow:4px 4px 0 var(--foreground);border-radius:24px;overflow:hidden}
+.a-head{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:2px solid var(--foreground);background:var(--t1)}
+.a-head b{font-family:var(--f-head);font-size:16px}
+.orb{position:relative;width:30px;height:30px;border-radius:50%;background:conic-gradient(var(--primary),var(--gold-2),var(--green-deep),var(--primary));border:2px solid var(--foreground);flex:0 0 auto}
+.orb::after{content:"";position:absolute;inset:5px;border-radius:50%;background:#fff}
+.orb.busy{animation:spin 1.6s linear infinite}
+.orb.sm{width:20px;height:20px;border-width:1.5px}.orb.sm::after{inset:4px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.status{font-family:var(--f-mono);font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--t1-sub)}
+.feed{flex:1;overflow:auto;padding:16px 18px;display:flex;flex-direction:column;gap:14px;max-height:540px}
+.m-a{display:flex;gap:10px;align-items:flex-start}
+.m-a p{font-size:15px;line-height:1.55;color:var(--foreground)}
+.caret{display:inline-block;width:7px;height:15px;background:var(--primary);vertical-align:-2px;margin-left:2px;animation:blink 1s steps(2) infinite}
+@keyframes blink{50%{opacity:0}}
+.m-u{align-self:flex-end;background:var(--foreground);color:#fff;border-radius:16px 16px 4px 16px;padding:9px 14px;font-size:14px;font-weight:500;max-width:85%}
+.run{border-radius:16px;padding:12px 14px;margin-left:30px;background:var(--t2);color:var(--t2-fg);border:2px solid var(--foreground)}
+.run-h{display:flex;justify-content:space-between;font-family:var(--f-head);font-size:14px;font-weight:700}
+.run ol{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:7px}
+.run li{display:flex;gap:9px;align-items:center;font-size:13px}
+.run li .mt{margin-left:auto;color:var(--t2-sub);font-family:var(--f-mono);font-size:11px}
+.dot{width:16px;height:16px;border-radius:50%;flex:0 0 16px;display:grid;place-items:center;background:#fff}
+.dot.wait{border:2px solid rgba(8,47,92,.25)}
+.dot.doing{border:2px solid rgba(8,47,92,.2);border-top-color:var(--t2-fg);animation:spin .8s linear infinite}
+.dot.done{background:var(--primary)}
+.dot.done::after{content:"";width:7px;height:4px;border-left:2px solid #fff;border-bottom:2px solid #fff;transform:rotate(-45deg) translate(1px,-1px)}
+.qa{margin-left:30px;display:flex;flex-wrap:wrap;gap:8px}
+.qchip{padding:7px 14px;border-radius:999px;border:2px solid var(--foreground);background:#fff;font-size:13.5px;font-weight:600;box-shadow:2px 2px 0 var(--foreground);transition:transform .15s,box-shadow .15s,background .15s}
+.qchip:hover{background:var(--green-soft);transform:translate(-1px,-1px);box-shadow:3px 3px 0 var(--foreground)}
+.qin{margin-left:30px;display:flex;gap:6px}
+.qin input{flex:1;min-width:0;border:2px solid var(--foreground);border-radius:999px;padding:7px 14px;font-size:13.5px;background:#fbfaf6}
+.card{margin-left:30px;border:2px solid var(--foreground);box-shadow:3px 3px 0 var(--foreground);border-radius:16px;padding:14px;background:#fff}
+.lab{display:inline-flex;font-family:var(--f-mono);font-size:10.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:2px 9px;border-radius:999px;border:1.5px solid currentColor}
+.lab.r{background:var(--t2);color:var(--t2-sub)}.lab.f{background:var(--t1);color:var(--t1-sub)}
+.diff{display:grid;gap:6px;margin:10px 0 12px;font-size:13.5px}
+.del{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--bad)}
+.ins{background:var(--green-soft);border-radius:10px;padding:7px 10px;color:#06392b}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.done-l{font-family:var(--f-mono);font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--primary);font-weight:600}
+.done-l.skip{color:var(--muted)}
+.score-card{display:flex;gap:16px;align-items:center}
+.ring{--v:0;width:78px;height:78px;flex:0 0 78px;border-radius:50%;background:conic-gradient(var(--primary) calc(var(--v)*1%),var(--border) 0);display:grid;place-items:center;border:2px solid var(--foreground)}
+.ring span{width:60px;height:60px;border-radius:50%;background:#fff;border:2px solid var(--foreground);display:grid;place-items:center;font-family:var(--f-head);font-weight:700;font-size:22px}
+.score-card b{font-family:var(--f-head);font-size:16px}
+.reqlist{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:7px}
+.reqlist li{display:flex;gap:9px;font-size:13px;align-items:flex-start;color:var(--body)}
+.st{width:20px;height:20px;flex:0 0 20px;border-radius:6px;display:grid;place-items:center;font-size:11px;font-weight:700;border:1.5px solid var(--foreground);margin-top:0}
+.st.ok{background:var(--green-soft);color:var(--primary)}.st.part{background:var(--t1);color:var(--t1-sub)}.st.bad{background:var(--t3);color:var(--t3-sub)}
+.fine{font-size:11.5px;color:var(--muted);margin-top:10px;border-top:1.5px dashed var(--border);padding-top:8px}
+.composer{padding:12px 16px 16px;border-top:2px solid var(--foreground);display:grid;gap:10px;background:#fff}
+.sugg{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
+.sugg button{flex:0 0 auto;padding:5px 12px;border-radius:999px;font-size:12.5px;font-weight:600}
+.sugg button:nth-child(1){background:var(--t1);color:var(--t1-fg)}
+.sugg button:nth-child(2){background:var(--t2);color:var(--t2-fg)}
+.sugg button:nth-child(3){background:var(--t4);color:var(--t4-fg)}
+.sugg button:nth-child(4){background:var(--t5);color:var(--t5-fg)}
+.cbox{display:flex;align-items:center;gap:8px;border:2px solid var(--foreground);border-radius:14px;padding:5px 5px 5px 14px;background:#fbfaf6}
+.cbox:focus-within{box-shadow:0 0 0 4px rgba(243,223,162,.8)}
+.cbox input{flex:1;min-width:0;border:0;outline:0;font-size:14px;background:transparent}
+.send{width:38px;height:38px;border-radius:10px;background:var(--gold-2);color:var(--gold-ink);border:2px solid var(--foreground);display:grid;place-items:center}
+
+.doc{display:flex;flex-direction:column;background:var(--green-soft);min-width:0;border:2px solid var(--foreground);box-shadow:4px 4px 0 var(--foreground);border-radius:24px;overflow:hidden}
+.d-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 14px;justify-content:space-between;border-bottom:2px solid var(--foreground);background:#fff}
+.pill{display:inline-flex;align-items:center;gap:8px;padding:4px 12px 4px 4px;border-radius:999px;background:#fff;border:2px solid var(--foreground);font-size:13px;font-weight:700}
+.pill .n{min-width:30px;height:26px;padding:0 6px;border-radius:999px;background:var(--foreground);color:#fff;display:grid;place-items:center;font-size:12px;font-family:var(--f-head)}
+.pill.up .n{background:var(--primary)}
+.tools{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.ibtn{width:34px;height:34px;border-radius:10px;background:#fff;border:2px solid var(--foreground);display:grid;place-items:center}
+.ibtn[disabled]{opacity:.35}
+.tsel{height:34px;border:2px solid var(--foreground);border-radius:10px;background:#fff;padding:0 8px;font-size:13px;font-weight:600}
+.sheet-wrap{flex:1;padding:18px;display:flex;justify-content:center;align-items:flex-start}
+.sheet{position:relative;width:100%;max-width:470px;aspect-ratio:8.5/11;background:#fff;border-radius:4px;border:2px solid var(--foreground);box-shadow:4px 4px 0 var(--foreground);padding:7% 8%;font-family:var(--f-doc);color:#1b1b1b;font-size:10.2px;line-height:1.4;overflow:hidden}
+.sheet.empty{display:grid;align-content:start;gap:9px}
+.sk{height:8px;border-radius:5px;background:linear-gradient(90deg,#eceee9,#f6f7f4,#eceee9);background-size:200% 100%;animation:sh 1.3s infinite}
+@keyframes sh{to{background-position:-200% 0}}
+.sheet.compact{font-size:9.4px;line-height:1.3}
+.sheet h4{font-size:9.4px;letter-spacing:.14em;text-transform:uppercase;border-bottom:1px solid #222;margin:11px 0 5px;padding-bottom:2px;font-family:var(--f-doc)}
+.sheet .nm{font-size:19px;font-weight:700}
+.sheet .ttl{font-size:11px;color:#444}
+.sheet .ct{font-size:9px;color:#555;margin-top:3px}
+.sheet .jh{display:flex;justify-content:space-between;gap:8px;font-weight:700}
+.sheet .jo{color:#555;font-style:italic}
+.sheet ul{margin:2px 0 6px;padding-left:13px}
+.secs{display:flex;flex-direction:column}
+.sheet.first .s-edu{order:-1}
+.hl{background:#cdeedd;border-radius:2px}
+.wm{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none}
+.wm span{transform:rotate(-28deg);font-family:var(--f-head);font-weight:700;font-size:26px;color:rgba(15,107,79,.1);white-space:nowrap}
+.d-foot{padding:0 18px 18px;display:flex;justify-content:center}
+
+/* ---------- pay view ---------- */
+.jobban{display:flex;align-items:center;gap:16px;flex-wrap:wrap;border-radius:24px;padding:20px 22px;background:var(--green-deep);color:#fff;position:relative;overflow:hidden;border:2px solid var(--foreground);box-shadow:4px 4px 0 var(--foreground)}
+.jobban::before{content:"";position:absolute;left:-120px;top:-200px;width:420px;height:420px;border-radius:50%;background:radial-gradient(circle,rgba(212,165,55,.5),rgba(212,165,55,0) 65%)}
+.jobban::after{content:"";position:absolute;right:-120px;bottom:-240px;width:420px;height:420px;border-radius:50%;background:radial-gradient(circle,rgba(31,163,122,.55),rgba(31,163,122,0) 65%)}
+.jobban>*{position:relative;z-index:1}
+.jobban .co{background:#fff;color:var(--foreground)}
+.jobban .k{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--gold-1)}
+.jobban h2{font-size:22px;margin-top:2px}
+.jobban .sc{margin-left:auto;text-align:right}
+.jobban .sc b{font-family:var(--f-head);font-size:34px}
+.pay-h{text-align:center;font-size:clamp(28px,4cqi,42px);letter-spacing:-.04em;margin:32px 0 24px}
+.pay-h em{font-style:normal;color:var(--primary)}
+.pay-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:22px;align-items:start}
+@container (max-width:820px){.pay-grid{grid-template-columns:minmax(0,1fr)}}
+.plans{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding-top:12px}
+.plan{position:relative;border:2px solid var(--foreground);box-shadow:3px 3px 0 var(--foreground);border-radius:20px;padding:22px 12px 16px;text-align:center;background:#fff;transition:transform .15s,box-shadow .15s,background .15s}
+.plan:hover{transform:translate(-2px,-2px);box-shadow:5px 5px 0 var(--foreground)}
+.plan[aria-pressed="true"]{background:var(--t1);box-shadow:5px 5px 0 var(--primary);border-color:var(--primary)}
+.plan .big{font-family:var(--f-head);font-size:34px;font-weight:700;line-height:1}
+.plan .per{color:var(--muted);font-size:13px}
+.plan .pr{font-family:var(--f-head);font-weight:700;font-size:19px;margin-top:16px}
+.plan .badge{position:absolute;top:-13px;left:50%;transform:translateX(-50%);background:var(--primary);color:#fff;border:2px solid var(--foreground);font-family:var(--f-mono);font-size:10.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;padding:2px 10px;border-radius:999px;white-space:nowrap}
+.save{display:inline-block;margin-top:8px;font-size:11.5px;font-weight:700;color:var(--t3-sub);background:var(--t3);padding:2px 9px;border-radius:999px}
+.box{border:2px solid var(--foreground);box-shadow:4px 4px 0 var(--foreground);border-radius:24px;padding:20px;background:#fff}
+.chk{list-style:none;margin:0;padding:0;display:grid;gap:12px;font-size:14.5px;color:var(--body)}
+.chk li{display:flex;gap:10px}
+.chk b{color:var(--foreground)}
+.chk svg{flex:0 0 18px;margin-top:2px;color:var(--primary)}
+.methods{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-top:4px}
+.methods span{font-family:var(--f-mono);font-size:11px;font-weight:600;color:var(--body);border:1.5px solid var(--foreground);background:#fff;border-radius:8px;padding:2px 8px}
+.ben-h{font-family:var(--f-head);font-weight:700;font-size:20px;text-align:center;margin-bottom:14px;letter-spacing:-.02em}
+.bens{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@container (max-width:460px){.bens{grid-template-columns:1fr}}
+.ben{display:flex;gap:10px;align-items:center;border-radius:16px;padding:12px;font-size:13.5px;font-weight:600;line-height:1.35}
+.ben svg{flex:0 0 20px}
+.ben:nth-child(1){background:var(--t1);color:var(--t1-fg)}.ben:nth-child(2){background:var(--t2);color:var(--t2-fg)}
+.ben:nth-child(3){background:var(--t3);color:var(--t3-fg)}.ben:nth-child(4){background:var(--t4);color:var(--t4-fg)}
+.ben:nth-child(5){background:var(--t5);color:var(--t5-fg)}.ben:nth-child(6){background:var(--green-soft);color:var(--green-deep)}
+.cta{width:100%;height:58px;border-radius:14px;margin-top:18px;font-size:17px;font-weight:700;color:var(--gold-ink);background:var(--gold-2);border:2px solid var(--foreground);box-shadow:4px 4px 0 var(--foreground);transition:transform .15s,box-shadow .15s}
+.cta:hover{transform:translate(-2px,-2px);box-shadow:6px 6px 0 var(--foreground)}
+.cta-note{text-align:center;font-size:13px;color:var(--muted);margin-top:10px}
+
+/* ---------- done view ---------- */
+.okmark{width:68px;height:68px;border-radius:50%;background:var(--green-soft);color:var(--primary);border:2px solid var(--foreground);box-shadow:3px 3px 0 var(--foreground);display:grid;place-items:center;margin:0 auto;animation:pop .5s ease}
+@keyframes pop{from{transform:scale(.6);opacity:0}}
+.vers{display:grid;gap:10px;margin-top:24px}
+.ver{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;border:2px solid var(--foreground);box-shadow:3px 3px 0 var(--foreground);border-radius:16px;padding:12px 14px;font-size:14px;background:#fff}
+.ver:first-child{background:var(--t4)}
+
+/* ---------- overlays ---------- */
+.scrim{position:fixed;inset:0;background:rgba(14,16,17,.4);z-index:20;display:flex;justify-content:flex-end;animation:fade .2s}
+.scrim.center{justify-content:center;align-items:center;padding:16px}
+@keyframes fade{from{opacity:0}}
+.drawer{width:min(560px,100%);height:100%;background:#fff;overflow:auto;border-left:2px solid var(--foreground);padding:24px 24px calc(24px + env(safe-area-inset-bottom,0px));animation:slide .25s ease}
+@keyframes slide{from{transform:translateX(30px);opacity:.4}}
+.drawer h2{font-size:24px;letter-spacing:-.03em;margin:12px 0 4px}
+.drawer h3{font-size:15px;margin:18px 0 6px}
+.drawer p,.drawer li{font-size:14px;color:var(--body);line-height:1.55}
+.drawer ul{padding-left:18px;margin:4px 0}
+.drawer .pend{background:var(--t1);color:var(--t1-sub);border-radius:4px;padding:0 5px;font-size:12px;font-weight:600}
+.modal{width:min(420px,100%);background:#fff;border-radius:24px;padding:24px;border:2px solid var(--foreground);box-shadow:6px 6px 0 var(--foreground)}
+.toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--foreground);color:#fff;padding:10px 16px;border-radius:12px;font-size:13.5px;z-index:30;max-width:calc(100% - 32px);box-shadow:3px 3px 0 var(--gold-2)}
+</style>
+
+<div class="chrome">
+  <div class="t"><b>Hoja de vida con IA</b> · prototipo con datos ficticios · pago simulado</div>
+  <div class="row">
+    <div class="seg" role="group" aria-label="Dispositivo"><button id="d-desk" data-a="device" data-v="desktop" aria-pressed="true">Escritorio</button><button id="d-mob" data-a="device" data-v="mobile" aria-pressed="false">Móvil</button></div>
+    <button class="chip-btn dark" id="tour" data-a="tour">▶ Ver recorrido</button>
+    <button class="chip-btn" data-a="reset">Reiniciar</button>
+  </div>
+</div>
+<div class="stage"><div class="frame" id="frame"></div></div>
+<div id="layer"></div>
+
+<script>
+(function(){
+"use strict";
+/* ============ data (vacante real, candidata ficticia) ============ */
+const JOB={title:"Auxiliar administrativo contable",city:"Bogotá",company:"Alz Energy",initials:"AE",source:"LinkedIn",type:"Tiempo completo",
+  url:"https://buscotrabajo.co/empleos/01811122-c6f6-4625-ab1b-e15411edf5ce/auxiliar-administrativo-contable-bogota-bogota-d-c-metropolitan-area",snapshot:"14 nov 2026"};
+const REQS=[
+ {id:"R1",kind:"Obligatorio",text:"Técnico, tecnólogo o profesional en Contabilidad, Finanzas, Administración o afines"},
+ {id:"R2",kind:"Obligatorio",text:"Mínimo un (1) año de experiencia en funciones contables o administrativas"},
+ {id:"R3",kind:"Obligatorio",text:"Conocimientos en nómina, novedades de personal y liquidación de conceptos laborales"},
+ {id:"R4",kind:"Obligatorio",text:"Manejo de herramientas ofimáticas, especialmente Microsoft Excel"},
+ {id:"R5",kind:"Deseable",text:"Experiencia con herramientas de inteligencia artificial en tareas contables"},
+ {id:"R6",kind:"Deseable",text:"Organizar, revisar y gestionar información financiera y documental"}];
+const NOW=[2026,11];
+const PLANS={"1":{months:1,perMonth:14900,total:14900},"3":{months:3,perMonth:9900,total:29700}};
+const cop=n=>"COP "+n.toLocaleString("es-CO");
+function baseCv(){return{name:"Laura Méndez Rincón",title:"Auxiliar contable",contact:"Bogotá · 300 000 0000 · laura.mendez@ejemplo.test",
+ summary:"Técnica en contabilidad. Responsable y puntual.",
+ experience:[{role:"Asistente contable",org:"Comercializadora Andina Demo S.A.S.",start:[2024,2],end:null,bullets:["Registro de facturas de proveedores en el software contable.","Archivo de soportes contables.","Apoyo en conciliaciones bancarias mensuales."]},
+  {role:"Auxiliar administrativa (práctica)",org:"Distribuciones Ejemplo Ltda.",start:[2023,7],end:"?",bullets:["Atención de llamadas y correspondencia.","Elaboración de cuentas de cobro."]}],
+ education:[{title:"Técnica Profesional en Contabilidad y Finanzas",org:"Instituto Técnico Ejemplo",year:"2023"}],
+ skills:["Excel (tablas dinámicas, BUSCARV)","Software contable","Conciliación bancaria","Atención al cliente"],
+ languages:["Español (nativo)","Inglés (básico)"]};}
+const MO=["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+const fd=d=>d==="?"?"—":d?MO[d[1]-1]+" "+d[0]:"actual";
+const months=(a,b)=>{if(b==="?")b=a;b=b||NOW;return(b[0]-a[0])*12+(b[1]-a[1]);};
+const dur=m=>{const y=Math.floor(m/12),r=m%12;return(y?y+(y>1?" años":" año"):"")+(y&&r?" y ":"")+(r?r+(r>1?" meses":" mes"):"");};
+const clone=o=>JSON.parse(JSON.stringify(o));
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+/* ============ deterministic score (doc 05 §4) ============ */
+const VERB=/^(registr|organic|archiv|apoy|atend|elabor|revis|gestion|realic|prepar|us[eé])/i;
+function analyze(cv){
+ const B=cv.experience.flatMap(e=>e.bullets);const fb=re=>B.find(b=>re.test(b));const sk=re=>cv.skills.find(s=>re.test(s));
+ const rel=cv.experience.filter(e=>/contab|administ/i.test(e.role));const m=rel.reduce((a,e)=>a+months(e.start,e.end),0);
+ const xb=fb(/excel/i),xs=sk(/excel/i),nom=fb(/n[oó]mina/i),ia=fb(/inteligencia artificial|\bIA\b/i),doc=fb(/archiv|soportes/i);
+ const res=[
+  {...REQS[0],st:cv.education.some(e=>/contab|finanz/i.test(e.title))?"ok":"bad",ev:"Formación: "+cv.education[0].title},
+  {...REQS[1],st:m>=12?"ok":m>0?"part":"bad",ev:dur(m)+" de experiencia relacionada"},
+  {...REQS[2],st:nom?"ok":"bad",ev:nom||"Tu CV no lo menciona"},
+  {...REQS[3],st:xb?"ok":xs?"part":"bad",ev:xb||"Solo aparece en habilidades"},
+  {...REQS[4],st:ia?"ok":"bad",ev:ia||"Tu CV no lo menciona"},
+  {...REQS[5],st:doc?"ok":"bad",ev:doc||"No aparece"}];
+ const text=[cv.summary,...B,...cv.skills].join(" ");
+ const tk=[/conciliaci[oó]n(es)? bancari/i,/conciliaci[oó]n de cuentas/i,/contab/i,/atenci[oó]n al cliente|llamadas/i,/hablar en p[uú]blico/i,/tribut/i,/control interno/i,/estados financieros/i,/facturas de proveedores|cuentas (a|por) pagar/i,/organi[cz]|archiv/i].filter(r=>r.test(text)).length;
+ const checks=[cv.summary.length>=110&&cv.summary.length<=420,B.every(b=>VERB.test(b)),true,true,true].filter(Boolean).length;
+ const kws=["factura","conciliaci","nómina","excel","soportes"].filter(k=>cv.summary.toLowerCase().includes(k)).length;
+ const p=s=>s==="ok"?1:s==="part"?.5:0;
+ const comp=[res.slice(0,4).reduce((a,r)=>a+p(r.st)*10,0),res.slice(4).reduce((a,r)=>a+p(r.st)*7.5,0),tk*2,checks*3,(/contab/i.test(cv.summary)?5:0)+(kws>=2?5:0)];
+ return{res,total:Math.round(comp.reduce((a,b)=>a+b,0)),comp,met:res.filter(r=>r.st==="ok").length};
+}
+
+/* ============ state ============ */
+let S;
+function fresh(device){return{view:"job",device:device||"desktop",consent:{data:false,terms:false,cloud:false},sheet:null,
+ cv:null,hist:[],fut:[],feed:[],busy:false,baseline:null,agentDone:false,cmp:"after",tpl:"clasica",tab:"agent",plan:"3",pay:null,touring:false,lastChange:null};}
+S=fresh();try{const d=localStorage.getItem("rs-dev");if(d)S.device=d;}catch(e){}
+const reduce=matchMedia("(prefers-reduced-motion: reduce)").matches;
+const sleep=ms=>new Promise(r=>setTimeout(r,reduce?Math.min(ms,80):ms));
+function commit(fn){S.hist.push(clone(S.cv));S.fut=[];fn(S.cv);S.lastChange=Date.now();renderDoc();}
+
+/* ============ icons ============ */
+const I={
+ spark:'<svg class="spark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 3l1.9 5.6L19.5 10l-5.6 1.9L12 17.5l-1.9-5.6L4.5 10l5.6-1.4z"/><path d="M19 15.5l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></svg>',
+ up:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3"/></svg>',
+ send:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></svg>',
+ undo:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 010 10h-3"/></svg>',
+ redo:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14l5-5-5-5"/><path d="M20 9H9a5 5 0 000 10h3"/></svg>',
+ check:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+ target:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1" fill="currentColor"/></svg>',
+ file:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M14 3H6v18h12V7z"/><path d="M14 3v4h4M9 12h6M9 16h6"/></svg>',
+ layers:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M12 4l9 5-9 5-9-5z"/><path d="M3 14l9 5 9-5"/></svg>',
+ bars:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M6 20V11M12 20V5M18 20v-6"/></svg>',
+ chat:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M4 5h16v11H9l-5 4z"/></svg>',
+ shield:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg>',
+ back:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 6l-6 6 6 6"/></svg>'
+};
+
+/* ============ legal texts behind each checkbox (doc 07) ============ */
+const P='<span class="pend">pendiente</span>';
+const LEGAL={
+ data:{k:"Autorización · Ley 1581 de 2012",t:"Autorización para el tratamiento de datos personales y aviso de privacidad",v:"Versión 2026-11 · borrador para revisión legal",body:`
+  <h3>Responsable del tratamiento</h3><p>BuscoTrabajo.co. Razón social ${P}, NIT ${P}, domicilio ${P}, correo de privacidad ${P}.</p>
+  <h3>Datos que tratamos</h3><ul><li>Los que contiene tu hoja de vida: nombre, contacto, experiencia, formación, habilidades e idiomas.</li><li>Tus respuestas al asistente y las versiones que guardes.</li><li>La vacante que elijas para comparar.</li></ul>
+  <h3>Finalidades</h3><ul><li>Leer tu hoja de vida y convertirla en un documento editable.</li><li>Compararla con las vacantes que tú elijas y explicarte el resultado.</li><li>Proponerte cambios de redacción y hacerte preguntas cuando falte un dato.</li><li>Generar el documento que descargas.</li><li>Cobrar el pase, facturar y prevenir fraude.</li></ul>
+  <p><b>No</b> vendemos tus datos, no los compartimos con empleadores, no los usamos para publicidad y no se usan para entrenar modelos de IA.</p>
+  <h3>Encargado y transmisión internacional</h3><p>Para el análisis con IA, tu hoja de vida se envía, sin tu correo ni tu teléfono, a Google Cloud (Vertex AI) en una región de Estados Unidos, que actúa como encargado bajo contrato de transmisión (Decreto 1074 de 2015, arts. 2.2.2.25.5.1 y 2.2.2.25.5.2). Estados Unidos figura entre los países con nivel adecuado de protección de la Circular Externa 005 de 2017 de la SIC.</p>
+  <h3>Datos sensibles</h3><p>No los necesitamos. No incluyas foto, número de documento, estado civil, religión, salud, afiliación política ni sindical. Si aparecen, los excluimos del análisis. Responder preguntas sobre datos sensibles es facultativo.</p>
+  <h3>Tus derechos (Ley 1581, art. 8)</h3><ul><li>Conocer, actualizar y rectificar tus datos.</li><li>Pedir prueba de esta autorización.</li><li>Saber cómo usamos tus datos.</li><li>Presentar quejas ante la Superintendencia de Industria y Comercio.</li><li>Revocar la autorización y pedir la supresión de tus datos.</li><li>Acceder gratis a tus datos.</li></ul>
+  <h3>Cómo ejercerlos y plazos</h3><p>En «Mi cuenta → Datos y privacidad» (exportar, corregir, borrar, revocar) o al correo ${P}. Consultas: respuesta en máximo 10 días hábiles, prorrogables 5. Reclamos: máximo 15 días hábiles, prorrogables 8 (Ley 1581, arts. 14 y 15).</p>
+  <h3>Cuánto tiempo</h3><p>Sin cuenta: en tu navegador hasta que lo borres. Con cuenta: hasta que lo borres o tras 12 meses sin uso ${P}. Conservamos solo el registro del pago y la prueba de esta autorización.</p>
+  <h3>Política completa</h3><p>Política de Tratamiento de Datos Personales v2026-11 en /legal/privacidad ${P}.</p>`},
+ terms:{k:"Términos del servicio",t:"Términos del servicio Hoja de vida con IA",v:"Versión 2026-11 · borrador para revisión legal",body:`
+  <h3>Qué es</h3><p>Una herramienta para crear tu hoja de vida, compararla con vacantes de BuscoTrabajo y descargarla. Las vacantes y sus enlaces de aplicación siguen gratis y no dependen de esta herramienta.</p>
+  <h3>Qué es gratis</h3><p>Subir tu CV, el análisis, el chat con el asistente y la vista previa.</p>
+  <h3>Qué se paga</h3><p>Un pase de 1 o 3 meses que desbloquea descargas en PDF y DOCX, todas las plantillas y adaptaciones ilimitadas mientras esté vigente. Pagas una vez con Wompi. <b>No hay renovación automática.</b> Precios con IVA incluido ${P}.</p>
+  <h3>Garantía y retracto</h3><p>Si el archivo no se genera o no quedas satisfecho, puedes pedir la devolución dentro de los 7 días siguientes al pago ${P}. El derecho de retracto aplica según la Ley 1480 de 2011 ${P}.</p>
+  <h3>Lo que no prometemos</h3><p>La compatibilidad es una estimación de BuscoTrabajo con una fórmula pública. No es el puntaje de ningún sistema de selección (ATS) y no garantiza entrevistas ni contratación.</p>
+  <h3>Tu responsabilidad</h3><p>La información de tu hoja de vida debe ser verdadera. El asistente no agrega experiencia, estudios ni logros que tú no confirmes.</p>
+  <h3>Uso aceptable</h3><p>No subas hojas de vida de otras personas sin su autorización ni contenido ilegal.</p>`},
+ cloud:{k:"Opcional",t:"Guardar mi hoja de vida en mi cuenta",v:"Puedes cambiar esto cuando quieras",body:`
+  <p>Si lo marcas, guardamos tu hoja de vida y sus versiones en tu cuenta de BuscoTrabajo para que la edites desde otro dispositivo. Si no lo marcas, solo queda en este navegador.</p>
+  <h3>Qué guardamos</h3><ul><li>El contenido de tu hoja de vida, cifrado.</li><li>Hasta 6 versiones (una base y cinco adaptadas).</li><li>Los análisis contra vacantes, con una copia de la vacante en ese momento.</li></ul>
+  <h3>Qué no guardamos</h3><p>El archivo original que subiste. Lo leemos y lo descartamos.</p>
+  <h3>Cuánto tiempo</h3><p>Hasta que lo borres, o 12 meses sin uso ${P}. Te avisamos 30 días antes.</p>`}
+};
+
+/* ============ rendering ============ */
+const frame=document.getElementById("frame"),layer=document.getElementById("layer");
+const STEPS=[["job","Vacante"],["upload","Tu CV"],["agent","Agente"],["pay","Descarga"]];
+function header(){const idx=Math.max(0,STEPS.findIndex(s=>s[0]===(S.view==="done"?"pay":S.view)));
+ return `<div class="top"><div class="brand"><svg viewBox="0 0 28 24" aria-hidden="true"><path d="M1 4h9l2 2.5h6V9H1z" fill="#1fa37a"/><rect x="1" y="6" width="22" height="17" rx="1.5" fill="#1fa37a"/><path d="M6 10h21v13H6z" fill="#0f6b4f"/></svg><span>Buscotrabajo.co</span></div><div class="steps">${STEPS.map((s,i)=>`<span class="${i===idx?"on":i<idx?"done":""}"><i></i><span class="lb">${s[1]}</span></span>`).join("")}</div></div>`;}
+function jobchip(){return `<span class="jobchip"><span class="co">${JOB.initials}</span><span><b>${JOB.title}</b> · ${JOB.company}</span></span>`;}
+
+const V={};
+V.job=()=>`<div class="pad hero"><div class="narrow">
+ <div class="row" style="gap:14px"><span class="co">${JOB.initials}</span><div><div class="eyebrow">${JOB.source} · publicada hoy</div><div class="muted small">${JOB.company}</div></div></div>
+ <h1 class="job-title">Auxiliar administrativo <em>contable</em></h1>
+ <div class="meta"><span>${JOB.city}</span><span>${JOB.type}</span><span>$1.900.000 – $2.100.000</span></div>
+ <div class="row" style="margin-top:26px;gap:10px"><a class="btn ink" href="${JOB.url}" target="_blank" rel="noopener">Aplicar en ${JOB.source} ↗</a><button class="btn-ai" data-a="analyze">${I.spark} Analizar mi perfil para esta vacante</button></div>
+ <details class="reqs"><summary><span>Requisitos</span><span class="muted">6</span></summary><ul>${REQS.map(r=>`<li>${r.text}</li>`).join("")}</ul></details>
+</div></div>`;
+
+V.upload=()=>{const ok=S.consent.data&&S.consent.terms;return `<div class="pad hero"><div class="narrow">
+ <button class="row muted small" data-a="go" data-v="job" style="gap:4px">${I.back} Volver a la vacante</button>
+ <div style="margin-top:18px">${jobchip()}</div>
+ <h1 class="h1">Sube tu hoja de vida</h1>
+ <p class="lead">La comparamos con esta vacante y te decimos qué mejorar. Gratis hasta la vista previa.</p>
+ <div class="consent">
+  <label class="ck"><input type="checkbox" id="ck-data" data-a="ck" data-v="data" ${S.consent.data?"checked":""}><span>Autorizo el tratamiento de mis datos personales. <a href="#" data-a="legal" data-v="data">Ver autorización</a></span></label>
+  <label class="ck"><input type="checkbox" id="ck-terms" data-a="ck" data-v="terms" ${S.consent.terms?"checked":""}><span>Acepto los términos del servicio. <a href="#" data-a="legal" data-v="terms">Ver términos</a></span></label>
+  <label class="ck"><input type="checkbox" id="ck-cloud" data-a="ck" data-v="cloud" ${S.consent.cloud?"checked":""}><span>Guardar mi hoja de vida en mi cuenta <span class="opt">(opcional)</span>. <a href="#" data-a="legal" data-v="cloud">Qué guardamos</a></span></label>
+ </div>
+ <div class="drop"><div class="drop-in">
+  <div class="ico">${I.up}</div>
+  <b>Arrastra tu PDF o DOCX</b><span class="muted small">Máximo 2 MB · PDF con texto, no escaneado</span>
+  <button class="btn gold" data-a="upload" ${ok?"":"disabled"} style="margin-top:6px">Elegir archivo</button>
+  ${ok?"":`<span class="small">Marca las dos primeras casillas para continuar</span>`}
+ </div></div>
+ <p class="small muted" style="text-align:center;margin-top:14px">¿No tienes hoja de vida? <button class="small" style="text-decoration:underline" data-a="scratch" ${ok?"":"disabled"}>Créala desde cero con el agente</button></p>
+</div></div>`;};
+
+V.agent=()=>`<div class="wtabs"><div class="seg" role="group" aria-label="Vista"><button data-a="tab" data-v="agent" aria-pressed="${S.tab==="agent"}">Agente</button><button data-a="tab" data-v="doc" aria-pressed="${S.tab==="doc"}">Tu CV</button></div></div>
+ <div class="ws" data-tab="${S.tab}">
+  <section class="agent" aria-label="Agente">
+   <div class="a-head"><span class="orb ${S.busy?"busy":""}" id="orb"></span><div><b>Agente BuscoTrabajo</b><div class="status" id="status">${status()}</div></div></div>
+   <div class="feed" id="feed" aria-live="polite"></div>
+   <form class="composer" data-a="send">
+    <div class="sugg">${["Mejora mi resumen","Hazlo más claro","Más fácil para ATS","Cambia la plantilla"].map(s=>`<button type="button" data-a="sugg" data-v="${s}">${s}</button>`).join("")}</div>
+    <div class="cbox"><input id="cin" placeholder="Pídele un cambio al agente…" aria-label="Mensaje al agente" autocomplete="off"><button class="send" aria-label="Enviar">${I.send}</button></div>
+   </form>
+  </section>
+  <section class="doc" aria-label="Tu hoja de vida" id="doc"></section>
+ </div>`;
+
+V.pay=()=>{const a=analyze(S.cv);const pl=PLANS[S.plan];return `<div class="pad hero" style="padding-top:28px">
+ <div class="jobban"><span class="co">${JOB.initials}</span><div style="position:relative;z-index:1;min-width:0"><div class="k">Tu hoja de vida para</div><h2>${JOB.title}</h2><div class="small" style="opacity:.8">${JOB.company} · ${JOB.city} · ${JOB.source}</div></div>
+  <div class="sc"><div class="k">Compatibilidad</div><b class="num">${a.total}</b><span style="opacity:.7">/100</span></div></div>
+ <h1 class="pay-h">Descarga tu hoja de vida y <em>postúlate hoy</em>.</h1>
+ <div class="pay-grid">
+  <div style="display:grid;gap:14px">
+   <div class="plans" role="radiogroup" aria-label="Elige tu pase">
+    ${["1","3"].map(k=>{const p=PLANS[k];return `<button class="plan" role="radio" aria-pressed="${S.plan===k}" aria-checked="${S.plan===k}" data-a="plan" data-v="${k}">${k==="3"?'<span class="badge">Recomendado</span>':""}<div class="big">${p.months}</div><div class="per">${p.months>1?"meses":"mes"}</div>${k==="3"?'<span class="save">Ahorra 34 %</span>':'<span class="save" style="visibility:hidden">·</span>'}<div class="pr num">${cop(p.perMonth)}</div><div class="per">/mes</div></button>`;}).join("")}
+   </div>
+   <div class="box"><ul class="chk">
+    <li>${I.check}<span><b>Ilimitadas</b> <span class="muted">plantillas y descargas</span></span></li>
+    <li>${I.check}<span><b>Adapta</b> <span class="muted">tu CV a cada vacante que te interese</span></span></li>
+    <li>${I.check}<span><b>Garantía de devolución</b> <span class="muted">de 7 días</span></span></li></ul></div>
+   <div class="methods"><span>Tarjeta</span><span>PSE</span><span>Nequi</span><span>Bancolombia</span><span>Wompi</span></div>
+  </div>
+  <div class="box">
+   <div class="ben-h">Todo lo que incluye tu pase</div>
+   <div class="bens">
+    <div class="ben">${I.target}<span>Adapta tu CV a una vacante en segundos</span></div>
+    <div class="ben">${I.file}<span>PDF y DOCX sin marca de agua</span></div>
+    <div class="ben">${I.chat}<span>Agente ilimitado para mejorar tu CV</span></div>
+    <div class="ben">${I.layers}<span>Todas las plantillas y versiones</span></div>
+    <div class="ben">${I.bars}<span>Análisis completo de compatibilidad</span></div>
+    <div class="ben hi">${I.shield}<span>Garantía de devolución de 7 días</span></div>
+   </div>
+   <button class="cta" data-a="unlock">Desbloquear por ${cop(pl.total)}</button>
+   <div class="cta-note">Pago único con Wompi · sin renovación automática</div>
+  </div>
+ </div>
+ <p class="small muted" style="text-align:center;margin-top:20px">¿Prefieres no pagar? Tu análisis y la vista previa siguen aquí, y <a href="${JOB.url}" target="_blank" rel="noopener">la vacante</a> sigue gratis.</p>
+</div>`;};
+
+V.done=()=>{const a=analyze(S.cv);return `<div class="pad hero"><div class="narrow" style="text-align:center">
+ <div class="okmark">${I.check}</div>
+ <h1 class="h1">Tu hoja de vida está lista</h1>
+ <p class="muted">Pase de ${PLANS[S.plan].months} ${PLANS[S.plan].months>1?"meses":"mes"} activo (simulado). Descárgala y postúlate.</p>
+ <div style="margin-top:18px">${jobchip()}</div>
+ <div class="row" style="justify-content:center;margin-top:22px;gap:10px"><button class="btn gold" data-a="dl" data-v="pdf">Descargar PDF</button><button class="btn" data-a="dl" data-v="docx">DOCX</button><a class="btn green" href="${JOB.url}" target="_blank" rel="noopener">Aplicar ↗</a></div>
+ <div class="vers" style="text-align:left">
+  <div class="ver"><span><b>Adaptada · ${JOB.company}</b><br><span class="small muted">${a.total}/100 · hoy</span></span><span class="small" style="color:var(--primary);font-weight:600">Desbloqueada</span></div>
+  <div class="ver"><span><b>Base</b><br><span class="small muted">Sin adaptar · hoy</span></span><button class="btn sm" data-a="toast" data-v="En el producto: abre otra vacante y adapta esta base.">Adaptar a otra vacante</button></div>
+ </div>
+ <p class="small muted" style="margin-top:18px"><button style="text-decoration:underline" data-a="toast" data-v="En el producto: descarga todos tus datos en JSON.">Exportar mis datos</button> · <button style="text-decoration:underline" data-a="toast" data-v="En el producto: confirma y se borra todo en 24 h.">Borrar todo</button></p>
+</div></div>`;};
+
+function status(){if(!S.cv)return"Preparando…";if(S.busy)return"Trabajando…";if(S.agentDone)return"Listo";return"Esperando tu respuesta";}
+
+function sheet(cv,diffWith,wm){
+ if(!cv)return `<div class="sheet empty">${[60,40,90,85,70,92,80,50,88,75].map(w=>`<div class="sk" style="width:${w}%"></div>`).join("")}</div>`;
+ const old=diffWith?diffWith.experience.flatMap(e=>e.bullets):null;const h=(s,o)=>diffWith&&o!==s?`<span class="hl">${esc(s)}</span>`:esc(s);
+ return `<div class="sheet ${S.tpl==="compacta"?"compact":""} ${S.tpl==="primer"?"first":""}" role="document" aria-label="Hoja de vida">
+  <div class="nm">${esc(cv.name)}</div><div class="ttl">${esc(cv.title)}</div><div class="ct">${esc(cv.contact)}</div>
+  <div class="secs"><div><h4>Perfil</h4>${h(cv.summary,diffWith&&diffWith.summary)}</div>
+  <div><h4>Experiencia</h4>${cv.experience.map(e=>`<div class="jh"><span>${esc(e.role)}</span><span>${fd(e.start)} – ${fd(e.end)}</span></div><div class="jo">${esc(e.org)} · Bogotá</div><ul>${e.bullets.map(b=>`<li>${old&&!old.includes(b)?`<span class="hl">${esc(b)}</span>`:esc(b)}</li>`).join("")}</ul>`).join("")}</div>
+  <div class="s-edu"><h4>Formación</h4>${cv.education.map(e=>`<div class="jh"><span>${esc(e.title)}</span><span>${e.year}</span></div><div class="jo">${esc(e.org)}</div>`).join("")}</div>
+  <div><h4>Habilidades</h4>${cv.skills.map(esc).join(" · ")}</div><div><h4>Idiomas</h4>${cv.languages.map(esc).join(" · ")}</div></div>
+  ${wm?'<div class="wm" aria-hidden="true"><span>Vista previa · BuscoTrabajo</span></div>':""}</div>`;}
+
+function renderDoc(){const el=document.getElementById("doc");if(!el)return;
+ const a=S.baseline?analyze(S.cv):null;const showBefore=S.cmp==="before"&&S.baseline;
+ el.innerHTML=`<div class="d-head">
+   ${a?`<span class="pill ${a.total>S.baseline.a.total?"up":""}"><span class="n num">${a.total}</span>Compatibilidad</span>`:`<span class="pill"><span class="n">–</span>Analizando</span>`}
+   <div class="tools">
+    ${S.baseline?`<div class="seg" role="group" aria-label="Comparar"><button data-a="cmp" data-v="before" aria-pressed="${S.cmp==="before"}">Antes</button><button data-a="cmp" data-v="after" aria-pressed="${S.cmp==="after"}">Después</button></div>`:""}
+    <select class="tsel" id="tpl" aria-label="Plantilla" data-a="tpl"><option value="clasica" ${S.tpl==="clasica"?"selected":""}>Clásica</option><option value="compacta" ${S.tpl==="compacta"?"selected":""}>Compacta</option><option value="primer" ${S.tpl==="primer"?"selected":""}>Primer empleo</option></select>
+    <button class="ibtn" data-a="undo" aria-label="Deshacer" ${S.hist.length?"":"disabled"}>${I.undo}</button><button class="ibtn" data-a="redo" aria-label="Rehacer" ${S.fut.length?"":"disabled"}>${I.redo}</button>
+   </div></div>
+  <div class="sheet-wrap">${showBefore?sheet(S.baseline.cv,null,true):sheet(S.cv,S.baseline&&S.cmp==="after"?S.baseline.cv:null,true)}</div>
+  ${S.agentDone?`<div class="d-foot"><button class="btn gold" data-a="go" data-v="pay" data-tour="1">Descargar mi CV →</button></div>`:""}`;}
+
+function renderFeed(){const el=document.getElementById("feed");if(!el)return;const atEnd=el.scrollHeight-el.scrollTop-el.clientHeight<60;
+ el.innerHTML=S.feed.map((it,i)=>item(it,i)).join("");
+ if(atEnd||S.busy)el.scrollTop=el.scrollHeight;
+ const o=document.getElementById("orb");if(o)o.classList.toggle("busy",S.busy);const st=document.getElementById("status");if(st)st.textContent=status();}
+function item(it,i){
+ if(it.t==="agent")return `<div class="m-a"><span class="orb sm" style="margin-top:3px"></span><p>${esc(it.text.slice(0,it.shown))}${it.shown<it.text.length?'<span class="caret"></span>':""}</p></div>`;
+ if(it.t==="user")return `<div class="m-u">${esc(it.text)}</div>`;
+ if(it.t==="run"){const done=it.steps.every(s=>s.st==="done");return `<div class="run"><div class="run-h"><span>${done?"Revisé tu CV y la vacante":"Trabajando"}</span><span class="muted num" style="font-weight:500">${it.steps.filter(s=>s.st==="done").length}/${it.steps.length}</span></div><ol>${it.steps.map(s=>`<li><span class="dot ${s.st}"></span>${esc(s.l)}${s.st==="done"&&s.mt?`<span class="mt">${esc(s.mt)}</span>`:""}</li>`).join("")}</ol></div>`;}
+ if(it.t==="q"){if(!it.open)return "";return `<div class="qa">${it.chips.map((c,j)=>`<button class="qchip" data-a="ans" data-i="${i}" data-v="${esc(c)}" ${j===(it.tour||0)?'data-tour="1"':""}>${esc(c)}</button>`).join("")}</div>${it.input?`<form class="qin" data-a="ansform" data-i="${i}"><input id="qi-${i}" placeholder="${esc(it.input)}" aria-label="${esc(it.input)}"><button class="send" aria-label="Enviar">${I.send}</button></form>`:""}`;}
+ if(it.t==="prop")return `<div class="card"><div class="row" style="justify-content:space-between"><b style="font-size:14px">${esc(it.title)}</b><span class="lab ${it.kind==="Redacción"?"r":"f"}">${it.kind}</span></div><div class="diff"><span class="del">${esc(it.from)}</span><span class="ins">${esc(it.to)}</span></div>${it.open?`<div class="row"><button class="btn sm ink" data-a="prop" data-i="${i}" data-v="apply" data-tour="1">Aplicar</button><button class="btn sm" data-a="prop" data-i="${i}" data-v="skip">Omitir</button></div>`:`<span class="done-l ${it.res==="apply"?"":"skip"}">${it.res==="apply"?"✓ Aplicado":"Omitido"}</span>`}</div>`;
+ if(it.t==="score"){const a=it.a;return `<div class="card"><div class="score-card"><div class="ring" style="--v:${a.total}"><span class="num">${a.total}</span></div><div><b>Compatibilidad estimada</b><div class="small muted">Cumples ${a.met} de 6 requisitos de la vacante</div></div></div>
+  <ul class="reqlist">${a.res.map(r=>`<li><span class="st ${r.st}">${r.st==="ok"?"✓":r.st==="part"?"½":"✕"}</span><span>${esc(r.text)}</span></li>`).join("")}</ul>
+  <p class="fine">Estimación de BuscoTrabajo con fórmula pública. No es un puntaje de ATS ni garantiza entrevistas.</p></div>`;}
+ if(it.t==="win")return `<div class="card" style="background:var(--green-soft)"><div class="row" style="justify-content:space-between"><b>De ${it.from} a ${it.to} sin inventar nada</b><span class="num" style="font-family:var(--f-head);font-weight:700;color:var(--primary)">+${it.to-it.from}</span></div><div class="row" style="margin-top:10px"><button class="btn sm" data-a="cmp" data-v="before">Ver antes</button><button class="btn sm gold" data-a="go" data-v="pay">Descargar mi CV →</button></div></div>`;
+ return "";}
+
+function render(){
+ frame.classList.toggle("mobile",S.device==="mobile");
+ document.getElementById("d-desk").setAttribute("aria-pressed",S.device==="desktop");
+ document.getElementById("d-mob").setAttribute("aria-pressed",S.device==="mobile");
+ document.getElementById("tour").textContent=S.touring?"■ Detener":"▶ Ver recorrido";
+ frame.innerHTML=header()+`<div class="view">${V[S.view]()}</div>`;
+ if(S.view==="agent"){renderFeed();renderDoc();}
+ renderLayer();}
+function renderLayer(){
+ if(S.sheet){const L=LEGAL[S.sheet];layer.innerHTML=`<div class="scrim" data-a="close"><aside class="drawer" role="dialog" aria-modal="true" aria-labelledby="lg-t"><div class="row" style="justify-content:space-between"><span class="eyebrow">${L.k}</span><button class="ibtn" data-a="close" aria-label="Cerrar">✕</button></div><h2 id="lg-t">${L.t}</h2><p class="small muted">${L.v}</p>${L.body}<button class="btn ink" style="margin-top:22px;width:100%" data-a="accept" data-v="${S.sheet}">Entendido, marcar la casilla</button></aside></div>`;return;}
+ if(S.pay==="open")layer.innerHTML=`<div class="scrim center"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="pm"><span class="eyebrow">Simulación</span><h2 id="pm" style="font-size:22px;margin:6px 0 8px">Aquí se abre el checkout de Wompi</h2><p class="small muted">En el producto, el servidor firma la referencia y Wompi muestra su formulario. Este prototipo no pide ningún dato de pago.</p><p style="margin:14px 0"><b>${cop(PLANS[S.plan].total)}</b> · pase de ${PLANS[S.plan].months} ${PLANS[S.plan].months>1?"meses":"mes"}</p><div style="display:grid;gap:8px"><button class="btn ink" data-a="payok" data-tour="1">Simular pago aprobado</button><button class="btn" data-a="payko">Simular rechazo</button><button class="btn" style="border:0" data-a="close">Cancelar</button></div></div></div>`;
+ else if(S.pay==="wait")layer.innerHTML=`<div class="scrim center"><div class="modal" role="status"><div class="row"><span class="orb busy"></span><b>Confirmando con Wompi…</b></div><p class="small muted" style="margin-top:8px">Solo desbloqueamos cuando llega la confirmación firmada del pago.</p></div></div>`;
+ else if(S.pay==="ko")layer.innerHTML=`<div class="scrim center"><div class="modal" role="dialog" aria-modal="true"><h2 style="font-size:22px">Pago rechazado</h2><p class="small muted" style="margin:8px 0 14px">Tu hoja de vida no se pierde. Prueba con otro medio.</p><div class="row"><button class="btn ink" data-a="unlock">Intentar de nuevo</button><button class="btn" data-a="close">Cerrar</button></div></div></div>`;
+ else layer.innerHTML="";}
+let tt;function toast(t){clearTimeout(tt);let e=document.querySelector(".toast");if(!e){e=document.createElement("div");e.className="toast";e.setAttribute("role","status");document.body.appendChild(e);}e.textContent=t;tt=setTimeout(()=>e.remove(),2600);}
+
+/* ============ agent engine ============ */
+function push(it){S.feed.push(it);renderFeed();return it;}
+function say(text){const it=push({t:"agent",text,shown:reduce?text.length:0});return new Promise(res=>{if(it.shown>=text.length)return res();const iv=setInterval(()=>{it.shown=Math.min(text.length,it.shown+3);renderFeed();if(it.shown>=text.length){clearInterval(iv);res();}},16);});}
+async function run(steps){const it=push({t:"run",steps:steps.map(s=>({...s,st:"wait"}))});for(const s of it.steps){s.st="doing";renderFeed();await sleep(s.ms||700);s.st="done";renderFeed();}}
+function setBusy(b){S.busy=b;renderFeed();}
+function ask(o){setBusy(false);const it=push({t:"q",open:true,...o});return new Promise(r=>{it.resolve=v=>{it.open=false;push({t:"user",text:v});setBusy(true);r(v);};});}
+function propose(o){setBusy(false);const it=push({t:"prop",open:true,...o});return new Promise(r=>{it.resolve=v=>{it.open=false;it.res=v;if(v==="apply")commit(o.apply);setBusy(true);renderFeed();r(v);};});}
+
+async function agent(){
+ S.busy=true;renderFeed();
+ await run([{l:"Leyendo hoja-de-vida-laura.pdf",mt:"1 pág.",ms:900},{l:"Extrayendo tus datos",mt:"11/12 campos",ms:1000},{l:`Leyendo la vacante de ${JOB.company}`,mt:"6 requisitos",ms:800}]);
+ S.cv=baseCv();renderDoc();
+ await say("Ya tengo tu hoja de vida. Me falta un dato y no lo voy a adivinar: ¿cuándo terminó tu práctica en Distribuciones Ejemplo?");
+ const end=await ask({chips:["ene 2024","dic 2023","No lo recuerdo"]});
+ commit(cv=>{cv.experience[1].end=end==="ene 2024"?[2024,1]:end==="dic 2023"?[2023,12]:null;});S.hist=[];
+ await sleep(400);const a0=analyze(S.cv);S.baseline={cv:clone(S.cv),a:a0};renderDoc();
+ push({t:"score",a:a0});
+ await say(`Cumples ${a0.met} de 6 requisitos. Puedo subir tu compatibilidad sin inventar nada. Empiezo por lo que ya está en tu CV.`);
+ const rel=dur(months([2024,2],null));
+ const sum=`Técnica Profesional en Contabilidad y Finanzas con ${rel} de experiencia como asistente contable: registro de facturas de proveedores, conciliaciones bancarias y archivo de soportes. Busco aportar como auxiliar contable.`;
+ await propose({kind:"Redacción",title:"Resumen enfocado en el cargo",from:S.cv.summary,to:sum,apply:cv=>{cv.summary=sum;}});
+ const map={"Registro de facturas de proveedores en el software contable.":"Registré facturas de proveedores en el software contable.","Archivo de soportes contables.":"Organicé y archivé los soportes contables del área.","Apoyo en conciliaciones bancarias mensuales.":"Apoyé las conciliaciones bancarias mensuales.","Atención de llamadas y correspondencia.":"Atendí llamadas y gestioné la correspondencia.","Elaboración de cuentas de cobro.":"Elaboré cuentas de cobro."};
+ await propose({kind:"Redacción",title:"Viñetas que empiezan con un verbo",from:"Registro de facturas de proveedores…",to:"Registré facturas de proveedores…  (y 4 viñetas más)",apply:cv=>cv.experience.forEach(e=>e.bullets=e.bullets.map(b=>map[b]||b))});
+ await say("Ahora necesito tus respuestas. Solo agrego lo que tú me confirmes.");
+ await say("La vacante pide Excel «especialmente». ¿En qué tarea lo usas?");
+ const x=await ask({chips:["En las conciliaciones bancarias","En reportes mensuales"],input:"Otra tarea…"});
+ commit(cv=>{const e=cv.experience[0];const i=e.bullets.findIndex(b=>/conciliaci/i.test(b));if(/concilia/i.test(x)&&i>=0)e.bullets[i]=e.bullets[i].replace(/\.$/,"")+" usando Excel (tablas dinámicas y BUSCARV).";else e.bullets.push(`Usé Excel ${x.replace(/^en /i,"en ").replace(/\.$/,"").toLowerCase()}.`);});
+ await say("Listo, lo puse en tu experiencia. ¿Has trabajado con nómina? Es un requisito obligatorio y tu CV no lo menciona.");
+ const n=await ask({chips:["Sí, revisaba las novedades de nómina quincenal","No"]});
+ if(n!=="No")commit(cv=>{cv.experience[0].bullets.push("Revisé las novedades de nómina quincenal antes de enviarlas al contador.");});
+ else await say("Entendido. No lo agrego.");
+ await say("Última: ¿has usado herramientas de inteligencia artificial en tu trabajo?");
+ const ia=await ask({chips:["Sí","No"],tour:1});
+ if(ia==="No")await say("Perfecto, lo dejo así. Ese requisito queda como no demostrado: es mejor que inventarlo.");
+ else await say("En el producto te preguntaría qué herramienta y para qué tarea antes de agregarlo.");
+ const a1=analyze(S.cv);push({t:"win",from:a0.total,to:a1.total});
+ S.agentDone=true;setBusy(false);renderDoc();
+}
+async function freeText(t){push({t:"user",text:t});const was=S.busy;S.busy=true;renderFeed();await sleep(500);
+ if(/plantilla/i.test(t)){await say("Puedes cambiarla arriba de tu CV. Tu contenido no cambia.");}
+ else if(/ats|leer/i.test(t)){await say("Tu CV ya es de una columna, sin tablas ni imágenes, con encabezados estándar. Ningún formato garantiza pasar un filtro: cada sistema lee distinto.");}
+ else if(/resumen|clar/i.test(t)){await say("Ya te propuse un resumen y viñetas más claras arriba. Si quieres otro tono, dime cuál (más corto, más formal).");}
+ else await say("En este prototipo mis respuestas están escritas de antemano. En el producto te respondería con una propuesta que puedes aplicar u omitir, y te preguntaría antes de agregar cualquier dato nuevo.");
+ S.busy=was;renderFeed();}
+
+/* ============ events ============ */
+document.addEventListener("click",e=>{
+ const b=e.target.closest("[data-a]");if(!b)return;const a=b.dataset.a,v=b.dataset.v;
+ if(e.isTrusted&&S.touring&&a!=="tour")stopTour();
+ if(b.tagName==="FORM")return;
+ switch(a){
+ case "device":S.device=v;try{localStorage.setItem("rs-dev",v);}catch(_){}render();break;
+ case "reset":stopTour();S=fresh(S.device);render();break;
+ case "tour":S.touring?stopTour():startTour();break;
+ case "go":S.view=v;if(v==="job")S.feed=[];render();break;
+ case "analyze":S.view="upload";render();break;
+ case "ck":S.consent[v]=b.checked;render();break;
+ case "legal":e.preventDefault();S.sheet=v;renderLayer();break;
+ case "accept":S.consent[v]=true;S.sheet=null;render();break;
+ case "close":if(e.target!==b&&b.classList.contains("scrim"))return;S.sheet=null;if(S.pay!=="wait")S.pay=null;renderLayer();break;
+ case "upload":case "scratch":if(a==="scratch")toast("En el producto, el agente te entrevista para crearla. El prototipo continúa con un CV de ejemplo.");S.view="agent";S.feed=[];S.cv=null;render();agent();break;
+ case "tab":S.tab=v;render();break;
+ case "sugg":freeText(v);break;
+ case "ans":{const it=S.feed[+b.dataset.i];if(it&&it.open)it.resolve(v);break;}
+ case "prop":{const it=S.feed[+b.dataset.i];if(it&&it.open)it.resolve(v);break;}
+ case "cmp":S.cmp=v;if(S.device==="mobile"){S.tab="doc";render();}else renderDoc();break;
+ case "undo":if(S.hist.length){S.fut.push(clone(S.cv));S.cv=S.hist.pop();renderDoc();toast("Cambio deshecho");}break;
+ case "redo":if(S.fut.length){S.hist.push(clone(S.cv));S.cv=S.fut.pop();renderDoc();toast("Cambio rehecho");}break;
+ case "plan":S.plan=v;render();break;
+ case "unlock":S.pay="open";renderLayer();break;
+ case "payok":S.pay="wait";renderLayer();setTimeout(()=>{S.pay=null;S.view="done";render();},1500);break;
+ case "payko":S.pay="ko";renderLayer();break;
+ case "dl":toast(`En el producto se descarga «laura-mendez-auxiliar-contable.${v}». El prototipo no genera archivos.`);break;
+ case "toast":toast(v);break;
+ }});
+document.addEventListener("change",e=>{if(e.target.id==="tpl"){S.tpl=e.target.value;renderDoc();}});
+document.addEventListener("submit",e=>{e.preventDefault();const f=e.target;
+ if(f.dataset.a==="send"){const i=document.getElementById("cin");const t=i.value.trim();if(t){i.value="";freeText(t);}}
+ if(f.dataset.a==="ansform"){const it=S.feed[+f.dataset.i];const inp=f.querySelector("input");const t=inp&&inp.value.trim();if(it&&it.open&&t)it.resolve(t);}});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&(S.sheet||S.pay==="open"||S.pay==="ko")){S.sheet=null;S.pay=null;renderLayer();}});
+
+/* ============ guided tour ============ */
+let tiv=null;
+function startTour(){S=fresh(S.device);S.touring=true;render();tiv=setInterval(tick,1500);}
+function stopTour(){clearInterval(tiv);S.touring=false;const t=document.getElementById("tour");if(t)t.textContent="▶ Ver recorrido";}
+function clk(sel,root){const el=(root||document).querySelector(sel);if(el){el.click();return true;}return false;}
+function tick(){
+ if(S.view==="job")return clk('[data-a="analyze"]');
+ if(S.view==="upload"){if(!S.consent.data)return clk('#ck-data');if(!S.consent.terms)return clk('#ck-terms');return clk('[data-a="upload"]');}
+ if(S.view==="agent"){if(S.busy)return;const els=document.querySelectorAll('#feed [data-tour]');if(els.length)return els[els.length-1].click();if(S.agentDone)return clk('[data-a="go"][data-v="pay"]');return;}
+ if(S.view==="pay"){if(S.pay==="open")return clk('[data-a="payok"]');if(S.pay)return;return clk('[data-a="unlock"]');}
+ if(S.view==="done")stopTour();}
+render();
+})();
+</script>
