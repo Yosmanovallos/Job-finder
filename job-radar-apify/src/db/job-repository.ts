@@ -1028,6 +1028,32 @@ export function peekJobsPage(options: Omit<JobsPageOptions, "offset">): JobsPage
   return jobsPageCache.peek(jobsPageCacheKey(firstPage), () => queryJobsPage(firstPage));
 }
 
+// Category/role/city hubs (phase-1 hygiene) keep their own 120-entry cache,
+// outside the dashboard's 64-entry LRU (`jobsPageCache`): hub crawlers and
+// job-detail peeks must never evict the warmed CO/VE dashboard first pages.
+const CATEGORY_HUB_CACHE_ENTRIES = 120;
+const categoryHubCache = new StaleWhileRevalidateCache<string, JobsPage>({
+  freshForMs: JOBS_PAGE_CACHE_FRESH_MS,
+  staleForMs: JOBS_PAGE_CACHE_STALE_MS,
+  maxEntries: CATEGORY_HUB_CACHE_ENTRIES,
+  clone: cloneJobsPage,
+  onBackgroundRefreshError: () => {
+    console.warn("[category-hub-cache] Background refresh failed; serving the last valid page.");
+  }
+});
+
+export async function getCategoryHubPage(options: JobsPageOptions = {}): Promise<JobsPage> {
+  const limit = Math.min(Math.max(options.limit ?? 24, 1), 100);
+  const offset = Math.max(options.offset ?? 0, 0);
+  const normalized: JobsPageOptions = { ...options, limit, offset };
+  return categoryHubCache.get(jobsPageCacheKey(normalized), () => queryJobsPage(normalized));
+}
+
+export function peekCategoryHubPage(options: Omit<JobsPageOptions, "offset">): JobsPage | undefined {
+  const firstPage: JobsPageOptions = { ...options, offset: 0 };
+  return categoryHubCache.peek(jobsPageCacheKey(firstPage), () => queryJobsPage(firstPage));
+}
+
 // Infinite scroll asks for 24 jobs at a time, and every new offset used to
 // be its own cold run of the canonical projection (~1 s in production, 6 s
 // under load). Pages after the first now come from blocks of 96 rows that

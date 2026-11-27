@@ -60,6 +60,7 @@
     <script>
       (function () {
         var loaded = false;
+        var scheduled = false;
         var events = ["pointerdown", "keydown", "scroll", "touchstart"];
         function inject(src, crossOrigin) {
           var script = document.createElement("script");
@@ -72,21 +73,42 @@
           if (loaded) return;
           loaded = true;
           events.forEach(function (name) {
-            window.removeEventListener(name, loadThirdParties);
+            window.removeEventListener(name, scheduleLoad);
           });
           inject("https://www.googletagmanager.com/gtag/js?id=G-QV1E0K4KZF", false);
           // AdSense only where the server marked the page as publisher
           // content (src/lib/ad-eligibility.ts). Sign-in, account, search,
           // 404, legal pages and third-party job copies carry no marker.
+          // Staggered by 600 ms after gtag so mobile INP stays unblocked.
           if (document.querySelector('meta[name="bt-ads"][content="on"]')) {
-            inject("https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2247075733653451", true);
+            setTimeout(function () {
+              inject("https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2247075733653451", true);
+            }, 600);
+          }
+        }
+        function scheduleLoad() {
+          if (loaded || scheduled) return;
+          scheduled = true;
+          events.forEach(function (name) {
+            window.removeEventListener(name, scheduleLoad);
+          });
+          if ("requestIdleCallback" in window) {
+            window.requestIdleCallback(loadThirdParties, { timeout: 1500 });
+          } else {
+            setTimeout(loadThirdParties, 150);
           }
         }
         events.forEach(function (name) {
-          window.addEventListener(name, loadThirdParties, { once: true, passive: true });
+          window.addEventListener(name, scheduleLoad, { once: true, passive: true });
         });
         function afterLoad() {
-          setTimeout(loadThirdParties, 4000);
+          setTimeout(function () {
+            if ("requestIdleCallback" in window) {
+              window.requestIdleCallback(loadThirdParties, { timeout: 1500 });
+            } else {
+              loadThirdParties();
+            }
+          }, 2500);
         }
         if (document.readyState === "complete") afterLoad();
         else window.addEventListener("load", afterLoad, { once: true });

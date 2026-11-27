@@ -85,11 +85,10 @@ export const SOURCES_BY_COUNTRY: Record<string, string[]> = {
     "Torre",
     "GetOnBoard",
     "RemoteOK",
-    "Remotive",
     "Workana",
     "WeRemoto"
   ],
-  VE: ["LinkedIn Jobs", "Computrabajo", "Torre", "GetOnBoard", "RemoteOK", "Remotive", "WeRemoto"]
+  VE: ["LinkedIn Jobs", "Computrabajo", "Torre", "GetOnBoard", "RemoteOK", "WeRemoto"]
 };
 
 // Country stamping at ingest, NOT the dashboard modality (that one is

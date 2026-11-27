@@ -38,7 +38,7 @@ const COUNTRY_ORDER = ["CO", "VE"];
 // identical content either way, so switching from there just remembers the
 // preference (see AppRoutes' redirect gate in App.tsx) and lands on that
 // country's dashboard, the closest "still useful" destination.
-function getCountryTargetHref(pathname: string, targetCode: string): string {
+export function getCountryTargetHref(pathname: string, targetCode: string): string {
   const alreadyVe = isVePrefixed(pathname);
   if (targetCode === "VE") {
     if (alreadyVe) return pathname;
@@ -46,6 +46,8 @@ function getCountryTargetHref(pathname: string, targetCode: string): string {
     if (pathname === "/dashboard") return "/ve/dashboard";
     if (pathname === "/empresas") return "/ve/empresas";
     if (pathname.startsWith("/empresas/")) return `/ve${pathname}`;
+    if (pathname === "/empleos" || pathname === "/empleos/") return "/ve/empleos";
+    if (pathname === "/empleos/remoto") return "/ve/empleos/remoto";
     return "/ve/dashboard";
   }
   if (!alreadyVe) return pathname;
@@ -53,6 +55,8 @@ function getCountryTargetHref(pathname: string, targetCode: string): string {
   if (pathname === "/ve/dashboard") return "/dashboard";
   if (pathname === "/ve/empresas") return "/empresas";
   if (pathname.startsWith("/ve/empresas/")) return pathname.slice(3);
+  if (pathname === "/ve/empleos" || pathname === "/ve/empleos/") return "/empleos";
+  if (pathname === "/ve/empleos/remoto") return "/empleos/remoto";
   return "/dashboard";
 }
 

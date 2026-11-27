@@ -406,3 +406,13 @@ test("ADS-040 IndexNow gets the guides that went live or changed in the window, 
   const script = fs.readFileSync(path.join(root, "scripts", "indexnow-submit.ts"), "utf-8");
   assert.match(script, /getPublishedGuides\(\)/, "the script reads the live guides (empty while the switch is off)");
 });
+
+test("ADS-040 guides stay scoped to Colombia and never attach to VE hubs or VE jobs", () => {
+  assert.deepEqual(guideTagsForHub({ kind: "ciudad", country: "VE" }), []);
+  assert.deepEqual(guideTagsForHub({ kind: "intencion", intent: "remoto", country: "VE" }), []);
+  assert.deepEqual(guideTagsForHub({ kind: "rol", country: "VE" }), []);
+  assert.ok(guideTagsForHub({ kind: "ciudad", country: "CO" }).length > 0);
+  assert.deepEqual(guideTagsForJob({ modality: "remoto", country: "VE" }), []);
+  assert.deepEqual(guideTagsForJob({ modality: "presencial", country: "VE" }), []);
+  assert.ok(guideTagsForJob({ modality: "remoto", country: "CO" }).length > 0);
+});
