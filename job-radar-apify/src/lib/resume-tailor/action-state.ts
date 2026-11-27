@@ -54,8 +54,20 @@ export type CardAnswer =
   | { status: "discarded"; claims: { kind: string; value: string }[]; reason?: string; language?: CvLanguage | null }
   | { status: "error"; error: string };
 
-export function outcomeFor(answer: CardAnswer, requirement: string): Omit<Extract<ActionState, { kind: "result" }>, "kind" | "action"> | null {
+export function outcomeFor(
+  answer: CardAnswer,
+  requirement: string,
+  /** The turn came from the user's own request («agrega que…», «mejóralo»): explain THAT, not the requirement. */
+  options: { userRequest?: boolean; retried?: boolean } = {}
+): Omit<Extract<ActionState, { kind: "result" }>, "kind" | "action"> | null {
   if (answer.status === "proposal") return null;
+  if ((options.userRequest || options.retried) && answer.status !== "error" && !answer.claims.length && !(answer.status === "discarded" && answer.reason === "language")) {
+    const why = answer.status === "question" && answer.question.trim() ? answer.question.trim() : "Tu hoja de vida no muestra ese dato.";
+    // «Redactar solo con mi CV» after a «no evidence» card: the card already said what's missing; say only the new part.
+    return options.retried
+      ? { tone: "info", title: "Tampoco con tu CV", text: `${why} No escribimos nada que tu hoja de vida no diga.`, next: ["back", "tell", "skip"] }
+      : { tone: "info", title: "No lo agregamos", text: `${why} No escribimos nada que tu hoja de vida no diga.`, next: ["tell", "skip"] };
+  }
   if (answer.status === "error") return { tone: "error", title: "No se pudo esta vez", text: answer.error, next: ["retry", "tell", "skip"] };
   if (answer.status === "discarded" && answer.reason === "language") {
     const lang = answer.language ? LANGUAGE_NAME[answer.language] : "el idioma de tu hoja de vida";
@@ -63,6 +75,15 @@ export function outcomeFor(answer: CardAnswer, requirement: string): Omit<Extrac
       tone: "info",
       title: "Salió en otro idioma",
       text: `Tu hoja de vida está en ${lang} y la propuesta no, así que no la aplicamos. Puedes intentarlo de nuevo o escribirlo tú.`,
+      next: ["retry", "tell", "skip"]
+    };
+  }
+  // The proposal cited a CV line that doesn't exist, or came back empty: nothing specific is «missing».
+  if (answer.status === "discarded" && !answer.claims.length) {
+    return {
+      tone: "info",
+      title: "No pudimos verificarla",
+      text: "La propuesta se apoyaba en algo que no encontramos en tu hoja de vida, así que no la mostramos. Puedes pedir otra redactada solo con tu CV o escribirlo tú.",
       next: ["retry", "tell", "skip"]
     };
   }

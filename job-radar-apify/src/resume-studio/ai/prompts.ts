@@ -355,7 +355,8 @@ export const CARD_CHAT: PromptSpec<{ cardType: string; current: string; instruct
   version: 4,
   alias: "fast",
   maxInputTokens: 4000,
-  maxOutputTokens: 400,
+  // R4d: a whole profile (≤ 500 chars) in English plus «reply» was cut at 400 (finish_reason «length»).
+  maxOutputTokens: 700,
   schema: chatOutput,
   render: ({ cardType, current, instruction, facts, language }) => ({
     system: system(

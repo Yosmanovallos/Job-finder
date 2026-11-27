@@ -575,8 +575,10 @@ function BeforeAfter({ before, after, target, strike = true }: { before: string;
  * as «Se parece a», never as backing.
  */
 function EvidenceList({ items, answer, baseIds }: { items: EvidenceItem[]; answer?: string; baseIds: Set<string> }) {
-  if (!items.length && !answer) return null;
   const cited = items.some((e) => e.cited);
+  // With the user's own words, a CV line that only shares words isn't backing: not listed.
+  const shown = cited ? items.filter((e) => e.cited) : answer ? [] : items;
+  if (!shown.length && !answer) return null;
   return (
     <div className="mt-2 text-xs" style={{ color: "#3d413e" }}>
       <p className="font-semibold">{cited || answer ? "Se apoya en:" : "Se parece a estas líneas de tu hoja de vida:"}</p>
@@ -586,7 +588,7 @@ function EvidenceList({ items, answer, baseIds }: { items: EvidenceItem[]; answe
             💬 Basado en lo que nos contaste: <q>{snip(answer, 160)}</q>
           </li>
         ) : null}
-        {items.map((e) => (
+        {shown.map((e) => (
           <li key={e.factId}>
             {baseIds.has(e.factId) ? `📄 Basado en tu hoja de vida${e.where ? ` (${e.where})` : ""}` : "💬 Basado en lo que nos contaste"}: <q>{snip(e.text, 160)}</q>
           </li>
@@ -798,7 +800,7 @@ function ProposalCard({
         dispatch({ type: "done", outcome: null });
         return;
       }
-      dispatch({ type: "done", outcome: outcomeFor(data as CardAnswer, requirement) });
+      dispatch({ type: "done", outcome: outcomeFor(data as CardAnswer, requirement, action === "redraft" ? { retried: true } : { userRequest: true }) });
     } catch {
       if (!ctrl.signal.aborted) dispatch({ type: "done", outcome: outcomeFor({ status: "error", error: "Se perdió la conexión. Inténtalo de nuevo." }, requirement) });
     }
@@ -929,7 +931,8 @@ function ProposalCard({
             );
           })()}
           <EvidenceList items={evidence} answer={answer} baseIds={baseIds} />
-          {proposal.why ? <p className="text-xs mt-2" style={{ color: "#3d413e" }}>Por qué: {proposal.why}</p> : null}
+          {/* The app speaks Spanish: a «why» the model wrote in another language isn't shown. */}
+          {proposal.why && !languageMismatch(proposal.why, "es") ? <p className="text-xs mt-2" style={{ color: "#3d413e" }}>Por qué: {proposal.why}</p> : null}
           <ScoreDelta from={now} to={scoreOf(apply(proposal.text))} />
           {proposal.ask && years ? (
             <div className="mt-2 text-sm flex flex-wrap items-center gap-2">
@@ -1045,6 +1048,9 @@ function ProposalCard({
               <button className={button} disabled={busy} onClick={startEdit}>Editar</button>
               <button className={ghost} disabled={busy} onClick={() => onSkip()} title="Tu hoja de vida queda como estaba en este punto.">No cambiar nada</button>
             </>
+          ) : act.kind === "result" && act.action === "redraft" ? (
+            // The answer replaces the whole row: one set of next steps, never two.
+            slot("redraft", "", null)
           ) : (
             <>
               {slot(
@@ -1257,7 +1263,7 @@ function ToolCard({
               setPhrase(e.target.value);
               if (hint) setHint(null);
             }}
-            placeholder={cvLang === "en" ? `E.g.: ran the regression suite with ${skill} on every release.` : `Ej.: ejecuté la suite de regresión con ${skill} en cada entrega.`}
+            placeholder={cvLang === "en" ? `E.g.: what you used ${skill} for, in a few words` : `Ej.: para qué usaste ${skill}, en pocas palabras`}
           />
           <BeforeAfter before={skillsLine} after={[skillsLine, skill].filter(Boolean).join(" · ")} target="Habilidades" strike={false} />
           <ScoreDelta from={now} to={scoreOf(withSkill)} />

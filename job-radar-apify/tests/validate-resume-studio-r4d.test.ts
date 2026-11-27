@@ -222,6 +222,20 @@ test("R4D-NOTICE says what is missing, that we don't invent it, and asks a quest
   assert.equal(missingNotice({ claims: [], requirement: "Shopping flows", question: "¿Trabajaste con flujos de reserva?" }).ask, "¿Trabajaste con flujos de reserva?");
   assert.equal(requirementTopic("Experiencia en atención al cliente."), "atención al cliente");
   assert.equal(outcomeFor({ status: "proposal" }, "x"), null);
+  // An invented citation (unknown fact id): says it couldn't be verified, not «your CV doesn't mention <requirement>».
+  const unverified = outcomeFor({ status: "discarded", claims: [], reason: "unknown_fact" }, "Perfil para «QA Engineer»");
+  assert.equal(unverified?.title, "No pudimos verificarla");
+  assert.equal(unverified?.text.includes("Perfil para"), false);
+  // A user's own request the CV can't back («agrega que tengo 10 años…»): explain that, not the requirement.
+  const chat = outcomeFor({ status: "question", claims: [], question: "Tu CV no menciona liderazgo de equipos." }, "Cargo de la vacante: «QA Engineer»", { userRequest: true });
+  assert.equal(chat?.text, "Tu CV no menciona liderazgo de equipos. No escribimos nada que tu hoja de vida no diga.");
+  assert.equal(chat?.text.includes("Cargo de la vacante"), false);
+  assert.deepEqual(chat?.next, ["tell", "skip"]);
+  // «Redactar solo con mi CV» on a card that already said what's missing: only the new part, once.
+  const again = outcomeFor({ status: "question", claims: [], question: "No aparecen en los datos del CV." }, "Experience with Jenkins", { retried: true });
+  assert.equal(again?.title, "Tampoco con tu CV");
+  assert.equal(again?.text.includes("no menciona"), false);
+  assert.deepEqual(again?.next, ["back", "tell", "skip"]);
   assert.equal(outcomeFor({ status: "error", error: "El proveedor de IA no respondió." }, "x")?.tone, "error");
   for (const o of [tool, topic]) assert.equal(/error|sin evidencia/i.test(`${o?.title} ${o?.text}`), false, "neutral, never «error»");
 });
