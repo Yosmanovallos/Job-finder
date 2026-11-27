@@ -102,6 +102,10 @@ comparten, y deciden la guarda de inventario y GSC después del lanzamiento.
 | 7 | **Alertas de vacantes** para registrados | Dan razón para registrarse y volver; necesitan aprobación para enviar correos (Ley 1581) | Cambio propio | Enero |
 | 8 | **Difusión orgánica:** TikTok con cadencia, informe mensual de empleo con datos propios (enlaces de prensa), SENA/universidades/alcaldías | La marca y los enlaces son el límite de autoridad | Sin código | Desde ya, continuo |
 
+**Insumo 2026-11-15:** `docs/SEO-UBERSUGGEST-PLAN-2026-11.md` (cuenta
+Individual de Ubersuggest: competidores, backlinks, rutinas y lista de Rank
+Tracking). Alimenta esta tabla; no la sustituye.
+
 **Comprobado el 2026-11-07:** las vacantes que llegan con `utm_*` (Google Empleos) tienen canonical a la URL limpia; no hace falta cambio.
 
 **Limpieza menor detectada**, revisarla en el cambio 3 con el runbook SEO:
