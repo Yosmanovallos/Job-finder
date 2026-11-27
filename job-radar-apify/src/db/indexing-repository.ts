@@ -36,6 +36,16 @@ export const INDEXING_PRIORITY = {
  */
 export const API_NOTIFICATION_WINDOW_DAYS = 7;
 
+/**
+ * Rollback flag for official-vacancy Indexing API notifications (ADR 0006 §15).
+ * Unset means on; false/0/off stops official URL_UPDATED enqueue/backfill and
+ * restores pure chronological ordering immediately without a code deploy.
+ */
+export function directIndexingEnabled(env: Record<string, string | undefined> = process.env): boolean {
+  const value = (env.DIRECT_INDEXING_ENABLED || "").trim().toLowerCase();
+  return !(value === "false" || value === "0" || value === "off");
+}
+
 /** Terminal, non-sendable reason codes introduced by ADR 0004 (and its F2 amendment). */
 export const API_WINDOW_EXPIRED = "api_window_expired";
 export const DELETE_NOT_API_NOTIFIED = "delete_not_api_notified";
@@ -224,27 +234,22 @@ export function laneOf(row: Pick<PendingIndexingRow, "notification_type" | "prio
   return "reconcile";
 }
 
-const LANE_SQL = `CASE WHEN notification_type = 'URL_DELETED' THEN 'delete'
-  WHEN priority <= ${INDEXING_PRIORITY.newlyReady} THEN 'new'
-  WHEN priority = ${INDEXING_PRIORITY.contentUpdate} THEN 'content' ELSE 'reconcile' END`;
+const LANE_SQL_Q = `CASE WHEN q.notification_type = 'URL_DELETED' THEN 'delete'
+  WHEN q.priority <= ${INDEXING_PRIORITY.newlyReady} THEN 'new'
+  WHEN q.priority = ${INDEXING_PRIORITY.contentUpdate} THEN 'content' ELSE 'reconcile' END`;
 
 /**
- * `perLane` pending rows of each lane for planIndexingSends(), oldest first
- * in each array. Which rows: the oldest of a FIFO lane, the NEWEST of a lane
- * the scheduler drains newest-first (GOOGLE-JOBS F2) — otherwise a
- * newest-first planner would only see the newest of the oldest rows.
- *
- * Newest-first no longer starves what waits (the 2026-08-10 LIFO lesson,
- * SEO-IMPROVEMENT-PLAN §1.20): since ADR 0004 nothing waits unboundedly. A
- * URL_UPDATED not sent within its 7-day API window is closed as
- * api_window_expired and the sitemap covers it; an URL_DELETED past its
- * delete window is never handed to the planner (and the reconcile closes it),
- * the 410 covers it.
+ * `perLane` pending rows of each lane for planIndexingSends(), ordered so
+ * FIFO lanes yield oldest-first at index 0 and LIFO lanes yield newest-first
+ * at the tail (`tail - 1`). Within the `new` lane, live official portals
+ * (`jobs.direct_job_id IS NOT NULL`) take priority ahead of job-board copies
+ * when `prioritizeOfficial` (ADR 0006 §15) is active.
  */
 export async function getPendingIndexingLanesWith(
   db: Queryable,
   perLane: number,
-  newestFirst: QueueLane[] = newestFirstLanes(DEFAULT_SCHEDULER)
+  newestFirst: QueueLane[] = newestFirstLanes(DEFAULT_SCHEDULER),
+  prioritizeOfficial: boolean = directIndexingEnabled()
 ): Promise<LaneQueues<PendingLaneRow>> {
   const lanes: LaneQueues<PendingLaneRow> = { new: [], delete: [], content: [], reconcile: [] };
   if (perLane <= 0) return lanes;
@@ -253,15 +258,25 @@ export async function getPendingIndexingLanesWith(
        SELECT id, url, notification_type, job_id, priority, created_at, lane,
               ROW_NUMBER() OVER (
                 PARTITION BY lane
-                ORDER BY (CASE WHEN lane = ANY($2::text[]) THEN created_at END) DESC NULLS LAST, created_at ASC, id ASC
+                ORDER BY
+                  (CASE WHEN lane = 'new' AND $3::boolean THEN is_official::int ELSE 0 END) DESC,
+                  (CASE WHEN lane = ANY($2::text[]) THEN created_at END) DESC NULLS LAST,
+                  created_at ASC,
+                  id ASC
               ) AS rank
        FROM (
-         SELECT *, ${LANE_SQL} AS lane FROM indexing_queue
-         WHERE status = 'pending'
-           AND NOT (notification_type = 'URL_DELETED' AND created_at <= NOW() - INTERVAL '${DELETE_WINDOW_DAYS} days')
+         SELECT q.id, q.url, q.notification_type, q.job_id, q.priority, q.created_at,
+                ${LANE_SQL_Q} AS lane,
+                (q.notification_type = 'URL_UPDATED' AND j.direct_job_id IS NOT NULL) AS is_official
+         FROM indexing_queue q
+         LEFT JOIN jobs j ON j.id = q.job_id
+         WHERE q.status = 'pending'
+           AND NOT (q.notification_type = 'URL_DELETED' AND q.created_at <= NOW() - INTERVAL '${DELETE_WINDOW_DAYS} days')
        ) pending
-     ) ranked WHERE rank <= $1 ORDER BY created_at ASC, id ASC`,
-    [perLane, newestFirst]
+     ) ranked
+     WHERE rank <= $1
+     ORDER BY (CASE WHEN lane = ANY($2::text[]) THEN -rank ELSE rank END) ASC, id ASC`,
+    [perLane, newestFirst, prioritizeOfficial]
   );
   for (const row of result.rows) {
     lanes[row.lane].push({ ...row, arrival: new Date(row.created_at).getTime() / 3_600_000 });

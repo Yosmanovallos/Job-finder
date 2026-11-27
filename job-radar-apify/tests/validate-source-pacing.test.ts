@@ -1,7 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
-import { PACED_FALLBACK_MS, decidePacing, pacedOutForDrain, pacedSourcesFor } from "../src/queue/source-pacing.js";
+import {
+  PACED_FALLBACK_MS,
+  PACED_FALLBACK_MS_VE,
+  decidePacing,
+  pacedFallbackMsFor,
+  pacedOutForDrain,
+  pacedSourcesFor
+} from "../src/queue/source-pacing.js";
 import { SOURCE_CADENCE_MS, SOURCE_CADENCE_MS_VE } from "../src/queue/source-cadence.js";
 
 const NOW = Date.parse("2026-11-02T12:00:00Z");
@@ -25,6 +32,21 @@ test("dispatch ticks hold paced sources until the worst observed schedule gap", 
   const fallback = decidePacing({ country: "CO", trigger: "workflow_dispatch", lastParticipationMs: NOW - PACED_FALLBACK_MS, nowMs: NOW });
   assert.deepEqual({ allowed: fallback.allowed, reason: fallback.reason }, { allowed: true, reason: "fallback_gap" });
   assert.equal(PACED_FALLBACK_MS >= 7 * HOUR, true, "never more often than the worst measured gap (7.17 h)");
+});
+
+test("VE uses a 4.5 h fallback floor without lowering CO's 7 h floor", () => {
+  assert.equal(PACED_FALLBACK_MS_VE, 4.5 * HOUR);
+  assert.equal(pacedFallbackMsFor("VE"), PACED_FALLBACK_MS_VE);
+  assert.equal(pacedFallbackMsFor("CO"), PACED_FALLBACK_MS);
+
+  const veHeld = decidePacing({ country: "VE", trigger: "workflow_dispatch", lastParticipationMs: NOW - 4 * HOUR, nowMs: NOW });
+  assert.deepEqual({ allowed: veHeld.allowed, reason: veHeld.reason }, { allowed: false, reason: "held_for_schedule" });
+
+  const veAllowed = decidePacing({ country: "VE", trigger: "workflow_dispatch", lastParticipationMs: NOW - 4.5 * HOUR, nowMs: NOW });
+  assert.deepEqual({ allowed: veAllowed.allowed, reason: veAllowed.reason }, { allowed: true, reason: "fallback_gap" });
+
+  const coHeldAtVeGap = decidePacing({ country: "CO", trigger: "workflow_dispatch", lastParticipationMs: NOW - 4.5 * HOUR, nowMs: NOW });
+  assert.deepEqual({ allowed: coHeldAtVeGap.allowed, reason: coHeldAtVeGap.reason }, { allowed: false, reason: "held_for_schedule" });
 });
 
 test("an unreadable history fails closed for non-schedule ticks", () => {

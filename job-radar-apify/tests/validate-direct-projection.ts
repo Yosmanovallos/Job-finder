@@ -3,7 +3,9 @@ import { readFile } from "node:fs/promises";
 import { pool } from "../src/db/client.js";
 import { projectionHash, supersedeCopies, syncProjections } from "../src/db/direct-projection-repository.js";
 import { saveListing, upsertEmployer, type EmployerSourceRow } from "../src/db/direct-repository.js";
+import { getPendingIndexingLanes, INDEXING_PRIORITY } from "../src/db/indexing-repository.js";
 import { getJobById, getJobsPage, getSupersedingTarget, saveJobs } from "../src/db/job-repository.js";
+import { DEFAULT_SCHEDULER, planIndexingSends } from "../src/lib/indexing-scheduler.js";
 import type { DirectPosting } from "../src/direct/types.js";
 
 /**
@@ -319,6 +321,110 @@ async function run(): Promise<void> {
   check((await row(p2)) === undefined,
     "Archivo oficial mayor de 30 días nunca revive aunque cambie la fecha de fuente.", "Proyección renovó vacante vencida.");
 
+  // 9) ADR 0006 §15: Google-ready official portals enqueue URL_UPDATED and outrank newer board jobs.
+  const richDescription = [
+    "Buscamos analista financiero senior para liderar modelos de presupuesto y análisis de variaciones en Colombia.",
+    "Serás responsable de presentar reportes ejecutivos semanales, coordinar auditorías internas y automatizar tableros de seguimiento.",
+    "Contrato a término indefinido con beneficios corporativos y esquema híbrido en Bogotá."
+  ].join("\n");
+  await saveListing(source, [
+    posting({
+      externalId: "seo-ready-official",
+      title: "Analista Financiero Senior",
+      applyUrl: "https://jobs.lever.co/proj-co/seo-ready-official",
+      descriptionText: richDescription,
+      publishedAt: daysAgo(2)
+    })
+  ], false);
+  const officialReadyId = (await pool.query<{ id: string }>(
+    `SELECT id FROM direct_jobs WHERE employer_source_id = $1 AND external_id = 'seo-ready-official'`,
+    [source.id]
+  )).rows[0].id;
+  await syncProjections();
+  const officialReadyRow = await pool.query<{ seo_ready: boolean }>(
+    `SELECT seo_ready FROM jobs WHERE id = $1`,
+    [officialReadyId]
+  );
+  const officialQueue = await pool.query<{ status: string; priority: number }>(
+    `SELECT status, priority FROM indexing_queue WHERE job_id = $1 AND notification_type = 'URL_UPDATED'`,
+    [officialReadyId]
+  );
+  check(
+    officialReadyRow.rows[0]?.seo_ready === true &&
+      officialQueue.rows.length === 1 &&
+      officialQueue.rows[0].status === "pending" &&
+      officialQueue.rows[0].priority === INDEXING_PRIORITY.newlyReady,
+    "Vacante oficial apta (seo_ready = true) encola URL_UPDATED en prioridad 2 (ADR 0006 §15).",
+    `Estado oficial §15 inesperado: ${JSON.stringify({ row: officialReadyRow.rows[0], queue: officialQueue.rows })}`
+  );
+
+  // Wait briefly so the board row's indexing_queue.created_at is strictly newer than the official row's.
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  const newerBoardSave = await saveJobs([
+    {
+      jobId: "",
+      title: "Desarrollador Backend Node",
+      company: "Otra Empresa SAS",
+      location: "Medellín, Colombia",
+      url: "https://www.magneto365.com/co/trabajos/desarrollador-backend-node-proj-test",
+      source: "Magneto",
+      dateText: "Hoy",
+      publishedAt: daysAgo(0),
+      country: "CO",
+      employmentType: "Tiempo completo",
+      description: richDescription,
+      requirements: [
+        "Cinco años de experiencia con TypeScript y PostgreSQL.",
+        "Diseño de APIs REST escalables y pruebas automatizadas.",
+        "Inglés intermedio para coordinación técnica."
+      ]
+    }
+  ], "direct-projection-test");
+  const newerBoardId = newerBoardSave.insertedJobs[0]?.id;
+  const lanes = await getPendingIndexingLanes(20);
+  const planned = planIndexingSends(lanes, 10, DEFAULT_SCHEDULER, Date.now() / 3_600_000);
+  const officialPlanIdx = planned.findIndex((item) => item.job_id === officialReadyId);
+  const boardPlanIdx = planned.findIndex((item) => item.job_id === newerBoardId);
+  check(
+    Boolean(newerBoardId) && officialPlanIdx >= 0 && boardPlanIdx >= 0 && officialPlanIdx < boardPlanIdx,
+    "El planificador envía la vacante oficial ANTES que una vacante de bolsa más reciente.",
+    `Orden inesperado: official=${officialPlanIdx}, board=${boardPlanIdx}, planned=${JSON.stringify(planned.map((p) => p.job_id))}`
+  );
+
+  // Rollback flag: DIRECT_INDEXING_ENABLED=false stops official enqueue cleanly.
+  process.env.DIRECT_INDEXING_ENABLED = "false";
+  let officialDisabledId = "";
+  try {
+    await saveListing(source, [
+      posting({
+        externalId: "seo-ready-official-disabled",
+        title: "Director Contable",
+        applyUrl: "https://jobs.lever.co/proj-co/seo-ready-official-disabled",
+        descriptionText: richDescription,
+        publishedAt: daysAgo(1)
+      })
+    ], false);
+    officialDisabledId = (await pool.query<{ id: string }>(
+      `SELECT id FROM direct_jobs WHERE employer_source_id = $1 AND external_id = 'seo-ready-official-disabled'`,
+      [source.id]
+    )).rows[0].id;
+    await syncProjections();
+    const disabledQueue = await pool.query<{ n: number }>(
+      `SELECT COUNT(*)::int AS n FROM indexing_queue WHERE job_id = $1 AND notification_type = 'URL_UPDATED'`,
+      [officialDisabledId]
+    );
+    check(
+      disabledQueue.rows[0].n === 0,
+      "Rollback DIRECT_INDEXING_ENABLED=false detiene el encolado oficial sin errores.",
+      `Encoladas con bandera apagada: ${disabledQueue.rows[0].n}`
+    );
+  } finally {
+    delete process.env.DIRECT_INDEXING_ENABLED;
+  }
+
+  await pool.query(`DELETE FROM indexing_queue WHERE job_id = ANY($1::uuid[])`, [
+    [officialReadyId, newerBoardId, officialDisabledId].filter(Boolean)
+  ]);
   await pool.query(`DELETE FROM jobs WHERE company IN ('Proj Co LA', 'Otra Empresa SAS', 'Proj Co')`);
   await pool.query(`DELETE FROM employers WHERE slug = 'proj-co'`);
 }

@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { pool } from "./client.js";
+import { directIndexingEnabled } from "./indexing-repository.js";
 import { mutateReadinessRelevantJobs, refreshGoogleReadiness } from "./job-readiness-repository.js";
 import { deleteClosedJobs } from "./scheduler-repository.js";
 import { liveDirectJobSql } from "../direct/ingest.js";
@@ -243,9 +244,12 @@ export async function supersedeCopies(): Promise<number> {
 export async function syncProjections(): Promise<ProjectionResult> {
   const upserted = await upsertProjections();
   await touchLiveProjections();
-  // Google gate without Indexing API notifications (§10.7): new and changed
-  // rows only.
-  for (const id of upserted.changedIds) await refreshGoogleReadiness(id, { contentObtained: true, notify: false });
+  // Google gate + Indexing API queue behind DIRECT_INDEXING_ENABLED (ADR 0006 §15):
+  // new and changed Google-ready official vacancies take priority inside the free 200/day quota.
+  const notifyOfficial = directIndexingEnabled();
+  for (const id of upserted.changedIds) {
+    await refreshGoogleReadiness(id, { contentObtained: true, notify: notifyOfficial });
+  }
   const removed = await removeDeadProjections();
   const reversion = await revertOrphanOrMismatchedCopies();
   const superseded = await supersedeCopies();

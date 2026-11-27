@@ -48,6 +48,7 @@ async function once(url: string, init: HttpRequestInit = {}): Promise<{ status: 
 
 export const boundedGet: HttpGet = async (url, init) => {
   const first = await once(url, init);
+  if (first.status === 429 && init?.noRetryOn429) return first;
   if (first.status !== 429 && first.status < 500) return first;
   await new Promise((resolve) => setTimeout(resolve, Math.min(first.retryAfterMs ?? 2_000, MAX_RETRY_WAIT_MS)));
   return once(url, init);

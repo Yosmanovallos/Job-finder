@@ -427,15 +427,15 @@ export function buildJobTitleTag(job: SeoJob): string {
   const where = city ? `${title} en ${city}` : title;
   // The brand goes first: Google already shows the site name beside the
   // result, while the city and the employer are what the searcher scans for.
+  // The city goes last of all: the same vacancy is often posted in several
+  // cities, and without it those pages share one <title> (Ubersuggest audit
+  // 2026-11-15: 21 duplicates). Roadmap §2.1: never drop the city.
   const candidates = [
     company ? `${where} – ${company}${BRAND_SUFFIX}` : null,
     company ? `${where} – ${company}` : null,
-    `${where}${BRAND_SUFFIX}`,
-    where,
-    `${title}${BRAND_SUFFIX}`,
-    title
+    `${where}${BRAND_SUFFIX}`
   ].filter((candidate): candidate is string => Boolean(candidate));
-  return candidates.find((candidate) => codePoints(candidate) <= JOB_TITLE_TAG_MAX) ?? title;
+  return candidates.find((candidate) => codePoints(candidate) <= JOB_TITLE_TAG_MAX) ?? where;
 }
 
 /** Title, company and location, then employment type and the first real source sentence when they exist. */
@@ -680,7 +680,11 @@ export const GUARDED_CITY_HUBS: ReadonlyArray<{ label: string; country: "CO" | "
   { label: "Quibdó", country: "CO" },
   { label: "Fusagasugá", country: "CO" },
   { label: "Maturín", country: "VE" },
-  { label: "Lechería", country: "VE" }
+  { label: "Lechería", country: "VE" },
+  { label: "Chía", country: "CO" },
+  { label: "Sincelejo", country: "CO" },
+  { label: "Anzoátegui", country: "VE" },
+  { label: "San Cristóbal", country: "VE" }
 ];
 
 export function isGuardedCityHub(category: Pick<ResolvedCategory, "kind" | "label" | "country">): boolean {

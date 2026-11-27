@@ -97,6 +97,8 @@ export interface HttpResponse {
   body: string;
   /** Only pagination headers used by public WordPress collection endpoints. */
   headers?: { "x-wp-total"?: string; "x-wp-totalpages"?: string };
+  /** Parsed HTTP Retry-After delay in milliseconds when provided by the host. */
+  retryAfterMs?: number | null;
 }
 /**
  * GET by default. `json` turns it into a POST with a JSON body (Workday's
@@ -107,5 +109,10 @@ export interface HttpRequestInit {
   json?: unknown;
   /** Asks for HTML/XML. Such requests never follow redirects: a 3xx comes back as is. */
   accept?: string;
+  /**
+   * Callers that implement their own bounded 429 retry (Workday) pass true so
+   * boundedGet does not stack an inner retry on top of the connector retry.
+   */
+  noRetryOn429?: boolean;
 }
 export type HttpGet = (url: string, init?: HttpRequestInit) => Promise<HttpResponse>;
