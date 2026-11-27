@@ -113,3 +113,30 @@ JSON-LD, que era lo único que se leía.
   de integración falló en `validate-sitemap-streaming.ts` («El heap creció
   69 MB»), prueba de memoria que este cambio no toca; la siguiente corrida
   pasó completa.
+
+## 8. Viñetas perdidas al extraer el CV (2026-11-27)
+
+El propietario subió otra versión de su CV y la vista previa quedó con **una
+viñeta por empleo** (7 de 25). El PDF marca las viñetas con «●» y parte cada
+una en dos líneas. En esa corrida el modelo devolvió un solo par de anclas por
+empleo (inicio de la primera viñeta, fin de la última), y la copia literal,
+que nunca cruza a la siguiente viñeta, se quedó con la primera. Es variable:
+en la corrida siguiente el mismo CV dio las 25.
+
+- `recoverBullets` (tailor-service) + `bulletsInRange`/`sectionEnd` (text.ts):
+  el código separa las viñetas del propio texto del CV dentro de la zona de
+  cada empleo (buscada en orden, porque dos empleos comparten cargo). Si
+  encuentra MÁS que el modelo, usa esas. Copia literal con `sourceSpan`; nada
+  escrito. Para en el siguiente título de sección o en la cabecera de otro
+  empleo (`|` o rango de fechas), aunque el modelo la haya omitido.
+- Registro sin contenido: `[resume-ai] extract-bullets {model, text, kept}`.
+- CV real (solo conteos): modelo [7,3,4,3,3,3,2], texto [7,3,4,3,3,3,2], 25
+  de las 25 viñetas de experiencia del PDF.
+- Pruebas: `R4D-BULLETS` (el modelo une las viñetas → se recuperan 3 y 2,
+  literales, sin mezclar dos empleos con el mismo cargo ni tomar EDUCATION),
+  `R4D-BULLETS-RANGE`. La prueba R4C «old-shape» ahora espera también la
+  viñeta que el modelo omitió.
+- Gates: tsc 0; build con hash CSS sin cambios; unit 746/0; resume-studio
+  54 ✅ 0 ❌ (+133 unitarias); integration 287 ✅ 0 ❌. Una corrida intermedia
+  tuvo un fallo de tiempo en `EXE-004` (fetch-context), que este cambio no
+  toca; pasó 3 de 3 al repetirla y en la corrida completa.

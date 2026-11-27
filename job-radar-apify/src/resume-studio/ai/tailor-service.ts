@@ -4,7 +4,7 @@ import { computeEvidence, factTexts, verifyCitations, type Citation, type FactTe
 import { newClaims, validateProposal, type Claim } from "../../lib/resume-tailor/factuality.js";
 import { acceptModelRequirements, analyzeJob, type JobAnalysis } from "../../lib/resume-tailor/requirements.js";
 import { compatibilityScore, qualityScore } from "../../lib/resume-tailor/score.js";
-import { findQuote, sliceBetween } from "../../lib/resume-tailor/text.js";
+import { bulletsInRange, findQuote, sectionEnd, sliceBetween } from "../../lib/resume-tailor/text.js";
 import { MAX_CHAT_TURNS } from "../../lib/resume-tailor/cards.js";
 import type { CallContext, GatewayFailure, ResumeAiGateway } from "./gateway.js";
 import { CARD_CHAT, CARD_DRAFT, CARD_HEADLINE, CARD_REWRITE, CARD_SUMMARY, CV_EXTRACT, EVIDENCE_MAP, JOB_REQUIREMENTS } from "./prompts.js";
@@ -53,6 +53,47 @@ export function sourcedMonth(original: string, value: string): string {
     new RegExp(`\\b${year}\\s*[/.-]\\s*${nums}\\b`)
   ];
   return patterns.some((re) => re.test(text)) ? value : "";
+}
+
+// ---------- R4d: bullets the model merged or skipped -----------------------
+//
+// A real CV (bullets marked «●», wrapped over two lines) came back with ONE
+// bullet per job: the model gave one pair of anchors per job (first bullet's
+// start, last bullet's end) and the literal copy never crosses into the next
+// bullet, so 30 bullets became 7. The code now also splits each job's own
+// region of the CV text by its bullet marks; when that finds MORE bullets
+// than the model, those are used. Literal by construction: nothing is
+// written, only copied. Each region starts at the line of that job's role or
+// company (searched in CV order, so two jobs with the same role don't mix)
+// and ends at the next job or the next section heading.
+
+export function recoverBullets(original: string, facts: ResumeFacts, modelCounts: number[] = []): void {
+  let cursor = 0;
+  const starts = facts.experience.map((e) => {
+    for (const probe of [e.company, e.role].filter((p) => p.trim().length >= 2)) {
+      const q = findQuote(original.slice(cursor), probe);
+      if (q) {
+        const at = cursor + q.start;
+        cursor = cursor + q.end;
+        return original.lastIndexOf("\n", at) + 1;
+      }
+    }
+    return -1;
+  });
+  const found: number[] = [];
+  facts.experience.forEach((exp, i) => {
+    const from = starts[i];
+    if (from < 0) return found.push(-1);
+    const nextStart = starts.slice(i + 1).find((s) => s > from);
+    const to = Math.min(nextStart ?? original.length, sectionEnd(original, from));
+    const split = bulletsInRange(original, from, to);
+    found.push(split.length);
+    if (split.length > exp.bullets.length) {
+      exp.bullets = split.slice(0, 8).map((b) => ({ id: newFactId("b"), source: "file" as const, sourceSpan: b.span, text: b.text }));
+    }
+  });
+  // Content-free diagnostic: bullets per job from the model vs found in the text.
+  console.info("[resume-ai] extract-bullets", JSON.stringify({ model: modelCounts, text: found, kept: facts.experience.map((e) => e.bullets.length) }));
 }
 
 // ---------- CV extraction (doc 05 §2) ----------------------------------
@@ -136,6 +177,7 @@ export async function extractCvFacts(gateway: ResumeAiGateway, ctx: CallContext,
     });
     if (facts.experience.length >= 15) break;
   }
+  recoverBullets(original, facts, out.experience.map((e) => e.bullets.length));
   for (const ed of out.education) {
     const degree = short(`Formación «${ed.degree}»`, ed.degree);
     const institution = literal(ed.institution);

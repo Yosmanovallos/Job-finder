@@ -16,6 +16,7 @@ import { mockTransport } from "../src/resume-studio/ai/mock.js";
 import { CARD_CHAT, CARD_DRAFT, CARD_HEADLINE, CARD_REWRITE, CARD_SUMMARY, CV_EXTRACT, EVIDENCE_MAP, JOB_REQUIREMENTS } from "../src/resume-studio/ai/prompts.js";
 import { citedIds, extractCvFacts, proposeCard } from "../src/resume-studio/ai/tailor-service.js";
 import { buildResumeDocumentXml } from "../src/resume-studio/docx.js";
+import { bulletsInRange, sectionEnd } from "../src/lib/resume-tailor/text.js";
 import { jobPostingFromMicrodata } from "../src/resume-studio/job-link/microdata.js";
 import { coverageReport, linkHost, linkOutcome } from "../src/resume-studio/job-link/coverage.js";
 import { jobPostingFromPageText } from "../src/resume-studio/job-link/page-text.js";
@@ -523,4 +524,61 @@ test("R4D-COVERAGE link reads are counted by site host and outcome only; the rep
     { host: "empresa.example", hits: 3, reasons: ["paste_no_structured_data", "paste_fetch_failed"] }
   ]);
   assert.equal(coverageReport([]).resolvedPct, 0);
+});
+
+// ---------- CV extraction: bullets the model merges (owner's real CV, Nov 27) --------
+
+const BULLET_CV = [
+  "Alex Example",
+  "QA Engineer",
+  "EXPERIENCE",
+  "QA Specialist (Hybrid) - Demo Bank",
+  "Jun 2024 – Present",
+  "● Led the validation of automation workflows built with UiPath and Power Automate to ensure",
+  "accuracy and efficiency.",
+  "● Performed data testing, including the validation of reports and complex SQL queries.",
+  "● Designed automated test scripts using Playwright for web applications.",
+  "QA Specialist (Hybrid) - Example Corp",
+  "Jan 2023 – May 2024",
+  "● Led validation of UiPath workflows through risk-based functional and regression",
+  "testing.",
+  "● Analyzed system logs to troubleshoot issues with executed scripts.",
+  "EDUCATION",
+  "● Systems Engineering, Universidad Demo"
+].join("\n");
+
+test("R4D-BULLETS one anchor pair per job from the model → the code still keeps every bullet, copied from the CV", async () => {
+  // A model answer that merges each job's bullets into ONE span (first bullet's start, last bullet's end).
+  const merged = {
+    headline: { text: "QA Engineer" },
+    summary: null,
+    experience: [
+      { role: "QA Specialist (Hybrid)", company: "Demo Bank", city: "", startDate: "2024-06", endDate: "", current: true, bullets: [{ start: "Led the validation of automation workflows", end: "for web applications." }] },
+      { role: "QA Specialist (Hybrid)", company: "Example Corp", city: "", startDate: "2023-01", endDate: "2024-05", current: false, bullets: [{ start: "Led validation of UiPath workflows", end: "with executed scripts." }] }
+    ],
+    education: [],
+    certifications: [],
+    skills: [],
+    languages: []
+  };
+  const { gateway } = gatewayWith(async () => ({ content: JSON.stringify(merged), usage: { promptTokens: 100, completionTokens: 100, cachedTokens: 0 }, finishReason: "stop" }));
+  const out = await extractCvFacts(gateway, { ...ctx, purpose: "cv_extract" }, BULLET_CV);
+  assert.ok(out.ok);
+  const exp = out.ok ? out.result.facts.experience : [];
+  assert.deepEqual(exp.map((e) => e.company), ["Demo Bank", "Example Corp"]);
+  assert.deepEqual(exp.map((e) => e.bullets.length), [3, 2], "every bullet, each job its own (same role name in both)");
+  assert.equal(exp[0].bullets[0].text, "Led the validation of automation workflows built with UiPath and Power Automate to ensure accuracy and efficiency.", "wrapped lines joined");
+  assert.equal(exp[1].bullets[1].text, "Analyzed system logs to troubleshoot issues with executed scripts.");
+  assert.equal(exp.flatMap((e) => e.bullets).some((b) => /Systems Engineering|EDUCATION/.test(b.text)), false, "stops at the next section");
+  for (const b of exp.flatMap((e) => e.bullets)) {
+    assert.ok(b.sourceSpan);
+    assert.equal(BULLET_CV.slice(b.sourceSpan.start, b.sourceSpan.end).replace(/\s+/g, " ").trim(), b.text, "literal copy of the CV");
+  }
+});
+
+test("R4D-BULLETS-RANGE the splitter: marks open, wrapped lines continue, blank lines close", () => {
+  const text = "x\n• First item that\nwraps here.\n\nnot a bullet\n- Second item\n* Third item here\n";
+  assert.deepEqual(bulletsInRange(text, 0, text.length).map((b) => b.text), ["First item that wraps here.", "Second item", "Third item here"]);
+  assert.equal(sectionEnd("A\nB\nEDUCATION\nC", 0), "A\nB".length);
+  assert.equal(sectionEnd("A\nB", 0), 3);
 });

@@ -91,6 +91,70 @@ export function sliceBetween(
   return text.length >= 2 ? { text, span: { start: s.start, end: stop } } : null;
 }
 
+// ---------- R4d: bullets split by CODE from the CV's own text ----------------
+
+const MARKER_LINE = /^[ \t]*[•●▪◦‣■□➢►✓✔\-–*·][ \t]+/;
+/** Section headings that end the experience list («EDUCATION», «HABILIDADES»…). */
+const NEXT_SECTION = /^\s*(education|educaci[oó]n|formaci[oó]n|estudios|skills|technical skills|habilidades|competencias|certifica\w*|courses|cursos|languages|idiomas|projects|proyectos|references|referencias|awards|logros|reconocimientos|volunteer\w*|voluntariado)\b[^\n]{0,30}$/i;
+
+/** Where the experience section stops after `from`: the next section heading, or the end. */
+export function sectionEnd(original: string, from: number): number {
+  const re = /\n([^\n]*)/g;
+  re.lastIndex = from;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(original))) if (NEXT_SECTION.test(m[1]) && m[1].trim().length <= 40) return m.index;
+  return original.length;
+}
+
+/**
+ * Every bullet between `from` and `to`, copied from the CV: a line that starts
+ * with a bullet mark opens one, the following unmarked lines (wrapped text)
+ * continue it, and a blank line or the next mark closes it. Literal by
+ * construction (whitespace collapsed, the mark removed); capped on a word.
+ */
+export function bulletsInRange(original: string, from: number, to: number, maxChars = 300): { text: string; span: { start: number; end: number } }[] {
+  const out: { text: string; span: { start: number; end: number } }[] = [];
+  let open: { start: number; end: number } | null = null;
+  const close = () => {
+    if (!open) return;
+    let text = original.slice(open.start, open.end).replace(/\s+/g, " ").trim();
+    if (text.length > maxChars) {
+      text = text.slice(0, maxChars);
+      const space = text.lastIndexOf(" ");
+      if (space > maxChars * 0.6) text = text.slice(0, space);
+    }
+    if (text.length >= 8) out.push({ text, span: { ...open } });
+    open = null;
+  };
+  let pos = from;
+  while (pos < to) {
+    const nl = original.indexOf("\n", pos);
+    const lineEnd = nl < 0 || nl > to ? to : nl;
+    const line = original.slice(pos, lineEnd);
+    const mark = MARKER_LINE.exec(line);
+    if (mark) {
+      close();
+      open = { start: pos + mark[0].length, end: lineEnd };
+    } else if (!line.trim()) {
+      close();
+    } else if (HEADER_LINE.test(line) && (open || out.length)) {
+      // Another job's header (e.g. one the model left out): this job's bullets are over.
+      close();
+      break;
+    } else if (open) {
+      // A finished sentence isn't continued by an unmarked line.
+      if (/[.!?;]\s*$/.test(original.slice(open.start, open.end))) close();
+      else open.end = lineEnd;
+    }
+    pos = lineEnd + 1;
+  }
+  close();
+  return out;
+}
+
+/** «Rol | Empresa | Ciudad», «Jan 2023 – Present», «2019-01 – 2021-02»: a job header, not bullet text. */
+const HEADER_LINE = /\||\b(19|20)\d{2}\b[^\n]{0,20}[–—-][^\n]{0,20}(\b(19|20)\d{2}\b|actual|present|presente|current|hoy)/i;
+
 /** Folded text plus, for each folded char, its index in the source. */
 function foldChars(value: string): { text: string; map: number[] } {
   let text = "";
