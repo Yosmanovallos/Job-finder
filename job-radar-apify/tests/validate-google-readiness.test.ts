@@ -324,6 +324,26 @@ test("addressRegion (ADR 0009): CO city without region gets its DIVIPOLA departm
   assert.ok(buildJobPageBody(bogotaCountry).includes("<li>Ubicación: Bogotá, D.C., Colombia</li>"));
   const hybrid = asStoredPage(base({ location: "Híbrido - Cali, Colombia", remoteType: "hybrid" }));
   assert.ok(buildJobPageBody(hybrid).includes("<li>Ubicación: Híbrido - Cali, Valle del Cauca, Colombia</li>"));
+
+  // Multi-municipality strings resolve only when all known municipalities agree
+  // on one DIVIPOLA department; never emit a municipality name as addressRegion.
+  assert.equal(regionOf({ location: "Medellín, Itagui" }), "Antioquia");
+  assert.equal(regionOf({ location: "Medellín, Envigado, Itagui" }), "Antioquia");
+  assert.equal(regionOf({ location: "Bosconia, Codazzi, San Diego" }), "Cesar");
+  assert.equal(regionOf({ location: "Medellín, Envigado, Antioquia" }), "Antioquia");
+  assert.equal(regionOf({ location: "Bogotá, Medellín" }), undefined);
+  assert.equal(regionOf({ location: "Medellín, Bogotá" }), undefined);
+  assert.equal(regionOf({ location: "Bogota, D.C., Capital District, Colombia" }), "Capital District");
+  assert.equal(regionOf({ location: "VillaNueva, OtraCiudad, TerceraCiudad" }), undefined);
+});
+
+test("buildJobPosting trims hiringOrganization.name and rejects whitespace-only employer names", () => {
+  const trimmed = buildJobPosting(asStoredPage(base({ company: "  Acme Colombia S.A.S.  " }))) as {
+    hiringOrganization?: { name?: string };
+  } | null;
+  assert.equal(trimmed?.hiringOrganization?.name, "Acme Colombia S.A.S.");
+  const blank = buildJobPosting(asStoredPage(base({ company: "   " })));
+  assert.equal(blank, null);
 });
 
 test("validThrough: omitted when unknown, source value when stated, and expiry flips readiness on read", () => {

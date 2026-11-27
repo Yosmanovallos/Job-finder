@@ -20,7 +20,7 @@ const DEPARTMENT_MUNICIPALITIES: Record<string, string[]> = {
   Caldas: ["Manizales", "Villamaría", "Chinchiná", "La Dorada"],
   Casanare: ["Yopal", "Aguazul"],
   Cauca: ["Popayán", "Santander de Quilichao"],
-  Cesar: ["Valledupar", "Aguachica"],
+  Cesar: ["Valledupar", "Aguachica", "Bosconia"],
   Chocó: ["Quibdó"],
   Córdoba: ["Montería", "Cereté", "Lorica", "Sahagún"],
   Cundinamarca: ["Soacha", "Chía", "Zipaquirá", "Facatativá", "Fusagasugá", "Girardot", "Madrid", "Funza", "Cajicá", "Tocancipá", "Cota", "Sopó"],
@@ -55,13 +55,42 @@ function normalize(name: string): string {
     .trim();
 }
 
+function normalizeDepartment(name: string): string {
+  return name
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[.,]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 const MUNICIPALITY_TO_DEPARTMENT = new Map<string, string>(
   Object.entries(DEPARTMENT_MUNICIPALITIES).flatMap(([department, municipalities]) =>
     municipalities.map((municipality): [string, string] => [normalize(municipality), department])
   )
 );
 
+const EXTRA_CO_DEPARTMENT_LABELS = [
+  "Caquetá",
+  "San Andrés y Providencia",
+  "Archipiélago de San Andrés, Providencia y Santa Catalina",
+  "Bogotá D.C.",
+  "Bogotá DC",
+  "Distrito Capital",
+  "Capital District"
+];
+
+const CO_DEPARTMENTS = new Set<string>(
+  [...Object.keys(DEPARTMENT_MUNICIPALITIES), ...EXTRA_CO_DEPARTMENT_LABELS].map(normalizeDepartment)
+);
+
 /** The department of a uniquely-named Colombian municipality, else null. */
 export function coDepartmentFor(locality: string): string | null {
   return MUNICIPALITY_TO_DEPARTMENT.get(normalize(locality)) ?? null;
+}
+
+/** Whether `name` matches a known Colombian department (e.g. "Antioquia", "Bogotá, D.C."). */
+export function isCoDepartment(name: string): boolean {
+  return CO_DEPARTMENTS.has(normalizeDepartment(name));
 }

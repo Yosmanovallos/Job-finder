@@ -14,7 +14,7 @@
  */
 import { assessDescription, type DescriptionReason, type DescriptionSignals } from "./job-description-quality.js";
 import { toCountryCode, toCountryCodes } from "./country-codes.js";
-import { coDepartmentFor } from "./co-departments.js";
+import { coDepartmentFor, isCoDepartment } from "./co-departments.js";
 import { getGoogleJobSourcePolicy } from "./google-job-source-policy.js";
 import { jobStaleReason, liveJobSql } from "./job-freshness.js";
 
@@ -69,6 +69,8 @@ const REMOTE_TEXT = /\b(remot[oa]s?|remote|teletrabajo|home ?office|anywhere|wor
 const HYBRID_TEXT = /\bh[ií]brid[oa]\b|\bhybrid\b/i;
 const MODALITY_PREFIX = /^\s*(h[ií]brid[oa]|hybrid|remot[oa]|remote|presencial)\s*[-–—:,|/]\s*/i;
 const PLACEHOLDER_TITLES = /^(oportunidad torre|vacante|empleo|job|oferta)$/i;
+const NON_CITY_REGION_TEXT =
+  /(?:^|[\s,-])(district|distrito|department|departamento|regi[oó]n|valle de|[aá]rea metropolitana|metropolitan area|d\.?\s*c\.?)(?:$|[\s,-])/i;
 
 function parseDate(value: string | Date | null | undefined): Date | null {
   if (!value) return null;
@@ -125,8 +127,23 @@ export function resolveGoogleLocation(
   const locality = places[0];
   const stated = places.length > 1 ? places[places.length - 1] : null;
   // ADR 0009: a CO city with no source region gets its department from the
-  // closed DIVIPOLA table; a source-stated region always wins.
-  const region = stated && stated !== locality ? stated : country === "CO" ? coDepartmentFor(locality) : null;
+  // closed DIVIPOLA table; a source-stated region always wins — unless the
+  // comma-separated segments are multiple municipalities (e.g. "Medellín, Itagüí"
+  // or "Bosconia, Codazzi, San Diego"), which would otherwise emit a city name
+  // as addressRegion.
+  const isMultiCityList =
+    country === "CO" &&
+    stated !== null &&
+    !isCoDepartment(stated) &&
+    !NON_CITY_REGION_TEXT.test(stated) &&
+    (places.length >= 3 || coDepartmentFor(stated) !== null);
+  let region: string | null;
+  if (isMultiCityList) {
+    const depts = new Set(places.map(coDepartmentFor).filter((d): d is string => d !== null));
+    region = depts.size === 1 ? [...depts][0]! : null;
+  } else {
+    region = stated && stated !== locality ? stated : country === "CO" ? coDepartmentFor(locality) : null;
+  }
   return { location: { kind: "physical", locality, region, country }, reason: null };
 }
 

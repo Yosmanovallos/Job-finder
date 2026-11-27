@@ -660,13 +660,15 @@ const INTENT_GUIDE_TAGS: Record<string, string[]> = {
   temporada: [GUIDE_TAGS.contracts, GUIDE_TAGS.benefits, GUIDE_TAGS.firstJob]
 };
 
-export function guideTagsForHub(hub: { kind: string; intent?: string }): string[] {
+export function guideTagsForHub(hub: { kind: string; intent?: string; country?: string | null }): string[] {
+  if (hub.country === "VE") return [];
   if (hub.intent && INTENT_GUIDE_TAGS[hub.intent]) return INTENT_GUIDE_TAGS[hub.intent]!;
   if (hub.kind === "rol") return [GUIDE_TAGS.resume, GUIDE_TAGS.interview, GUIDE_TAGS.contracts];
   return [GUIDE_TAGS.search, GUIDE_TAGS.publicService, GUIDE_TAGS.resume];
 }
 
-export function guideTagsForJob(job: { modality?: string | null; remote?: boolean | null }): string[] {
+export function guideTagsForJob(job: { modality?: string | null; remote?: boolean | null; country?: string | null }): string[] {
+  if (job.country === "VE") return [];
   const remote = job.remote === true || /remot/i.test(job.modality ?? "");
   return remote
     ? [GUIDE_TAGS.remote, GUIDE_TAGS.scams, GUIDE_TAGS.interview]

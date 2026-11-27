@@ -6,7 +6,8 @@ import { brotliCompress, constants as zlibConstants, gzip } from "node:zlib";
 import dotenv from "dotenv";
 import {
   getJobsPage,
-  peekJobsPage,
+  getCategoryHubPage,
+  peekCategoryHubPage,
   getIntentPage,
   knownIntentTotal,
   getJobById,
@@ -225,6 +226,8 @@ let activeSitemapStreams = 0;
 // even leaked a truncated 200 that Cloudflare cached (parse error, 0 URLs).
 // ~200 B per URL, so ≤ ~10 MB at the 50k cap.
 let lastGoodJobsSitemap: string | null = null;
+let lastGoodJobsSitemapAt = 0;
+const MAX_STALE_SITEMAP_AGE_MS = 60 * 60_000;
 const STALE_SITEMAP_CACHE_CONTROL = "public, max-age=60, s-maxage=60";
 const SPA_ROUTES = new Set([
   "/login",
@@ -1746,7 +1749,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
         if (resolved.intent === "remoto" && !resolved.city) {
           category = { kind: "ciudad", label: "Remoto", country: "CO" };
         } else {
-          res.writeHead(410, { "Content-Type": "text/html; charset=utf-8" });
+          res.writeHead(410, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "private, no-store" });
           res.end(
             '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Categoría ya no disponible | BuscoTrabajo</title><meta name="robots" content="noindex"></head><body><h1>Esta categoría ya no está disponible</h1><p><a href="/dashboard">Ver todas las vacantes</a></p></body></html>'
           );
@@ -1759,13 +1762,13 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
         // real "no longer here", not the same as a slug that never existed
         // — same distinction wasJobPurged() already makes for job URLs.
         if (RETIRED_ROLE_SLUGS.has(id.toLowerCase())) {
-          res.writeHead(410, { "Content-Type": "text/html; charset=utf-8" });
+          res.writeHead(410, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "private, no-store" });
           res.end(
             '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Categoría ya no disponible | BuscoTrabajo</title><meta name="robots" content="noindex"></head><body><h1>Esta categoría ya no está disponible</h1><p>El rol fue retirado de la lista de búsqueda activa.</p><p><a href="/dashboard">Ver todas las vacantes</a></p></body></html>'
           );
           return;
         }
-        res.writeHead(404, { "Content-Type": "text/html; charset=utf-8" });
+        res.writeHead(404, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "private, no-store" });
         res.end(
           '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Categoría no encontrada | BuscoTrabajo</title><meta name="robots" content="noindex"></head><body><h1>Categoría no encontrada</h1><p><a href="/dashboard">Ver todas las vacantes</a></p></body></html>'
         );
@@ -1784,7 +1787,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       // only from 10 jobs. With the rollback flag off they answer 410.
       const isGuardedCity = isGuardedCityHub(category);
       if (isGuardedCity && !empleosCoverageEnabled()) {
-        res.writeHead(410, { "Content-Type": "text/html; charset=utf-8" });
+        res.writeHead(410, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "private, no-store" });
         res.end(
           '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Categoría ya no disponible | BuscoTrabajo</title><meta name="robots" content="noindex"></head><body><h1>Esta categoría ya no está disponible</h1><p><a href="/dashboard">Ver todas las vacantes</a></p></body></html>'
         );
@@ -1803,7 +1806,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       // dashboard's 64-entry LRU.
       const matched = isIntent || isGuardedCity
         ? await getIntentPage(filterParams, CITY_HUB_PAGE_LIMIT)
-        : await getJobsPage({
+        : await getCategoryHubPage({
             filters: filterParams,
             limit: CITY_HUB_PAGE_LIMIT,
             offset: 0,
@@ -2150,7 +2153,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     // job (CX-5) and never past the freshness rule (CX-9).
     const cityHub = resolveJobCityHub(visible);
     const hubPage = cityHub
-      ? peekJobsPage({ filters: cityHubFilters(cityHub), limit: CITY_HUB_PAGE_LIMIT, includeDetails: false })
+      ? peekCategoryHubPage({ filters: cityHubFilters(cityHub), limit: CITY_HUB_PAGE_LIMIT, includeDetails: false })
       : undefined;
     const related = hubPage
       ? pickRelatedJobs(
@@ -2183,7 +2186,11 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     // Ads only on the employer's own vacancy; a copy from another job
     // board is replicated content (adsense-readiness PP-4).
     // adsense-readiness F3: 2–3 related guides (static tag mapping, no query).
-    const guides = relatedGuidesSnippet(getPublishedGuides(), guideTagsForJob({ modality: classifyModality(visible) }), pathname);
+    const guides = relatedGuidesSnippet(
+      getPublishedGuides(),
+      guideTagsForJob({ modality: classifyModality(visible), country: visible.country }),
+      pathname
+    );
     indexHtml = renderJobPageHtml(indexHtml, { job: visible, publicJob, related, companyJobs, guides });
 
     await sendBody(req, res, 200, { "Content-Type": "text/html; charset=utf-8" }, indexHtml);
@@ -2792,6 +2799,10 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     // inside buildJobsSitemapXml) it wouldn't also show that visitor.
     const sendLastGoodSitemap = async (): Promise<boolean> => {
       if (lastGoodJobsSitemap === null) return false;
+      if (Date.now() - lastGoodJobsSitemapAt > MAX_STALE_SITEMAP_AGE_MS) {
+        lastGoodJobsSitemap = null;
+        return false;
+      }
       await sendBody(
         req,
         res,
@@ -2859,6 +2870,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       await write(JOBS_SITEMAP_FOOTER);
       res.end();
       lastGoodJobsSitemap = body.join("");
+      lastGoodJobsSitemapAt = Date.now();
     } catch (error) {
       if (error instanceof SitemapStreamAbortedError || controller.signal.aborted) {
         if (!res.writableEnded) res.destroy();
@@ -3395,7 +3407,7 @@ async function handleMarketReportRoute(
       res.end(JSON.stringify({ error: "Informe no encontrado." }));
       return;
     }
-    await sendBody(req, res, 404, { "Content-Type": "text/html; charset=utf-8", Vary: "Accept" }, NOT_FOUND_HTML);
+    await sendBody(req, res, 404, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "private, no-store", Vary: "Accept" }, NOT_FOUND_HTML);
   };
   if (!marketReportsEnabled()) {
     await notFound();
@@ -3457,7 +3469,7 @@ async function handleMarketReportRoute(
       (noindex ? `  <meta name="robots" content="noindex,follow">\n` : "") +
       `  <script>window.__SSR_REPORT__=${escapeJsonForScriptTag({ pathname, content, noindex })};</script>\n</head>`
   );
-  await sendBody(req, res, 200, { "Content-Type": "text/html; charset=utf-8", Vary: "Accept" }, html);
+  await sendBody(req, res, 200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "private, no-store", Vary: "Accept" }, html);
   return true;
 }
 

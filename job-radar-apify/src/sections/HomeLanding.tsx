@@ -445,6 +445,8 @@ function Explore({ country, data }: { country: string; data: HomeData }) {
   const countryConfig = getCountryConfig(country);
   const cities = getHomeCities(country);
   const discovery = getHomeCityDiscovery(country === "VE" ? "VE" : "CO");
+  const empleosIndexPath = country === "VE" ? "/ve/empleos" : "/empleos";
+  const remotePath = buildCategoryPath({ kind: "intencion", label: "Remoto", intent: "remoto", country });
   const remoteCount = formatCount(data.remote);
   const roles = HOME_POPULAR_ROLES;
   // adsense-readiness F4 (SP-6): every block of links says what its figures
@@ -456,7 +458,7 @@ function Explore({ country, data }: { country: string; data: HomeData }) {
 
   return (
     <section className={`sr-host order-6 ${CONTAINER} ${SECTION_Y}`}>
-      <SectionHeader title="Explora ofertas de empleo" className="md:hidden" />
+      <SectionHeader title="Explora ofertas de empleo" link={{ to: empleosIndexPath, label: "Explorar empleos" }} className="md:hidden" />
       <div role="tablist" aria-label="Explorar por" className="sr md:hidden grid grid-cols-2 gap-1 p-1 mb-4 rounded-[14px] border-2 border-foreground bg-white">
         {(["ciudad", "cargo"] as const).map((id) => (
           <button
@@ -473,7 +475,7 @@ function Explore({ country, data }: { country: string; data: HomeData }) {
       </div>
 
       <div className={tab === "ciudad" ? "" : "hidden md:block"}>
-        <SectionHeader title="Ofertas de empleo por ciudad" className="hidden md:flex" />
+        <SectionHeader title="Ofertas de empleo por ciudad" link={{ to: empleosIndexPath, label: "Ver todas las categorías" }} className="hidden md:flex" />
         {cityContext ? <p className={`${T.small} md:text-base mb-4 md:mb-6 max-w-[760px] text-[#3d413e]`}>{cityContext}</p> : null}
         <div className="sr-stagger flex flex-col md:grid md:grid-cols-[repeat(auto-fill,minmax(260px,1fr))] md:gap-3.5 overflow-clip md:overflow-visible rounded-2xl md:rounded-none border-2 md:border-0 border-foreground">
           {cities.map((city, i) => {
@@ -503,11 +505,11 @@ function Explore({ country, data }: { country: string; data: HomeData }) {
             );
           })}
           <Link
-            to={buildCategoryPath({ kind: "ciudad", label: "Remoto", country })}
+            to={remotePath}
             className="sr md:ink-card ink-lift md:col-span-2 flex items-center justify-between gap-3 min-h-[52px] px-4 md:p-6 md:rounded-[20px] bg-white md:bg-foreground md:text-white md:shadow-[4px_4px_0_hsl(var(--gold-2))] no-underline"
           >
             <span>
-              <span className={`${T.small} hidden md:block font-mono text-[#a3a7a2]`}>/empleos/remoto</span>
+              <span className={`${T.small} hidden md:block font-mono text-[#a3a7a2]`}>{remotePath}</span>
               <h3 className={`${T.h3} md:mt-6 md:mb-1 text-foreground md:text-white`}>Trabajo remoto<span className="hidden md:inline"> desde {countryConfig.name}</span></h3>
             </span>
             {remoteCount ? (
@@ -545,6 +547,31 @@ function Explore({ country, data }: { country: string; data: HomeData }) {
           ¿Cómo se reparte el empleo por ciudad, cargo y modalidad?{" "}
           <Link to={MARKET_REPORT_INDEX_PATH} className="font-semibold text-primary underline underline-offset-4">Informe mensual del mercado laboral</Link>
         </p>
+      ) : null}
+      {country === "CO" ? (
+        <nav aria-label="Búsquedas por intención" className="mt-6 md:mt-8 border-t border-border pt-5">
+          <h3 className={T.h3}>Búsquedas frecuentes</h3>
+          <ul className="mt-3 flex flex-wrap gap-x-6 gap-y-2">
+            {(
+              [
+                { intent: "sin-experiencia" as const, label: "Empleo sin experiencia" },
+                { intent: "remoto" as const, label: "Trabajo remoto" },
+                { intent: "medio-tiempo" as const, label: "Trabajo medio tiempo" },
+                { intent: "fines-de-semana" as const, label: "Trabajo fines de semana" },
+                { intent: "temporada" as const, label: "Empleo de temporada" }
+              ] as const
+            ).map((item) => (
+              <li key={item.intent}>
+                <Link
+                  to={buildCategoryPath({ kind: "intencion", label: item.label, intent: item.intent, country })}
+                  className={`${T.body} inline-flex min-h-11 items-center font-semibold text-primary underline underline-offset-4`}
+                >
+                  {item.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </nav>
       ) : null}
       <nav aria-label={discovery.heading} className="mt-6 md:mt-8 border-t border-border pt-5">
         <h3 className={T.h3}>{discovery.heading}</h3>

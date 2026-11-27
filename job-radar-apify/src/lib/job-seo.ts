@@ -548,7 +548,8 @@ const EMPLOYMENT_TYPE_LABEL_TO_SCHEMA: Record<string, string> = {
 export function buildJobPosting(job: SeoJob): Record<string, unknown> | null {
   if (!isGoogleEligiblePage(job)) return null;
   const { location } = resolveGoogleLocation(job);
-  if (!location || !job.publishedAt || !job.company) return null;
+  const company = job.company?.trim();
+  if (!location || !job.publishedAt || !company) return null;
 
   const posting: Record<string, unknown> = {
     "@context": "https://schema.org/",
@@ -558,7 +559,7 @@ export function buildJobPosting(job: SeoJob): Record<string, unknown> | null {
     datePosted: new Date(job.publishedAt).toISOString(),
     hiringOrganization: {
       "@type": "Organization",
-      name: job.company
+      name: company
     }
   };
 
