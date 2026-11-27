@@ -1,0 +1,57 @@
+{
+  "job": {
+    "id": "01811122-c6f6-4625-ab1b-e15411edf5ce",
+    "title": "Auxiliar administrativo contable - Bogotá",
+    "company": "Alz Energy",
+    "location": "Bogotá D.C. Metropolitan Area",
+    "source": "LinkedIn",
+    "sources": [
+      "LinkedIn"
+    ],
+    "publishedAt": "2026-11-14T19:44:04.765Z",
+    "country": "CO",
+    "description": "En Alz Energy, empresa del sector de energía solar, nos encontramos en la búsqueda de un(a) Auxiliar Contable que cuente con conocimientos técnicos en procesos contables, manejo de nómina y herramientas tecnológicas, y que esté interesado(a) en aportar al cumplimiento de los objetivos del área administrativa y financiera.\nBuscamos una persona organizada, responsable, analítica y orientada al detalle, con capacidad para gestionar información de manera eficiente, cumplir con los procedimientos establecidos y utilizar herramientas de inteligencia artificial para optimizar las actividades propias del cargo.\nPerfil\nResponsabilidades\nCompetencias\nBuscamos una persona que se caracterice por su organización, responsabilidad, atención al detalle, pensamiento analítico y capacidad para trabajar en equipo. Es importante contar con habilidades para administrar adecuadamente la información, cumplir los plazos establecidos, mantener la confidencialidad de los datos y proponer alternativas de mejora en los procesos.\nSe valorará especialmente la iniciativa para aprender nuevas herramientas tecnológicas y aplicar soluciones que permitan mejorar la productividad y reducir errores operativos.\nCondiciones de la Oferta\nCargo: Auxiliar Contable.\nEmpresa: Suncol Energy.\nUbicación: Bogotá D. C.\nExperiencia requerida: Mínimo un (1) año.\nNivel académico: Técnico, tecnólogo o profesional en áreas contables, financieras o afines.",
+    "requirements": [
+      "Técnico, tecnólogo o profesional en Contabilidad, Finanzas, Administración o carreras afines.",
+      "Experiencia laboral mínima de un (1) año en funciones contables, administrativas o relacionadas con el cargo.",
+      "Conocimientos en procesos de nómina, novedades de personal y liquidación de conceptos laborales.",
+      "Manejo de herramientas ofimáticas, especialmente Microsoft Excel.",
+      "Conocimientos y experiencia en el uso de herramientas de inteligencia artificial aplicadas a actividades contables y administrativas.",
+      "Capacidad para organizar, revisar y gestionar información financiera y documental.",
+      "Apoyar la ejecución y el seguimiento de los procesos contables y administrativos de la compañía.",
+      "Registrar, organizar y verificar información contable, de acuerdo con los procedimientos internos.",
+      "Apoyar la gestión de facturas, cuentas de cobro, comprobantes y demás documentos relacionados con las operaciones de la empresa.",
+      "Brindar apoyo en la preparación, revisión y consolidación de información para los procesos contables y financieros.",
+      "Apoyar la gestión de nómina, incluyendo la recopilación y revisión de novedades, validación de información y seguimiento de los procesos correspondientes.",
+      "Contribuir a la organización y actualización de los soportes documentales y archivos del área.",
+      "Utilizar herramientas ofimáticas e inteligencia artificial para optimizar tareas, automatizar actividades y mejorar la eficiencia de los procesos.",
+      "Apoyar las demás actividades relacionadas con el cargo que sean requeridas por el área administrativa y financiera.",
+      "Asignación salarial: Entre $1.900.000 a $2.100.000 mensuales, de acuerdo con la formación académica, experiencia y competencias."
+    ],
+    "technologies": [
+      "Conciliación bancaria",
+      "Conciliación de cuentas",
+      "Contabilidad",
+      "Comunicación",
+      "Hablar en público",
+      "Contabilidad tributaria",
+      "Control interno",
+      "Estados financieros",
+      "Cuentas a pagar",
+      "Aptitudes de organización"
+    ],
+    "employmentType": "Tiempo completo",
+    "salaryMin": null,
+    "salaryMax": null,
+    "salaryCurrency": null,
+    "salaryRaw": null,
+    "applicantCount": null,
+    "canonicalUrl": "https://buscotrabajo.co/empleos/01811122-c6f6-4625-ab1b-e15411edf5ce/auxiliar-administrativo-contable-bogota-bogota-d-c-metropolitan-area",
+    "applicationUrl": "https://co.linkedin.com/jobs/view/auxiliar-administrativo-contable-bogot%C3%A1-at-alz-energy-4491097454"
+  },
+  "_snapshot": {
+    "fetchedAt": "2026-11-14",
+    "endpoint": "https://buscotrabajo.co/api/v1/jobs/01811122-c6f6-4625-ab1b-e15411edf5ce",
+    "note": "Copia de datos publicos de una vacante para el prototipo; puede vencer."
+  }
+}
