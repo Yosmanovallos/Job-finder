@@ -1,3 +1,5 @@
+import { jobPostingFromMicrodata } from "./microdata.js";
+import { jobPostingFromPageText } from "./page-text.js";
 import type { AtsRead } from "./ats.js";
 import { jobPostingFromHtml } from "./jsonld.js";
 import { buildSnapshot, cleanExternalText, SNAPSHOT_TEXT_MAX, SNAPSHOT_TITLE_MAX, type JobSnapshot, type SnapshotDraft, type SnapshotVia } from "./job-snapshot.js";
@@ -105,9 +107,16 @@ export async function resolveJobLink(rawUrl: string, deps: ResolverDeps): Promis
   if (page.status === 404 || page.status === 410) return pasteRequired("not_found", sourceUrl, canonicalUrl);
   if (page.status < 200 || page.status >= 300) return pasteRequired("fetch_failed", sourceUrl, canonicalUrl);
   if (LOGIN_PATH.test(new URL(page.finalUrl).pathname)) return pasteRequired("login_wall", sourceUrl, canonicalUrl);
-  const draft = jobPostingFromHtml(page.body);
-  const snapshot = snapshotOf(draft, "jsonld");
+  const snapshot = snapshotOf(jobPostingFromHtml(page.body), "jsonld");
   if (snapshot) return done(snapshot);
+  // R4d: the same schema.org JobPosting written as microdata (SAP SuccessFactors…).
+  const micro = snapshotOf(jobPostingFromMicrodata(page.body), "microdata");
+  if (micro) return done(micro);
+  // R4d: last automatic try, the page's visible text when it clearly reads like a vacancy.
+  if (!CHALLENGE.test(page.body)) {
+    const visible = snapshotOf(jobPostingFromPageText(page.body), "page_text");
+    if (visible) return done(visible);
+  }
   return pasteRequired(CHALLENGE.test(page.body) ? "anti_bot" : "no_structured_data", sourceUrl, canonicalUrl);
 }
 

@@ -16,6 +16,10 @@ import { mockTransport } from "../src/resume-studio/ai/mock.js";
 import { CARD_CHAT, CARD_DRAFT, CARD_HEADLINE, CARD_REWRITE, CARD_SUMMARY, CV_EXTRACT, EVIDENCE_MAP, JOB_REQUIREMENTS } from "../src/resume-studio/ai/prompts.js";
 import { citedIds, extractCvFacts, proposeCard } from "../src/resume-studio/ai/tailor-service.js";
 import { buildResumeDocumentXml } from "../src/resume-studio/docx.js";
+import { jobPostingFromMicrodata } from "../src/resume-studio/job-link/microdata.js";
+import { jobPostingFromPageText } from "../src/resume-studio/job-link/page-text.js";
+import { resolveJobLink } from "../src/resume-studio/job-link/resolve.js";
+import { jobSnapshotSchema } from "../src/resume-studio/job-link/job-snapshot.js";
 
 // AI Resume Studio R4d — the five P0 changes of the report «Adaptación de CV
 // con IA»: missing tools asked one by one, AI buttons that never look dead,
@@ -413,4 +417,78 @@ test("R4D-CITED profile/title drop a cited id that doesn't exist (the text is st
   const strict = gatewayWith(async () => answer("Automated end-to-end regression tests with Playwright and TypeScript for the customer web app.", ["b-invented"]));
   const s = await proposeCard(strict.gateway, ctx, { card: "draft", requirement: "test automation", facts: cv, experienceId: "exp-1" });
   assert.deepEqual(s, { status: "discarded", claims: [], reason: "unknown_fact" });
+});
+
+// ---------- job links: microdata and visible text (owner's Scotiabank link) --------
+
+const LONG = Array.from({ length: 6 }, (_, i) => `<li>Diseñar y ejecutar casos de prueba funcionales del módulo ${i + 1} y reportar defectos.</li>`).join("");
+
+/** Synthetic page shaped like a SAP SuccessFactors career site: JobPosting as microdata, no JSON-LD. */
+const MICRODATA_PAGE = `<!doctype html><html><head><title>QA Funcional Job Details | Banco Ejemplo</title>
+<meta property="og:title" content="QA Funcional"></head><body>
+<nav><a href="/">Inicio</a><a href="/jobs">Empleos</a></nav>
+<div itemscope itemtype="http://schema.org/JobPosting">
+  <span itemprop="jobLocation" itemscope itemtype="http://schema.org/Place"><span itemprop="address" itemscope itemtype="http://schema.org/PostalAddress">
+    <meta itemprop="addressLocality" content="Bogota"><meta itemprop="addressRegion" content="DC"><meta itemprop="addressCountry" content="CO"></span></span>
+  <meta itemprop="datePosted" content="Fri Nov 20 00:00:00 UTC 2026">
+  <meta itemprop="hiringOrganization" content="Banco Ejemplo">
+  <h1><span itemprop="title">QA Funcional</span></h1>
+  <span class="jobdescription" itemprop="description"><p><strong>Propósito</strong></p><div><div><p>Asegurar la calidad de las aplicaciones.</p></div></div>
+    <p><strong>Requisitos</strong></p><ul>${LONG}</ul><p>Experiencia de 2 años en pruebas.</p></span>
+</div>
+<footer>© 2026 Banco Ejemplo</footer></body></html>`;
+
+test("R4D-LINK-MICRODATA a JobPosting written as microdata is read like JSON-LD (only stated fields)", () => {
+  const d = jobPostingFromMicrodata(MICRODATA_PAGE);
+  assert.ok(d);
+  assert.equal(d.title, "QA Funcional");
+  assert.equal(d.company, "Banco Ejemplo");
+  assert.equal(d.location, "Bogota, DC, CO");
+  assert.equal(d.datePosted, "2026-11-20T00:00:00.000Z");
+  assert.match(d.description ?? "", /Asegurar la calidad[\s\S]*Requisitos[\s\S]*módulo 6[\s\S]*2 años/);
+  assert.equal(/Inicio|Empleos|©/.test(d.description ?? ""), false, "only the posting's own description");
+  assert.equal(d.salary, null);
+  assert.equal(jobPostingFromMicrodata("<html><div itemscope itemtype='https://schema.org/Organization'><span itemprop='name'>X</span></div></html>"), null);
+});
+
+const TEXT_PAGE = `<html><head><title>Analista QA - Empresa Demo</title><meta property="og:site_name" content="Empresa Demo"></head><body>
+<header><a>Trabaja con nosotros</a></header><div class="menu"><p>Empleos</p><p>Áreas</p></div>
+<div class="content"><h1>Analista QA</h1><p>En este rol serás responsable de la calidad del producto.</p>
+<h2>Responsabilidades</h2><ul>${LONG}</ul><h2>Requisitos</h2><ul><li>Experiencia de 2 años en pruebas manuales y automatizadas.</li><li>Conocimientos de SQL y Postman.</li></ul></div>
+<footer>© 2026 Empresa Demo · Política de privacidad</footer></body></html>`;
+
+test("R4D-LINK-TEXT a plain-HTML vacancy is read from its visible text; a home page or a cookie wall is not", () => {
+  const d = jobPostingFromPageText(TEXT_PAGE);
+  assert.ok(d);
+  assert.equal(d.title, "Analista QA");
+  assert.equal(d.company, "Empresa Demo");
+  assert.match(d.description ?? "", /^Analista QA\n[\s\S]*Responsabilidades[\s\S]*Postman/);
+  assert.equal(/Trabaja con nosotros|Empleos|©|Política de privacidad/.test(d.description ?? ""), false, "menus before the title and the footer are left out");
+  // Not a vacancy: too short, or no job sections.
+  assert.equal(jobPostingFromPageText("<html><h1>Bienvenido</h1><p>Somos una empresa líder.</p></html>"), null);
+  const home = `<html><h1>Empresa Demo</h1>${"<p>Conoce nuestros productos y servicios para tu hogar y tu negocio en todo el país.</p>".repeat(12)}</html>`;
+  assert.equal(jobPostingFromPageText(home), null);
+  assert.equal(jobPostingFromPageText("<html><h1>Cookies</h1><p>Aceptar</p></html>"), null);
+});
+
+test("R4D-LINK-ORDER JSON-LD → microdata → visible text → paste; an anti-bot page is never read as text", async () => {
+  const serve = (body: string) => ({
+    ourJobDraft: async () => null,
+    findJobIdByUrl: async () => null,
+    findSameJob: async () => null,
+    getCached: async () => null,
+    putCached: async () => {},
+    readAts: async () => ({ kind: "error" as const }),
+    fetchHtml: async (u: string) => ({ status: 200, finalUrl: u, contentType: "text/html", body, redirects: 0 })
+  });
+  const via = async (body: string) => {
+    const r = await resolveJobLink("https://empleos.example/job/qa/123/", serve(body));
+    return r.status === "resolved" ? r.snapshot.via : r.status === "paste_required" ? r.reason : r.status;
+  };
+  assert.equal(await via(MICRODATA_PAGE), "microdata");
+  assert.equal(await via(TEXT_PAGE), "page_text");
+  assert.equal(await via("<html><h1>Vacante</h1></html>"), "no_structured_data");
+  assert.equal(await via(`${TEXT_PAGE}<script src="/cdn-cgi/challenge-platform/x"></script>`), "anti_bot");
+  const ok = await resolveJobLink("https://empleos.example/job/qa/123/", serve(MICRODATA_PAGE));
+  assert.ok(ok.status === "resolved" && jobSnapshotSchema.safeParse(ok.snapshot).success && ok.snapshot.untrusted === true);
 });

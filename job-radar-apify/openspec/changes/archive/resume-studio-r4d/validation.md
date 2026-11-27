@@ -70,3 +70,25 @@ las tarjetas de herramientas.
 - Preguntar el idioma cuando vacante y CV difieren (hoy se informa y se usa el
   del CV).
 - P1/P2 del informe.
+
+## 6. Links de vacantes: microdata y texto visible (2026-11-27)
+
+El propietario pegó un link de Scotiabank (SAP SuccessFactors) y salió «No
+encontramos los datos de la vacante». La página respondía 200 y declaraba la
+vacante como schema.org JobPosting en **microdata** (`itemprop`), no en
+JSON-LD, que era lo único que se leía.
+
+- `job-link/microdata.ts`: lee JobPosting en microdata (título, descripción,
+  empresa, ciudad, fecha), solo lo que la página declara.
+- `job-link/page-text.ts`: último intento automático con el texto visible,
+  solo si se lee como vacante (≥ 2 secciones típicas, 400–20 000 caracteres,
+  sin menús ni pie, empezando en el título). Nunca en páginas anti-bot.
+- Orden: JSON-LD → microdata → texto visible → pegar el texto.
+- Link real de Scotiabank: microdata → título, Scotiabank, «Bogota, DC, CO»,
+  4 789 caracteres de descripción.
+- Sigue pidiendo pegar el texto cuando la página pide login, tiene anti-bot,
+  `robots.txt` lo prohíbe o se arma solo con JavaScript (no hay texto que leer
+  con una descarga simple).
+- Pruebas: `R4D-LINK-MICRODATA`, `R4D-LINK-TEXT`, `R4D-LINK-ORDER`. Gates:
+  tsc 0; build con hash CSS sin cambios; unit 743/0; resume-studio 53 ✅ 0 ❌
+  (+130 unitarias); integration 286 ✅ 0 ❌.
